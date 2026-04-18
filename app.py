@@ -37,7 +37,7 @@ ensure_data_dirs()
 
 st.set_page_config(
     page_title="VidMirror — AI 视频创作工作台",
-    page_icon="🎬",
+    page_icon="assets/logo.svg",
     layout="wide",
 )
 
