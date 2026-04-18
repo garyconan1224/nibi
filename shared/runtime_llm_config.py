@@ -16,7 +16,7 @@ from shared.config import (
     VISION_MODEL_DEFAULT,
 )
 from shared.settings_store import AppSettings, load_settings
-from src.video_pipeline_studio.core.providers.registry import create_default_registry
+from src.vidmirror.core.providers.registry import create_default_registry
 
 Capability = Literal["chat", "vision", "embedding", "rerank"]
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Sequence
 
-from src.video_pipeline_studio.core.providers.types import ChatRequest
+from src.vidmirror.core.providers.types import ChatRequest
 
 
 class BaseProvider(ABC):

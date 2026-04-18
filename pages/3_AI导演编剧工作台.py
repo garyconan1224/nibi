@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 import streamlit as st
-from src.video_pipeline_studio.ui.session_keys import (
+from src.vidmirror.ui.session_keys import (
     CREATOR_KNOWLEDGE_KEY,
     CREATOR_PLAN_A_KEY,
     CREATOR_PLAN_B_KEY,

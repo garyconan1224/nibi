@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from shared.settings_store import load_settings
-from src.video_pipeline_studio.core.providers.registry import create_default_registry
+from src.vidmirror.core.providers.registry import create_default_registry
 
 router = APIRouter(prefix="/providers", tags=["providers"])
 

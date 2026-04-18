@@ -1,5 +1,5 @@
 from shared.settings_store import AppSettings, ProviderProfile
-from src.video_pipeline_studio.core.providers.registry import create_default_registry
+from src.vidmirror.core.providers.registry import create_default_registry
 
 
 def test_registry_resolves_default_chat_provider() -> None:

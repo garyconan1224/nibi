@@ -13,7 +13,7 @@ from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import streamlit as st
-from src.video_pipeline_studio.ui.session_keys import (
+from src.vidmirror.ui.session_keys import (
     DOWNLOAD_BACKEND_TASK_IDS_KEY,
     DOWNLOAD_TASKS_BY_PROJECT_KEY,
 )

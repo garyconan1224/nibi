@@ -20,7 +20,7 @@
 
 ## 2) 注册到 Registry
 
-编辑 `src/video_pipeline_studio/core/providers/registry.py`：
+编辑 `src/vidmirror/core/providers/registry.py`：
 
 1. 在 `create_default_registry()` 添加 `registry.register(...)`
 2. `provider_kind` 与 settings 中的 profile.kind 保持一致

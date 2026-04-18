@@ -7,8 +7,8 @@ from dataclasses import asdict
 from typing import Any
 
 import streamlit as st
-from src.video_pipeline_studio.core.providers.registry import create_default_registry
-from src.video_pipeline_studio.ui.session_keys import SET_SETTINGS_LOADED_KEY
+from src.vidmirror.core.providers.registry import create_default_registry
+from src.vidmirror.ui.session_keys import SET_SETTINGS_LOADED_KEY
 
 from shared.config import ANTHROPIC_TEXT_MODEL_CHOICES, TEXT_BACKEND_ANTHROPIC, TEXT_BACKEND_OPENAI_COMPAT
 from shared.settings_store import AppSettings, ProviderProfile, clear_settings, load_settings, save_settings
