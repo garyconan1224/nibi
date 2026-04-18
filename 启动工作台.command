@@ -1,11 +1,11 @@
 #!/bin/bash
-# Video Pipeline Studio — AI 视频创作全流程工作台 启动脚本
+# VidMirror — AI 视频创作工作台 启动脚本
 # 双击此文件即可在 macOS 上启动
 
 cd "$(dirname "$0")"
 
 echo "=================================="
-echo "  Video Pipeline Studio AI 视频创作全流程工作台"
+echo "  VidMirror — AI 视频创作工作台"
 echo "=================================="
 
 # macOS 双击 .command 时 PATH 较小，主动补齐常见 Python 与 Homebrew 安装位置

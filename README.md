@@ -1,12 +1,12 @@
-# Video Pipeline Studio
+# VidMirror — AI 视频创作工作台
 
 [![QA E2E](https://github.com/<OWNER>/<REPO>/actions/workflows/qa-e2e.yml/badge.svg)](https://github.com/<OWNER>/<REPO>/actions/workflows/qa-e2e.yml)
 [![Lint](https://github.com/<OWNER>/<REPO>/actions/workflows/lint.yml/badge.svg)](https://github.com/<OWNER>/<REPO>/actions/workflows/lint.yml)
 [![Backend Tests](https://github.com/<OWNER>/<REPO>/actions/workflows/backend-tests.yml/badge.svg)](https://github.com/<OWNER>/<REPO>/actions/workflows/backend-tests.yml)
 
-统一的视频下载 -> 分析 -> 创作工作台（Streamlit 多页面）。
+统一的视频下载 → 分析 → 创作工作台（Streamlit 多页面）。
 
-该项目原代号已移除，当前统一名称为 **Video Pipeline Studio**。
+**VidMirror** 是一个一体化的 AI 视频创作平台，集成了视频下载、智能分析、多模态理解与自动化脚本生成。
 
 ## Bilibili 下载排障（常见）
 
