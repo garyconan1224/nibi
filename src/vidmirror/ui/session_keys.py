@@ -26,3 +26,9 @@ CREATOR_PLAN_B_KEY = "creator_plan_b"
 CREATOR_PLAN_C_KEY = "creator_plan_c"
 CREATOR_PROJECT_NAME_KEY = "creator_project_name"
 CREATOR_STORYBOARD_TASK_BY_PROJECT_KEY = "creator_storyboard_task_by_project"
+
+# Phase 2 单页应用式工作台（app.py 驱动的全局状态）
+VIEW_KEY = "view"
+CURRENT_PROJECT_ID_KEY = "current_project_id"
+TASKS_CACHE_KEY = "tasks_cache"
+SELECTED_TASK_ID_KEY = "selected_task_id"
