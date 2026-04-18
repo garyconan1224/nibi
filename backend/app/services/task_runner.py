@@ -7,7 +7,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict
 
-from backend.app.models.tasks import TaskRecord
+from backend.app.models.tasks import TERMINAL_STATUS_VALUES, TaskRecord, TaskStatus
 from backend.app.services.task_store import TaskStore
 
 TaskHandler = Callable[[TaskRecord, "TaskRunner"], Dict[str, Any]]
@@ -34,7 +34,8 @@ class TaskRunner:
         for rec in self.store.list_all():
             if rec.project_id != project_id or rec.task_type != task_type:
                 continue
-            if rec.status not in ("queued", "running"):
+            # 非终结态（含 PENDING 与各运行阶段）均视为活跃
+            if rec.status in TERMINAL_STATUS_VALUES:
                 continue
             existing_url = str(rec.payload.get("url") or "").strip().lower()
             if existing_url == new_url:
@@ -67,23 +68,25 @@ class TaskRunner:
             return
         handler = self._handlers.get(record.task_type)
         if handler is None:
-            self.store.update(task_id, status="failed", error=f"unsupported task_type: {record.task_type}")
+            self.store.update(task_id, status=TaskStatus.FAILED.value, error=f"unsupported task_type: {record.task_type}")
             self.store.append_log(task_id, f"Unsupported task type: {record.task_type}", level="error")
             return
 
-        self.store.update(task_id, status="running", progress=0.01)
+        # "running" 不在新 Enum 内；沿用 LEGACY_MAP 将其规范化为 DOWNLOADING
+        # （pipeline 主链路起点为下载阶段，语义对齐）。
+        self.store.update(task_id, status=TaskStatus.DOWNLOADING.value, progress=0.01)
         self.store.append_log(task_id, "Task started")
         try:
             result = handler(record, self)
             current = self.store.get(task_id)
             if current and current.cancel_requested:
-                self.store.update(task_id, status="cancelled", progress=1.0, result=result)
+                self.store.update(task_id, status=TaskStatus.CANCELLED.value, progress=1.0, result=result)
                 self.store.append_log(task_id, "Task cancelled by request", level="warning")
                 return
-            self.store.update(task_id, status="succeeded", progress=1.0, result=result, error="")
+            self.store.update(task_id, status=TaskStatus.SUCCESS.value, progress=1.0, result=result, error="")
             self.store.append_log(task_id, "Task succeeded")
         except Exception as err:  # noqa: BLE001
-            self.store.update(task_id, status="failed", error=str(err))
+            self.store.update(task_id, status=TaskStatus.FAILED.value, error=str(err))
             self.store.append_log(task_id, f"Task failed: {err}", level="error")
 
     def set_progress(self, task_id: str, progress: float, message: str | None = None) -> None:
@@ -102,8 +105,9 @@ class TaskRunner:
     def cancel_task(self, task_id: str) -> TaskRecord:
         rec = self.store.update(task_id, cancel_requested=True)
         self.store.append_log(task_id, "Cancel requested", level="warning")
-        if rec.status in ("queued", "running"):
-            rec = self.store.update(task_id, status="cancelled")
+        # 非终结态一律可取消（覆盖 PENDING 及各运行阶段）
+        if rec.status not in TERMINAL_STATUS_VALUES:
+            rec = self.store.update(task_id, status=TaskStatus.CANCELLED.value)
         return rec
 
     def retry_task(self, task_id: str) -> TaskRecord:
