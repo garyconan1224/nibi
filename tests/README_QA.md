@@ -45,7 +45,7 @@ python3 tests/e2e_qa.py
 执行后会打印类似：
 
 ```text
-=== Video Pipeline Studio QA 验收报告 ===
+=== VidMirror QA 验收报告 ===
 [PASS] #01 ...
 ...
 通过 12/12  失败 0/12

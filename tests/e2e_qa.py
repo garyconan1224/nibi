@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Video Pipeline Studio 端到端 QA 验收脚本（离线可运行）。
+VidMirror 端到端 QA 验收脚本（离线可运行）。
 
 检查项（12）：
 1. app.py 语法

@@ -1,8 +1,8 @@
 """
-Video Pipeline Studio Python package (phase-2 migration scaffold).
+VidMirror Python package (core modules scaffold).
 
-This package is introduced to migrate from legacy flat `shared/` modules
-to a github-ready, English-named project structure.
+This package provides the core functionality for VidMirror,
+transitioning from legacy flat `shared/` modules to a structured architecture.
 """
 
 __all__ = ["__version__"]
