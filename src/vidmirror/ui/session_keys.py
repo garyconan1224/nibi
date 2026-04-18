@@ -32,3 +32,6 @@ VIEW_KEY = "view"
 CURRENT_PROJECT_ID_KEY = "current_project_id"
 TASKS_CACHE_KEY = "tasks_cache"
 SELECTED_TASK_ID_KEY = "selected_task_id"
+
+# 设置页菜单
+SETTINGS_MENU_KEY = "settings_menu"  # 当前选中的设置菜单项
