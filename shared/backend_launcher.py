@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import time
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
@@ -86,7 +87,17 @@ def _can_import_uvicorn(executable: str) -> bool:
 
 
 def _select_python_for_backend() -> tuple[str, str, bool]:
-    preferred = (os.environ.get("VPS_BACKEND_PYTHON") or "").strip()
+    # TODO(VidMirror v0.3): remove VPS_BACKEND_PYTHON fallback
+    preferred = (os.environ.get("VIDMIRROR_BACKEND_PYTHON") or "").strip()
+    if not preferred:
+        preferred = (os.environ.get("VPS_BACKEND_PYTHON") or "").strip()
+        if preferred:
+            warnings.warn(
+                "VPS_BACKEND_PYTHON is deprecated and will be removed in v0.3. "
+                "Please use VIDMIRROR_BACKEND_PYTHON instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
     candidates_raw = [preferred, sys.executable, "python3.12", "python3.11", "python3.10", "python3"]
     candidates: list[str] = []
     for item in candidates_raw:
@@ -185,7 +196,7 @@ def start_backend_once(base_url: str | None = None, *, wait_timeout_sec: float =
             message=(
                 f"自动启动失败：当前解释器 `{py_exec}` (Python {py_ver}) 不兼容后端。"
                 f"\n{hint}\n"
-                "可选：设置环境变量 `VPS_BACKEND_PYTHON` 指向可用解释器后重试。"
+                "可选：设置环境变量 `VIDMIRROR_BACKEND_PYTHON` 指向可用解释器后重试。"
             ),
         )
     if not has_uvicorn:

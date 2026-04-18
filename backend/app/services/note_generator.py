@@ -1,7 +1,7 @@
 """
 NoteGenerator 笔记生成主流水线
 
-复刻BiliNote的核心逻辑，整合nibi现有能力：
+借鉴 BiliNote 的核心逻辑，整合 VidMirror 既有能力：
 1. 下载器选择（优先无Cookie方案）
 2. 字幕优先策略（避免音频下载+ASR）
 3. GPT分片处理（长视频转写文本）

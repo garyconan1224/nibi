@@ -1,4 +1,4 @@
-# Video Pipeline Studio — AI 视频创作全流程工作台
+# VidMirror — AI 视频创作工作台
 # 整合自：AI 导演编剧工作台、video-analyzer-new、YouTubeDownloader
 #
 # 安装：pip install -r requirements.txt

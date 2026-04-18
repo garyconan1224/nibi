@@ -10,7 +10,7 @@ from backend.app.routes.rag import router as rag_router
 from backend.app.routes.transcript import router as transcript_router
 from backend.app.routes.notes import router as notes_router
 
-app = FastAPI(title="Video Pipeline Studio API", version="0.2.0")
+app = FastAPI(title="VidMirror API", version="0.2.0")
 app.include_router(providers_router)
 app.include_router(pipeline_router)
 app.include_router(transcript_router)

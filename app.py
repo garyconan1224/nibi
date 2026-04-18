@@ -1,5 +1,5 @@
 """
-Video Pipeline Studio — AI 视频创作全流程工作台
+VidMirror — AI 视频创作工作台
 多页面 Streamlit 应用入口。
 
 本地配置：复制 .env.example 为 .env 并填写密钥（勿提交 .env）。
@@ -18,12 +18,12 @@ from shared.config import ensure_data_dirs
 ensure_data_dirs()
 
 st.set_page_config(
-    page_title="视频流水线工作台 — AI 视频创作",
+    page_title="VidMirror — AI 视频创作工作台",
     page_icon="🎬",
     layout="wide",
 )
 
-st.title("🎬 视频流水线工作台 — AI 视频创作全流程")
+st.title("🎬 VidMirror — AI 视频创作工作台")
 st.markdown(
     """
     欢迎使用本工作台。功能形成完整的「下载 → 分析 → 创作」流水线。

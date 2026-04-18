@@ -1,11 +1,11 @@
 #!/bin/bash
-# Video Pipeline Studio — AI 视频创作全流程工作台 启动脚本
+# VidMirror — AI 视频创作工作台 启动脚本
 # 双击此文件即可在 macOS 上启动
 
 cd "$(dirname "$0")"
 
 echo "=================================="
-echo "  Video Pipeline Studio AI 视频创作全流程工作台"
+echo "  VidMirror — AI 视频创作工作台"
 echo "=================================="
 
 # macOS 双击 .command 时 PATH 较小，主动补齐常见 Python 与 Homebrew 安装位置
@@ -13,8 +13,10 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:/Library/Frameworks/Python.framewo
 
 # 选择一个 >=3.10 的 Python 解释器，优先更高版本
 select_python() {
+    # TODO(VidMirror v0.3): remove VPS_BACKEND_PYTHON fallback
+    local preferred="${VIDMIRROR_BACKEND_PYTHON:-${VPS_BACKEND_PYTHON}}"
     local candidates=(
-        "$VPS_BACKEND_PYTHON"
+        "$preferred"
         "python3.12"
         "python3.11"
         "python3.10"
@@ -61,7 +63,7 @@ fi
 echo "使用 Python 解释器: $PYBIN ($("$PYBIN" --version 2>&1))"
 
 # 让后端启动器（backend_launcher）使用同一解释器，避免再次挑选时走到 3.8
-export VPS_BACKEND_PYTHON="$PYBIN"
+export VIDMIRROR_BACKEND_PYTHON="$PYBIN"
 
 # 检查并安装依赖（streamlit 前端 + uvicorn/fastapi 后端）
 if ! "$PYBIN" -c "import streamlit, uvicorn, fastapi, pydantic" 2>/dev/null; then

@@ -3,7 +3,7 @@
 测试B站无Cookie下载器
 
 运行方式：
-cd /Users/conan/Desktop/nibi
+cd <project-root>
 python backend/app/downloaders/test_bilibili_nocookie.py
 """
 

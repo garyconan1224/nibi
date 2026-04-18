@@ -1,12 +1,12 @@
-# Video Pipeline Studio
+# VidMirror — AI 视频创作工作台
 
 [![QA E2E](https://github.com/<OWNER>/<REPO>/actions/workflows/qa-e2e.yml/badge.svg)](https://github.com/<OWNER>/<REPO>/actions/workflows/qa-e2e.yml)
 [![Lint](https://github.com/<OWNER>/<REPO>/actions/workflows/lint.yml/badge.svg)](https://github.com/<OWNER>/<REPO>/actions/workflows/lint.yml)
 [![Backend Tests](https://github.com/<OWNER>/<REPO>/actions/workflows/backend-tests.yml/badge.svg)](https://github.com/<OWNER>/<REPO>/actions/workflows/backend-tests.yml)
 
-统一的视频下载 -> 分析 -> 创作工作台（Streamlit 多页面）。
+统一的视频下载 → 分析 → 创作工作台（Streamlit 多页面）。
 
-该项目原代号已移除，当前统一名称为 **Video Pipeline Studio**。
+**VidMirror** 是一个一体化的 AI 视频创作平台，集成了视频下载、智能分析、多模态理解与自动化脚本生成。
 
 ## Bilibili 下载排障（常见）
 
@@ -28,7 +28,7 @@ uvicorn backend.app.main:app --host 127.0.0.1 --port 8010
 streamlit run app.py
 ```
 
-可选环境变量：`VPS_BACKEND_URL` / `BACKEND_URL`（默认 `http://127.0.0.1:8010`，与后端端口一致即可）。
+可选环境变量：`VIDMIRROR_BACKEND_URL` / `BACKEND_URL`（默认 `http://127.0.0.1:8010`，与后端端口一致即可）。旧变量 `VPS_BACKEND_URL` 仍兼容但已废弃。
 
 任务日志流式接口（便于调试或外部脚本订阅）：
 

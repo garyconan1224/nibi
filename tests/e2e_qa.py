@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Video Pipeline Studio 端到端 QA 验收脚本（离线可运行）。
+VidMirror 端到端 QA 验收脚本（离线可运行）。
 
 检查项（12）：
 1. app.py 语法
@@ -316,7 +316,7 @@ def main() -> int:
         ("api_key_resolver 优先级", check_12_api_resolver_priority),
     ]
 
-    print("=== Video Pipeline Studio QA 验收报告 ===")
+    print("=== VidMirror QA 验收报告 ===")
     with setup_tmp_env():
         for i, (name, fn) in enumerate(checks, start=1):
             res = run_check(i, name, fn)
