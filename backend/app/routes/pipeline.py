@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse
 
+from backend.app.models.tasks import TERMINAL_STATUS_VALUES, TaskStatus
 from backend.app.services.pipeline_tasks import register_pipeline_handlers
 from backend.app.services.task_runner import TaskRunner
 from backend.app.services.task_store import TaskStore
@@ -20,7 +21,7 @@ _store = TaskStore()
 _runner = TaskRunner(_store)
 register_pipeline_handlers(_runner)
 
-_TERMINAL_STATUSES = frozenset({"succeeded", "failed", "cancelled"})
+_TERMINAL_STATUSES = TERMINAL_STATUS_VALUES
 
 
 class TaskCreateRequest(BaseModel):
@@ -55,7 +56,7 @@ def purge_tasks(project_id: str | None = None) -> dict[str, Any]:
         all_recs = [r for r in all_recs if r.project_id == project_id]
     removed: list[str] = []
     for rec in all_recs:
-        if rec.status != "failed":
+        if rec.status != TaskStatus.FAILED.value:
             continue
         err_msg = str(rec.error or "")
         if "append_log" in err_msg:
