@@ -1,6 +1,6 @@
 # 启用指南（本地）
 
-本文用于快速启用 `Video Pipeline Studio` 的任务驱动模式（下载 / 分析 / 自动分镜）。
+本文用于快速启用 `VidMirror` 的任务驱动模式（下载 / 分析 / 自动分镜）。
 
 ## 0. 前置条件
 
@@ -22,7 +22,7 @@ cp .env.example .env
 
 按需编辑 `.env`：
 
-- `VPS_BACKEND_URL` 或 `BACKEND_URL`（默认 `http://127.0.0.1:8010`）
+- `VIDMIRROR_BACKEND_URL` 或 `BACKEND_URL`（默认 `http://127.0.0.1:8010`）；`VPS_BACKEND_URL` 已废弃但仍兼容至 v0.3
 - 各 Provider 的 API Key（建议在设置页补齐）
 - ASR 相关（如 `GROQ_API_KEY`，仅在 Groq 回退时需要）
 
@@ -77,7 +77,7 @@ streamlit run app.py
 ### 后端不可达
 
 - 确认终端 1 的 uvicorn 正在运行
-- 确认端口与 `VPS_BACKEND_URL/BACKEND_URL` 一致
+- 确认端口与 `VIDMIRROR_BACKEND_URL` / `BACKEND_URL` 一致
 - 你也可以在下载页/分析页/创作页点击 `手动一键启动后端` 按钮自动拉起服务
 
 ### preflight 报 provider 缺少 api_key

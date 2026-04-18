@@ -1,10 +1,10 @@
 # Add a New API Provider
 
-本指南用于在 Video Pipeline Studio 中接入新的大模型 API 提供方。
+本指南用于在 VidMirror 中接入新的大模型 API 提供方。
 
 ## 1) 实现 Provider 适配器
 
-在 `src/video_pipeline_studio/core/providers/` 新建实现类，继承 `BaseProvider`：
+在 `src/vidmirror/core/providers/` 新建实现类，继承 `BaseProvider`：
 
 - 必选：
   - `test_connection()`

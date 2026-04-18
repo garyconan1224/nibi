@@ -316,7 +316,7 @@ def main() -> int:
         ("api_key_resolver 优先级", check_12_api_resolver_priority),
     ]
 
-    print("=== Video Pipeline Studio QA 验收报告 ===")
+    print("=== VidMirror QA 验收报告 ===")
     with setup_tmp_env():
         for i, (name, fn) in enumerate(checks, start=1):
             res = run_check(i, name, fn)
