@@ -76,6 +76,28 @@ def purge_pipeline_tasks(*, project_id: str | None = None, base_url: str | None 
     return r.json()
 
 
+def get_recent_tasks(
+    limit: int = 10,
+    *,
+    base_url: str | None = None,
+    timeout_sec: float = 5.0,
+) -> list[dict[str, Any]]:
+    """拉取最近任务列表（GET /pipeline/tasks?limit={limit}）。
+
+    返回任务字典列表；后端不可达或返回格式异常时抛出异常，由调用方决定如何处理。
+    """
+    base = (base_url or get_backend_base_url()).rstrip("/")
+    r = requests.get(f"{base}/pipeline/tasks", params={"limit": limit}, timeout=timeout_sec)
+    r.raise_for_status()
+    result = r.json()
+    # 兼容后端返回纯列表或 {"tasks": [...]} / {"items": [...]} 两种格式
+    if isinstance(result, list):
+        return result
+    if isinstance(result, dict):
+        return result.get("tasks", result.get("items", []))
+    return []
+
+
 def iter_task_sse_events(
     task_id: str,
     *,
