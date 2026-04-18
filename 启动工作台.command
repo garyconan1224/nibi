@@ -13,8 +13,10 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:/Library/Frameworks/Python.framewo
 
 # 选择一个 >=3.10 的 Python 解释器，优先更高版本
 select_python() {
+    # TODO(VidMirror v0.3): remove VPS_BACKEND_PYTHON fallback
+    local preferred="${VIDMIRROR_BACKEND_PYTHON:-${VPS_BACKEND_PYTHON}}"
     local candidates=(
-        "$VPS_BACKEND_PYTHON"
+        "$preferred"
         "python3.12"
         "python3.11"
         "python3.10"
@@ -61,7 +63,7 @@ fi
 echo "使用 Python 解释器: $PYBIN ($("$PYBIN" --version 2>&1))"
 
 # 让后端启动器（backend_launcher）使用同一解释器，避免再次挑选时走到 3.8
-export VPS_BACKEND_PYTHON="$PYBIN"
+export VIDMIRROR_BACKEND_PYTHON="$PYBIN"
 
 # 检查并安装依赖（streamlit 前端 + uvicorn/fastapi 后端）
 if ! "$PYBIN" -c "import streamlit, uvicorn, fastapi, pydantic" 2>/dev/null; then
