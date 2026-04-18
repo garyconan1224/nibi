@@ -128,8 +128,10 @@ def _render_visual_json_result(jf: Path) -> None:
                 )
             st.markdown("**关键帧表（摘要）**")
             st.dataframe(rows, use_container_width=True, hide_index=True)
-        with st.expander("查看完整 JSON", expanded=False):
-            st.json(data)
+        # 注意：此函数在外层 st.expander 内被调用，Streamlit 不允许 expander 嵌套，
+        # 因此改为直接展示完整 JSON，而不再使用内嵌 st.expander。
+        st.markdown("**完整 JSON**")
+        st.code(json.dumps(data, ensure_ascii=False, indent=2), language="json")
 
 
 def _init_state() -> None:
