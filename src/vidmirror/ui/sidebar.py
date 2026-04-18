@@ -8,9 +8,11 @@
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from typing import Callable
 
 import streamlit as st
+
+from shared.backend_client import get_recent_tasks
 
 # 导航视图常量（与 session_keys.VIEW_KEY 取值对齐）
 NAV_VIEW_DOWNLOAD = "download"
@@ -132,40 +134,46 @@ def render_nav_tabs(
 
 
 def render_history_panel(
-    tasks: list[dict],
     on_select: Callable[[str], None],
-    refresh_callback: Optional[Callable[[], list[dict]]] = None,
 ) -> None:
-    """渲染历史任务面板。
+    """渲染历史任务面板（Phase 2.4：每 3 秒自动轮询后端）。
 
-    tasks 每项需包含 "id"、"title"、"status"；可选 "time"。
-    refresh_callback：预留给 Phase 2.4 的轮询钩子，当前不调用。
+    on_select：点击「查看详情」时的回调，接收 task_id 字符串。
+    后端不可达时静默降级，仅显示「暂无任务记录」。
     """
     st.markdown("**最近任务**")
 
-    # 预留轮询接口（本步不实现，仅保留参数位）
-    _ = refresh_callback  # noqa: F841
+    @st.fragment(run_every="3s")
+    def _poll_and_render() -> None:
+        """片段函数：每 3 秒独立重跑，拉取并渲染最新任务列表。"""
+        try:
+            tasks = get_recent_tasks(limit=10)
+        except Exception:
+            # 后端不可达或返回异常 → 静默降级
+            tasks = []
 
-    if not tasks:
-        st.caption("暂无任务记录")
-        return
+        if not tasks:
+            st.caption("暂无任务记录")
+            return
 
-    for task in tasks[:10]:
-        task_id = str(task.get("id", ""))
-        title = str(task.get("title", "(无标题)"))
-        status = str(task.get("status", ""))
-        time_str = str(task.get("time", ""))
-        badge = _STATUS_BADGES.get(status.lower(), f"• {status}" if status else "")
+        for task in tasks[:10]:
+            task_id = str(task.get("id", ""))
+            title = str(task.get("title", "(无标题)"))
+            status = str(task.get("status", ""))
+            time_str = str(task.get("time", ""))
+            badge = _STATUS_BADGES.get(status.lower(), f"• {status}" if status else "")
 
-        with st.container(border=True):
-            st.markdown(f"**{title}**")
-            meta_parts = [p for p in (badge, time_str) if p]
-            if meta_parts:
-                st.caption("　".join(meta_parts))
-            if st.button(
-                "查看详情",
-                key=f"_sidebar_task_btn_{task_id}",
-                use_container_width=True,
-            ):
-                on_select(task_id)
+            with st.container(border=True):
+                st.markdown(f"**{title}**")
+                meta_parts = [p for p in (badge, time_str) if p]
+                if meta_parts:
+                    st.caption("　".join(meta_parts))
+                if st.button(
+                    "查看详情",
+                    key=f"_sidebar_task_btn_{task_id}",
+                    use_container_width=True,
+                ):
+                    on_select(task_id)
+
+    _poll_and_render()
 

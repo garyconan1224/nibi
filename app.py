@@ -84,7 +84,7 @@ with st.sidebar:
         on_create=_on_project_create,
     )
     render_nav_tabs(st.session_state[VIEW_KEY], _on_view_change)
-    render_history_panel(st.session_state[TASKS_CACHE_KEY], _on_task_select)
+    render_history_panel(_on_task_select)
     st.divider()
     st.page_link("pages/0_系统设置.py", label="⚙️ 系统设置")
 
