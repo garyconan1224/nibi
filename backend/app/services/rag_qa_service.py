@@ -11,8 +11,8 @@ from shared.knowledge_base import (
     retrieve_with_sources,
 )
 from shared.settings_store import load_settings
-from src.video_pipeline_studio.core.providers import ChatRequest
-from src.video_pipeline_studio.core.providers.registry import create_default_registry
+from src.vidmirror.core.providers import ChatRequest
+from src.vidmirror.core.providers.registry import create_default_registry
 
 
 def ask_with_sources(

@@ -5,8 +5,8 @@ from __future__ import annotations
 import os
 
 from shared.providers.anthropic_client import AnthropicError, messages_completion
-from src.video_pipeline_studio.core.providers.base import BaseProvider
-from src.video_pipeline_studio.core.providers.types import ChatRequest, ProviderRequestError
+from src.vidmirror.core.providers.base import BaseProvider
+from src.vidmirror.core.providers.types import ChatRequest, ProviderRequestError
 
 
 class AnthropicProvider(BaseProvider):

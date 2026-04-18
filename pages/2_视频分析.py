@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import streamlit as st
-from src.video_pipeline_studio.ui.session_keys import ANALYZE_BACKEND_TASK_BY_PROJECT_KEY
+from src.vidmirror.ui.session_keys import ANALYZE_BACKEND_TASK_BY_PROJECT_KEY
 
 ANALYSIS_EXPAND_FIRST_JSON_KEY = "_analysis_expand_first_json_basename"
 

@@ -1,8 +1,8 @@
 """Provider protocol, implementations, and registry."""
 
-from src.video_pipeline_studio.core.providers.base import BaseProvider
-from src.video_pipeline_studio.core.providers.registry import ProviderRegistry, create_default_registry
-from src.video_pipeline_studio.core.providers.types import (
+from src.vidmirror.core.providers.base import BaseProvider
+from src.vidmirror.core.providers.registry import ProviderRegistry, create_default_registry
+from src.vidmirror.core.providers.types import (
     ChatRequest,
     ProviderError,
     ProviderRequestError,

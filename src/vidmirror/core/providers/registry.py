@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from typing import Callable
 
 from shared.settings_store import AppSettings, ProviderProfile
-from src.video_pipeline_studio.core.providers.anthropic_provider import AnthropicProvider
-from src.video_pipeline_studio.core.providers.base import BaseProvider
-from src.video_pipeline_studio.core.providers.openai_compat_provider import OpenAICompatProvider
-from src.video_pipeline_studio.core.providers.types import ProviderRequestError
+from src.vidmirror.core.providers.anthropic_provider import AnthropicProvider
+from src.vidmirror.core.providers.base import BaseProvider
+from src.vidmirror.core.providers.openai_compat_provider import OpenAICompatProvider
+from src.vidmirror.core.providers.types import ProviderRequestError
 
 ProviderFactory = Callable[[ProviderProfile], BaseProvider]
 

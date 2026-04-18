@@ -12,8 +12,8 @@ from shared.sf_client import (
     get_model_ids,
     rerank_documents,
 )
-from src.video_pipeline_studio.core.providers.base import BaseProvider
-from src.video_pipeline_studio.core.providers.types import ChatRequest, ProviderRequestError
+from src.vidmirror.core.providers.base import BaseProvider
+from src.vidmirror.core.providers.types import ChatRequest, ProviderRequestError
 
 
 class OpenAICompatProvider(BaseProvider):

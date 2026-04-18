@@ -53,7 +53,7 @@ python3 tests/e2e_qa.py
 
 ## Phase-2 重构状态
 
-- 已引入英文结构骨架：`src/video_pipeline_studio/`
+- 已引入英文结构骨架：`src/vidmirror/`
 - 当前运行逻辑保持兼容，详见：`docs/PHASE2_RESTRUCTURE.md`
 - 历史来源目录说明：`1/legacy/README.md`
 

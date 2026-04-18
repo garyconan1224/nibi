@@ -27,8 +27,8 @@ from shared.knowledge_base import (
 )
 from shared.settings_store import AppSettings, ProviderProfile, load_settings
 from shared.sf_client import SiliconFlowError, analyze_product_images
-from src.video_pipeline_studio.core.providers import ChatRequest
-from src.video_pipeline_studio.core.providers.registry import create_default_registry
+from src.vidmirror.core.providers import ChatRequest
+from src.vidmirror.core.providers.registry import create_default_registry
 
 
 def resolve_chat_profile_for_storyboard(
