@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import os
 import json
-import warnings
 from pathlib import Path
 
 from shared.dotenv_loader import load_dotenv_if_present
@@ -219,24 +218,11 @@ TEXT_MODEL_CHOICES: tuple[str, ...] = (
 def get_backend_base_url() -> str:
     """Streamlit 与本地脚本请求后端时的根 URL（无尾部斜杠）。
 
-    优先级：VIDMIRROR_BACKEND_URL > VPS_BACKEND_URL > BACKEND_URL > 默认 http://127.0.0.1:8010
-
-    注意：VPS_BACKEND_URL 已废弃，将在 v0.3 移除。使用 VIDMIRROR_BACKEND_URL 替代。
+    优先级：VIDMIRROR_BACKEND_URL > BACKEND_URL > 默认 http://127.0.0.1:8010
     """
     # 优先新变量名
     raw = (os.environ.get("VIDMIRROR_BACKEND_URL") or "").strip()
     if raw:
-        return raw.rstrip("/")
-
-    # 兼容旧变量名，发出 deprecation 警告
-    raw = (os.environ.get("VPS_BACKEND_URL") or "").strip()
-    if raw:
-        warnings.warn(
-            "VPS_BACKEND_URL is deprecated and will be removed in v0.3. "
-            "Please use VIDMIRROR_BACKEND_URL instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
         return raw.rstrip("/")
 
     # 最后尝试通用变量

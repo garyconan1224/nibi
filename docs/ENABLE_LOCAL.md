@@ -22,7 +22,7 @@ cp .env.example .env
 
 按需编辑 `.env`：
 
-- `VIDMIRROR_BACKEND_URL` 或 `BACKEND_URL`（默认 `http://127.0.0.1:8010`）；`VPS_BACKEND_URL` 已废弃但仍兼容至 v0.3
+- `VIDMIRROR_BACKEND_URL` 或 `BACKEND_URL`（默认 `http://127.0.0.1:8010`）；自 v0.3 起仅支持 `VIDMIRROR_BACKEND_URL`
 - 各 Provider 的 API Key（建议在设置页补齐）
 - ASR 相关（如 `GROQ_API_KEY`，仅在 Groq 回退时需要）
 

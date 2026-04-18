@@ -7,7 +7,6 @@ import shutil
 import subprocess
 import sys
 import time
-import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
@@ -87,17 +86,7 @@ def _can_import_uvicorn(executable: str) -> bool:
 
 
 def _select_python_for_backend() -> tuple[str, str, bool]:
-    # TODO(VidMirror v0.3): remove VPS_BACKEND_PYTHON fallback
     preferred = (os.environ.get("VIDMIRROR_BACKEND_PYTHON") or "").strip()
-    if not preferred:
-        preferred = (os.environ.get("VPS_BACKEND_PYTHON") or "").strip()
-        if preferred:
-            warnings.warn(
-                "VPS_BACKEND_PYTHON is deprecated and will be removed in v0.3. "
-                "Please use VIDMIRROR_BACKEND_PYTHON instead.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
     candidates_raw = [preferred, sys.executable, "python3.12", "python3.11", "python3.10", "python3"]
     candidates: list[str] = []
     for item in candidates_raw:

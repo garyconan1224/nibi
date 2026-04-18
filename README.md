@@ -28,7 +28,7 @@ uvicorn backend.app.main:app --host 127.0.0.1 --port 8010
 streamlit run app.py
 ```
 
-可选环境变量：`VIDMIRROR_BACKEND_URL` / `BACKEND_URL`（默认 `http://127.0.0.1:8010`，与后端端口一致即可）。旧变量 `VPS_BACKEND_URL` 仍兼容但已废弃。
+可选环境变量：`VIDMIRROR_BACKEND_URL` / `BACKEND_URL`（默认 `http://127.0.0.1:8010`，与后端端口一致即可）。自 v0.3 起仅支持 `VIDMIRROR_BACKEND_URL`。
 
 任务日志流式接口（便于调试或外部脚本订阅）：
 
