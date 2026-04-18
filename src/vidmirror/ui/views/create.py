@@ -425,12 +425,36 @@ def render_create_view(project_id: str) -> None:
         st.divider()
         st.subheader("分镜输出")
         plan_tab_a, plan_tab_b, plan_tab_c = st.tabs(["方案 A", "方案 B", "方案 C"])
+
+        # Plan A 展示，带 Markdown 和思维导图两个标签页
         with plan_tab_a:
-            st.markdown(st.session_state.get(CREATOR_PLAN_A_KEY) or "_空_")
+            plan_a_markdown = st.session_state.get(CREATOR_PLAN_A_KEY) or "_空_"
+            tab_md_a, tab_mind_a = st.tabs(["📝 Markdown", "🗺️ 思维导图"])
+            with tab_md_a:
+                st.markdown(plan_a_markdown)
+            with tab_mind_a:
+                from src.vidmirror.ui.markmap_view import render_markmap
+                render_markmap(plan_a_markdown)
+
+        # Plan B 展示，带 Markdown 和思维导图两个标签页
         with plan_tab_b:
-            st.markdown(st.session_state.get(CREATOR_PLAN_B_KEY) or "_空_")
+            plan_b_markdown = st.session_state.get(CREATOR_PLAN_B_KEY) or "_空_"
+            tab_md_b, tab_mind_b = st.tabs(["📝 Markdown", "🗺️ 思维导图"])
+            with tab_md_b:
+                st.markdown(plan_b_markdown)
+            with tab_mind_b:
+                from src.vidmirror.ui.markmap_view import render_markmap
+                render_markmap(plan_b_markdown)
+
+        # Plan C 展示，带 Markdown 和思维导图两个标签页
         with plan_tab_c:
-            st.markdown(st.session_state.get(CREATOR_PLAN_C_KEY) or "_空_")
+            plan_c_markdown = st.session_state.get(CREATOR_PLAN_C_KEY) or "_空_"
+            tab_md_c, tab_mind_c = st.tabs(["📝 Markdown", "🗺️ 思维导图"])
+            with tab_md_c:
+                st.markdown(plan_c_markdown)
+            with tab_mind_c:
+                from src.vidmirror.ui.markmap_view import render_markmap
+                render_markmap(plan_c_markdown)
 
         export_payload = _build_project_payload(
             project_name=project_name,
