@@ -1,0 +1,113 @@
+"""Background task runner with lifecycle controls."""
+
+from __future__ import annotations
+
+import threading
+import uuid
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Callable, Dict
+
+from backend.app.models.tasks import TaskRecord
+from backend.app.services.task_store import TaskStore
+
+TaskHandler = Callable[[TaskRecord, "TaskRunner"], Dict[str, Any]]
+
+
+class TaskRunner:
+    def __init__(self, store: TaskStore, max_workers: int = 4) -> None:
+        self.store = store
+        self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="vps-task")
+        self._handlers: dict[str, TaskHandler] = {}
+        self._lock = threading.Lock()
+
+    def register(self, task_type: str, handler: TaskHandler) -> None:
+        with self._lock:
+            self._handlers[task_type] = handler
+
+    def _has_active_duplicate(self, project_id: str, task_type: str, payload: dict[str, Any]) -> str | None:
+        """检查是否已有同 project + 同 URL 的 running/queued 下载任务。返回 task_id 或 None。"""
+        if task_type != "download":
+            return None
+        new_url = str(payload.get("url") or "").strip().lower()
+        if not new_url:
+            return None
+        for rec in self.store.list_all():
+            if rec.project_id != project_id or rec.task_type != task_type:
+                continue
+            if rec.status not in ("queued", "running"):
+                continue
+            existing_url = str(rec.payload.get("url") or "").strip().lower()
+            if existing_url == new_url:
+                return rec.task_id
+        return None
+
+    def create_task(self, project_id: str, task_type: str, payload: dict[str, Any], *, retry_of: str = "") -> TaskRecord:
+        # 防止同 URL 的重复下载任务
+        if not retry_of:
+            dup_tid = self._has_active_duplicate(project_id, task_type, payload)
+            if dup_tid:
+                raise ValueError(
+                    f"该链接已有正在执行的下载任务 {dup_tid}，请等待完成或取消后再提交"
+                )
+        rec = TaskRecord(
+            task_id=f"{task_type}-{uuid.uuid4().hex[:12]}",
+            project_id=project_id,
+            task_type=task_type,
+            payload=payload,
+            retry_of=retry_of,
+        )
+        self.store.create(rec)
+        self.store.append_log(rec.task_id, "Task accepted")
+        self._executor.submit(self._run, rec.task_id)
+        return rec
+
+    def _run(self, task_id: str) -> None:
+        record = self.store.get(task_id)
+        if record is None:
+            return
+        handler = self._handlers.get(record.task_type)
+        if handler is None:
+            self.store.update(task_id, status="failed", error=f"unsupported task_type: {record.task_type}")
+            self.store.append_log(task_id, f"Unsupported task type: {record.task_type}", level="error")
+            return
+
+        self.store.update(task_id, status="running", progress=0.01)
+        self.store.append_log(task_id, "Task started")
+        try:
+            result = handler(record, self)
+            current = self.store.get(task_id)
+            if current and current.cancel_requested:
+                self.store.update(task_id, status="cancelled", progress=1.0, result=result)
+                self.store.append_log(task_id, "Task cancelled by request", level="warning")
+                return
+            self.store.update(task_id, status="succeeded", progress=1.0, result=result, error="")
+            self.store.append_log(task_id, "Task succeeded")
+        except Exception as err:  # noqa: BLE001
+            self.store.update(task_id, status="failed", error=str(err))
+            self.store.append_log(task_id, f"Task failed: {err}", level="error")
+
+    def set_progress(self, task_id: str, progress: float, message: str | None = None) -> None:
+        pct = max(0.0, min(float(progress), 1.0))
+        self.store.update(task_id, progress=pct)
+        if message:
+            self.store.append_log(task_id, message)
+
+    def append_log(self, task_id: str, message: str, *, level: str = "info") -> None:
+        self.store.append_log(task_id, message, level=level)
+
+    def is_cancel_requested(self, task_id: str) -> bool:
+        rec = self.store.get(task_id)
+        return bool(rec.cancel_requested) if rec else False
+
+    def cancel_task(self, task_id: str) -> TaskRecord:
+        rec = self.store.update(task_id, cancel_requested=True)
+        self.store.append_log(task_id, "Cancel requested", level="warning")
+        if rec.status in ("queued", "running"):
+            rec = self.store.update(task_id, status="cancelled")
+        return rec
+
+    def retry_task(self, task_id: str) -> TaskRecord:
+        rec = self.store.get(task_id)
+        if rec is None:
+            raise KeyError(f"task not found: {task_id}")
+        return self.create_task(rec.project_id, rec.task_type, rec.payload, retry_of=rec.task_id)

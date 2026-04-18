@@ -1,0 +1,782 @@
+"""
+视频画面深度拆解核心逻辑 v3（整合版）
+提取自 video-analyzer-new/analyze_videos.py，去除内置 HTTP Dashboard。
+供 Streamlit 页面直接调用。
+
+主要功能：
+- 视频抽帧（OpenCV）
+- 逐帧视觉分析（硅基流动视觉模型，并发）
+- 全局视觉总结（硅基流动文本模型）
+- 三位一体输出：JSON + Markdown + HTML
+- 断点续传支持
+- 分析结果自动同步到 data/json_data/（供导演台知识库使用）
+"""
+
+from __future__ import annotations
+
+import base64
+import json
+import re
+import shutil
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Callable, Optional
+from html import escape as _esc
+
+import cv2
+
+from shared.config import (
+    API_CONCURRENCY,
+    COLLECT_DIR_NAME,
+    ARCHIVE_DIR_NAME,
+    FRAME_INTERVAL_SEC,
+    JPEG_QUALITY,
+    JSON_DATA_DIR,
+    MAX_IMAGE_SIDE,
+    SHORT_VIDEO_THRESHOLD,
+    TEXT_MODEL_ANALYZER,
+    VIDEO_EXTENSIONS,
+    VIDEOS_DIR,
+    VISION_MODEL_ANALYZER,
+    ensure_data_dirs,
+)
+from shared.sf_client import analyze_video_frame, generate_video_summary, SiliconFlowError
+
+
+# ── 进度回调类型 ──────────────────────────────────────────────
+
+ProgressCallback = Optional[Callable[[float, str], None]]
+
+
+# ── 进度状态数据类 ─────────────────────────────────────────────
+
+@dataclass
+class VideoProgress:
+    """单视频分析进度。"""
+    video_name: str
+    total_frames: int = 0
+    analyzed_frames: int = 0
+    current_timestamp: str = ""
+    status: str = "pending"  # pending / analyzing / summarizing / done / failed / skipped
+    percent: float = 0.0
+    error: str = ""
+
+
+@dataclass
+class AnalysisState:
+    """一次批量分析的全局状态（线程安全）。"""
+    videos: list[VideoProgress] = field(default_factory=list)
+    finished: bool = False
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
+    recent_live_frames: list[dict[str, Any]] = field(default_factory=list)
+    _live_lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
+
+    def push_live_frame(self, video_name: str, frame_data: dict[str, Any], frames_dir: Path) -> None:
+        """供任务中心轮询展示最近关键帧与 JSON 片段。"""
+        img = str(frame_data.get("frame_image") or "")
+        path_str = ""
+        if img:
+            p = (frames_dir / img).resolve()
+            if p.is_file():
+                path_str = str(p)
+        desc = str(frame_data.get("description_zh") or "")
+        snap: dict[str, Any] = {
+            "video_name": video_name,
+            "timestamp": frame_data.get("timestamp"),
+            "description_zh": desc[:500],
+            "frame_json": {
+                "timestamp": frame_data.get("timestamp"),
+                "description_zh": desc[:280],
+                "image_prompt_en": (str(frame_data.get("image_prompt_en") or ""))[:200],
+            },
+            "frame_image": img,
+            "frame_image_path": path_str,
+        }
+        with self._live_lock:
+            self.recent_live_frames.append(snap)
+            if len(self.recent_live_frames) > 40:
+                self.recent_live_frames = self.recent_live_frames[-40:]
+
+    def live_frames_snapshot(self) -> list[dict[str, Any]]:
+        with self._live_lock:
+            return list(self.recent_live_frames)
+
+    def update(self, idx: int, **kwargs: Any) -> None:
+        with self._lock:
+            v = self.videos[idx]
+            for k, val in kwargs.items():
+                setattr(v, k, val)
+            if v.total_frames > 0:
+                v.percent = round(v.analyzed_frames / v.total_frames * 90.0, 1)
+            if v.status == "done":
+                v.percent = 100.0
+
+    def snapshot(self) -> list[dict[str, Any]]:
+        with self._lock:
+            return [
+                {
+                    "video_name": v.video_name,
+                    "total_frames": v.total_frames,
+                    "analyzed_frames": v.analyzed_frames,
+                    "current_timestamp": v.current_timestamp,
+                    "status": v.status,
+                    "percent": v.percent,
+                    "error": v.error,
+                }
+                for v in self.videos
+            ]
+
+
+# ── 工具函数 ──────────────────────────────────────────────────
+
+def format_timestamp(seconds: int) -> str:
+    h = seconds // 3600
+    m = (seconds % 3600) // 60
+    s = seconds % 60
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+
+def sanitize_filename(name: str) -> str:
+    """将文件名中的特殊字符替换为下划线，保留字母数字和下划线。"""
+    return re.sub(r"[^\w]", "_", name)
+
+
+def extract_product_name(filename_stem: str) -> str:
+    """从文件名智能提取商品名。"""
+    name = re.sub(r"[(\[][^)\]]*[)\]]", "", filename_stem).strip()
+    name = re.sub(r"\s+", " ", name).strip()
+    if not name:
+        return filename_stem
+
+    NOISE_WORDS = {
+        "reveal", "review", "unboxing", "hands-on", "handson",
+        "first", "look", "official", "trailer", "ad", "promo",
+        "commercial", "teaser", "concept", "introduction", "intro",
+        "launch", "event", "keynote", "presentation", "demo",
+        "test", "comparison", "vs", "versus", "benchmark",
+        "video", "clip", "short", "shorts", "reel", "reels",
+        "hands", "new", "latest", "best", "top",
+        "4k", "8k", "hd", "uhd", "fhd", "1080p", "720p",
+    }
+
+    words = name.split()
+    product_words = []
+    for word in words:
+        lower = word.lower().strip(".,!?-_")
+        if not lower or lower in NOISE_WORDS:
+            break
+        product_words.append(word)
+
+    result = " ".join(product_words).strip()
+    return result if result else filename_stem
+
+
+def resize_frame(frame: Any) -> Any:
+    """等比缩放帧到 MAX_IMAGE_SIDE 以内。"""
+    h, w = frame.shape[:2]
+    if max(h, w) > MAX_IMAGE_SIDE:
+        scale = MAX_IMAGE_SIDE / max(h, w)
+        frame = cv2.resize(frame, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+    return frame
+
+
+def frame_to_base64(frame: Any) -> str:
+    """OpenCV 帧 → 内存 JPEG → Base64，不写磁盘。"""
+    frame = resize_frame(frame)
+    ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
+    if not ok:
+        raise RuntimeError("JPEG 编码失败")
+    return base64.b64encode(buf).decode("utf-8")
+
+
+def save_frame_to_disk(frame: Any, filepath: Path) -> None:
+    """将帧保存为本地 JPEG。"""
+    frame = resize_frame(frame)
+    cv2.imwrite(str(filepath), frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
+
+
+def make_frame_filename(safe_name: str, ts: str) -> str:
+    return f"{safe_name}_{ts.replace(':', '_')}.jpg"
+
+
+def is_transition_frame(description: str) -> bool:
+    return "纯色过渡帧" in description
+
+
+# ── 视频信息 ──────────────────────────────────────────────────
+
+def find_videos(directory: Path) -> list[Path]:
+    """递归查找目录下所有视频文件。"""
+    videos = []
+    for f in sorted(directory.iterdir()):
+        if f.is_file() and f.suffix.lower() in VIDEO_EXTENSIONS:
+            videos.append(f)
+    return videos
+
+
+def compute_frame_interval(duration_sec: int) -> int:
+    """根据视频时长自动决定抽帧间隔。"""
+    if FRAME_INTERVAL_SEC > 0:
+        return FRAME_INTERVAL_SEC
+    return 1 if duration_sec <= SHORT_VIDEO_THRESHOLD else 2
+
+
+def get_video_info(video_path: Path) -> tuple[int, int, int]:
+    """返回 (时长秒, 预计帧数, 间隔秒)。"""
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        return 0, 0, 1
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    cap.release()
+    duration = int(total / fps)
+    interval = compute_frame_interval(duration)
+    estimated = max(duration // interval, 1)
+    return duration, estimated, interval
+
+
+def extract_frames(video_path: Path, interval_sec: int = 2):
+    """生成器：按间隔抽帧，yield (秒, frame)。"""
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise RuntimeError(f"无法打开视频: {video_path}")
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    step = max(int(round(fps * interval_sec)), 1)
+    idx = 0
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        if idx % step == 0:
+            yield int(idx / fps), frame
+        idx += 1
+    cap.release()
+
+
+# ── 安全名称管理 ──────────────────────────────────────────────
+
+_VIDEO_SAFE_NAMES: dict[str, str] = {}
+
+
+def assign_safe_names(video_paths: list[Path]) -> None:
+    """为每个视频分配唯一的安全名称，同名商品自动加数字后缀。"""
+    _VIDEO_SAFE_NAMES.clear()
+    name_counts: dict[str, int] = {}
+    for vp in video_paths:
+        base = sanitize_filename(extract_product_name(vp.stem))
+        name_counts[base] = name_counts.get(base, 0) + 1
+
+    name_idx: dict[str, int] = {}
+    for vp in video_paths:
+        base = sanitize_filename(extract_product_name(vp.stem))
+        if name_counts[base] > 1:
+            idx = name_idx.get(base, 0) + 1
+            name_idx[base] = idx
+            _VIDEO_SAFE_NAMES[str(vp.resolve())] = f"{base}_{idx}"
+        else:
+            _VIDEO_SAFE_NAMES[str(vp.resolve())] = base
+
+
+def get_safe_name(video_path: Path) -> str:
+    """获取视频的唯一安全名称（须先调用 assign_safe_names）。"""
+    key = str(video_path.resolve())
+    if key in _VIDEO_SAFE_NAMES:
+        return _VIDEO_SAFE_NAMES[key]
+    return sanitize_filename(extract_product_name(video_path.stem))
+
+
+# ── 输出目录 ──────────────────────────────────────────────────
+
+def get_output_dir(video_path: Path) -> Path:
+    """{商品名}_分析报告/ — 与视频同级的专属项目文件夹。"""
+    return video_path.parent / (get_safe_name(video_path) + "_分析报告")
+
+
+# ── 断点续传 ──────────────────────────────────────────────────
+
+CHECKPOINT_FILE = "_checkpoint.jsonl"
+
+
+def load_checkpoint(output_dir: Path) -> list[dict[str, Any]]:
+    """加载断点数据，返回已分析的帧列表。"""
+    cp_path = output_dir / CHECKPOINT_FILE
+    frames = []
+    if not cp_path.exists():
+        return frames
+    try:
+        with open(cp_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    frames.append(json.loads(line))
+    except (json.JSONDecodeError, OSError):
+        pass
+    return frames
+
+
+def append_checkpoint(output_dir: Path, frame_data: dict[str, Any]) -> None:
+    """每分析完一帧，立即追加到断点文件（崩溃安全）。"""
+    cp_path = output_dir / CHECKPOINT_FILE
+    with open(cp_path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(frame_data, ensure_ascii=False) + "\n")
+
+
+def clear_checkpoint(output_dir: Path) -> None:
+    """分析全部完成后清理断点文件。"""
+    cp_path = output_dir / CHECKPOINT_FILE
+    if cp_path.exists():
+        cp_path.unlink()
+
+
+# ── 完成检测 ──────────────────────────────────────────────────
+
+def _check_json_complete(jp: Path) -> bool:
+    try:
+        with open(jp, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return (
+            isinstance(data, dict)
+            and "global_visual_summary" in data
+            and isinstance(data.get("frames"), list)
+            and len(data["frames"]) > 0
+        )
+    except (json.JSONDecodeError, OSError):
+        return False
+
+
+def is_already_processed(video_path: Path, target_json_dir: Path | None = None) -> bool:
+    """检测分析结果是否完整。"""
+    sn = get_safe_name(video_path)
+
+    # 1. 检查与视频同级的 _分析报告 目录
+    out = get_output_dir(video_path)
+    jp = out / (sn + "_视觉数据.json")
+    if jp.exists() and jp.stat().st_size > 0 and _check_json_complete(jp):
+        return True
+
+    # 2. 检查目标 JSON 目录（默认 data/json_data/）
+    json_dir = target_json_dir or JSON_DATA_DIR
+    gjp = json_dir / (sn + "_视觉数据.json")
+    if gjp.exists() and gjp.stat().st_size > 0 and _check_json_complete(gjp):
+        return True
+
+    return False
+
+
+# ── 结果保存 ──────────────────────────────────────────────────
+
+def save_results(
+    output_dir: Path,
+    safe_name: str,
+    original_title: str,
+    product_name: str,
+    summary: str,
+    frames: list[dict[str, Any]],
+) -> tuple[str, str, str]:
+    """三位一体输出：JSON + Markdown + HTML。"""
+    jp = output_dir / (safe_name + "_视觉数据.json")
+    mp = output_dir / (safe_name + "_图文分镜.md")
+    hp = output_dir / (safe_name + "_图文分镜.html")
+    frames_dir = output_dir / "frames"
+
+    json_frames = [
+        {
+            "timestamp": fr["timestamp"],
+            "description_zh": fr["description_zh"],
+            "image_prompt_en": fr["image_prompt_en"],
+        }
+        for fr in frames
+    ]
+    json_data = {
+        "video_title": original_title,
+        "product_name": product_name,
+        "global_visual_summary": summary,
+        "frames": json_frames,
+    }
+    with open(jp, "w", encoding="utf-8") as f:
+        json.dump(json_data, f, ensure_ascii=False, indent=2)
+
+    _save_markdown(mp, original_title, product_name, summary, frames)
+    _save_html(hp, frames_dir, original_title, product_name, summary, frames)
+
+    return jp.name, mp.name, hp.name
+
+
+def _save_markdown(
+    md_path: Path,
+    original_title: str,
+    product_name: str,
+    summary: str,
+    frames: list[dict[str, Any]],
+) -> None:
+    with open(md_path, "w", encoding="utf-8") as f:
+        f.write(f"# 视频拆解：《{original_title}》\n\n")
+        f.write(f"> 商品名：{product_name}\n\n")
+        f.write("## 全局视觉总结\n\n")
+        f.write(summary + "\n\n---\n\n")
+        f.write("## 逐帧拆解\n\n")
+        for fr in frames:
+            f.write(f"### [{fr['timestamp']}]\n\n")
+            f.write(f"- **描述**：{fr['description_zh']}\n")
+            if fr["image_prompt_en"]:
+                f.write(f"- **提示词**：{fr['image_prompt_en']}\n")
+            f.write("\n---\n\n")
+
+
+_THEME_LIGHT = {
+    "bg": "#f8f9fa", "sf": "#ffffff", "sf2": "#f1f3f5", "bd": "#dee2e6",
+    "ac": "#5c6bc0", "acl": "#3949ab", "txt": "#212529", "mut": "#868e96",
+    "grn": "#2e7d32", "cpbg": "#f1f3f5", "img_bg": "#e9ecef",
+    "hero_bg": "linear-gradient(180deg,#e8eaf6 0%,#f8f9fa 100%)",
+    "prompt_txt": "#495057",
+}
+_THEME_DARK = {
+    "bg": "#0f0f14", "sf": "#1a1a24", "sf2": "#22222e", "bd": "#2d2d3d",
+    "ac": "#7986cb", "acl": "#9fa8da", "txt": "#e8e8f0", "mut": "#8888a0",
+    "grn": "#66bb6a", "cpbg": "#2d2d44", "img_bg": "#1a1a24",
+    "hero_bg": "linear-gradient(180deg,#1a1a28 0%,#0f0f14 100%)",
+    "prompt_txt": "#aab0b8",
+}
+
+_HTML_TEMPLATE = r'''<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{product_name} - AI 视频拆解</title>
+<style>
+:root{{
+  --bg:{bg};--sf:{sf};--sf2:{sf2};--bd:{bd};
+  --ac:{ac};--acl:{acl};--txt:{txt};--mut:{mut};
+  --grn:{grn};--cpbg:{cpbg};
+}}
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",
+  "Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  background:var(--bg);color:var(--txt);line-height:1.7}}
+.hero{{text-align:center;padding:80px 20px 40px;background:{hero_bg}}}
+.hero h1{{font-size:2.5em;font-weight:800;color:var(--acl);margin-bottom:10px}}
+.hero .sub{{color:var(--mut);font-size:1.05em}}
+.wrap{{max-width:1200px;margin:0 auto;padding:0 32px}}
+.sec-t{{font-size:1.4em;font-weight:700;margin:56px 0 24px;color:var(--acl)}}
+.sum-card{{background:var(--sf);border:1px solid var(--bd);border-radius:16px;padding:36px;
+  line-height:2;white-space:pre-wrap;font-size:.95em;box-shadow:0 1px 4px rgba(0,0,0,.06)}}
+hr.dv{{border:none;border-top:1px solid var(--bd);margin:56px 0}}
+.fr{{display:flex;align-items:center;background:var(--sf);border:1px solid var(--bd);
+  border-radius:16px;overflow:hidden;margin-bottom:28px;box-shadow:0 1px 4px rgba(0,0,0,.06);transition:box-shadow .2s}}
+.fr:hover{{box-shadow:0 4px 16px rgba(0,0,0,.15)}}
+.fr-img{{flex:0 0 45%;position:relative;background:{img_bg};display:flex;align-items:center;justify-content:center}}
+.fr-img img{{width:100%;display:block}}
+.fr-img .ts{{position:absolute;top:12px;left:12px;background:rgba(92,107,192,.92);color:#fff;
+  font-weight:700;font-size:.8em;padding:4px 14px;border-radius:16px;backdrop-filter:blur(8px)}}
+.fr-img .tr{{position:absolute;top:12px;right:12px;background:rgba(0,0,0,.6);color:#fff;
+  font-size:.75em;padding:3px 10px;border-radius:12px}}
+.fr-txt{{flex:1;padding:28px;display:flex;flex-direction:column;gap:16px}}
+.fr-lbl{{font-weight:700;color:var(--acl);font-size:.9em;margin-bottom:4px}}
+.fr-desc{{color:var(--txt);line-height:1.85;font-size:.92em}}
+.pw{{position:relative}}
+.pb{{background:var(--sf2);border:1px solid var(--bd);border-radius:12px;padding:16px 80px 16px 16px;
+  font-family:"SF Mono","Fira Code","Menlo",monospace;font-size:.82em;color:{prompt_txt};
+  line-height:1.7;white-space:pre-wrap;word-break:break-word;max-height:280px;overflow-y:auto}}
+.cb{{position:absolute;top:8px;right:8px;background:var(--cpbg);color:var(--acl);border:1px solid var(--bd);
+  border-radius:8px;padding:6px 14px;font-size:.78em;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit}}
+.cb:hover{{background:var(--ac);color:#fff;border-color:var(--ac)}}
+.cb.ok{{background:var(--grn);color:#fff;border-color:var(--grn)}}
+@media(max-width:768px){{.fr{{flex-direction:column}}.fr-img{{flex:none}}.wrap{{padding:0 16px}}.hero h1{{font-size:1.8em}}}}
+.foot{{text-align:center;padding:48px 20px;color:var(--mut);font-size:.82em}}
+</style>
+</head>
+<body>
+<div class="hero">
+  <h1>{product_name}</h1>
+  <p class="sub">视频画面深度拆解 · 共 {frame_count} 帧</p>
+</div>
+<div class="wrap">
+  <h2 class="sec-t">📝 全局视觉总结</h2>
+  <div class="sum-card">{summary}</div>
+  <hr class="dv">
+  <h2 class="sec-t">🎞️ 逐帧图文拆解</h2>
+  {frames_html}
+</div>
+<div class="foot">由 AI 视频画面拆解工具自动生成</div>
+<script>
+function cp(b){{var t=b.closest('.pw').querySelector('.pb').textContent;
+navigator.clipboard.writeText(t).then(function(){{b.textContent='✓ 已复制';b.classList.add('ok');
+setTimeout(function(){{b.textContent='📋 复制';b.classList.remove('ok')}},2000)}})}}
+</script>
+</body>
+</html>'''
+
+
+def _compute_avg_brightness(frames_dir: Path, frames: list[dict[str, Any]]) -> float:
+    total, count = 0.0, 0
+    sample = frames[:min(8, len(frames))]
+    for fr in sample:
+        img_file = fr.get("frame_image", "")
+        if not img_file:
+            continue
+        img_path = frames_dir / img_file
+        if not img_path.exists():
+            continue
+        img = cv2.imread(str(img_path))
+        if img is None:
+            continue
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        total += gray.mean()
+        count += 1
+    return total / count if count else 80
+
+
+def _build_frame_html(fr: dict[str, Any], frames_dir: Path) -> str:
+    ts = fr["timestamp"]
+    desc = fr["description_zh"]
+    prompt = fr["image_prompt_en"]
+    img_file = fr.get("frame_image", "")
+    transition = is_transition_frame(desc)
+
+    parts = ['<div class="fr">']
+    parts.append('<div class="fr-img">')
+    if img_file:
+        parts.append(f'<img src="frames/{_esc(img_file)}" alt="{_esc(ts)}">')
+    parts.append(f'<span class="ts">⏱️ {_esc(ts)}</span>')
+    if transition:
+        parts.append('<span class="tr">过渡帧</span>')
+    parts.append("</div>")
+
+    parts.append('<div class="fr-txt">')
+    parts.append('<div><div class="fr-lbl">👀 画面描述</div>')
+    parts.append(f'<div class="fr-desc">{_esc(desc)}</div></div>')
+
+    if prompt:
+        parts.append('<div class="pw">')
+        parts.append('<div class="fr-lbl">🪄 生图提示词</div>')
+        parts.append(f'<div class="pb">{_esc(prompt)}</div>')
+        parts.append('<button class="cb" onclick="cp(this)">📋 复制</button>')
+        parts.append("</div>")
+
+    parts.append("</div></div>")
+    return "\n".join(parts)
+
+
+def _save_html(
+    html_path: Path,
+    frames_dir: Path,
+    original_title: str,
+    product_name: str,
+    summary: str,
+    frames: list[dict[str, Any]],
+) -> None:
+    frames_html_parts = [_build_frame_html(fr, frames_dir) for fr in frames]
+    brightness = _compute_avg_brightness(frames_dir, frames)
+    theme = _THEME_DARK if brightness > 170 else _THEME_LIGHT
+    html = _HTML_TEMPLATE.format(
+        product_name=_esc(product_name),
+        summary=_esc(summary),
+        frame_count=len(frames),
+        frames_html="\n".join(frames_html_parts),
+        **theme,
+    )
+    with open(html_path, "w", encoding="utf-8") as f:
+        f.write(html)
+
+
+# ── 归档：JSON 自动同步到 data/json_data/ ─────────────────────
+
+def sync_json_to_data_dir(
+    output_dir: Path,
+    safe_name: str,
+    target_json_dir: Path | None = None,
+) -> Optional[Path]:
+    """将分析完成的 JSON 复制到目标目录（默认 data/json_data/）。"""
+    src = output_dir / (safe_name + "_视觉数据.json")
+    if not src.exists():
+        return None
+    if target_json_dir is None:
+        ensure_data_dirs()
+    else:
+        target_json_dir.mkdir(parents=True, exist_ok=True)
+    dst_dir = target_json_dir or JSON_DATA_DIR
+    dst = dst_dir / (safe_name + "_视觉数据.json")
+    shutil.copy2(str(src), str(dst))
+    return dst
+
+
+# ── 主处理管线 ────────────────────────────────────────────────
+
+def _analyze_frame_task(
+    sec: int,
+    frame_img: Any,
+    api_key: str,
+    vision_model: str,
+    product_name: str,
+    safe_name: str,
+    frames_dir: Path,
+) -> dict[str, Any]:
+    """并发 worker：编码帧 → 调用视觉 API → 保存图片 → 返回 frame_data。"""
+    ts = format_timestamp(sec)
+    img_b64 = frame_to_base64(frame_img)
+    try:
+        result = analyze_video_frame(api_key, vision_model, img_b64, product_name)
+    except Exception as e:
+        result = {"description_zh": f"[分析失败: {e}]", "image_prompt_en": ""}
+    img_filename = make_frame_filename(safe_name, ts)
+    save_frame_to_disk(frame_img, frames_dir / img_filename)
+    return {
+        "timestamp": ts,
+        "description_zh": result["description_zh"],
+        "image_prompt_en": result["image_prompt_en"],
+        "frame_image": img_filename,
+    }
+
+
+def process_video(
+    api_key: str,
+    video_path: Path,
+    video_idx: int,
+    total_videos: int,
+    state: AnalysisState,
+    vision_model: str = VISION_MODEL_ANALYZER,
+    text_model: str = TEXT_MODEL_ANALYZER,
+    on_frame: Optional[Callable[[int, str], None]] = None,
+    auto_sync_json: bool = True,
+    target_json_dir: Path | None = None,
+) -> Optional[Path]:
+    """
+    完整处理单个视频：抽帧分析 → 全局总结 → 三位一体保存（支持断点续传）。
+
+    auto_sync_json: True 时将 JSON 同步到目标目录（默认 data/json_data/）。
+    返回分析报告目录路径，失败返回 None。
+    """
+    original_title = video_path.stem
+    product_name = extract_product_name(original_title)
+    safe_name = get_safe_name(video_path)
+
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        state.update(video_idx, status="failed", error=f"无法打开视频: {video_path.name}")
+        return None
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    total_fc = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    cap.release()
+    duration = int(total_fc / fps)
+    interval = compute_frame_interval(duration)
+    estimated = max(duration // interval, 1)
+
+    output_dir = get_output_dir(video_path)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    frames_dir = output_dir / "frames"
+    frames_dir.mkdir(exist_ok=True)
+
+    existing_frames = load_checkpoint(output_dir)
+    analyzed_ts = {fr["timestamp"] for fr in existing_frames}
+
+    state.update(video_idx, status="analyzing", total_frames=estimated)
+
+    frames = list(existing_frames)
+    frame_count = len(analyzed_ts)
+    concurrency = API_CONCURRENCY
+
+    with ThreadPoolExecutor(max_workers=concurrency) as executor:
+        pending = {}
+
+        for sec, frame_img in extract_frames(video_path, interval):
+            ts = format_timestamp(sec)
+            if ts in analyzed_ts:
+                frame_count += 1
+                state.update(video_idx, analyzed_frames=frame_count, current_timestamp=ts)
+                continue
+            future = executor.submit(
+                _analyze_frame_task, sec, frame_img,
+                api_key, vision_model, product_name, safe_name, frames_dir,
+            )
+            pending[future] = sec
+
+        for future in as_completed(pending):
+            try:
+                frame_data = future.result()
+            except Exception as e:
+                frame_data = {
+                    "timestamp": format_timestamp(pending[future]),
+                    "description_zh": f"[分析失败: {e}]",
+                    "image_prompt_en": "",
+                    "frame_image": "",
+                }
+            frames.append(frame_data)
+            append_checkpoint(output_dir, frame_data)
+            frame_count += 1
+            state.update(video_idx, analyzed_frames=frame_count, current_timestamp=frame_data["timestamp"])
+            state.push_live_frame(video_path.name, frame_data, frames_dir)
+            if on_frame:
+                on_frame(frame_count, frame_data["timestamp"])
+
+    if not frames:
+        state.update(video_idx, status="failed", error="未提取到任何帧")
+        return None
+
+    frames.sort(key=lambda x: x["timestamp"])
+
+    state.update(video_idx, status="summarizing")
+
+    desc_lines = [f"[{fr['timestamp']}] {fr['description_zh']}" for fr in frames]
+    desc_text = "\n".join(desc_lines)
+
+    try:
+        summary = generate_video_summary(api_key, text_model, product_name, desc_text)
+    except Exception as e:
+        summary = f"[全局总结生成失败: {e}]"
+
+    save_results(output_dir, safe_name, original_title, product_name, summary, frames)
+    clear_checkpoint(output_dir)
+
+    if auto_sync_json:
+        sync_json_to_data_dir(output_dir, safe_name, target_json_dir=target_json_dir)
+
+    state.update(video_idx, status="done", analyzed_frames=frame_count)
+    return output_dir
+
+
+def run_batch_analysis(
+    api_key: str,
+    video_paths: list[Path],
+    vision_model: str = VISION_MODEL_ANALYZER,
+    text_model: str = TEXT_MODEL_ANALYZER,
+    progress_cb: ProgressCallback = None,
+    auto_sync_json: bool = True,
+    target_json_dir: Path | None = None,
+) -> AnalysisState:
+    """
+    批量分析视频（在后台线程中运行）。
+    返回 AnalysisState 供调用方轮询进度。
+    """
+    assign_safe_names(video_paths)
+    state = AnalysisState(
+        videos=[VideoProgress(video_name=vp.name) for vp in video_paths]
+    )
+
+    def _run() -> None:
+        total = len(video_paths)
+        for idx, vp in enumerate(video_paths):
+            if progress_cb:
+                progress_cb(idx / max(total, 1), f"处理第 {idx + 1}/{total} 个视频：{vp.name}")
+            if is_already_processed(vp, target_json_dir=target_json_dir):
+                state.update(idx, status="skipped", percent=100.0)
+                continue
+            try:
+                process_video(
+                    api_key, vp, idx, total, state,
+                    vision_model=vision_model,
+                    text_model=text_model,
+                    auto_sync_json=auto_sync_json,
+                    target_json_dir=target_json_dir,
+                )
+            except Exception as e:
+                state.update(idx, status="failed", error=str(e))
+        state.finished = True
+        if progress_cb:
+            progress_cb(1.0, "全部视频分析完成")
+
+    thread = threading.Thread(target=_run, daemon=True)
+    thread.start()
+    return state
