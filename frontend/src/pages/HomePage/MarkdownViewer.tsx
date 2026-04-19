@@ -6,7 +6,7 @@ import 'highlight.js/styles/github.css'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useTaskStore } from '@/store/taskStore'
 import { TaskStatus } from '@/types/task'
-import { FileText, Loader2, AlertCircle } from 'lucide-react'
+import { FileText, Loader2, AlertCircle, CheckCircle2, Download, ArrowRight } from 'lucide-react'
 
 // ── 自定义 Markdown 渲染组件（无需 @tailwindcss/typography）──
 const mdComponents: React.ComponentProps<typeof ReactMarkdown>['components'] = {
@@ -111,6 +111,40 @@ const FailedState: FC<{ message?: string }> = ({ message }) => (
   </div>
 )
 
+// ── 下载完成状态 ──
+const DownloadSuccessState: FC<{
+  fileName?: string
+  savePath?: string
+}> = ({ fileName, savePath }) => (
+  <div className="flex h-full flex-col items-center justify-center gap-6 px-8">
+    <div className="flex flex-col items-center gap-4">
+      <CheckCircle2 className="h-16 w-16 text-green-500" />
+      <h2 className="text-2xl font-bold text-gray-900">下载完成</h2>
+    </div>
+
+    <div className="w-full max-w-md space-y-4 rounded-lg border border-neutral-200 bg-neutral-50 p-6">
+      <div className="space-y-2">
+        <p className="text-xs font-semibold text-gray-600">文件名</p>
+        <p className="break-all rounded bg-white px-3 py-2 text-sm font-medium text-gray-800">
+          {fileName || '-'}
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs font-semibold text-gray-600">保存路径</p>
+        <p className="break-all rounded bg-white px-3 py-2 text-sm text-gray-700">
+          {savePath || '-'}
+        </p>
+      </div>
+    </div>
+
+    <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-700">
+      <ArrowRight className="h-4 w-4 flex-shrink-0" />
+      <span>可继续提交 analyze 任务进行分析</span>
+    </div>
+  </div>
+)
+
 // ── 主组件 ──
 const MarkdownViewer: FC = () => {
   const getCurrentTask = useTaskStore(s => s.getCurrentTask)
@@ -119,13 +153,24 @@ const MarkdownViewer: FC = () => {
   // 无选中任务
   if (!task) return <EmptyState />
 
-  const { status, error, result } = task
+  const { status, error, result, task_type } = task
 
   // 任务失败
   if (status === TaskStatus.FAILED) return <FailedState message={error} />
 
   // 任务处于终结成功态
   if (status === TaskStatus.SUCCESS) {
+    // download 任务：显示下载完成卡片
+    if (task_type === 'download') {
+      return (
+        <DownloadSuccessState
+          fileName={result?.file_name as string | undefined}
+          savePath={result?.save_path as string | undefined}
+        />
+      )
+    }
+
+    // 其他任务（analyze/create/storyboard）：显示 Markdown
     const markdown = result?.markdown as string | undefined
     return (
       <ScrollArea className="h-full">
