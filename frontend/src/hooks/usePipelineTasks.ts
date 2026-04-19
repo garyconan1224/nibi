@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import { useTaskStore } from '@/store/taskStore'
 import { http } from '@/services/client'
 import { isTaskTerminal } from '@/types/task'
-import type { TaskRecord, TaskListResponse } from '@/types/task'
+import type { TaskRecord } from '@/types/task'
 
 interface UsePipelineTasksOptions {
   projectId?: string
@@ -42,14 +42,15 @@ export const usePipelineTasks = (options: UsePipelineTasksOptions = {}) => {
     try {
       const url = '/pipeline/tasks'
       const params = projectId ? { project_id: projectId } : {}
-      const resp = await http.get<TaskListResponse>(url, { params })
+      // 后端 list_tasks 直接返回裸数组 [...], 不是 { data: [...] } 包装格式
+      const resp = await http.get<TaskRecord[] | { data: TaskRecord[] }>(url, { params })
 
-      const tasksData = resp.data.data || []
+      const raw = resp.data
       // 兼容后端直接返回数组或 { data: [...] } 两种结构
-      const taskList: TaskRecord[] = Array.isArray(tasksData)
-        ? tasksData
-        : tasksData && typeof tasksData === 'object' && 'data' in tasksData
-          ? (tasksData as { data: TaskRecord[] }).data
+      const taskList: TaskRecord[] = Array.isArray(raw)
+        ? raw
+        : Array.isArray((raw as { data: TaskRecord[] })?.data)
+          ? (raw as { data: TaskRecord[] }).data
           : []
 
       console.log('[usePipelineTasks] 拉取的任务数据:', taskList)

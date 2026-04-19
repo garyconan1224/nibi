@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { TaskRecord } from '@/types/task'
+import { isTaskTerminal } from '@/types/task'
 
 interface TaskStoreState {
   // 状态
@@ -24,7 +25,23 @@ export const useTaskStore = create<TaskStoreState>((set, get) => ({
   currentTaskId: null,
   isPolling: false,
 
-  setTasks: (tasks) => set({ tasks }),
+  // 用后端全量列表同步 store。
+  // 防御逻辑：若后端返回空数组（网络抖动/重启），保留本地仍在追踪的非终结任务，
+  // 避免进行中的任务因一次空响应被清空。
+  setTasks: (incoming) =>
+    set((state) => {
+      if (incoming.length === 0) {
+        // 后端返回空：仅保留本地非终结状态任务（下载中、等待中等）
+        const activeLocally = state.tasks.filter((t) => !isTaskTerminal(t.status))
+        return { tasks: activeLocally }
+      }
+      // 正常同步：以后端数据为准，同时将本地有但后端没有的非终结任务补回
+      const backendIds = new Set(incoming.map((t) => t.task_id))
+      const localOnlyActive = state.tasks.filter(
+        (t) => !backendIds.has(t.task_id) && !isTaskTerminal(t.status)
+      )
+      return { tasks: [...incoming, ...localOnlyActive] }
+    }),
 
   addTask: (task) =>
     set((state) => {
