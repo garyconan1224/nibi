@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """RAG QA routes."""
 
-from typing import Any
+from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -21,7 +21,7 @@ class RagAskRequest(BaseModel):
 
 
 @router.post("/ask")
-def rag_ask(req: RagAskRequest) -> dict[str, Any]:
+def rag_ask(req: RagAskRequest) -> Dict[str, Any]:
     try:
         return ask_with_sources(
             project_json_dir=req.project_json_dir,

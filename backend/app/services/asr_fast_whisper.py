@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
+from typing import List
 
 
 def transcribe_with_fast_whisper(audio_bytes: bytes, *, model_name: str = "base", device: str = "cpu") -> str:
@@ -18,7 +19,7 @@ def transcribe_with_fast_whisper(audio_bytes: bytes, *, model_name: str = "base"
     try:
         model = WhisperModel(model_name, device=device)
         segments, _info = model.transcribe(str(tmp_path))
-        parts: list[str] = []
+        parts: List[str] = []
         for seg in segments:
             text = str(getattr(seg, "text", "")).strip()
             if text:

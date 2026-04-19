@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """RAG QA service with source citation payload."""
 
-from typing import Any
+from typing import Any, Dict, List
 
 from shared.knowledge_base import (
     LongKnowledge,
@@ -21,7 +21,8 @@ def ask_with_sources(
     query: str,
     embedding_model: str,
     api_key: str = "",
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
+    """使用源引用执行 RAG QA"""
     settings = load_settings()
     effective_key = api_key.strip() or settings.openai_api_key.strip()
     if not effective_key:
@@ -32,7 +33,7 @@ def ask_with_sources(
         project_json_dir,
         embedding_model=embedding_model,
     )
-    source_items: list[dict[str, Any]] = []
+    source_items: List[Dict[str, Any]] = []
     if isinstance(knowledge, LongKnowledge):
         source_items = list(retrieve_with_sources(effective_key, knowledge, query))
         context = "\n\n".join(

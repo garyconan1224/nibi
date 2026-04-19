@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import io
 import time
-from typing import Any
+from typing import Any, Dict, List
 
 from backend.app.services.asr_fast_whisper import transcribe_with_fast_whisper
 from backend.app.services.asr_groq import transcribe_with_groq
@@ -56,7 +56,8 @@ def get_transcript(
     enable_groq: bool = True,
     groq_api_key: str = "",
     groq_model: str = "whisper-large-v3",
-) -> dict[str, Any]:
+) -> Dict[str, Any]:
+    """获取语音转录结果"""
     started = time.perf_counter()
     if prefer_subtitle:
         hit = fetch_best_subtitle_text(url)
@@ -70,7 +71,7 @@ def get_transcript(
             }
 
     audio_bytes = _download_audio_bytes(url)
-    errors: list[str] = []
+    errors: List[str] = []
 
     if enable_fast_whisper:
         try:

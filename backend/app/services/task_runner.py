@@ -89,7 +89,7 @@ class TaskRunner:
             self.store.update(task_id, status=TaskStatus.FAILED.value, error=str(err))
             self.store.append_log(task_id, f"Task failed: {err}", level="error")
 
-    def set_progress(self, task_id: str, progress: float, message: str | None = None) -> None:
+    def set_progress(self, task_id: str, progress: float, message: Optional[str] = None) -> None:
         pct = max(0.0, min(float(progress), 1.0))
         self.store.update(task_id, progress=pct)
         if message:

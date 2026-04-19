@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Dict
+
 from fastapi import FastAPI
 
 from backend.app.routes.pipeline import router as pipeline_router
@@ -19,5 +21,6 @@ app.include_router(notes_router)  # 新增：笔记生成API
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
+def health() -> Dict[str, str]:
+    """后端健康检查端点"""
     return {"status": "ok"}

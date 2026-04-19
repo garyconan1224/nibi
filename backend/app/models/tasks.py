@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Literal
+from typing import Any, Dict, FrozenSet, List, Literal
 
 
 class TaskStatus(str, Enum):
@@ -25,7 +25,7 @@ class TaskStatus(str, Enum):
 # 历史遗留小写状态 → 新 Enum 的映射。
 # 覆盖范围：phase-1 早期命名（running/done/error/queued）与 phase-2 命名
 # （succeeded/failed/cancelled）。
-LEGACY_STATUS_MAP: dict[str, "TaskStatus"] = {
+LEGACY_STATUS_MAP: Dict[str, TaskStatus] = {
     "running": TaskStatus.DOWNLOADING,
     "done": TaskStatus.SUCCESS,
     "error": TaskStatus.FAILED,
@@ -37,7 +37,7 @@ LEGACY_STATUS_MAP: dict[str, "TaskStatus"] = {
 
 
 # 终结态集合（用于 delete/SSE 终止判断等）。
-TERMINAL_STATUS_VALUES: frozenset[str] = frozenset(
+TERMINAL_STATUS_VALUES: FrozenSet[str] = frozenset(
     {TaskStatus.SUCCESS.value, TaskStatus.FAILED.value, TaskStatus.CANCELLED.value}
 )
 
@@ -73,21 +73,23 @@ class TaskLogEntry:
 
 @dataclass
 class TaskRecord:
+    """任务记录数据模型"""
     task_id: str
     project_id: str
     task_type: str
-    payload: dict[str, Any]
+    payload: Dict[str, Any]
     status: str = TaskStatus.PENDING.value
     progress: float = 0.0
-    log: list[TaskLogEntry] = field(default_factory=list)
-    result: dict[str, Any] = field(default_factory=dict)
+    log: List[TaskLogEntry] = field(default_factory=list)
+    result: Dict[str, Any] = field(default_factory=dict)
     error: str = ""
     retry_of: str = ""
     cancel_requested: bool = False
     created_at: str = field(default_factory=_now_iso)
     updated_at: str = field(default_factory=_now_iso)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典格式"""
         obj = asdict(self)
         obj["log"] = [asdict(item) for item in self.log]
         # 防御：即便某处误把 Enum 成员直接赋给 status，也保证外部 JSON 为纯字符串值
@@ -95,8 +97,9 @@ class TaskRecord:
         return obj
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "TaskRecord":
-        log_items: list[TaskLogEntry] = []
+    def from_dict(cls, data: Dict[str, Any]) -> "TaskRecord":
+        """从字典创建任务记录"""
+        log_items: List[TaskLogEntry] = []
         for item in data.get("log") or []:
             if not isinstance(item, dict):
                 continue

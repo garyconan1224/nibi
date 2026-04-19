@@ -3,7 +3,7 @@ from __future__ import annotations
 """Transcript extraction routes."""
 
 import os
-from typing import Any
+from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -14,6 +14,7 @@ router = APIRouter(prefix="/transcript", tags=["transcript"])
 
 
 class TranscriptRequest(BaseModel):
+    """语音转录请求"""
     url: str
     prefer_subtitle: bool = True
     enable_fast_whisper: bool = True
@@ -25,7 +26,7 @@ class TranscriptRequest(BaseModel):
 
 
 @router.post("/extract")
-def extract_transcript(req: TranscriptRequest) -> dict[str, Any]:
+def extract_transcript(req: TranscriptRequest) -> Dict[str, Any]:
     try:
         return get_transcript(
             req.url,

@@ -6,7 +6,7 @@ import json
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List, Optional
 
 from backend.app.models.tasks import TaskLogEntry, TaskRecord
 from shared.config import ROOT_DIR
@@ -51,7 +51,7 @@ class TaskStore:
             self._save()
         return record
 
-    def get(self, task_id: str) -> TaskRecord | None:
+    def get(self, task_id: str) -> Optional[TaskRecord]:
         with self._lock:
             return self._records.get(task_id)
 
@@ -76,7 +76,7 @@ class TaskStore:
             self._save()
             return rec
 
-    def list_all(self) -> list[TaskRecord]:
+    def list_all(self) -> List[TaskRecord]:
         with self._lock:
             return list(self._records.values())
 
