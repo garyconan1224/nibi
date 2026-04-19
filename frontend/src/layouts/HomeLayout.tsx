@@ -23,7 +23,7 @@ const HomeLayout: FC = () => {
         {/* 左栏 */}
         <ResizablePanel
           ref={leftPanelRef}
-          defaultSize={25}
+          defaultSize={30}
           minSize={10}
           maxSize={40}
           collapsible
@@ -106,7 +106,7 @@ const HomeLayout: FC = () => {
         {/* 中栏 */}
         <ResizablePanel
           ref={middlePanelRef}
-          defaultSize={25}
+          defaultSize={20}
           minSize={10}
           maxSize={40}
           collapsible
