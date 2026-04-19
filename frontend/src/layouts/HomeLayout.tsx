@@ -1,5 +1,8 @@
 import { FC, useRef, useState } from 'react'
 import { SlidersHorizontal, PanelLeftClose, PanelLeftOpen, History as HistoryIcon } from 'lucide-react'
+import TaskDashboard from '@/pages/HomePage/TaskDashboard'
+import NoteForm from '@/pages/HomePage/NoteForm'
+import MarkdownViewer from '@/pages/HomePage/MarkdownViewer'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip.tsx'
 import { Link } from 'react-router-dom'
 import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from '@/components/ui/resizable'
@@ -73,9 +76,7 @@ const HomeLayout: FC = () => {
             </header>
             <ScrollArea className="flex-1 overflow-auto">
               <div className="p-4">
-                <div className="text-center py-8 text-muted-foreground">
-                  Note Form Panel
-                </div>
+                <NoteForm />
               </div>
             </ScrollArea>
           </aside>
@@ -115,7 +116,7 @@ const HomeLayout: FC = () => {
         >
           <aside className="flex h-full flex-col overflow-hidden border-r border-neutral-200 bg-white">
             <header className="flex h-10 shrink-0 items-center justify-between border-b border-neutral-100 px-3">
-              <span className="text-sm font-medium text-gray-600">历史</span>
+              <span className="text-sm font-medium text-gray-600">任务中心</span>
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -132,13 +133,9 @@ const HomeLayout: FC = () => {
                 </Tooltip>
               </TooltipProvider>
             </header>
-            <ScrollArea className="flex-1 overflow-auto">
-              <div className="p-4">
-                <div className="text-center py-8 text-muted-foreground">
-                  History Panel
-                </div>
-              </div>
-            </ScrollArea>
+            <div className="flex-1 overflow-hidden">
+              <TaskDashboard />
+            </div>
           </aside>
         </ResizablePanel>
 
@@ -165,10 +162,8 @@ const HomeLayout: FC = () => {
 
         {/* 右栏 */}
         <ResizablePanel defaultSize={61} minSize={30}>
-          <main className="flex h-full flex-col overflow-hidden bg-white p-6">
-            <div className="text-center py-8 text-muted-foreground">
-              Markdown Viewer Panel
-            </div>
+          <main className="flex h-full flex-col overflow-hidden bg-white">
+            <MarkdownViewer />
           </main>
         </ResizablePanel>
       </ResizablePanelGroup>
