@@ -1,4 +1,4 @@
-import { FC, useRef, useState } from 'react'
+import { type FC, useRef, useState } from 'react'
 import { SlidersHorizontal, PanelLeftClose, PanelLeftOpen, History as HistoryIcon } from 'lucide-react'
 import TaskDashboard from '@/pages/HomePage/TaskDashboard'
 import NoteForm from '@/pages/HomePage/NoteForm'
