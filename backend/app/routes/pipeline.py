@@ -31,7 +31,7 @@ class TaskCreateRequest(BaseModel):
 
 
 @router.get("/tasks")
-def list_tasks(project_id: str | None = None) -> list[dict[str, Any]]:
+def list_tasks(project_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """列出所有任务，可按 project_id 过滤。"""
     all_recs = _store.list_all()
     if project_id:
@@ -40,7 +40,7 @@ def list_tasks(project_id: str | None = None) -> list[dict[str, Any]]:
 
 
 @router.post("/tasks")
-def create_task(req: TaskCreateRequest) -> dict[str, Any]:
+def create_task(req: TaskCreateRequest) -> Dict[str, Any]:
     try:
         rec = _runner.create_task(req.project_id, req.task_type, dict(req.payload or {}))
         return {"status": "accepted", "task_id": rec.task_id}
@@ -49,12 +49,12 @@ def create_task(req: TaskCreateRequest) -> dict[str, Any]:
 
 
 @router.post("/tasks/purge")
-def purge_tasks(project_id: str | None = None) -> dict[str, Any]:
+def purge_tasks(project_id: Optional[str] = None) -> Dict[str, Any]:
     """批量清理已终结的冗余失败任务。删除因 append_log bug 而失败的旧记录。"""
     all_recs = _store.list_all()
     if project_id:
         all_recs = [r for r in all_recs if r.project_id == project_id]
-    removed: list[str] = []
+    removed: List[str] = []
     for rec in all_recs:
         if rec.status != TaskStatus.FAILED.value:
             continue
@@ -66,7 +66,7 @@ def purge_tasks(project_id: str | None = None) -> dict[str, Any]:
 
 
 @router.get("/tasks/{task_id}")
-def get_task(task_id: str) -> dict[str, Any]:
+def get_task(task_id: str) -> Dict[str, Any]:
     rec = _store.get(task_id)
     if rec is None:
         raise HTTPException(status_code=404, detail=f"task not found: {task_id}")
@@ -74,7 +74,7 @@ def get_task(task_id: str) -> dict[str, Any]:
 
 
 @router.delete("/tasks/{task_id}")
-def delete_task(task_id: str) -> dict[str, Any]:
+def delete_task(task_id: str) -> Dict[str, Any]:
     """从持久化存储中删除一条任务记录（仅限已终结状态）。"""
     rec = _store.get(task_id)
     if rec is None:
@@ -91,7 +91,7 @@ def delete_task(task_id: str) -> dict[str, Any]:
 
 
 @router.post("/tasks/{task_id}/cancel")
-def cancel_task(task_id: str) -> dict[str, Any]:
+def cancel_task(task_id: str) -> Dict[str, Any]:
     try:
         rec = _runner.cancel_task(task_id)
         return rec.to_dict()
@@ -100,7 +100,7 @@ def cancel_task(task_id: str) -> dict[str, Any]:
 
 
 @router.post("/tasks/{task_id}/retry")
-def retry_task(task_id: str) -> dict[str, Any]:
+def retry_task(task_id: str) -> Dict[str, Any]:
     try:
         rec = _runner.retry_task(task_id)
         return rec.to_dict()

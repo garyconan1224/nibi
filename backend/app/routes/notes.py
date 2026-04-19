@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, FrozenSet, List, Literal, Optional
 
 import httpx
 from fastapi import APIRouter, File, Form, UploadFile
@@ -78,7 +78,7 @@ def _resolve_project_id(project_id: Optional[str]) -> str:
 
 # ── 状态机映射 ────────────────────────────────────────────────
 # BiliNote 前端仅识别 7 态：PENDING/PARSING/DOWNLOADING/TRANSCRIBING/SUMMARIZING/SUCCESS/FAILED
-_BILINOTE_ACCEPTED: frozenset[str] = frozenset(
+_BILINOTE_ACCEPTED: FrozenSet[str] = frozenset(
     {
         TaskStatus.PENDING.value,
         TaskStatus.PARSING.value,
