@@ -1,11 +1,11 @@
-"""Background task runner with lifecycle controls."""
-
 from __future__ import annotations
+
+"""Background task runner with lifecycle controls."""
 
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, Optional
 
 from backend.app.models.tasks import TERMINAL_STATUS_VALUES, TaskRecord, TaskStatus
 from backend.app.services.task_store import TaskStore
@@ -17,14 +17,14 @@ class TaskRunner:
     def __init__(self, store: TaskStore, max_workers: int = 4) -> None:
         self.store = store
         self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="vps-task")
-        self._handlers: dict[str, TaskHandler] = {}
+        self._handlers: Dict[str, TaskHandler] = {}
         self._lock = threading.Lock()
 
     def register(self, task_type: str, handler: TaskHandler) -> None:
         with self._lock:
             self._handlers[task_type] = handler
 
-    def _has_active_duplicate(self, project_id: str, task_type: str, payload: dict[str, Any]) -> str | None:
+    def _has_active_duplicate(self, project_id: str, task_type: str, payload: Dict[str, Any]) -> Optional[str]:
         """检查是否已有同 project + 同 URL 的 running/queued 下载任务。返回 task_id 或 None。"""
         if task_type != "download":
             return None
@@ -42,7 +42,7 @@ class TaskRunner:
                 return rec.task_id
         return None
 
-    def create_task(self, project_id: str, task_type: str, payload: dict[str, Any], *, retry_of: str = "") -> TaskRecord:
+    def create_task(self, project_id: str, task_type: str, payload: Dict[str, Any], *, retry_of: str = "") -> TaskRecord:
         # 防止同 URL 的重复下载任务
         if not retry_of:
             dup_tid = self._has_active_duplicate(project_id, task_type, payload)

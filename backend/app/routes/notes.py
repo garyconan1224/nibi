@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """BiliNote 兼容适配层（Phase A.2 重写）。
 
 目标：把 BiliNote 风格的 `/api/*` 请求薄包装后转发到 VidMirror
@@ -9,8 +11,6 @@ pipeline 任务引擎（`backend/app/routes/pipeline.py` 的 `_store` / `_runner
   ``CANCELLED`` → ``FAILED``（message 标注"已取消"）。
 - 路由前缀 ``/api``，与现有 ``/pipeline`` / ``/providers`` 共存。
 """
-
-from __future__ import annotations
 
 import json
 import re

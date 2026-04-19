@@ -1,11 +1,12 @@
-"""Persistent task store."""
-
 from __future__ import annotations
+
+"""Persistent task store."""
 
 import json
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Dict
 
 from backend.app.models.tasks import TaskLogEntry, TaskRecord
 from shared.config import ROOT_DIR
@@ -22,7 +23,7 @@ class TaskStore:
         self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
-        self._records: dict[str, TaskRecord] = {}
+        self._records: Dict[str, TaskRecord] = {}
         self._load()
 
     def _load(self) -> None:

@@ -1,6 +1,6 @@
-"""Pipeline task endpoints."""
-
 from __future__ import annotations
+
+"""Pipeline task endpoints."""
 
 import asyncio
 import json

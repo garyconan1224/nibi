@@ -1,6 +1,6 @@
-"""Task domain models."""
-
 from __future__ import annotations
+
+"""Task domain models."""
 
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone

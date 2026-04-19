@@ -1,6 +1,6 @@
-"""Transcript extraction routes."""
-
 from __future__ import annotations
+
+"""Transcript extraction routes."""
 
 import os
 from typing import Any

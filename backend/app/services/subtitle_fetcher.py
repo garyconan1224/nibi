@@ -1,11 +1,11 @@
-"""Subtitle-first extraction via yt-dlp metadata."""
-
 from __future__ import annotations
 
-from typing import Any
+"""Subtitle-first extraction via yt-dlp metadata."""
+
+from typing import Any, Dict, Optional, Tuple
 
 
-def fetch_best_subtitle_text(url: str) -> tuple[str, dict[str, Any]] | None:
+def fetch_best_subtitle_text(url: str) -> Optional[Tuple[str, Dict[str, Any]]]:
     """Try extracting subtitle text metadata-first. Returns (text, metadata)."""
     try:
         import yt_dlp

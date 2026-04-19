@@ -1,6 +1,6 @@
-"""Groq ASR client (OpenAI-compatible transcription endpoint)."""
-
 from __future__ import annotations
+
+"""Groq ASR client (OpenAI-compatible transcription endpoint)."""
 
 import json
 import tempfile
