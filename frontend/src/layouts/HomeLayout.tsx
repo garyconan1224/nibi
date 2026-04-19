@@ -18,14 +18,14 @@ const HomeLayout: FC = () => {
   const health = useBackendHealth()
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden">
-      <ResizablePanelGroup direction="horizontal" className="flex flex-1">
+    <div className="h-screen w-screen overflow-hidden">
+      <ResizablePanelGroup direction="horizontal" className="h-full w-full">
         {/* 左栏 */}
         <ResizablePanel
           ref={leftPanelRef}
-          defaultSize={30}
+          defaultSize={25}
           minSize={10}
-          maxSize={35}
+          maxSize={40}
           collapsible
           collapsedSize={0}
           onCollapse={() => setIsLeftCollapsed(true)}
@@ -106,9 +106,9 @@ const HomeLayout: FC = () => {
         {/* 中栏 */}
         <ResizablePanel
           ref={middlePanelRef}
-          defaultSize={20}
+          defaultSize={25}
           minSize={10}
-          maxSize={30}
+          maxSize={40}
           collapsible
           collapsedSize={0}
           onCollapse={() => setIsMiddleCollapsed(true)}
@@ -161,7 +161,7 @@ const HomeLayout: FC = () => {
         )}
 
         {/* 右栏 */}
-        <ResizablePanel defaultSize={61} minSize={30}>
+        <ResizablePanel defaultSize={50} minSize={30}>
           <main className="flex h-full flex-col overflow-hidden bg-white">
             <MarkdownViewer />
           </main>
