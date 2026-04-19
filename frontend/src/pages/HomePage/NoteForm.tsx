@@ -19,11 +19,20 @@ const NoteForm: FC = () => {
     setError(null)
 
     try {
-      // 构造请求体：project_id 用随机 UUID，task_type 固定为 create
+      // 构造请求体：project_id 用随机 UUID，task_type 改为 download
+      // payload 补齐后端 download 任务需要的字段
       const body = {
         project_id: crypto.randomUUID(),
-        task_type: 'create',
-        payload: { url: trimmed },
+        task_type: 'download',
+        payload: {
+          url: trimmed,
+          browser: 'chrome',
+          proxy: '',
+          po_token: '',
+          visitor_data: '',
+          format_selector: 'best',
+          cookie_base_dirs: [],
+        },
       }
 
       // 调用后端 POST /pipeline/tasks（通过服务层封装）
