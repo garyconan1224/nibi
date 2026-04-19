@@ -1,6 +1,6 @@
-"""Transcript service with subtitle-first fallback strategy."""
-
 from __future__ import annotations
+
+"""Transcript service with subtitle-first fallback strategy."""
 
 import io
 import time

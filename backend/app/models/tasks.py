@@ -1,6 +1,6 @@
-"""Task domain models."""
-
 from __future__ import annotations
+
+"""Task domain models."""
 
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -8,9 +8,6 @@ from enum import Enum
 from typing import Any, Literal
 
 
-# 注：backend/app/services/note_generator.py 另有一个笔记生成专用的 TaskStatus，
-#     领域不同（含 SAVING 状态），本 Enum 仅用于 pipeline 任务。
-#     合并两者留待后续单独立项。
 class TaskStatus(str, Enum):
     """Pipeline 任务状态机（继承 str 以便 JSON 直接序列化为字符串）。"""
 

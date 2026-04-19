@@ -1,6 +1,6 @@
-"""Local ASR with faster-whisper."""
-
 from __future__ import annotations
+
+"""Local ASR with faster-whisper."""
 
 import tempfile
 from pathlib import Path

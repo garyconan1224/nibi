@@ -1,6 +1,6 @@
-"""RAG QA service with source citation payload."""
-
 from __future__ import annotations
+
+"""RAG QA service with source citation payload."""
 
 from typing import Any
 

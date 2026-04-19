@@ -1,9 +1,9 @@
-"""Task handlers for pipeline task center."""
-
 from __future__ import annotations
 
+"""Task handlers for pipeline task center."""
+
 import time
-from typing import Any
+from typing import Any, Dict, List, Optional
 
 from backend.app.models.tasks import TaskRecord
 from backend.app.services.task_runner import TaskRunner
@@ -16,7 +16,8 @@ from src.vidmirror.core.providers import ChatRequest
 from src.vidmirror.core.providers.registry import create_default_registry
 
 
-def handle_download_task(record: TaskRecord, runner: TaskRunner) -> dict[str, Any]:
+def handle_download_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
+    """处理视频下载任务"""
     runner.set_progress(record.task_id, 0.05, "Preparing download")
     url = str(record.payload.get("url") or "").strip()
     if not url:
@@ -25,7 +26,7 @@ def handle_download_task(record: TaskRecord, runner: TaskRunner) -> dict[str, An
     project_video_dir.mkdir(parents=True, exist_ok=True)
 
     raw_dirs = record.payload.get("cookie_base_dirs")
-    cookie_base_dirs_list: list[str] | None = None
+    cookie_base_dirs_list: Optional[List[str]] = None
     if isinstance(raw_dirs, list) and raw_dirs:
         cookie_base_dirs_list = [str(x) for x in raw_dirs]
 
@@ -52,7 +53,7 @@ def handle_download_task(record: TaskRecord, runner: TaskRunner) -> dict[str, An
     }
 
 
-def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> dict[str, Any]:
+def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     payload = record.payload
     api_key = str(payload.get("api_key") or "").strip() or load_settings().openai_api_key.strip()
     if not api_key:
@@ -105,7 +106,8 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> dict[str, Any
     }
 
 
-def handle_create_task(record: TaskRecord, runner: TaskRunner) -> dict[str, Any]:
+def handle_create_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
+    """处理创意内容生成任务"""
     payload = record.payload
     query = str(payload.get("prompt") or "").strip()
     if not query:
@@ -140,7 +142,7 @@ def handle_create_task(record: TaskRecord, runner: TaskRunner) -> dict[str, Any]
     return {"content": content, "artifact_path": str(out_file)}
 
 
-def handle_storyboard_task(record: TaskRecord, runner: TaskRunner) -> dict[str, Any]:
+def handle_storyboard_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     payload = record.payload
     runner.set_progress(record.task_id, 0.02, "Storyboard pipeline starting")
     raw_paths = payload.get("image_paths") or []

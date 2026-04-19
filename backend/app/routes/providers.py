@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 """Provider management endpoints."""
 
-from __future__ import annotations
+from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -16,9 +18,10 @@ class ProviderTestRequest(BaseModel):
 
 
 @router.get("")
-def list_providers() -> list[dict[str, object]]:
+def list_providers() -> Dict[str, Any]:
+    """获取所有配置的提供商列表"""
     settings = load_settings()
-    out: list[dict[str, object]] = []
+    out: list = []
     for p in settings.providers:
         out.append(
             {
@@ -35,7 +38,7 @@ def list_providers() -> list[dict[str, object]]:
 
 
 @router.post("/test")
-def test_provider(req: ProviderTestRequest) -> dict[str, str]:
+def test_provider(req: ProviderTestRequest) -> Dict[str, str]:
     settings = load_settings()
     profile = next((p for p in settings.providers if p.id == req.provider_id), None)
     if profile is None:

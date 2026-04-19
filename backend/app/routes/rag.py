@@ -1,6 +1,6 @@
-"""RAG QA routes."""
-
 from __future__ import annotations
+
+"""RAG QA routes."""
 
 from typing import Any
 
