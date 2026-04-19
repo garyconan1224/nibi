@@ -16,3 +16,9 @@ runtime.log
 .DS_Store
 .local/
 data/projects/
+
+# Frontend (Vite + React)
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
