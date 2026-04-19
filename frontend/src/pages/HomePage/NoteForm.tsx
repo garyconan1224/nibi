@@ -1,12 +1,8 @@
 import { FC, useState } from 'react'
 import { Link2, Loader2, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { http } from '@/services/client'
+import { createPipelineTask } from '@/services/pipeline'
 import { useTaskStore } from '@/store/taskStore'
-import type { TaskCreateResponse } from '@/types/task'
-
-// 后端 pipeline 任务创建路径
-const PIPELINE_TASKS_URL = '/pipeline/tasks'
 
 const NoteForm: FC = () => {
   const [url, setUrl] = useState('')
@@ -30,9 +26,8 @@ const NoteForm: FC = () => {
         payload: { url: trimmed },
       }
 
-      // 调用后端 POST /pipeline/tasks
-      const res = await http.post<TaskCreateResponse>(PIPELINE_TASKS_URL, body)
-      const { task_id } = res.data
+      // 调用后端 POST /pipeline/tasks（通过服务层封装）
+      const { task_id } = await createPipelineTask(body)
 
       // 构造初始 TaskRecord 写入 store，等待轮询更新详情
       addTask({
