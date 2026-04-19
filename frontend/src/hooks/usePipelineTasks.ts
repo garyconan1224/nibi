@@ -52,6 +52,7 @@ export const usePipelineTasks = (options: UsePipelineTasksOptions = {}) => {
           ? (tasksData as { data: TaskRecord[] }).data
           : []
 
+      console.log('[usePipelineTasks] 拉取的任务数据:', taskList)
       setTasks(taskList)
       isFirstRunRef.current = false
     } catch (error) {
