@@ -5,12 +5,14 @@ import { Link } from 'react-router-dom'
 import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from '@/components/ui/resizable'
 import { ScrollArea } from '@/components/ui/scroll-area.tsx'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
+import { useBackendHealth } from '@/hooks/useBackendHealth'
 
 const HomeLayout: FC = () => {
   const [isLeftCollapsed, setIsLeftCollapsed] = useState(false)
   const [isMiddleCollapsed, setIsMiddleCollapsed] = useState(false)
   const leftPanelRef = useRef<ImperativePanelHandle>(null)
   const middlePanelRef = useRef<ImperativePanelHandle>(null)
+  const health = useBackendHealth()
 
   return (
     <div className="flex h-screen flex-col overflow-hidden">
@@ -34,34 +36,39 @@ const HomeLayout: FC = () => {
                 </div>
                 <div className="text-2xl font-bold text-gray-800">VidMirror</div>
               </div>
-              <div className="flex items-center gap-1">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => leftPanelRef.current?.collapse()}
-                        className="text-muted-foreground hover:text-primary cursor-pointer rounded p-1 hover:bg-neutral-100"
-                      >
-                        <PanelLeftClose className="h-5 w-5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <span>收起</span>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <Link to={'/settings'}>
-                        <SlidersHorizontal className="text-muted-foreground hover:text-primary cursor-pointer h-5 w-5" />
-                      </Link>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <span>设置</span>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground">
+                  {health === null ? '检测中...' : health ? '✅ 后端在线' : '❌ 后端离线'}
+                </span>
+                <div className="flex items-center gap-1">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => leftPanelRef.current?.collapse()}
+                          className="text-muted-foreground hover:text-primary cursor-pointer rounded p-1 hover:bg-neutral-100"
+                        >
+                          <PanelLeftClose className="h-5 w-5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <span>收起</span>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Link to={'/settings'}>
+                          <SlidersHorizontal className="text-muted-foreground hover:text-primary cursor-pointer h-5 w-5" />
+                        </Link>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <span>设置</span>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
               </div>
             </header>
             <ScrollArea className="flex-1 overflow-auto">
