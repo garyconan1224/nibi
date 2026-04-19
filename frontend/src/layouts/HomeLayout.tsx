@@ -18,12 +18,12 @@ const HomeLayout: FC = () => {
   const health = useBackendHealth()
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
-      <ResizablePanelGroup direction="horizontal" className="h-full w-full">
+    <div className="flex h-screen w-screen overflow-hidden">
+      <ResizablePanelGroup direction="horizontal" className="flex flex-1">
         {/* 左栏 */}
         <ResizablePanel
           ref={leftPanelRef}
-          defaultSize={23}
+          defaultSize={30}
           minSize={10}
           maxSize={35}
           collapsible
@@ -106,7 +106,7 @@ const HomeLayout: FC = () => {
         {/* 中栏 */}
         <ResizablePanel
           ref={middlePanelRef}
-          defaultSize={16}
+          defaultSize={20}
           minSize={10}
           maxSize={30}
           collapsible
