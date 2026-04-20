@@ -22,7 +22,7 @@ export interface TaskLogEntry {
 export interface TaskRecord {
   task_id: string
   project_id: string
-  task_type: string                    // download|analyze|create|storyboard
+  task_type: string                    // download|analyze|create|storyboard|note
   payload: Record<string, any>
   status: string                       // TaskStatus 值
   progress: number                     // 0.0 ~ 1.0
@@ -89,7 +89,7 @@ export interface DownloadPayload {
 // 任务创建请求
 export interface TaskCreateRequest {
   project_id: string
-  task_type: 'download' | 'analyze' | 'create' | 'storyboard'
+  task_type: 'download' | 'analyze' | 'create' | 'storyboard' | 'note'
   payload: AnalyzePayload | DownloadPayload | Record<string, unknown>
 }
 

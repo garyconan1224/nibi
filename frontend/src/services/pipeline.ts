@@ -36,3 +36,11 @@ export async function createPipelineTask(
   return res.data
 }
 
+/**
+ * 取消 pipeline 任务
+ * POST /pipeline/tasks/{task_id}/cancel
+ */
+export async function cancelPipelineTask(taskId: string): Promise<void> {
+  await http.post(`${PIPELINE_TASKS_URL}/${taskId}/cancel`)
+}
+
