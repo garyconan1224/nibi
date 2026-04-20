@@ -87,7 +87,6 @@ const NoteForm = () => {
     handleSubmit,
     watch,
     setValue,
-    reset,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -192,7 +191,6 @@ const NoteForm = () => {
       })
 
       setCurrentTask(task_id)
-      reset({ ...values, url: '' })
     } catch (err: unknown) {
       setSubmitError(err instanceof Error ? err.message : '提交失败，请重试')
     }
