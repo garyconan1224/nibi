@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { http } from '@/services/client'
 
 /** Provider 条目（与后端 GET /providers 响应字段对齐） */
 export interface ProviderItem {
@@ -26,8 +27,6 @@ interface ProviderStoreState {
   fetchProviders: () => Promise<void>
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
-
 export const useProviderStore = create<ProviderStoreState>()(
   persist(
     (set) => ({
@@ -40,9 +39,8 @@ export const useProviderStore = create<ProviderStoreState>()(
       fetchProviders: async () => {
         set({ loading: true, error: null })
         try {
-          const res = await fetch(`${API_BASE}/providers`)
-          if (!res.ok) throw new Error(`获取提供商列表失败 (${res.status})`)
-          const data: ProviderItem[] = await res.json()
+          const res = await http.get('/providers')
+          const data: ProviderItem[] = res.data.data ?? res.data
           set({ providers: data, loading: false })
         } catch (e) {
           const msg = e instanceof Error ? e.message : '未知错误'
