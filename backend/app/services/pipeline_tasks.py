@@ -5,12 +5,17 @@ from __future__ import annotations
 import time
 from typing import Any, Dict, List, Optional
 
-from backend.app.models.tasks import TaskRecord
+from backend.app.models.tasks import TaskRecord, TaskStatus
 from backend.app.services.task_runner import TaskRunner
 from shared.config import get_project_json_dir, get_project_videos_dir
 from shared.settings_store import load_settings
 from shared.storyboard_generator import run_storyboard_generation
-from shared.video_analyzer import find_videos, run_batch_analysis
+from shared.video_analyzer import (
+    find_videos,
+    get_output_dir,
+    get_safe_name,
+    run_batch_analysis,
+)
 from shared.video_download_ytdlp import run_ytdlp_download
 from src.vidmirror.core.providers import ChatRequest
 from src.vidmirror.core.providers.registry import create_default_registry
@@ -173,8 +178,122 @@ def handle_storyboard_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, 
     return result
 
 
+def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
+    """复合笔记任务：下载视频 → 视觉分析 → 汇总 markdown 结果。
+
+    状态机流转（task_runner._run 已将入口置为 DOWNLOADING）：
+      DOWNLOADING → (下载完成) → ANALYZING → (分析完成) → SUMMARIZING → (return) → SUCCESS
+    """
+    payload = record.payload
+    task_id = record.task_id
+
+    # ── 1. 取 payload 字段 ─────────────────────────────────────
+    url = str(payload.get("url") or payload.get("video_url") or "").strip()
+    if not url:
+        raise ValueError("note task 需要 payload.url 或 payload.video_url")
+
+    api_key = (
+        str(payload.get("api_key") or "").strip()
+        or load_settings().openai_api_key.strip()
+    )
+    if not api_key:
+        raise ValueError("note task 需要 api_key（payload 或 settings）")
+
+    vision_model = str(payload.get("vision_model") or "").strip() or load_settings().vision_model
+    text_model = str(payload.get("text_model") or "").strip() or load_settings().text_model
+
+    # ── 2. 准备项目目录 ────────────────────────────────────────
+    project_video_dir = get_project_videos_dir(record.project_id)
+    project_video_dir.mkdir(parents=True, exist_ok=True)
+    project_json_dir = get_project_json_dir(record.project_id)
+    project_json_dir.mkdir(parents=True, exist_ok=True)
+
+    # ── 3. 下载阶段（task_runner 已设 DOWNLOADING）─────────────
+    runner.set_progress(task_id, 0.02, "开始下载视频...")
+
+    raw_dirs = payload.get("cookie_base_dirs")
+    cookie_base_dirs_list: Optional[List[str]] = (
+        [str(x) for x in raw_dirs] if isinstance(raw_dirs, list) and raw_dirs else None
+    )
+
+    out = run_ytdlp_download(
+        url=url,
+        output_dir=str(project_video_dir),
+        browser=str(payload.get("browser") or "chrome"),
+        proxy=str(payload.get("proxy") or ""),
+        po_token=str(payload.get("po_token") or ""),
+        visitor_data=str(payload.get("visitor_data") or ""),
+        format_selector=str(payload.get("format_selector") or "best"),
+        cookie_base_dirs_list=cookie_base_dirs_list,
+        log=lambda m: runner.append_log(task_id, m),
+        # 下载进度映射到 2%–30%
+        progress_callback=lambda p, msg: runner.set_progress(task_id, 0.02 + p * 0.28, msg),
+    )
+    if not out.get("ok"):
+        err = (out.get("error_full") or out.get("error") or "download failed").strip()
+        raise RuntimeError(f"下载失败: {err}")
+
+    # ── 4. 分析阶段 ──────────────────────────────────────────
+    runner.store.update(task_id, status=TaskStatus.ANALYZING.value)
+    runner.set_progress(task_id, 0.32, "下载完成，开始视觉帧分析...")
+
+    videos = find_videos(project_video_dir)
+    if not videos:
+        raise ValueError(f"下载后未在 {project_video_dir} 找到视频文件")
+
+    state = run_batch_analysis(
+        api_key=api_key,
+        video_paths=videos,
+        vision_model=vision_model,
+        text_model=text_model,
+        auto_sync_json=True,
+        target_json_dir=project_json_dir,
+    )
+
+    while not state.finished:
+        if runner.is_cancel_requested(task_id):
+            break
+        snaps = state.snapshot()
+        if snaps:
+            avg = sum(float(s["percent"]) for s in snaps) / max(len(snaps), 1) / 100.0
+            # 分析进度映射到 32%–85%
+            runner.set_progress(task_id, min(0.85, 0.32 + avg * 0.53), "视觉帧分析中...")
+        time.sleep(0.2)
+
+    # ── 5. 汇总 markdown（SUMMARIZING 阶段）──────────────────
+    runner.store.update(task_id, status=TaskStatus.SUMMARIZING.value)
+    runner.set_progress(task_id, 0.90, "整理笔记内容...")
+
+    # 收集各视频生成的 markdown 文件（run_batch_analysis 写入 *_分析报告/ 子目录）
+    md_parts: List[str] = []
+    for video_path in videos:
+        safe_name = get_safe_name(video_path)
+        output_dir = get_output_dir(video_path)
+        md_file = output_dir / (safe_name + "_图文分镜.md")
+        if md_file.exists():
+            md_parts.append(md_file.read_text(encoding="utf-8"))
+
+    markdown = (
+        "\n\n---\n\n".join(md_parts)
+        if md_parts
+        else "（分析完成，未生成 markdown 文件，请检查日志）"
+    )
+
+    json_paths = sorted(project_json_dir.glob("*_视觉数据.json"))
+    runner.set_progress(task_id, 0.98, "笔记生成完成")
+
+    return {
+        "markdown":              markdown,
+        "video_file":            str(out.get("save_path") or ""),
+        "json_outputs":          [str(p.resolve()) for p in json_paths],
+        "json_output_basenames": [p.name for p in json_paths],
+        "json_output_dir":       str(project_json_dir.resolve()),
+    }
+
+
 def register_pipeline_handlers(runner: TaskRunner) -> None:
-    runner.register("download", handle_download_task)
-    runner.register("analyze", handle_analyze_task)
-    runner.register("create", handle_create_task)
+    runner.register("download",  handle_download_task)
+    runner.register("analyze",   handle_analyze_task)
+    runner.register("create",    handle_create_task)
     runner.register("storyboard", handle_storyboard_task)
+    runner.register("note",      handle_note_task)
