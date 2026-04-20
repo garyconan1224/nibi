@@ -23,3 +23,15 @@ export const STYLE_OPTIONS: { value: NoteStyle; label: string; description: stri
   { value: 'creative',   label: '创意',  description: '生动有趣、易于记忆' },
 ]
 
+/** Pipeline 可选步骤 */
+export type PipelineStep = 'download' | 'transcribe' | 'analyze' | 'note'
+
+export const PIPELINE_STEPS: { value: PipelineStep; label: string }[] = [
+  { value: 'download',   label: '下载视频' },
+  { value: 'transcribe', label: '转录音频' },
+  { value: 'analyze',    label: '视觉分析' },
+  { value: 'note',       label: '生成笔记' },
+]
+
+export const DEFAULT_STEPS: PipelineStep[] = ['download', 'transcribe', 'analyze', 'note']
+

@@ -3,6 +3,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
+  AlertTriangle,
   ChevronDown,
   ChevronUp,
   Link2,
@@ -36,7 +37,7 @@ import { useTaskStore } from '@/store/taskStore'
 import { useModelStore } from '@/store/modelStore'
 import { useProviderStore } from '@/store/providerStore'
 import { useConfigStore } from '@/store/configStore'
-import { QUALITY_OPTIONS, FORMAT_OPTIONS, STYLE_OPTIONS } from '@/constant/note'
+import { QUALITY_OPTIONS, FORMAT_OPTIONS, STYLE_OPTIONS, PIPELINE_STEPS, DEFAULT_STEPS } from '@/constant/note'
 import type { NoteFormat } from '@/store/configStore'
 
 /* ─── Zod Schema ─── */
@@ -64,6 +65,7 @@ const formSchema = z.object({
   grid_cols:           z.number().int().min(1).max(6),
   grid_rows:           z.number().int().min(1).max(6),
   extras:              z.string(),
+  steps:               z.array(z.string()).min(1, { message: '至少选择一个执行步骤' }),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -115,8 +117,15 @@ const NoteForm = () => {
       grid_cols:           config.grid_size[0],
       grid_rows:           config.grid_size[1],
       extras:              config.extras,
+      steps:               [...DEFAULT_STEPS],
     },
   })
+
+  /* 监听 steps：当 task_type 不是 note 时无需步骤选择 */
+  const watchedSteps = watch('steps')
+  const watchedTaskType = watch('task_type')
+  const isNoteTask = watchedTaskType === 'note'
+  const hasDownloadStep = watchedSteps.includes('download')
 
   /* 监听 provider 变化 → 触发拉取模型 & 自动切换到第一个模型 */
   const watchedProviderId = watch('provider_id')
@@ -181,6 +190,8 @@ const NoteForm = () => {
           format_selector:     'best',
           cookie_base_dirs:    [],
         },
+        // 仅 note 任务传递 steps，其他任务类型忽略
+        ...(values.task_type === 'note' ? { steps: values.steps } : {}),
       }
 
       const { task_id } = await createPipelineTask(body)
@@ -440,6 +451,59 @@ const NoteForm = () => {
         </CollapsibleTrigger>
 
         <CollapsibleContent className="mt-3 flex flex-col gap-3">
+          {/* ── 步骤选择器（仅 note 任务显示）── */}
+          {isNoteTask && (
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs text-muted-foreground">执行步骤（可自由组合）</Label>
+              <Controller
+                name="steps"
+                control={control}
+                render={({ field }) => (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                    {PIPELINE_STEPS.map(opt => {
+                      const checked = field.value.includes(opt.value)
+                      const needsLocalHint =
+                        !hasDownloadStep &&
+                        (opt.value === 'transcribe' || opt.value === 'analyze')
+                      return (
+                        <div key={opt.value} className="flex items-center gap-1.5">
+                          <Checkbox
+                            id={`step-${opt.value}`}
+                            checked={checked}
+                            onCheckedChange={(isChecked) => {
+                              if (isChecked) {
+                                field.onChange([...field.value, opt.value])
+                              } else {
+                                // 至少保留一个选中项
+                                const next = field.value.filter((v: string) => v !== opt.value)
+                                if (next.length > 0) field.onChange(next)
+                              }
+                            }}
+                          />
+                          <Label
+                            htmlFor={`step-${opt.value}`}
+                            className="text-xs cursor-pointer"
+                          >
+                            {opt.label}
+                          </Label>
+                          {needsLocalHint && checked && (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-600">
+                              <AlertTriangle className="h-3 w-3" />
+                              将尝试使用本地已有文件
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              />
+              {errors.steps && (
+                <p className="text-xs text-red-500">{errors.steps.message}</p>
+              )}
+            </div>
+          )}
+
           {/* screenshot */}
           <div className="flex items-center justify-between">
             <Label className="text-xs">插入截图</Label>
