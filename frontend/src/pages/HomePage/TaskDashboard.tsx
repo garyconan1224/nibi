@@ -37,6 +37,7 @@ const TaskDashboard: FC<TaskDashboardProps> = ({ projectId }) => {
   }
 
   // 过滤 + 倒序排列
+  // 注意：按 created_at（而非 updated_at）排序，避免任务进度更新时列表顺序跳动
   const sortedTasks = useMemo(() => {
     const lower = filterText.trim().toLowerCase()
     return [...tasks]
@@ -50,7 +51,7 @@ const TaskDashboard: FC<TaskDashboardProps> = ({ projectId }) => {
       })
       .sort(
         (a, b) =>
-          new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       )
   }, [tasks, filterText])
 
