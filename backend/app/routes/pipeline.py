@@ -26,8 +26,12 @@ _TERMINAL_STATUSES = TERMINAL_STATUS_VALUES
 
 class TaskCreateRequest(BaseModel):
     project_id: str
-    task_type: str = Field(description="download|analyze|create|storyboard")
+    task_type: str = Field(description="download|analyze|create|storyboard|note")
     payload: Dict[str, Any] = Field(default_factory=dict)
+    steps: List[str] = Field(
+        default=["download", "transcribe", "analyze", "note"],
+        description="可选步骤编排，仅对 note 任务生效。默认全量执行。",
+    )
 
 
 @router.get("/tasks")
@@ -42,7 +46,11 @@ def list_tasks(project_id: Optional[str] = None) -> List[Dict[str, Any]]:
 @router.post("/tasks")
 def create_task(req: TaskCreateRequest) -> Dict[str, Any]:
     try:
-        rec = _runner.create_task(req.project_id, req.task_type, dict(req.payload or {}))
+        payload = dict(req.payload or {})
+        # 将 steps 注入 payload，供 handle_note_task 读取
+        if req.task_type == "note":
+            payload["steps"] = req.steps
+        rec = _runner.create_task(req.project_id, req.task_type, payload)
         return {"status": "accepted", "task_id": rec.task_id}
     except Exception as err:  # noqa: BLE001
         raise HTTPException(status_code=400, detail=str(err)) from err
