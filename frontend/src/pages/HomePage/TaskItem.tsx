@@ -1,4 +1,4 @@
-import { FC, useState } from 'react'
+import { useState, type FC } from 'react'
 import { ChevronDown, ChevronUp, AlertCircle, Info, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {

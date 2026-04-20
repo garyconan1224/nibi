@@ -1,4 +1,4 @@
-import { FC } from 'react'
+import type { FC } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -6,7 +6,7 @@ import 'highlight.js/styles/github.css'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useTaskStore } from '@/store/taskStore'
 import { TaskStatus } from '@/types/task'
-import { FileText, Loader2, AlertCircle, CheckCircle2, Download, ArrowRight } from 'lucide-react'
+import { FileText, Loader2, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react'
 
 // ── 自定义 Markdown 渲染组件（无需 @tailwindcss/typography）──
 const mdComponents: React.ComponentProps<typeof ReactMarkdown>['components'] = {

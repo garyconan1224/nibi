@@ -1,4 +1,4 @@
-import { FC, useMemo, useState } from 'react'
+import { useMemo, useState, type FC } from 'react'
 import { RefreshCw, ListChecks, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'

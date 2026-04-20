@@ -26,8 +26,8 @@ export const usePipelineTasks = (options: UsePipelineTasksOptions = {}) => {
   const { setTasks, updateTask, setIsPolling } = useTaskStore()
   const tasks = useTaskStore((s) => s.tasks)
 
-  const intervalRef = useRef<NodeJS.Timeout | null>(null)
-  const perTaskIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const intervalRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const perTaskIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // 用 ref 保存最新 tasks，避免 setInterval 闭包过时引用
   const tasksRef = useRef<TaskRecord[]>(tasks)
   const isFirstRunRef = useRef(true)
