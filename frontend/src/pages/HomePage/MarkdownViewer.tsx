@@ -251,8 +251,12 @@ function TranscriptTab({ transcript }: { transcript: string }) {
 
 // ── 主组件 ──────────────────────────────────────────────────────
 export default function MarkdownViewer() {
-  const getCurrentTask = useTaskStore(s => s.getCurrentTask)
-  const task = getCurrentTask()
+  // 直接订阅 tasks + currentTaskId，保证任务状态更新时组件能响应式重渲染。
+  // 原来用 s => s.getCurrentTask（订阅函数引用，永不变化），导致任务完成后不刷新。
+  const task = useTaskStore(s => {
+    if (!s.currentTaskId) return undefined
+    return s.tasks.find(t => t.task_id === s.currentTaskId)
+  })
   const printRef = useRef<HTMLDivElement>(null)
   const handlePrint = useReactToPrint({ content: () => printRef.current })
 
