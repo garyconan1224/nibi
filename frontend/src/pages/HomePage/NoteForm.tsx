@@ -32,6 +32,7 @@ import {
 
 import { createPipelineTask } from '@/services/pipeline'
 import { useTaskStore } from '@/store/taskStore'
+// @deprecated: useModelStore 已被 providerStore.providerModels 取代，保留文件备用，后续清理
 import { useModelStore } from '@/store/modelStore'
 import { useProviderStore } from '@/store/providerStore'
 import { useConfigStore } from '@/store/configStore'
@@ -63,17 +64,21 @@ const NoteForm = () => {
   const [submitError, setSubmitError]   = useState<string | null>(null)
 
   /* stores */
-  const { addTask, setCurrentTask }   = useTaskStore()
-  const { models, currentModelId }    = useModelStore()
-  const { providers, fetchProviders } = useProviderStore()
-  const config                         = useConfigStore()
+  const { addTask, setCurrentTask }                             = useTaskStore()
+  const { models, currentModelId }                              = useModelStore() // @deprecated
+  const { providers, fetchProviders, providerModels,
+          modelsLoading, fetchProviderModels }                  = useProviderStore()
+  const config                                                   = useConfigStore()
 
-  /* 首次挂载拉取 providers */
+  /* 首次挂载拉取 providers（内部会自动拉各 enabled provider 的模型） */
   useEffect(() => { fetchProviders() }, [fetchProviders])
 
-  /* 当前选中模型归属的 provider */
+  /* 当前选中模型归属的 provider（优先用 providerStore 数据，fallback 到 modelStore） */
   const currentModel     = models.find(m => m.model_id === currentModelId) ?? models[0]
-  const defaultProviderId = currentModel?.provider_id ?? providers[0]?.id ?? ''
+  const defaultProviderId = providers.find(p => p.enabled)?.id
+    ?? currentModel?.provider_id
+    ?? providers[0]?.id
+    ?? ''
 
   /* react-hook-form 初始值从 configStore 读 */
   const {
@@ -103,17 +108,28 @@ const NoteForm = () => {
     },
   })
 
-  /* 监听 provider 变化 → 自动切换到该 provider 的第一个模型 */
+  /* 监听 provider 变化 → 触发拉取模型 & 自动切换到第一个模型 */
   const watchedProviderId = watch('provider_id')
   useEffect(() => {
-    const providerModels = models.filter(m => m.provider_id === watchedProviderId)
-    if (providerModels.length > 0) {
-      setValue('model_id', providerModels[0].model_id)
+    if (!watchedProviderId) return
+    // 若该 provider 尚未缓存模型，触发拉取
+    if (!providerModels[watchedProviderId] && !modelsLoading[watchedProviderId]) {
+      fetchProviderModels(watchedProviderId)
     }
-  }, [watchedProviderId, models, setValue])
+    // 切换 provider 时，自动选中第一个可用模型
+    const cached = providerModels[watchedProviderId]
+    if (cached && cached.length > 0) {
+      setValue('model_id', cached[0].id)
+    }
+  }, [watchedProviderId, providerModels, modelsLoading, fetchProviderModels, setValue])
 
-  /* 当前 provider 下的模型列表 */
-  const filteredModels = models.filter(m => m.provider_id === watchedProviderId)
+  /* 当前 provider 的动态模型列表（优先用 providerStore 缓存，fallback 到 modelStore） */
+  const dynamicModels = providerModels[watchedProviderId] ?? []
+  const isModelsLoading = !!modelsLoading[watchedProviderId]
+  // fallback：若动态模型为空，使用 modelStore 中属于该 provider 的静态模型
+  const fallbackModels = models
+    .filter(m => m.provider_id === watchedProviderId)
+    .map(m => ({ id: m.model_id, name: m.name }))
 
   /* ─── 提交 ─── */
   const onSubmit = async (values: FormValues) => {
@@ -255,20 +271,28 @@ const NoteForm = () => {
             render={({ field }) => (
               <Select value={field.value} onValueChange={field.onChange}>
                 <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="选择模型" />
+                  <SelectValue placeholder={isModelsLoading ? '加载中...' : '选择模型'} />
                 </SelectTrigger>
                 <SelectContent>
-                  {filteredModels.length === 0
-                    ? models.map(m => (
-                        <SelectItem key={m.model_id} value={m.model_id}>
+                  {isModelsLoading && (
+                    <SelectItem value="_loading" disabled>加载中...</SelectItem>
+                  )}
+                  {!isModelsLoading && dynamicModels.length === 0 && fallbackModels.length === 0 && (
+                    <SelectItem value="_none" disabled>暂无模型</SelectItem>
+                  )}
+                  {/* 优先展示动态拉取的真实模型列表 */}
+                  {dynamicModels.length > 0
+                    ? dynamicModels.map(m => (
+                        <SelectItem key={m.id} value={m.id}>
                           {m.name}
                         </SelectItem>
                       ))
-                    : filteredModels.map(m => (
-                        <SelectItem key={m.model_id} value={m.model_id}>
+                    : fallbackModels.map(m => (
+                        <SelectItem key={m.id} value={m.id}>
                           {m.name}
                         </SelectItem>
-                      ))}
+                      ))
+                  }
                 </SelectContent>
               </Select>
             )}
