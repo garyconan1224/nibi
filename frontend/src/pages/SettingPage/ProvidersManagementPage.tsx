@@ -27,6 +27,7 @@ import {
   RotateCcw,
   Save,
 } from 'lucide-react'
+import { http } from '@/services/client'
 
 /* ─── 类型定义 ─── */
 interface Provider {
@@ -69,8 +70,6 @@ const EMPTY_CREATE_FORM: CreateForm = {
   base_url: '',
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
-
 const ProvidersManagementPage = () => {
   const [providers, setProviders]     = useState<Provider[]>([])
   const [listLoading, setListLoading] = useState(true)
@@ -98,9 +97,8 @@ const ProvidersManagementPage = () => {
   const fetchProviders = async () => {
     try {
       setListLoading(true)
-      const res = await fetch(`${API_BASE}/providers`)
-      if (!res.ok) throw new Error(`获取提供商列表失败 (${res.status})`)
-      setProviders(await res.json())
+      const res = await http.get('/providers')
+      setProviders(res.data.data ?? res.data)
       setError(null)
     } catch (e) {
       const msg = e instanceof Error ? e.message : '未知错误'
@@ -120,9 +118,8 @@ const ProvidersManagementPage = () => {
 
     if (opening && !detailCache[id]) {
       try {
-        const res = await fetch(`${API_BASE}/providers/${id}`)
-        if (!res.ok) throw new Error(`获取详情失败 (${res.status})`)
-        const detail: ProviderDetail = await res.json()
+        const res = await http.get(`/providers/${id}`)
+        const detail: ProviderDetail = res.data.data ?? res.data
         setDetailCache(prev => ({ ...prev, [id]: detail }))
         setDrafts(prev => ({
           ...prev,
@@ -152,13 +149,8 @@ const ProvidersManagementPage = () => {
     setTestingId(id)
     setTestResult(prev => ({ ...prev, [id]: { ok: false, msg: '' } }))
     try {
-      const res = await fetch(`${API_BASE}/providers/test`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider_id: id }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.detail || '连接测试失败')
+      const res = await http.post('/providers/test', { provider_id: id })
+      const data = res.data.data ?? res.data
       setTestResult(prev => ({ ...prev, [id]: { ok: true, msg: data.message || '连接成功' } }))
       toast.success(`${provider.name} 连接成功`)
     } catch (e) {
@@ -185,15 +177,7 @@ const ProvidersManagementPage = () => {
       }
       if (draft.api_key.trim() !== '') body.api_key = draft.api_key
 
-      const res = await fetch(`${API_BASE}/providers/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.detail || `保存失败 (${res.status})`)
-      }
+      await http.put(`/providers/${id}`, body)
       toast.success('保存成功')
       setDetailCache(prev => { const n = { ...prev }; delete n[id]; return n })
       setExpanded(prev => ({ ...prev, [id]: false }))
@@ -212,15 +196,7 @@ const ProvidersManagementPage = () => {
     if (!createForm.name.trim()) { toast.error('名称不能为空'); return }
     setCreating(true)
     try {
-      const res = await fetch(`${API_BASE}/providers`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(createForm),
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.detail || `创建失败 (${res.status})`)
-      }
+      await http.post('/providers', createForm)
       toast.success(`提供商 "${createForm.name}" 已创建`)
       setCreateOpen(false)
       setCreateForm(EMPTY_CREATE_FORM)
