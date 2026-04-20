@@ -1,4 +1,4 @@
-import { FC, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type FC } from 'react'
 import { AlertCircle, Info, AlertTriangle, WifiOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTaskStore } from '@/store/taskStore'

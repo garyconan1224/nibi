@@ -8,7 +8,6 @@
 
 // ── 模拟场景：创建并监听任务轮询 ──
 
-import { useTaskStore } from '@/store/taskStore'
 import { isTaskTerminal } from '@/types/task'
 import type { TaskRecord } from '@/types/task'
 

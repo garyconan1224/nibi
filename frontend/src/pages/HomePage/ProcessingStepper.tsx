@@ -1,4 +1,4 @@
-import { FC } from 'react'
+import type { FC } from 'react'
 import { Zap, Download, Subtitles, Eye, BookMarked, CheckCircle2, XCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TaskStatus, PROCESSING_STAGES } from '@/types/task'
