@@ -44,12 +44,15 @@ const TaskLogViewer: FC<TaskLogViewerProps> = ({ taskId }) => {
   const [logs, setLogs] = useState<TaskLogEntry[]>([])
   const [connected, setConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
+  // 日志容器 ref：用于直接操作 scrollTop，避免 scrollIntoView 冒泡到父级 ScrollArea
+  const containerRef = useRef<HTMLDivElement>(null)
+  // 粘性底部：记录用户是否正在查阅历史（距底部 > 80px 时暂停自动滚动）
+  const isAtBottomRef = useRef(true)
   const esRef = useRef<EventSource | null>(null)
 
-  // 从 store 同步任务状态更新（SSE task 事件触发）
   const updateTask = useTaskStore((s) => s.updateTask)
 
+  // ── SSE 连接 ─────────────────────────────────────────────────
   useEffect(() => {
     if (!taskId) return
 
@@ -68,7 +71,6 @@ const TaskLogViewer: FC<TaskLogViewerProps> = ({ taskId }) => {
         if (data.type === 'log') {
           setLogs((prev) => [...prev, data.entry])
         } else if (data.type === 'task') {
-          // 同步进度与状态到 Zustand store
           updateTask(data.task.task_id, {
             status: data.task.status,
             progress: data.task.progress,
@@ -91,9 +93,21 @@ const TaskLogViewer: FC<TaskLogViewerProps> = ({ taskId }) => {
     }
   }, [taskId, updateTask])
 
-  // 新日志到达时自动滚到底部
+  // ── 粘性底部：监听用户手动滚动 ───────────────────────────────
+  const handleScroll = () => {
+    const el = containerRef.current
+    if (!el) return
+    // 距底部 80px 以内视为"在底部"
+    isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+  }
+
+  // ── 新日志到达时，仅在粘性底部模式下滚动 ──────────────────────
+  // 使用 scrollTop = scrollHeight（只滚本容器），而非 scrollIntoView（会冒泡到父级 ScrollArea）
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (!isAtBottomRef.current) return
+    const el = containerRef.current
+    if (!el) return
+    el.scrollTop = el.scrollHeight
   }, [logs])
 
   return (
@@ -118,8 +132,12 @@ const TaskLogViewer: FC<TaskLogViewerProps> = ({ taskId }) => {
         )}
       </div>
 
-      {/* 日志内容区 */}
-      <div className="max-h-56 overflow-y-auto bg-gray-950 px-4 py-3 font-mono text-xs">
+      {/* 日志内容区：ref 指向本容器，onScroll 检测用户是否在查阅历史 */}
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="max-h-56 overflow-y-auto bg-gray-950 px-4 py-3 font-mono text-xs"
+      >
         {logs.length === 0 && (
           <p className="text-gray-600">等待日志...</p>
         )}
@@ -137,8 +155,6 @@ const TaskLogViewer: FC<TaskLogViewerProps> = ({ taskId }) => {
             </div>
           )
         })}
-        {/* 自动滚底锚点 */}
-        <div ref={bottomRef} />
       </div>
     </div>
   )
