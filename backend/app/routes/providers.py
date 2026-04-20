@@ -33,7 +33,7 @@ class ProviderUpdateRequest(BaseModel):
 
 
 @router.get("")
-def list_providers() -> Dict[str, Any]:
+def list_providers() -> list[Dict[str, Any]]:
     """获取所有配置的提供商列表"""
     settings = load_settings()
     out: list = []
