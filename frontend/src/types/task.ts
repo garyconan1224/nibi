@@ -55,11 +55,42 @@ export interface TaskListResponse {
   data: TaskRecord[]
 }
 
+/** analyze 任务 payload（与后端 pipeline analyze handler 对齐） */
+export interface AnalyzePayload {
+  url: string
+  model_name: string
+  provider_id: string
+  quality: 'fast' | 'medium' | 'slow'
+  format: string[]
+  style: 'academic' | 'minimalist' | 'creative'
+  screenshot: boolean
+  link: boolean
+  video_understanding: boolean
+  video_interval: number
+  grid_size: [number, number]
+  extras?: string
+  browser?: string
+  proxy?: string
+  format_selector?: string
+  cookie_base_dirs?: string[]
+}
+
+/** download 任务 payload */
+export interface DownloadPayload {
+  url: string
+  browser?: string
+  proxy?: string
+  po_token?: string
+  visitor_data?: string
+  format_selector?: string
+  cookie_base_dirs?: string[]
+}
+
 // 任务创建请求
 export interface TaskCreateRequest {
   project_id: string
-  task_type: string
-  payload: Record<string, any>
+  task_type: 'download' | 'analyze' | 'create' | 'storyboard'
+  payload: AnalyzePayload | DownloadPayload | Record<string, unknown>
 }
 
 // 任务创建响应
