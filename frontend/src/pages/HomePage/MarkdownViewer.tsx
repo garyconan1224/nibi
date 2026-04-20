@@ -177,9 +177,11 @@ const MarkdownViewer: FC = () => {
         <div className="px-8 py-6">
           {markdown ? (
             <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              remarkPlugins={[remarkGfm as any]}
               rehypePlugins={[rehypeHighlight]}
-              components={mdComponents}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              components={mdComponents as any}
             >
               {markdown}
             </ReactMarkdown>
