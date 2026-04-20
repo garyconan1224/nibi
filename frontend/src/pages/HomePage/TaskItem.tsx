@@ -1,5 +1,5 @@
 import { useState, type FC } from 'react'
-import { ChevronDown, ChevronUp, AlertCircle, Info, AlertTriangle } from 'lucide-react'
+import { ChevronDown, ChevronUp, AlertCircle, Info, AlertTriangle, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   type TaskRecord,
@@ -8,6 +8,7 @@ import {
   getStatusColor,
   isTaskTerminal,
 } from '@/types/task'
+import { useTaskStore } from '@/store/taskStore'
 import ProcessingStepper from './ProcessingStepper'
 import TaskLogViewer from './TaskLogViewer'
 
@@ -42,8 +43,19 @@ interface TaskItemProps {
  */
 const TaskItem: FC<TaskItemProps> = ({ task, onSelect }) => {
   const [expanded, setExpanded] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+  const cancelTask = useTaskStore((s) => s.cancelTask)
 
   const isActive = !isTaskTerminal(task.status) && task.status !== 'PENDING'
+  // 仅 PENDING / DOWNLOADING / ANALYZING / SUMMARIZING 状态可取消
+  const isCancellable = !isTaskTerminal(task.status)
+
+  const handleCancel = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setCancelling(true)
+    await cancelTask(task.task_id)
+    setCancelling(false)
+  }
   const shortId = task.task_id.slice(0, 8)
   const progressPct = Math.round(task.progress * 100)
 
@@ -96,6 +108,20 @@ const TaskItem: FC<TaskItemProps> = ({ task, onSelect }) => {
         >
           {getStatusText(task.status)}
         </span>
+
+        {/* 取消按钮（仅非终结状态显示） */}
+        {isCancellable && (
+          <button
+            type="button"
+            aria-label="取消任务"
+            onClick={handleCancel}
+            disabled={cancelling}
+            title="取消任务"
+            className="shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-40"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
 
         {/* 展开日志按钮 */}
         <button

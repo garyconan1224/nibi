@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { TaskRecord } from '@/types/task'
 import { isTaskTerminal } from '@/types/task'
+import { cancelPipelineTask } from '@/services/pipeline'
 
 interface TaskStoreState {
   // 状态
@@ -15,6 +16,7 @@ interface TaskStoreState {
   updateTask: (taskId: string, task: Partial<TaskRecord>) => void
   setCurrentTask: (taskId: string | null) => void
   setIsPolling: (isPolling: boolean) => void
+  cancelTask: (taskId: string) => Promise<void>
 
   // 便利方法
   getTask: (taskId: string) => TaskRecord | undefined
@@ -67,6 +69,20 @@ export const useTaskStore = create<TaskStoreState>()(
 
       setCurrentTask: (taskId) => set({ currentTaskId: taskId }),
       setIsPolling: (isPolling) => set({ isPolling }),
+
+      // 调用后端 cancel 接口，并乐观地更新本地状态为 CANCELLED
+      cancelTask: async (taskId) => {
+        try {
+          await cancelPipelineTask(taskId)
+          set((state) => ({
+            tasks: state.tasks.map((t) =>
+              t.task_id === taskId ? { ...t, status: 'CANCELLED' } : t
+            ),
+          }))
+        } catch (err) {
+          console.error(`[taskStore] cancelTask ${taskId} failed:`, err)
+        }
+      },
 
       getTask: (taskId) => {
         const tasks = get().tasks
