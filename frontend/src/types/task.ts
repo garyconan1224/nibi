@@ -91,6 +91,8 @@ export interface TaskCreateRequest {
   project_id: string
   task_type: 'download' | 'analyze' | 'create' | 'storyboard' | 'note'
   payload: AnalyzePayload | DownloadPayload | Record<string, unknown>
+  /** 可选步骤编排，仅对 note 任务生效。默认全量执行。 */
+  steps?: string[]
 }
 
 // 任务创建响应
