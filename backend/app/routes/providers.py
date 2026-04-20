@@ -3,8 +3,9 @@ from __future__ import annotations
 """Provider management endpoints."""
 
 from dataclasses import asdict, replace
-from typing import Any, Dict
+from typing import Any, Dict, List
 
+import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -50,6 +51,39 @@ def list_providers() -> list[Dict[str, Any]]:
             }
         )
     return out
+
+
+@router.get("/{provider_id}/models")
+async def get_provider_models(provider_id: str) -> Dict[str, Any]:
+    """调用上游 {base_url}/models 获取该 provider 支持的模型列表。
+    返回格式: {"models": [{"id": "...", "name": "..."}]}
+    失败时返回: {"models": [], "error": "错误信息"}，不抛 500。
+    """
+    settings = load_settings()
+    profile = next((p for p in settings.providers if p.id == provider_id), None)
+    if profile is None:
+        raise HTTPException(status_code=404, detail=f"provider not found: {provider_id}")
+
+    base_url = profile.base_url.rstrip("/") or "https://api.siliconflow.cn/v1"
+    url = f"{base_url}/models"
+    headers = {"Authorization": f"Bearer {profile.api_key}"}
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(url, headers=headers)
+            resp.raise_for_status()
+            raw = resp.json()
+    except Exception as exc:  # noqa: BLE001
+        return {"models": [], "error": str(exc)}
+
+    # OpenAI 标准格式: {"data": [{"id": "...", "object": "model", ...}]}
+    data_list: list = raw.get("data", []) if isinstance(raw, dict) else []
+    models: List[Dict[str, str]] = [
+        {"id": item["id"], "name": item.get("name") or item["id"]}
+        for item in data_list
+        if isinstance(item, dict) and item.get("id")
+    ]
+    return {"models": models}
 
 
 @router.get("/{provider_id}")

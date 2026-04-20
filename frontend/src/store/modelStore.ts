@@ -1,3 +1,8 @@
+/**
+ * @deprecated modelStore 中的硬编码模型列表已被 providerStore.providerModels 取代。
+ * 该文件暂时保留作为 fallback，后续重构时统一清理。
+ * 请优先使用 useProviderStore().providerModels[provider_id] 获取动态模型列表。
+ */
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
