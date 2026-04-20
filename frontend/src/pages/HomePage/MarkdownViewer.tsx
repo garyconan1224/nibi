@@ -11,6 +11,7 @@ import {
   FileText,
   GitFork,
   Captions,
+  Eye,
   Info,
   Loader2,
   AlertCircle,
@@ -281,9 +282,19 @@ export default function MarkdownViewer() {
   // 非 SUCCESS：显示 Loading
   if (status !== TaskStatus.SUCCESS) return <LoadingState />
 
-  // analyze/create/storyboard 成功 → 4 Tabs
+  // analyze/create/storyboard/note 成功 → 按 completed_steps 展示 Tabs
+  const completedSteps = (Array.isArray(result?.completed_steps) ? result.completed_steps : []) as string[]
   const markdown = String(result?.markdown || '')
   const transcript = String(result?.transcript || '')
+  const analysis = String(result?.analysis || '')
+
+  // 步骤未执行时的占位组件
+  const StepNotExecuted = ({ stepName }: { stepName: string }) => (
+    <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
+      <Info className="h-8 w-8 opacity-30" />
+      <p className="text-sm">「{stepName}」步骤未在本次任务中执行</p>
+    </div>
+  )
 
   return (
     <Tabs defaultValue="note" className="flex h-full flex-col overflow-hidden">
@@ -301,6 +312,10 @@ export default function MarkdownViewer() {
           <TabsTrigger value="transcript">
             <Captions className="h-3.5 w-3.5" />
             字幕
+          </TabsTrigger>
+          <TabsTrigger value="analysis">
+            <Eye className="h-3.5 w-3.5" />
+            分析
           </TabsTrigger>
           <TabsTrigger value="meta">
             <Info className="h-3.5 w-3.5" />
@@ -322,9 +337,61 @@ export default function MarkdownViewer() {
 
       {/* ── 笔记 Tab ── */}
       <TabsContent value="note" className="min-h-0 flex-1 overflow-hidden">
-        <ScrollArea className="h-full">
-          <div ref={printRef} className="px-8 py-6">
-            {markdown ? (
+        {completedSteps.length > 0 && !completedSteps.includes('note') ? (
+          <StepNotExecuted stepName="生成笔记" />
+        ) : (
+          <ScrollArea className="h-full">
+            <div ref={printRef} className="px-8 py-6">
+              {markdown ? (
+                <ReactMarkdown
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  remarkPlugins={[remarkGfm as any]}
+                  rehypePlugins={[rehypeHighlight]}
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  components={mdComponents as any}
+                >
+                  {markdown}
+                </ReactMarkdown>
+              ) : (
+                <p className="text-sm text-muted-foreground">笔记内容为空。</p>
+              )}
+            </div>
+          </ScrollArea>
+        )}
+      </TabsContent>
+
+      {/* ── 思维导图 Tab ── */}
+      <TabsContent value="mindmap" className="min-h-0 flex-1 overflow-hidden">
+        {completedSteps.length > 0 && !completedSteps.includes('note') ? (
+          <StepNotExecuted stepName="生成笔记" />
+        ) : (
+          <Suspense fallback={
+            <div className="flex h-full items-center justify-center gap-2 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span className="text-sm">加载思维导图模块...</span>
+            </div>
+          }>
+            <MarkmapComponent markdown={markdown} />
+          </Suspense>
+        )}
+      </TabsContent>
+
+      {/* ── 字幕 Tab ── */}
+      <TabsContent value="transcript" className="min-h-0 flex-1 overflow-hidden">
+        {completedSteps.length > 0 && !completedSteps.includes('transcribe') ? (
+          <StepNotExecuted stepName="转录音频" />
+        ) : (
+          <TranscriptTab transcript={transcript} />
+        )}
+      </TabsContent>
+
+      {/* ── 分析 Tab ── */}
+      <TabsContent value="analysis" className="min-h-0 flex-1 overflow-hidden">
+        {completedSteps.length > 0 && !completedSteps.includes('analyze') ? (
+          <StepNotExecuted stepName="视觉分析" />
+        ) : analysis.trim() ? (
+          <ScrollArea className="h-full">
+            <div className="px-8 py-6">
               <ReactMarkdown
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 remarkPlugins={[remarkGfm as any]}
@@ -332,30 +399,16 @@ export default function MarkdownViewer() {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 components={mdComponents as any}
               >
-                {markdown}
+                {analysis}
               </ReactMarkdown>
-            ) : (
-              <p className="text-sm text-muted-foreground">笔记内容为空。</p>
-            )}
+            </div>
+          </ScrollArea>
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
+            <Eye className="h-8 w-8 opacity-30" />
+            <p className="text-sm">暂无分析内容</p>
           </div>
-        </ScrollArea>
-      </TabsContent>
-
-      {/* ── 思维导图 Tab ── */}
-      <TabsContent value="mindmap" className="min-h-0 flex-1 overflow-hidden">
-        <Suspense fallback={
-          <div className="flex h-full items-center justify-center gap-2 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span className="text-sm">加载思维导图模块...</span>
-          </div>
-        }>
-          <MarkmapComponent markdown={markdown} />
-        </Suspense>
-      </TabsContent>
-
-      {/* ── 字幕 Tab ── */}
-      <TabsContent value="transcript" className="min-h-0 flex-1 overflow-hidden">
-        <TranscriptTab transcript={transcript} />
+        )}
       </TabsContent>
 
       {/* ── 元信息 Tab ── */}

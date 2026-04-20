@@ -38,7 +38,6 @@ import { useModelStore } from '@/store/modelStore'
 import { useProviderStore } from '@/store/providerStore'
 import { useConfigStore } from '@/store/configStore'
 import { QUALITY_OPTIONS, FORMAT_OPTIONS, STYLE_OPTIONS, PIPELINE_STEPS, DEFAULT_STEPS } from '@/constant/note'
-import type { PipelineStep } from '@/constant/note'
 import type { NoteFormat } from '@/store/configStore'
 
 /* ─── Zod Schema ─── */
