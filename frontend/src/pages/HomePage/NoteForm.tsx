@@ -60,10 +60,11 @@ function formatFileSize(bytes: number): string {
 const TASK_TYPES = ['note', 'download', 'analyze'] as const
 type PipelineTaskType = typeof TASK_TYPES[number]
 
-const TASK_TYPE_LABELS: Record<PipelineTaskType, string> = {
-  note:     '完整流程（下载 + 分析 + 汇总）',
-  download: '仅下载视频',
-  analyze:  '仅分析（已有视频）',
+/** 从勾选的 steps 动态推导 task_type */
+function deriveTaskType(steps: string[]): PipelineTaskType {
+  if (steps.includes('note')) return 'note'
+  if (steps.length === 1 && steps[0] === 'download') return 'download'
+  return 'analyze'
 }
 
 const formSchema = z.object({
@@ -164,10 +165,8 @@ const NoteForm = () => {
     },
   })
 
-  /* 监听 steps：当 task_type 不是 note 时无需步骤选择 */
+  /* 监听 steps，用于控制上传区域与 task_type 推导 */
   const watchedSteps = watch('steps')
-  const watchedTaskType = watch('task_type')
-  const isNoteTask = watchedTaskType === 'note'
   const hasDownloadStep = watchedSteps.includes('download')
 
   /**
@@ -175,7 +174,6 @@ const NoteForm = () => {
    * 勾选了 analyze 或 transcribe，但未勾选 download
    */
   const showLocalUpload =
-    isNoteTask &&
     watchedSteps.some(s => ['analyze', 'transcribe'].includes(s)) &&
     !hasDownloadStep
 
@@ -230,9 +228,12 @@ const NoteForm = () => {
         videoPath = uploaded.video_path
       }
 
+      // 从勾选的 steps 推导 task_type，不依赖 form field
+      const taskType = deriveTaskType(values.steps)
+
       const body = {
         project_id: projectId,
-        task_type:  values.task_type as 'note' | 'download' | 'analyze',
+        task_type:  taskType,
         payload: {
           // 本地上传时用 video_path，否则用 URL 输入框的值
           url:                 videoPath ?? values.url,
@@ -253,8 +254,8 @@ const NoteForm = () => {
           format_selector:     'best',
           cookie_base_dirs:    [],
         },
-        // 仅 note 任务传递 steps，其他任务类型忽略
-        ...(values.task_type === 'note' ? { steps: values.steps } : {}),
+        // 始终传递 steps，让后端按照用户勾选的流程执行
+        steps: values.steps,
       }
 
       const { task_id } = await createPipelineTask(body)
@@ -262,7 +263,7 @@ const NoteForm = () => {
       addTask({
         task_id,
         project_id:       projectId,
-        task_type:        values.task_type,
+        task_type:        taskType,
         payload:          body.payload,
         status:           'PENDING',
         progress:         0,
@@ -291,31 +292,6 @@ const NoteForm = () => {
       <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
         <Link2 className="h-4 w-4 text-primary" />
         <span>新建笔记</span>
-      </div>
-
-      {/* ── 任务类型选择 ── */}
-      <div className="flex flex-col gap-1.5">
-        <Label className="text-xs text-muted-foreground">执行模式</Label>
-        <Controller
-          name="task_type"
-          control={control}
-          render={({ field }) => (
-            <RadioGroup
-              value={field.value}
-              onValueChange={field.onChange}
-              className="flex flex-col gap-1"
-            >
-              {TASK_TYPES.map((type) => (
-                <div key={type} className="flex items-center gap-2">
-                  <RadioGroupItem value={type} id={`task-type-${type}`} />
-                  <Label htmlFor={`task-type-${type}`} className="text-xs cursor-pointer leading-tight">
-                    {TASK_TYPE_LABELS[type]}
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
-          )}
-        />
       </div>
 
       {/* ── URL 输入（仅在不显示本地上传时展示）── */}
@@ -591,9 +567,8 @@ const NoteForm = () => {
         </CollapsibleTrigger>
 
         <CollapsibleContent className="mt-3 flex flex-col gap-3">
-          {/* ── 步骤选择器（仅 note 任务显示）── */}
-          {isNoteTask && (
-            <div className="flex flex-col gap-1.5">
+          {/* ── 步骤选择器（始终显示，通过 steps 推导 task_type）── */}
+          <div className="flex flex-col gap-1.5">
               <Label className="text-xs text-muted-foreground">执行步骤（可自由组合）</Label>
               <Controller
                 name="steps"
@@ -641,8 +616,7 @@ const NoteForm = () => {
               {errors.steps && (
                 <p className="text-xs text-red-500">{errors.steps.message}</p>
               )}
-            </div>
-          )}
+          </div>
 
           {/* screenshot */}
           <div className="flex items-center justify-between">
