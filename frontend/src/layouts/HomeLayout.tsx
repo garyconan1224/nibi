@@ -9,6 +9,7 @@ import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from '@/componen
 import { ScrollArea } from '@/components/ui/scroll-area.tsx'
 import type { ImperativePanelHandle } from 'react-resizable-panels'
 import { useBackendHealth } from '@/hooks/useBackendHealth'
+import ThemeSwitcher from '@/components/ThemeSwitcher'
 
 const HomeLayout: FC = () => {
   const [isLeftCollapsed, setIsLeftCollapsed] = useState(false)
@@ -44,6 +45,7 @@ const HomeLayout: FC = () => {
                   {health === null ? '检测中...' : health ? '✅ 后端在线' : '❌ 后端离线'}
                 </span>
                 <div className="flex items-center gap-1">
+                  <ThemeSwitcher />
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
