@@ -40,7 +40,17 @@ import { QUALITY_OPTIONS, FORMAT_OPTIONS, STYLE_OPTIONS } from '@/constant/note'
 import type { NoteFormat } from '@/store/configStore'
 
 /* ─── Zod Schema ─── */
+const TASK_TYPES = ['note', 'download', 'analyze'] as const
+type PipelineTaskType = typeof TASK_TYPES[number]
+
+const TASK_TYPE_LABELS: Record<PipelineTaskType, string> = {
+  note:     '完整流程（下载 + 分析 + 汇总）',
+  download: '仅下载视频',
+  analyze:  '仅分析（已有视频）',
+}
+
 const formSchema = z.object({
+  task_type:           z.enum(TASK_TYPES),
   url:                 z.string().url({ message: '请输入有效的视频 URL' }),
   provider_id:         z.string().min(1, { message: '请选择提供商' }),
   model_id:            z.string().min(1, { message: '请选择模型' }),
@@ -91,6 +101,7 @@ const NoteForm = () => {
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      task_type:           'note' as PipelineTaskType,
       url:                 '',
       provider_id:         defaultProviderId,
       model_id:            currentModelId ?? models[0]?.model_id ?? '',
@@ -151,7 +162,7 @@ const NoteForm = () => {
       const projectId = crypto.randomUUID()
       const body = {
         project_id: projectId,
-        task_type:  'note' as const,
+        task_type:  values.task_type as 'note' | 'download' | 'analyze',
         payload: {
           url:                 values.url,
           model_name:          values.model_id,
@@ -177,7 +188,7 @@ const NoteForm = () => {
       addTask({
         task_id,
         project_id:       projectId,
-        task_type:        body.task_type,
+        task_type:        values.task_type,
         payload:          body.payload,
         status:           'PENDING',
         progress:         0,
@@ -206,6 +217,31 @@ const NoteForm = () => {
       <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
         <Link2 className="h-4 w-4 text-primary" />
         <span>新建笔记</span>
+      </div>
+
+      {/* ── 任务类型选择 ── */}
+      <div className="flex flex-col gap-1.5">
+        <Label className="text-xs text-muted-foreground">执行模式</Label>
+        <Controller
+          name="task_type"
+          control={control}
+          render={({ field }) => (
+            <RadioGroup
+              value={field.value}
+              onValueChange={field.onChange}
+              className="flex flex-col gap-1"
+            >
+              {TASK_TYPES.map((type) => (
+                <div key={type} className="flex items-center gap-2">
+                  <RadioGroupItem value={type} id={`task-type-${type}`} />
+                  <Label htmlFor={`task-type-${type}`} className="text-xs cursor-pointer leading-tight">
+                    {TASK_TYPE_LABELS[type]}
+                  </Label>
+                </div>
+              ))}
+            </RadioGroup>
+          )}
+        />
       </div>
 
       {/* ── URL 输入 ── */}
