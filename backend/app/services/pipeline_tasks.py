@@ -178,29 +178,42 @@ def handle_storyboard_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, 
     return result
 
 
+def _persist_intermediate(runner: TaskRunner, task_id: str, result_patch: Dict[str, Any]) -> None:
+    """将中间结果合并写入 task.result，保留已有字段。"""
+    rec = runner.store.get(task_id)
+    merged = dict(rec.result) if rec and rec.result else {}
+    merged.update(result_patch)
+    runner.store.update(task_id, result=merged)
+
+
 def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
-    """复合笔记任务：下载视频 → 视觉分析 → 汇总 markdown 结果。
+    """复合笔记任务：按 payload.steps 动态编排执行步骤。
+
+    支持的步骤：download / transcribe / analyze / note
+    未指定 steps 时默认全量执行。
 
     状态机流转（task_runner._run 已将入口置为 DOWNLOADING）：
-      DOWNLOADING → (下载完成) → ANALYZING → (分析完成) → SUMMARIZING → (return) → SUCCESS
+      各步骤对应状态 → (全部完成) → SUCCESS
     """
     payload = record.payload
     task_id = record.task_id
+
+    # ── 0. 解析步骤列表 ────────────────────────────────────────
+    steps: List[str] = payload.get("steps") or ["download", "transcribe", "analyze", "note"]
+    completed_steps: List[str] = []
 
     # ── 1. 取 payload 字段 ─────────────────────────────────────
     url = str(payload.get("url") or payload.get("video_url") or "").strip()
     if not url:
         raise ValueError("note task 需要 payload.url 或 payload.video_url")
 
+    settings = load_settings()
     api_key = (
         str(payload.get("api_key") or "").strip()
-        or load_settings().openai_api_key.strip()
+        or settings.openai_api_key.strip()
     )
-    if not api_key:
-        raise ValueError("note task 需要 api_key（payload 或 settings）")
-
-    vision_model = str(payload.get("vision_model") or "").strip() or load_settings().vision_model
-    text_model = str(payload.get("text_model") or "").strip() or load_settings().text_model
+    vision_model = str(payload.get("vision_model") or "").strip() or settings.vision_model
+    text_model = str(payload.get("text_model") or "").strip() or settings.text_model
 
     # ── 2. 准备项目目录 ────────────────────────────────────────
     project_video_dir = get_project_videos_dir(record.project_id)
@@ -208,83 +221,142 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     project_json_dir = get_project_json_dir(record.project_id)
     project_json_dir.mkdir(parents=True, exist_ok=True)
 
-    # ── 3. 下载阶段（task_runner 已设 DOWNLOADING）─────────────
-    runner.set_progress(task_id, 0.02, "开始下载视频...")
+    # 中间产出容器
+    transcript_text = ""
+    analysis_text = ""
+    markdown = ""
+    download_save_path = ""
 
-    raw_dirs = payload.get("cookie_base_dirs")
-    cookie_base_dirs_list: Optional[List[str]] = (
-        [str(x) for x in raw_dirs] if isinstance(raw_dirs, list) and raw_dirs else None
-    )
+    # ── 3. download 步骤 ───────────────────────────────────────
+    if "download" in steps:
+        runner.store.update(task_id, status=TaskStatus.DOWNLOADING.value)
+        runner.set_progress(task_id, 0.02, "开始下载视频...")
 
-    out = run_ytdlp_download(
-        url=url,
-        output_dir=str(project_video_dir),
-        browser=str(payload.get("browser") or "chrome"),
-        proxy=str(payload.get("proxy") or ""),
-        po_token=str(payload.get("po_token") or ""),
-        visitor_data=str(payload.get("visitor_data") or ""),
-        format_selector=str(payload.get("format_selector") or "best"),
-        cookie_base_dirs_list=cookie_base_dirs_list,
-        log=lambda m: runner.append_log(task_id, m),
-        # 下载进度映射到 2%–30%
-        progress_callback=lambda p, msg: runner.set_progress(task_id, 0.02 + p * 0.28, msg),
-    )
-    if not out.get("ok"):
-        err = (out.get("error_full") or out.get("error") or "download failed").strip()
-        raise RuntimeError(f"下载失败: {err}")
+        raw_dirs = payload.get("cookie_base_dirs")
+        cookie_base_dirs_list: Optional[List[str]] = (
+            [str(x) for x in raw_dirs] if isinstance(raw_dirs, list) and raw_dirs else None
+        )
 
-    # ── 4. 分析阶段 ──────────────────────────────────────────
-    runner.store.update(task_id, status=TaskStatus.ANALYZING.value)
-    runner.set_progress(task_id, 0.32, "下载完成，开始视觉帧分析...")
+        out = run_ytdlp_download(
+            url=url,
+            output_dir=str(project_video_dir),
+            browser=str(payload.get("browser") or "chrome"),
+            proxy=str(payload.get("proxy") or ""),
+            po_token=str(payload.get("po_token") or ""),
+            visitor_data=str(payload.get("visitor_data") or ""),
+            format_selector=str(payload.get("format_selector") or "best"),
+            cookie_base_dirs_list=cookie_base_dirs_list,
+            log=lambda m: runner.append_log(task_id, m),
+            progress_callback=lambda p, msg: runner.set_progress(task_id, 0.02 + p * 0.28, msg),
+        )
+        if not out.get("ok"):
+            err = (out.get("error_full") or out.get("error") or "download failed").strip()
+            raise RuntimeError(f"下载失败: {err}")
 
-    videos = find_videos(project_video_dir)
-    if not videos:
-        raise ValueError(f"下载后未在 {project_video_dir} 找到视频文件")
+        download_save_path = str(out.get("save_path") or "")
+        completed_steps.append("download")
+        _persist_intermediate(runner, task_id, {
+            "completed_steps": completed_steps[:],
+            "video_file": download_save_path,
+        })
 
-    state = run_batch_analysis(
-        api_key=api_key,
-        video_paths=videos,
-        vision_model=vision_model,
-        text_model=text_model,
-        auto_sync_json=True,
-        target_json_dir=project_json_dir,
-    )
+    # ── 4. transcribe 步骤 ─────────────────────────────────────
+    if "transcribe" in steps:
+        # 前置检查：若未执行 download，检查本地是否存在视频文件
+        if "download" not in steps:
+            videos = find_videos(project_video_dir)
+            if not videos:
+                raise ValueError("本地视频文件不存在，请先执行下载步骤")
 
-    while not state.finished:
-        if runner.is_cancel_requested(task_id):
-            break
-        snaps = state.snapshot()
-        if snaps:
-            avg = sum(float(s["percent"]) for s in snaps) / max(len(snaps), 1) / 100.0
-            # 分析进度映射到 32%–85%
-            runner.set_progress(task_id, min(0.85, 0.32 + avg * 0.53), "视觉帧分析中...")
-        time.sleep(0.2)
+        runner.store.update(task_id, status=TaskStatus.TRANSCRIBING.value)
+        runner.set_progress(task_id, 0.32, "开始转录音频...")
 
-    # ── 5. 汇总 markdown（SUMMARIZING 阶段）──────────────────
-    runner.store.update(task_id, status=TaskStatus.SUMMARIZING.value)
-    runner.set_progress(task_id, 0.90, "整理笔记内容...")
+        from backend.app.services.transcript_service import get_transcript
+        transcript_result = get_transcript(url)
+        transcript_text = str(transcript_result.get("text") or "")
 
-    # 收集各视频生成的 markdown 文件（run_batch_analysis 写入 *_分析报告/ 子目录）
-    md_parts: List[str] = []
-    for video_path in videos:
-        safe_name = get_safe_name(video_path)
-        output_dir = get_output_dir(video_path)
-        md_file = output_dir / (safe_name + "_图文分镜.md")
-        if md_file.exists():
-            md_parts.append(md_file.read_text(encoding="utf-8"))
+        completed_steps.append("transcribe")
+        _persist_intermediate(runner, task_id, {
+            "transcript": transcript_text,
+            "completed_steps": completed_steps[:],
+        })
 
-    markdown = (
-        "\n\n---\n\n".join(md_parts)
-        if md_parts
-        else "（分析完成，未生成 markdown 文件，请检查日志）"
-    )
+    # ── 5. analyze 步骤 ────────────────────────────────────────
+    if "analyze" in steps:
+        if not api_key:
+            raise ValueError("analyze 步骤需要 api_key（payload 或 settings）")
+
+        # 前置检查：需确保本地存在视频文件
+        videos = find_videos(project_video_dir)
+        if not videos:
+            raise ValueError("本地视频文件不存在，请先执行下载步骤")
+
+        runner.store.update(task_id, status=TaskStatus.ANALYZING.value)
+        runner.set_progress(task_id, 0.50, "开始视觉帧分析...")
+
+        state = run_batch_analysis(
+            api_key=api_key,
+            video_paths=videos,
+            vision_model=vision_model,
+            text_model=text_model,
+            auto_sync_json=True,
+            target_json_dir=project_json_dir,
+        )
+
+        while not state.finished:
+            if runner.is_cancel_requested(task_id):
+                break
+            snaps = state.snapshot()
+            if snaps:
+                avg = sum(float(s["percent"]) for s in snaps) / max(len(snaps), 1) / 100.0
+                runner.set_progress(task_id, min(0.85, 0.50 + avg * 0.35), "视觉帧分析中...")
+            time.sleep(0.2)
+
+        # 收集分析产出的 markdown 文件
+        md_parts: List[str] = []
+        for video_path in videos:
+            safe_name = get_safe_name(video_path)
+            output_dir = get_output_dir(video_path)
+            md_file = output_dir / (safe_name + "_图文分镜.md")
+            if md_file.exists():
+                md_parts.append(md_file.read_text(encoding="utf-8"))
+        analysis_text = "\n\n---\n\n".join(md_parts) if md_parts else ""
+
+        completed_steps.append("analyze")
+        _persist_intermediate(runner, task_id, {
+            "analysis": analysis_text,
+            "completed_steps": completed_steps[:],
+        })
+
+    # ── 6. note 步骤（汇总 markdown）──────────────────────────
+    if "note" in steps:
+        runner.store.update(task_id, status=TaskStatus.SUMMARIZING.value)
+        runner.set_progress(task_id, 0.90, "整理笔记内容...")
+
+        # 数据源优先级：analyze 产出 > transcribe 文本 > 空字符串
+        source_text = analysis_text or transcript_text or ""
+        if source_text:
+            markdown = source_text
+        else:
+            markdown = "（未找到可用的分析或转录内容，请检查前置步骤是否已执行）"
+
+        completed_steps.append("note")
+        _persist_intermediate(runner, task_id, {
+            "markdown": markdown,
+            "completed_steps": completed_steps[:],
+        })
+
+    # ── 7. 构建最终返回结果 ────────────────────────────────────
+    runner.set_progress(task_id, 0.98, "任务完成")
 
     json_paths = sorted(project_json_dir.glob("*_视觉数据.json"))
-    runner.set_progress(task_id, 0.98, "笔记生成完成")
 
     return {
+        "transcript":            transcript_text,
+        "analysis":              analysis_text,
         "markdown":              markdown,
-        "video_file":            str(out.get("save_path") or ""),
+        "completed_steps":       completed_steps,
+        "video_file":            download_save_path,
         "json_outputs":          [str(p.resolve()) for p in json_paths],
         "json_output_basenames": [p.name for p in json_paths],
         "json_output_dir":       str(project_json_dir.resolve()),
