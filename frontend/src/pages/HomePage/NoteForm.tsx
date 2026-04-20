@@ -151,7 +151,7 @@ const NoteForm = () => {
       const projectId = crypto.randomUUID()
       const body = {
         project_id: projectId,
-        task_type:  'analyze' as const,
+        task_type:  'note' as const,
         payload: {
           url:                 values.url,
           model_name:          values.model_id,
