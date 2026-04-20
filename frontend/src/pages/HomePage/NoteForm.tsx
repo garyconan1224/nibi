@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -6,14 +6,18 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  FileVideo,
   Link2,
   Loader2,
   Send,
   Settings2,
+  Upload,
+  X,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Progress } from '@/components/ui/progress'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -32,6 +36,7 @@ import {
 } from '@/components/ui/collapsible'
 
 import { createPipelineTask } from '@/services/pipeline'
+import { uploadLocalFile } from '@/services/upload'
 import { useTaskStore } from '@/store/taskStore'
 // @deprecated: useModelStore 已被 providerStore.providerModels 取代，保留文件备用，后续清理
 import { useModelStore } from '@/store/modelStore'
@@ -39,6 +44,17 @@ import { useProviderStore } from '@/store/providerStore'
 import { useConfigStore } from '@/store/configStore'
 import { QUALITY_OPTIONS, FORMAT_OPTIONS, STYLE_OPTIONS, PIPELINE_STEPS, DEFAULT_STEPS } from '@/constant/note'
 import type { NoteFormat } from '@/store/configStore'
+
+/* ─── 本地上传允许的文件类型 ─── */
+const ACCEPTED_EXTENSIONS = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.mp3', '.wav', '.m4a']
+const ACCEPTED_MIME = 'video/*,audio/*'
+
+/** 字节数格式化为人类可读字符串 */
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
 
 /* ─── Zod Schema ─── */
 const TASK_TYPES = ['note', 'download', 'analyze'] as const
@@ -52,7 +68,8 @@ const TASK_TYPE_LABELS: Record<PipelineTaskType, string> = {
 
 const formSchema = z.object({
   task_type:           z.enum(TASK_TYPES),
-  url:                 z.string().url({ message: '请输入有效的视频 URL' }),
+  // 允许空字符串（本地上传模式下 URL 为空）
+  url:                 z.string(),
   provider_id:         z.string().min(1, { message: '请选择提供商' }),
   model_id:            z.string().min(1, { message: '请选择模型' }),
   quality:             z.enum(['fast', 'medium', 'slow']),
@@ -74,6 +91,32 @@ type FormValues = z.infer<typeof formSchema>
 const NoteForm = () => {
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [submitError, setSubmitError]   = useState<string | null>(null)
+
+  /* ── 本地文件上传相关 state ── */
+  const [localFile, setLocalFile]         = useState<File | null>(null)
+  const [uploadProgress, setUploadProgress] = useState<number>(0)
+  const [isDragOver, setIsDragOver]       = useState(false)
+  const fileInputRef                       = useRef<HTMLInputElement>(null)
+
+  /** 验证并选定文件（拖拽 / 点击共用） */
+  const handleFileSelect = useCallback((file: File) => {
+    const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+    const isMimeOk = file.type.startsWith('video/') || file.type.startsWith('audio/')
+    const isExtOk  = ACCEPTED_EXTENSIONS.includes(ext)
+    if (!isMimeOk && !isExtOk) return // 忽略不支持的文件类型
+    setLocalFile(file)
+    setUploadProgress(0)
+  }, [])
+
+  /* 拖拽事件处理 */
+  const onDragOver  = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true) }, [])
+  const onDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(false) }, [])
+  const onDrop      = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+    const file = e.dataTransfer.files[0]
+    if (file) handleFileSelect(file)
+  }, [handleFileSelect])
 
   /* stores */
   const { addTask, setCurrentTask }                             = useTaskStore()
@@ -127,6 +170,15 @@ const NoteForm = () => {
   const isNoteTask = watchedTaskType === 'note'
   const hasDownloadStep = watchedSteps.includes('download')
 
+  /**
+   * 是否需要显示本地文件上传区：
+   * 勾选了 analyze 或 transcribe，但未勾选 download
+   */
+  const showLocalUpload =
+    isNoteTask &&
+    watchedSteps.some(s => ['analyze', 'transcribe'].includes(s)) &&
+    !hasDownloadStep
+
   /* 监听 provider 变化 → 触发拉取模型 & 自动切换到第一个模型 */
   const watchedProviderId = watch('provider_id')
   useEffect(() => {
@@ -168,12 +220,23 @@ const NoteForm = () => {
     })
 
     try {
-      const projectId = crypto.randomUUID()
+      // ── 若存在本地文件，先上传，获取 project_id ──
+      let projectId: string = crypto.randomUUID()
+      let videoPath: string | undefined
+
+      if (showLocalUpload && localFile) {
+        const uploaded = await uploadLocalFile(localFile, projectId, setUploadProgress)
+        projectId = uploaded.project_id
+        videoPath = uploaded.video_path
+      }
+
       const body = {
         project_id: projectId,
         task_type:  values.task_type as 'note' | 'download' | 'analyze',
         payload: {
-          url:                 values.url,
+          // 本地上传时用 video_path，否则用 URL 输入框的值
+          url:                 videoPath ?? values.url,
+          video_path:          videoPath,
           model_name:          values.model_id,
           provider_id:         values.provider_id,
           quality:             values.quality,
@@ -255,21 +318,98 @@ const NoteForm = () => {
         />
       </div>
 
-      {/* ── URL 输入 ── */}
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="url" className="text-xs text-muted-foreground">视频 URL</Label>
-        <input
-          id="url"
-          type="url"
-          placeholder="粘贴 YouTube / Bilibili 链接..."
-          disabled={isSubmitting}
-          className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
-          {...register('url')}
-        />
-        {errors.url && (
-          <p className="text-xs text-red-500">{errors.url.message}</p>
-        )}
-      </div>
+      {/* ── URL 输入（仅在不显示本地上传时展示）── */}
+      {!showLocalUpload && (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="url" className="text-xs text-muted-foreground">视频 URL</Label>
+          <input
+            id="url"
+            type="url"
+            placeholder="粘贴 YouTube / Bilibili 链接..."
+            disabled={isSubmitting}
+            className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+            {...register('url')}
+          />
+          {errors.url && (
+            <p className="text-xs text-red-500">{errors.url.message}</p>
+          )}
+        </div>
+      )}
+
+      {/* ── 本地文件上传区（勾选 analyze/transcribe 且未勾选 download 时显示）── */}
+      {showLocalUpload && (
+        <div className="flex flex-col gap-2">
+          <Label className="text-xs text-muted-foreground">本地音视频文件</Label>
+
+          {/* 隐藏的 file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPTED_MIME}
+            className="hidden"
+            onChange={e => {
+              const file = e.target.files?.[0]
+              if (file) handleFileSelect(file)
+              e.target.value = '' // 允许重复选同一文件
+            }}
+          />
+
+          {/* 拖拽 / 点击触发区域 */}
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label="上传本地视频或音频文件"
+            onClick={() => fileInputRef.current?.click()}
+            onKeyDown={e => e.key === 'Enter' && fileInputRef.current?.click()}
+            onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop}
+            className={[
+              'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 cursor-pointer transition-colors',
+              isDragOver
+                ? 'border-primary bg-primary/5 text-primary'
+                : 'border-neutral-300 bg-neutral-50 text-muted-foreground hover:border-primary/60 hover:bg-primary/5',
+              isSubmitting ? 'pointer-events-none opacity-50' : '',
+            ].join(' ')}
+          >
+            <Upload className="h-6 w-6 shrink-0" />
+            <p className="text-xs text-center leading-relaxed">
+              拖拽视频 / 音频到此处，或 <span className="text-primary font-medium">点击选择</span>
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              支持 {ACCEPTED_EXTENSIONS.join(' ')}
+            </p>
+          </div>
+
+          {/* 已选文件信息 + 上传进度 */}
+          {localFile && (
+            <div className="rounded-md border border-neutral-200 bg-white px-3 py-2.5 flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <FileVideo className="h-4 w-4 shrink-0 text-primary" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium truncate">{localFile.name}</p>
+                  <p className="text-[10px] text-muted-foreground">{formatFileSize(localFile.size)}</p>
+                </div>
+                <button
+                  type="button"
+                  aria-label="移除文件"
+                  disabled={isSubmitting}
+                  onClick={e => { e.stopPropagation(); setLocalFile(null); setUploadProgress(0) }}
+                  className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-red-500 disabled:opacity-40"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {uploadProgress > 0 && (
+                <div className="flex flex-col gap-1">
+                  <Progress value={uploadProgress} className="h-1.5" />
+                  <p className="text-[10px] text-muted-foreground text-right">{uploadProgress}%</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Provider → Model 二级下拉 ── */}
       <div className="grid grid-cols-2 gap-3">
