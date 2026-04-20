@@ -61,6 +61,7 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
     vision_model = str(payload.get("vision_model") or "").strip() or load_settings().vision_model
     text_model = str(payload.get("text_model") or "").strip() or load_settings().text_model
     project_video_dir = get_project_videos_dir(record.project_id)
+    project_video_dir.mkdir(parents=True, exist_ok=True)   # 确保目录存在，防止 FileNotFoundError
     project_json_dir = get_project_json_dir(record.project_id)
     project_json_dir.mkdir(parents=True, exist_ok=True)
     videos = find_videos(project_video_dir)
