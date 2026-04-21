@@ -235,6 +235,8 @@ def run_ytdlp_download(
     cookie_base_dirs_list: list[str] | None = None,
     log: Callable[[str], None] | None = None,
     progress_callback: Callable[[float, str], None] | None = None,
+    # 实时下载速度回调（字符串形式，例如 "1.23MiB/s"），供上层写入任务状态供前端展示
+    speed_callback: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     """
     执行多策略 yt-dlp 下载。
@@ -274,6 +276,9 @@ def run_ytdlp_download(
             task_state.update({"status": "downloading", "percent": percent, "speed": speed, "eta": eta})
             if progress_callback:
                 progress_callback(min(0.99, max(0.02, percent / 100.0)), f"{percent:.0f}% {speed} ETA {eta}")
+            # 独立地把实时速度字符串回调给上层，便于任务中心展示 MB/s / KB/s
+            if speed_callback:
+                speed_callback(speed)
         elif d.get("status") == "finished":
             filename = d.get("filename", "")
             save_path = os.path.abspath(filename) if filename else ""
