@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
+    "@lobehub/icons": "^5.5.4",
     "@tailwindcss/vite": "^4.2.2",
     "axios": "^1.15.0",
     "class-variance-authority": "^0.7.1",

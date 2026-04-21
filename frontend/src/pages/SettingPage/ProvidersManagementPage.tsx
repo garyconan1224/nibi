@@ -28,6 +28,9 @@ import {
   RotateCcw,
   Save,
 } from 'lucide-react'
+// 仅使用 Mono（单色）版本，通过最深子路径 import 避免 barrel 间接引入 antd-style
+import OpenAIMono from '@lobehub/icons/es/OpenAI/components/Mono'
+import AnthropicMono from '@lobehub/icons/es/Anthropic/components/Mono'
 import { http } from '@/services/client'
 
 /* ─── 类型定义 ─── */
@@ -433,8 +436,18 @@ const ProvidersManagementPage = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="openai_compatible">OpenAI Compatible</SelectItem>
-                  <SelectItem value="anthropic">Anthropic</SelectItem>
+                  <SelectItem value="openai_compatible">
+                    <span className="inline-flex items-center gap-2">
+                      <OpenAIMono size={16} />
+                      OpenAI Compatible
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="anthropic">
+                    <span className="inline-flex items-center gap-2">
+                      <AnthropicMono size={16} />
+                      Anthropic
+                    </span>
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
