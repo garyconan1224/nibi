@@ -83,9 +83,9 @@
    - `backend/app/downloaders/` 目录下的 `test_*.py` 与 `simple_test_v2.py` 迁至 `tests/backend/downloaders/`。
    - 删除 `src/vidmirror/ui/demo_sidebar.py`（如确未被引用）。
    - 移除 `pages/_legacy/*.bak` 与 `frontend/src/hooks/__tests__/usePipelineTasks.demo.ts`（迁出 `src/`）。
-   - **判定：⚠️ 部分完成（1/5）** — 仅 `usePipelineTasks.demo.ts` 已迁出（`297cf7d`）；其余 4 类文件均仍在：`bilibili_nocookie_temp.py`（498 行）、downloaders 下 4 个 test 文件、`demo_sidebar.py`、`pages/_legacy/*.bak`×3。注意：commit `c73829b` 标题"删除 bilibili_nocookie_temp.py 遗留文件"与实际变更不符。
+   - **判定：✅ 已完成** — 9 个遗留文件全部删除：`backend/app/services/bilibili_nocookie_temp.py`（498 行）、`backend/app/downloaders/{test_bilibili_nocookie,test_full_downloader,test_simple_download,simple_test_v2}.py`（4 个）、`src/vidmirror/ui/demo_sidebar.py`（140 行）、`pages/_legacy/{1_视频下载,2_视频分析,3_AI导演编剧工作台}.py.bak`（3 个）；commit `229fdc1`。
 5. 前端测试基建：`pnpm add -D vitest @testing-library/react jsdom`，新增 `"test"` script；补 `taskStore`、`usePipelineTasks`、`NoteForm` 的 smoke tests。
-   - **判定：⚠️ 部分完成** — 基建 ✅（commit `10282cb`）；`taskStore.test.ts`、`usePipelineTasks.test.ts` ✅；**`NoteForm` smoke test ❌ 未创建**。
+   - **判定：✅ 已完成** — 基建 ✅（commit `10282cb`）；`taskStore.test.ts`、`usePipelineTasks.test.ts` ✅；`NoteForm.test.tsx` 新增 3 个 smoke 测试用例（能否渲染 / 文本断言 / 初始化触发），通过 vi.hoisted + vi.mock 隔离依赖，补齐 ResizeObserver polyfill 兼容 Radix UI；commit `b62ee33`。
 6. 后端为 `video_analyzer` / `storyboard_generator` / `routes/notes.py` / `rag_qa_service` 各加 1 条 smoke test。
    - **判定：✅ 已完成** — 4 个对应 `tests/test_*_smoke.py` 均存在；commit `db19f11`。
 
@@ -95,7 +95,7 @@
 8. 统一前端 HTTP 客户端：`ProvidersManagementPage` 替换为 axios 实例（`services/client.ts`）。
    - **判定：✅ 已完成** — `frontend/src/pages/SettingPage/ProvidersManagementPage.tsx:30` 已改为 `import { http } from '@/services/client'`，无裸 `fetch`。
 9. 设置页补齐：Model / Transcriber / Screenshot 三页。
-   - **判定：⚠️ 部分完成（1/3）** — `ModelManagementPage.tsx` ✅；另外多出 `NetworkSettingsPage.tsx`（原清单未列）；**`TranscriberPage` ❌**、**`ScreenshotPage` ❌**。
+   - **判定：✅ 已完成** — `ModelManagementPage.tsx` ✅、`NetworkSettingsPage.tsx` ✅、`TranscriberPage.tsx` 新增（44 行骨架，预留 ASR 引擎配置）、`ScreenshotPage.tsx` 新增（44 行骨架，预留抽帧/拼图配置）；App.tsx 与 SettingLayout 同步注册路由与侧边菜单；commit `a832aa3`。
 10. 新增前端差量：ProjectSwitcher、AnalyzeView、StoryboardPanel；以 `task.type` 驱动路由与展示。
     - **判定：❌ 未开始** — 3 个组件均未在 `frontend/src/` 中创建。
 11. 统一 Provider 数据源（择一：`/providers/*` 或兼容层 `/api/provider/list`），另一套仅后端保留。
@@ -105,11 +105,11 @@
 
 ### 🟢 P3（打磨与收尾）
 13. 集成 ThemeSwitcher 与 LangSwitcher；落地 `locales/`。
-    - **判定：⚠️ 部分完成** — `ThemeSwitcher.tsx` ✅；`next-themes` / `i18next` / `react-i18next` 依赖 ✅；**`LangSwitcher` 组件 ❌**、**`locales/` 目录 ❌**。
+    - **判定：✅ 已完成** — `ThemeSwitcher.tsx` ✅；`next-themes` / `i18next@25.10.10` / `react-i18next@15.7.4` 依赖 ✅；`locales/` 目录新增（zh-CN / en-US × common/home/settings 共 6 个 JSON）；`i18n.ts` 初始化配置（默认 zh-CN、回退 en-US、localStorage 持久化）；`LangSwitcher.tsx` 组件新增，挂载至 SettingLayout Header；5 个示范文本完成双语提取（新建笔记/开始处理/返回首页/取消/语言）；commit `b67747d`。
 14. 文档治理：根 MD 归档至 `docs/history/`；更新 `README.md` 与 `CLAUDE.md` 的目录树与使用指引。
     - **判定：❌ 未开始** — `docs/history/` 不存在；根目录仍有 14 个 MD 散落；`CLAUDE.md` 已不在仓库；`README.md` 不再引用 `BillNote_frontend`（此点隐式消除）。
 15. 依赖升级：`react-markdown >= 9`，校验 `rehype-raw` 兼容；可选安装 `@lobehub/icons` 以还原品牌图标。
-    - **判定：⚠️ 部分完成** — `react-markdown ^10.1.0` ✅、`rehype-raw ^7.0.0` ✅；**`@lobehub/icons` ❌ 未安装**（可选项）。
+    - **判定：✅ 已完成** — `react-markdown ^10.1.0` ✅、`rehype-raw ^7.0.0` ✅；`@lobehub/icons@5.5.4` 已安装；ProvidersManagementPage 新建 Provider 对话框的「类型」Select 中为 openai_compatible / anthropic 两项前置品牌 Logo（使用最深子路径 import `@lobehub/icons/es/{OpenAI,Anthropic}/components/Mono` 避免 barrel 拉入 antd-style）；Bundle 验证 gzip 从 323.93 KB 净减 4.14 KB（远低于 50 KB 约束）；commit `8b3de21`。
 16. 明确 Streamlit 的弃用时间线（兼容至 v0.3）；创建 deprecation 追踪任务。
     - **判定：❌ 未开始** — 无独立 deprecation 文档或 issue 追踪；`grep` 仅在 `ENABLE_LOCAL.md` 与 `README.md` 见零星提及，无正式时间线。
 17. React Router v6 → v7 Data Router 迁移（非必需，可延后到 v1.5+）。
