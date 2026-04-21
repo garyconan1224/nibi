@@ -6,6 +6,8 @@ import SettingPage from '@/pages/SettingPage/index'
 import ProvidersManagementPage from '@/pages/SettingPage/ProvidersManagementPage'
 import ModelManagementPage from '@/pages/SettingPage/ModelManagementPage'
 import NetworkSettingsPage from '@/pages/SettingPage/NetworkSettingsPage'
+import TranscriberPage from '@/pages/SettingPage/TranscriberPage'
+import ScreenshotPage from '@/pages/SettingPage/ScreenshotPage'
 import AboutPage from '@/pages/SettingPage/AboutPage'
 import NotFoundPage from '@/pages/NotFoundPage'
 
@@ -21,6 +23,8 @@ export default function App() {
             <Route path="providers" element={<ProvidersManagementPage />} />
             <Route path="models" element={<ModelManagementPage />} />
             <Route path="network" element={<NetworkSettingsPage />} />
+            <Route path="transcriber" element={<TranscriberPage />} />
+            <Route path="screenshot" element={<ScreenshotPage />} />
             <Route path="about" element={<AboutPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>

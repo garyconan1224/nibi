@@ -9,6 +9,8 @@ const SettingLayout = () => {
     { label: '提供商管理', path: '/settings/providers' },
     { label: '模型管理', path: '/settings/models' },
     { label: '网络设置', path: '/settings/network' },
+    { label: '音频转写', path: '/settings/transcriber' },
+    { label: '视频截图', path: '/settings/screenshot' },
     { label: '关于', path: '/settings/about' },
   ]
 
