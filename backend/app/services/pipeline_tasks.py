@@ -3,6 +3,7 @@ from __future__ import annotations
 """Task handlers for pipeline task center."""
 
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from backend.app.models.tasks import TaskRecord, TaskStatus
@@ -46,6 +47,8 @@ def handle_download_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, An
         cookie_base_dirs_list=cookie_base_dirs_list,
         log=lambda m: runner.append_log(record.task_id, m),
         progress_callback=lambda p, msg: runner.set_progress(record.task_id, p, msg),
+        # 将 yt-dlp 捕获的实时速度写入 task.result["download_speed"]，前端订阅展示
+        speed_callback=lambda s: runner.set_download_speed(record.task_id, s),
     )
     if not out.get("ok"):
         err = (out.get("error_full") or out.get("error") or "download failed").strip()
@@ -60,11 +63,23 @@ def handle_download_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, An
 
 def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     payload = record.payload
+    task_id = record.task_id
     api_key = str(payload.get("api_key") or "").strip() or load_settings().openai_api_key.strip()
     if not api_key:
         raise ValueError("analyze requires api_key in payload or settings")
     vision_model = str(payload.get("vision_model") or "").strip() or load_settings().vision_model
     text_model = str(payload.get("text_model") or "").strip() or load_settings().text_model
+    proxy = str(payload.get("proxy") or "").strip()
+
+    # 日志：记录收到的模型和代理配置
+    runner.append_log(
+        task_id,
+        f"📊 analyze_task 配置 | "
+        f"text_model={text_model} | "
+        f"vision_model={vision_model} | "
+        f"proxy={'✓' if proxy else '✗'}"
+    )
+
     project_video_dir = get_project_videos_dir(record.project_id)
     project_video_dir.mkdir(parents=True, exist_ok=True)   # 确保目录存在，防止 FileNotFoundError
     project_json_dir = get_project_json_dir(record.project_id)
@@ -214,6 +229,17 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     )
     vision_model = str(payload.get("vision_model") or "").strip() or settings.vision_model
     text_model = str(payload.get("text_model") or "").strip() or settings.text_model
+    proxy = str(payload.get("proxy") or "").strip()
+
+    # 日志：记录收到的文本/视觉模型和代理配置（音频模型已弃用，改用本地 faster-whisper）
+    runner.append_log(
+        task_id,
+        f"📋 note_task 配置 | "
+        f"text_model={text_model} | "
+        f"vision_model={vision_model} | "
+        f"proxy={'✓' if proxy else '✗'} | "
+        f"steps={steps}"
+    )
 
     # ── 2. 准备项目目录 ────────────────────────────────────────
     project_video_dir = get_project_videos_dir(record.project_id)
@@ -248,6 +274,8 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             cookie_base_dirs_list=cookie_base_dirs_list,
             log=lambda m: runner.append_log(task_id, m),
             progress_callback=lambda p, msg: runner.set_progress(task_id, 0.02 + p * 0.28, msg),
+            # note 流水线下载阶段同样上报实时速度
+            speed_callback=lambda s: runner.set_download_speed(task_id, s),
         )
         if not out.get("ok"):
             err = (out.get("error_full") or out.get("error") or "download failed").strip()
@@ -262,18 +290,54 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
 
     # ── 4. transcribe 步骤 ─────────────────────────────────────
     if "transcribe" in steps:
-        # 前置检查：若未执行 download，检查本地是否存在视频文件
+        # 预检查 A：本地 ASR 引擎是否就绪（轻量探活，避免先读大文件再崩溃）
+        import sys as _sys
+        from backend.app.services.asr_fast_whisper import (
+            is_fast_whisper_available,
+            get_install_hint,
+            get_last_probe_error,
+            transcribe_with_fast_whisper,
+        )
+        if not is_fast_whisper_available():
+            hint = get_install_hint()
+            probe = get_last_probe_error()
+            # 首行写关键上下文：解释器路径 + 错误类型，便于一眼定位是路径还是动态库问题
+            header = f"❌ 本地转录引擎未就绪 | python={_sys.executable}"
+            if probe is not None:
+                err_type, err_msg, err_tb = probe
+                runner.append_log(task_id, f"{header}\n错误类型: {err_type}\n错误信息: {err_msg}\nTraceback:\n{err_tb}\n{hint}")
+            else:
+                runner.append_log(task_id, f"{header}\n{hint}")
+            raise RuntimeError(f"本地转录引擎未安装。{hint}")
+
+        # 预检查 B：本地是否存在可转录的视频文件
         if "download" not in steps:
             videos = find_videos(project_video_dir)
             if not videos:
                 raise ValueError("本地视频文件不存在，请先执行下载步骤")
+        else:
+            # download 步骤已执行，使用 download_save_path
+            videos = [download_save_path] if download_save_path else find_videos(project_video_dir)
+
+        video_file = videos[0] if videos else ""
+        if not video_file:
+            raise ValueError("无可用的本地视频文件进行转录")
 
         runner.store.update(task_id, status=TaskStatus.TRANSCRIBING.value)
         runner.set_progress(task_id, 0.32, "开始转录音频...")
+        runner.append_log(task_id, f"📄 本地转录 | 视频文件={Path(video_file).name}")
 
-        from backend.app.services.transcript_service import get_transcript
-        transcript_result = get_transcript(url)
-        transcript_text = str(transcript_result.get("text") or "")
+        # 读取文件字节并转录（引擎已通过预检查，这里仅处理 I/O 或运行时错误）
+        try:
+            with open(video_file, "rb") as f:
+                audio_bytes = f.read()
+            transcript_text = transcribe_with_fast_whisper(
+                audio_bytes,
+                model_name="base",
+                device="cpu",
+            )
+        except Exception as e:
+            raise RuntimeError(f"本地转录失败: {str(e)}")
 
         completed_steps.append("transcribe")
         _persist_intermediate(runner, task_id, {

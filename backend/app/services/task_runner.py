@@ -95,6 +95,18 @@ class TaskRunner:
         if message:
             self.store.append_log(task_id, message)
 
+    def set_download_speed(self, task_id: str, speed: str) -> None:
+        """将实时下载速度字符串合并写入 task.result['download_speed']，供前端展示。
+
+        speed 形如 "1.23MiB/s" / "560KiB/s"，保持 yt-dlp 原生单位，前端自行归一渲染。
+        """
+        rec = self.store.get(task_id)
+        if rec is None:
+            return
+        merged = dict(rec.result) if rec.result else {}
+        merged["download_speed"] = str(speed or "").strip()
+        self.store.update(task_id, result=merged)
+
     def append_log(self, task_id: str, message: str, *, level: str = "info") -> None:
         self.store.append_log(task_id, message, level=level)
 
