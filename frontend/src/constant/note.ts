@@ -1,4 +1,4 @@
-import type { Quality, NoteFormat, NoteStyle } from '@/store/configStore'
+import type { Quality, NoteFormat, NoteStyle, DownloadMode } from '@/store/configStore'
 
 /** 质量选项 */
 export const QUALITY_OPTIONS: { value: Quality; label: string; description: string }[] = [
@@ -34,4 +34,42 @@ export const PIPELINE_STEPS: { value: PipelineStep; label: string }[] = [
 ]
 
 export const DEFAULT_STEPS: PipelineStep[] = ['download', 'transcribe', 'analyze', 'note']
+
+/** 下载模式预设（映射到视频下载引擎的 format selector） */
+export const DOWNLOAD_MODE_OPTIONS: {
+  value: DownloadMode
+  label: string
+  description: string
+  selector: string
+}[] = [
+  {
+    value: 'balanced',
+    label: '均衡',
+    description: '兼顾画质与速度（推荐）',
+    selector: 'best',
+  },
+  {
+    value: 'speed',
+    label: '优先速度',
+    description: '选择较低码率以加快下载',
+    selector: 'worst[ext=mp4]/worst',
+  },
+  {
+    value: 'quality',
+    label: '优先画质',
+    description: '分轨下载最高画质并合成',
+    selector: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
+  },
+  {
+    value: 'audio',
+    label: '仅提取音频',
+    description: '不下载视频流，体积最小',
+    selector: 'bestaudio[ext=m4a]/bestaudio',
+  },
+]
+
+/** 将下载模式枚举映射为 format selector 字符串（未命中时回退 best） */
+export function resolveFormatSelector(mode: DownloadMode): string {
+  return DOWNLOAD_MODE_OPTIONS.find(o => o.value === mode)?.selector ?? 'best'
+}
 

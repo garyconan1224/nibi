@@ -15,6 +15,15 @@ const ICON_MAP: Record<string, FC<{ className?: string }>> = {
 // 阶段在流程中的顺序索引
 const STAGE_ORDER = PROCESSING_STAGES.map((s) => s.id)
 
+// 阶段 → pipeline step 字符串映射：用于按 task.payload.steps 过滤渲染
+// PARSING 为 UI 通用的准备阶段，不对应具体 pipeline step，始终保留
+const STAGE_TO_STEP: Partial<Record<TaskStatus, string>> = {
+  [TaskStatus.DOWNLOADING]: 'download',
+  [TaskStatus.TRANSCRIBING]: 'transcribe',
+  [TaskStatus.ANALYZING]: 'analyze',
+  [TaskStatus.SUMMARIZING]: 'note',
+}
+
 /**
  * 判断当前 status 在步骤条中的位置
  * - PENDING 视为第 0 阶段前（index = -1），步骤条显示为"等待中"
@@ -41,6 +50,14 @@ interface ProcessingStepperProps {
   status: string
   /** 进度值 0~1，用于活跃阶段的进度条 */
   progress: number
+  /**
+   * 可选：任务 payload 中的步骤编排。
+   * 若提供，则未选中对应 step 的阶段将被隐藏（例如本地分析任务隐藏 DOWNLOADING）。
+   * 未提供时保持原有 5 段全量渲染，兼容历史任务。
+   */
+  steps?: string[]
+  /** 可选：实时下载速度字符串（如 "1.23MiB/s"），在 DOWNLOADING 活跃时展示 */
+  downloadSpeed?: string
 }
 
 /**
@@ -53,30 +70,47 @@ interface ProcessingStepperProps {
  * - SUCCESS：全部绿色✓
  * - FAILED：活跃阶段显示红色✗
  */
-const ProcessingStepper: FC<ProcessingStepperProps> = ({ status, progress }) => {
+const ProcessingStepper: FC<ProcessingStepperProps> = ({ status, progress, steps, downloadSpeed }) => {
   const isSuccess = status === TaskStatus.SUCCESS
   const isFailed = status === TaskStatus.FAILED
   const isCancelled = status === TaskStatus.CANCELLED
   const isPending = status === TaskStatus.PENDING
 
-  // 真实阶段索引（-1 表示不在阶段列表内）
-  const rawIndex = getStageIndex(status)
-  // 用于渲染的有效索引（PENDING 映射到 0，其他未知也映射到 0）
-  const activeIndex = isPending || rawIndex < 0 ? getEffectiveIndex(status) : rawIndex
+  // 根据 steps 过滤阶段：steps 为空或未传时保持原 5 段；否则只保留 PARSING + 被选中对应的 step 阶段
+  const visibleStages =
+    steps && steps.length > 0
+      ? PROCESSING_STAGES.filter((stage) => {
+          const mapped = STAGE_TO_STEP[stage.id]
+          // PARSING 无对应 step，始终保留作为起始展示
+          return mapped === undefined || steps.includes(mapped)
+        })
+      : PROCESSING_STAGES
+
+  // 在"可见阶段数组"内计算当前活跃位置（保持视觉顺序不跳跃）
+  const rawIndexInAll = getStageIndex(status)
+  const activeStatusId = rawIndexInAll >= 0 ? (status as TaskStatus) : null
+  const visibleActiveIndex = activeStatusId
+    ? visibleStages.findIndex((s) => s.id === activeStatusId)
+    : -1
+  // PENDING / 未知状态：定位到可见阶段的第一项（= 0）；保留 getEffectiveIndex 以兼容后续扩展
+  void getEffectiveIndex
+  const activeIndex = isPending || visibleActiveIndex < 0 ? 0 : visibleActiveIndex
 
   return (
     <div className="w-full px-1 py-2">
       <div className="flex items-start justify-between">
-        {PROCESSING_STAGES.map((stage, idx) => {
+        {visibleStages.map((stage, idx) => {
           const IconComp = ICON_MAP[stage.icon] ?? Zap
 
           // PENDING 时：全部阶段为灰色"待处理"，不显示活跃态
           // 正常运行时：activeIndex 之前为已完成，activeIndex 为活跃，之后为待处理
           const isDone = isSuccess || (!isFailed && !isCancelled && !isPending && activeIndex > idx)
           const isActive = !isSuccess && !isFailed && !isCancelled && !isPending && activeIndex === idx
-          // FAILED 时：若未识别到活跃阶段（rawIndex === -1），默认标红最后一个阶段
-          const failedIdx = rawIndex >= 0 ? rawIndex : PROCESSING_STAGES.length - 1
+          // FAILED 时：若能识别阶段则标红该阶段，否则标红可见阶段中的最后一个
+          const failedIdx = visibleActiveIndex >= 0 ? visibleActiveIndex : visibleStages.length - 1
           const isFail = isFailed && failedIdx === idx
+          // 下载速度仅在 DOWNLOADING 活跃阶段展示
+          const showSpeed = isActive && stage.id === TaskStatus.DOWNLOADING && !!downloadSpeed
 
           return (
             <div key={stage.id} className="flex flex-1 flex-col items-center">
@@ -122,8 +156,15 @@ const ProcessingStepper: FC<ProcessingStepperProps> = ({ status, progress }) => 
                 </div>
               )}
 
+              {/* 下载阶段实时网速（仅 DOWNLOADING 活跃时） */}
+              {showSpeed && (
+                <span className="mt-0.5 text-[10px] font-mono text-blue-600 tabular-nums">
+                  {downloadSpeed}
+                </span>
+              )}
+
               {/* 连接线（最后一个不显示） */}
-              {idx < PROCESSING_STAGES.length - 1 && (
+              {idx < visibleStages.length - 1 && (
                 <div
                   className={cn(
                     'absolute mt-4 hidden h-0.5 w-full translate-x-1/2',

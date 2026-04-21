@@ -58,8 +58,16 @@ export interface TaskListResponse {
 /** analyze 任务 payload（与后端 pipeline analyze handler 对齐） */
 export interface AnalyzePayload {
   url: string
+  video_path?: string
   model_name: string
-  provider_id: string
+  // 兼容旧版本（单 provider）
+  provider_id?: string
+  // 双模型：文本 + 视觉，各自独立的 provider + model
+  text_provider_id?: string
+  text_model?: string
+  vision_provider_id?: string
+  vision_model?: string
+  // 注：audio_model 已弃用，改用本地 faster-whisper 转录
   quality: 'fast' | 'medium' | 'slow'
   format: string[]
   style: 'academic' | 'minimalist' | 'creative'
@@ -71,6 +79,8 @@ export interface AnalyzePayload {
   extras?: string
   browser?: string
   proxy?: string
+  po_token?: string
+  visitor_data?: string
   format_selector?: string
   cookie_base_dirs?: string[]
 }

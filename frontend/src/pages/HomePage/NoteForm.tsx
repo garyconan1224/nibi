@@ -4,14 +4,11 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
   AlertTriangle,
-  ChevronDown,
-  ChevronUp,
   FileVideo,
   Link,
   Link2,
   Loader2,
   Send,
-  Settings2,
   Upload,
   X,
 } from 'lucide-react'
@@ -30,11 +27,6 @@ import {
 } from '@/components/ui/select'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
 
 import { createPipelineTask } from '@/services/pipeline'
 import { uploadLocalFile } from '@/services/upload'
@@ -43,8 +35,16 @@ import { useTaskStore } from '@/store/taskStore'
 import { useModelStore } from '@/store/modelStore'
 import { useProviderStore } from '@/store/providerStore'
 import { useConfigStore } from '@/store/configStore'
-import { QUALITY_OPTIONS, FORMAT_OPTIONS, STYLE_OPTIONS, PIPELINE_STEPS, DEFAULT_STEPS } from '@/constant/note'
-import type { NoteFormat } from '@/store/configStore'
+import {
+  QUALITY_OPTIONS,
+  FORMAT_OPTIONS,
+  STYLE_OPTIONS,
+  PIPELINE_STEPS,
+  DEFAULT_STEPS,
+  DOWNLOAD_MODE_OPTIONS,
+  resolveFormatSelector,
+} from '@/constant/note'
+import type { NoteFormat, DownloadMode } from '@/store/configStore'
 
 /* ─── 本地上传允许的文件类型 ─── */
 const ACCEPTED_EXTENSIONS = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.mp3', '.wav', '.m4a']
@@ -72,26 +72,34 @@ const formSchema = z.object({
   task_type:           z.enum(TASK_TYPES),
   // 允许空字符串（本地上传模式下 URL 为空）
   url:                 z.string(),
-  provider_id:         z.string().min(1, { message: '请选择提供商' }),
-  model_id:            z.string().min(1, { message: '请选择模型' }),
+  // 双模型：文本 + 视觉，各自独立选择 provider 和 model
+  // 注：音频模型已弃用，改用本地 faster-whisper 转录
+  text_provider_id:    z.string().min(1, { message: '请选择文本模型提供商' }),
+  text_model:          z.string().min(1, { message: '请选择文本模型' }),
+  video_provider_id:   z.string().min(1, { message: '请选择视频模型提供商' }),
+  video_model:         z.string().min(1, { message: '请选择视频模型' }),
+  // 笔记生成偏好
   quality:             z.enum(['fast', 'medium', 'slow']),
   formats:             z.array(z.string()).min(1, { message: '至少选择一种格式' }),
   style:               z.enum(['academic', 'minimalist', 'creative']),
-  screenshot:          z.boolean(),
-  link:                z.boolean(),
+  // 视觉理解与网格参数
   video_understanding: z.boolean(),
   video_interval:      z.number().int().min(1).max(300),
   grid_cols:           z.number().int().min(1).max(6),
   grid_rows:           z.number().int().min(1).max(6),
+  // 其他选项
+  screenshot:          z.boolean(),
+  link:                z.boolean(),
   extras:              z.string(),
   steps:               z.array(z.string()).min(1, { message: '至少选择一个执行步骤' }),
+  // 下载策略（默认从 configStore 读取；单次任务可临时覆盖）
+  download_mode:       z.enum(['balanced', 'speed', 'quality', 'audio']),
 })
 
 type FormValues = z.infer<typeof formSchema>
 
 /* ─── 组件 ─── */
 const NoteForm = () => {
-  const [advancedOpen, setAdvancedOpen] = useState(false)
   const [submitError, setSubmitError]   = useState<string | null>(null)
 
   /* ── 本地文件上传相关 state ── */
@@ -132,12 +140,13 @@ const NoteForm = () => {
 
   /* 当前选中模型归属的 provider（优先用 providerStore 数据，fallback 到 modelStore） */
   const currentModel     = models.find(m => m.model_id === currentModelId) ?? models[0]
+  // provider 默认值优先级：第一个 enabled provider > 历史 currentModel > providers 首项
   const defaultProviderId = providers.find(p => p.enabled)?.id
-    ?? currentModel?.provider_id
-    ?? providers[0]?.id
-    ?? ''
+    || currentModel?.provider_id
+    || providers[0]?.id
+    || ''
 
-  /* react-hook-form 初始值从 configStore 读 */
+  /* react-hook-form 初始值从 configStore 读（含三位模型 provider/model） */
   const {
     register,
     control,
@@ -150,8 +159,11 @@ const NoteForm = () => {
     defaultValues: {
       task_type:           'note' as PipelineTaskType,
       url:                 '',
-      provider_id:         defaultProviderId,
-      model_id:            currentModelId ?? models[0]?.model_id ?? '',
+      // 三位一体：优先复用上次持久化的 provider + model，否则用默认 provider + 空 model
+      text_provider_id:    config.textProviderId || defaultProviderId,
+      text_model:          config.textModelId,
+      video_provider_id:   config.visionProviderId || defaultProviderId,
+      video_model:         config.videoModelId,
       quality:             config.defaultQuality,
       formats:             config.defaultFormats,
       style:               config.defaultStyle,
@@ -163,6 +175,7 @@ const NoteForm = () => {
       grid_rows:           config.grid_size[1],
       extras:              config.extras,
       steps:               [...DEFAULT_STEPS],
+      download_mode:       config.downloadMode,
     },
   })
 
@@ -200,34 +213,47 @@ const NoteForm = () => {
     watchedSteps.some(s => ['analyze', 'transcribe'].includes(s)) &&
     !hasDownloadStep
 
-  /* 监听 provider 变化 → 触发拉取模型 & 自动切换到第一个模型 */
-  const watchedProviderId = watch('provider_id')
-  useEffect(() => {
-    if (!watchedProviderId) return
-    // 若该 provider 尚未缓存模型，触发拉取
-    if (!providerModels[watchedProviderId] && !modelsLoading[watchedProviderId]) {
-      fetchProviderModels(watchedProviderId)
-    }
-    // 切换 provider 时，自动选中第一个可用模型
-    const cached = providerModels[watchedProviderId]
-    if (cached && cached.length > 0) {
-      setValue('model_id', cached[0].id)
-    }
-  }, [watchedProviderId, providerModels, modelsLoading, fetchProviderModels, setValue])
+  /* 监听两个 provider 变化 → 为对应模型字段自动填入首个模型 */
+  const watchedTextProviderId = watch('text_provider_id')
+  const watchedVideoProviderId = watch('video_provider_id')
+  const watchedTextModel = watch('text_model')
+  const watchedVideoModel = watch('video_model')
 
-  /* 当前 provider 的动态模型列表（优先用 providerStore 缓存，fallback 到 modelStore） */
-  const dynamicModels = providerModels[watchedProviderId] ?? []
-  const isModelsLoading = !!modelsLoading[watchedProviderId]
-  // fallback：若动态模型为空，使用 modelStore 中属于该 provider 的静态模型
-  const fallbackModels = models
-    .filter(m => m.provider_id === watchedProviderId)
-    .map(m => ({ id: m.model_id, name: m.name }))
+  // 为文本模型的 provider 变化处理
+  useEffect(() => {
+    if (!watchedTextProviderId) return
+    if (!providerModels[watchedTextProviderId] && !modelsLoading[watchedTextProviderId]) {
+      fetchProviderModels(watchedTextProviderId)
+    }
+    const cached = providerModels[watchedTextProviderId]
+    if (cached && cached.length > 0) {
+      const ids = cached.map(m => m.id)
+      if (!watchedTextModel || !ids.includes(watchedTextModel)) {
+        setValue('text_model', cached[0].id)
+      }
+    }
+  }, [watchedTextProviderId, providerModels, modelsLoading, fetchProviderModels, setValue, watchedTextModel])
+
+  // 为视频模型的 provider 变化处理
+  useEffect(() => {
+    if (!watchedVideoProviderId) return
+    if (!providerModels[watchedVideoProviderId] && !modelsLoading[watchedVideoProviderId]) {
+      fetchProviderModels(watchedVideoProviderId)
+    }
+    const cached = providerModels[watchedVideoProviderId]
+    if (cached && cached.length > 0) {
+      const ids = cached.map(m => m.id)
+      if (!watchedVideoModel || !ids.includes(watchedVideoModel)) {
+        setValue('video_model', cached[0].id)
+      }
+    }
+  }, [watchedVideoProviderId, providerModels, modelsLoading, fetchProviderModels, setValue, watchedVideoModel])
 
   /* ─── 提交 ─── */
   const onSubmit = async (values: FormValues) => {
     setSubmitError(null)
 
-    // 提交后将选项写回 configStore（持久化偏好）
+    // 提交后将选项写回 configStore（持久化偏好：笔记格式、双模型 provider/model、下载模式）
     config.setConfig({
       defaultQuality:      values.quality,
       defaultFormats:      values.formats as NoteFormat[],
@@ -238,6 +264,11 @@ const NoteForm = () => {
       video_interval:      values.video_interval,
       grid_size:           [values.grid_cols, values.grid_rows],
       extras:              values.extras,
+      textProviderId:      values.text_provider_id,
+      textModelId:         values.text_model,
+      visionProviderId:    values.video_provider_id,
+      videoModelId:        values.video_model,
+      downloadMode:        values.download_mode as DownloadMode,
     })
 
     try {
@@ -251,8 +282,13 @@ const NoteForm = () => {
         videoPath = uploaded.video_path
       }
 
-      // 从勾选的 steps 推导 task_type，不依赖 form field
-      const taskType = deriveTaskType(values.steps)
+      // 本地文件存在时，强制从 steps 中剔除 download，让 UI 与 pipeline 从"转录/分析"直接开始
+      const effectiveSteps = (showLocalUpload && localFile)
+        ? values.steps.filter(s => s !== 'download')
+        : values.steps
+
+      // 从有效 steps 推导 task_type，不依赖 form field
+      const taskType = deriveTaskType(effectiveSteps)
 
       const body = {
         project_id: projectId,
@@ -261,8 +297,13 @@ const NoteForm = () => {
           // 本地上传时用 video_path，否则用 URL 输入框的值
           url:                 videoPath ?? values.url,
           video_path:          videoPath,
-          model_name:          values.model_id,
-          provider_id:         values.provider_id,
+          // 兼容旧后端字段：model_name 使用文本模型作为主模型
+          model_name:          values.text_model,
+          // 三位一体：各自独立的 provider + model
+          text_provider_id:    values.text_provider_id,
+          text_model:          values.text_model,
+          vision_provider_id:  values.video_provider_id,
+          vision_model:        values.video_model,
           quality:             values.quality,
           format:              values.formats,
           style:               values.style,
@@ -273,12 +314,18 @@ const NoteForm = () => {
           grid_size:           [values.grid_cols, values.grid_rows],
           extras:              values.extras || undefined,
           browser:             'chrome',
-          proxy:               '',
-          format_selector:     'best',
-          cookie_base_dirs:    [],
+          // 全局网络设置：代理 / PO Token / Visitor Data / Cookie 目录统一从 configStore 读取
+          proxy:               (config.httpProxy || '').trim(),
+          po_token:            (config.poToken || '').trim(),
+          visitor_data:        (config.visitorData || '').trim(),
+          format_selector:     resolveFormatSelector(values.download_mode as DownloadMode),
+          cookie_base_dirs:    (config.cookieBaseDirs || '')
+            .split('\n')
+            .map(s => s.trim())
+            .filter(Boolean),
         },
         // 始终传递 steps，让后端按照用户勾选的流程执行
-        steps: values.steps,
+        steps: effectiveSteps,
       }
 
       const { task_id } = await createPipelineTask(body)
@@ -287,7 +334,8 @@ const NoteForm = () => {
         task_id,
         project_id:       projectId,
         task_type:        taskType,
-        payload:          body.payload,
+        // 与后端 payload 保持一致，并把 steps 塞入 payload，便于前端步骤条按 steps 过滤阶段
+        payload:          { ...body.payload, steps: effectiveSteps },
         status:           'PENDING',
         progress:         0,
         log:              [],
@@ -434,81 +482,109 @@ const NoteForm = () => {
         </div>
       )}
 
-      {/* ── Provider → Model 二级下拉 ── */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="flex flex-col gap-1.5">
-          <Label className="text-xs text-muted-foreground">提供商</Label>
-          <Controller
-            name="provider_id"
-            control={control}
-            render={({ field }) => (
-              <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="选择提供商" />
-                </SelectTrigger>
-                <SelectContent>
-                  {providers.length === 0 && (
-                    <SelectItem value="_none" disabled>暂无提供商</SelectItem>
-                  )}
-                  {providers
-                    .filter(p => p.enabled)
-                    .map(p => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  {/* 硬编码备用（当 providers 未拉取时也能选） */}
-                  {models
-                    .filter(m => !providers.find(p => p.id === m.provider_id))
-                    .map(m => m.provider_id)
-                    .filter((v, i, a) => a.indexOf(v) === i)
-                    .map(pid => (
-                      <SelectItem key={pid} value={pid}>{pid}</SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
-        </div>
+      {/* ── 双模型选择器：文本 + 视觉（纵向堆叠） ── */}
+      {/* 注：音频模型已弃用，改用本地 faster-whisper 转录 */}
+      <div className="grid grid-cols-1 gap-4">
+        {([
+          {
+            providerField: 'text_provider_id' as const,
+            modelField: 'text_model' as const,
+            label: '文本模型',
+            hint: '脚本 / 摘要 / 总结',
+          },
+          {
+            providerField: 'video_provider_id' as const,
+            modelField: 'video_model' as const,
+            label: '视频模型',
+            hint: '视觉分析 / 抽帧',
+          },
+        ] as const).map(item => {
+          const watchedProviderId = watch(item.providerField)
+          const isLoading = !!modelsLoading[watchedProviderId]
+          const dynamicModels = providerModels[watchedProviderId] ?? []
+          const fallbackModels = models
+            .filter(m => m.provider_id === watchedProviderId)
+            .map(m => ({ id: m.model_id, name: m.name }))
 
-        <div className="flex flex-col gap-1.5">
-          <Label className="text-xs text-muted-foreground">模型</Label>
-          <Controller
-            name="model_id"
-            control={control}
-            render={({ field }) => (
-              <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder={isModelsLoading ? '加载中...' : '选择模型'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {isModelsLoading && (
-                    <SelectItem value="_loading" disabled>加载中...</SelectItem>
-                  )}
-                  {!isModelsLoading && dynamicModels.length === 0 && fallbackModels.length === 0 && (
-                    <SelectItem value="_none" disabled>暂无模型</SelectItem>
-                  )}
-                  {/* 优先展示动态拉取的真实模型列表 */}
-                  {dynamicModels.length > 0
-                    ? dynamicModels.map(m => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.name}
-                        </SelectItem>
-                      ))
-                    : fallbackModels.map(m => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.name}
-                        </SelectItem>
-                      ))
-                  }
-                </SelectContent>
-              </Select>
-            )}
-          />
-          {errors.model_id && (
-            <p className="text-xs text-red-500">{errors.model_id.message}</p>
-          )}
-        </div>
+          return (
+            <div key={item.label} className="flex flex-col gap-1.5">
+              <Label className="text-xs text-muted-foreground">
+                {item.label}
+                <span className="ml-1 text-[10px] text-muted-foreground/70">{item.hint}</span>
+              </Label>
+              {/* Provider 选择器 */}
+              <Controller
+                name={item.providerField}
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="h-8 text-xs truncate">
+                      <SelectValue placeholder="选择提供商" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px] overflow-y-auto">
+                      {providers.length === 0 && (
+                        <SelectItem value="_none" disabled>暂无提供商</SelectItem>
+                      )}
+                      {providers
+                        .filter(p => p.enabled)
+                        .map(p => (
+                          <SelectItem key={p.id} value={p.id} className="truncate">
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      {models
+                        .filter(m => !providers.find(p => p.id === m.provider_id))
+                        .map(m => m.provider_id)
+                        .filter((v, i, a) => a.indexOf(v) === i)
+                        .map(pid => (
+                          <SelectItem key={pid} value={pid} className="truncate">{pid}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors[item.providerField] && (
+                <p className="text-xs text-red-500">{errors[item.providerField]?.message as string}</p>
+              )}
+
+              {/* Model 选择器 */}
+              <Controller
+                name={item.modelField}
+                control={control}
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="h-8 text-xs truncate">
+                      <SelectValue placeholder={isLoading ? '加载中...' : '选择模型'} />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px] overflow-y-auto">
+                      {isLoading && (
+                        <SelectItem value="_loading" disabled>加载中...</SelectItem>
+                      )}
+                      {!isLoading && dynamicModels.length === 0 && fallbackModels.length === 0 && (
+                        <SelectItem value="_none" disabled>暂无模型</SelectItem>
+                      )}
+                      {dynamicModels.length > 0
+                        ? dynamicModels.map(m => (
+                            <SelectItem key={m.id} value={m.id} className="truncate">
+                              {m.name}
+                            </SelectItem>
+                          ))
+                        : fallbackModels.map(m => (
+                            <SelectItem key={m.id} value={m.id} className="truncate">
+                              {m.name}
+                            </SelectItem>
+                          ))
+                      }
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors[item.modelField] && (
+                <p className="text-xs text-red-500">{errors[item.modelField]?.message as string}</p>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       {/* ── Quality 单选 ── */}
@@ -595,157 +671,167 @@ const NoteForm = () => {
         />
       </div>
 
-      {/* ── 高级选项 Collapsible ── */}
-      <Collapsible open={advancedOpen} onOpenChange={setAdvancedOpen}>
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            className="flex w-full items-center justify-between rounded-md border border-dashed border-neutral-300 px-3 py-2 text-xs text-muted-foreground hover:bg-neutral-50"
-          >
-            <span className="flex items-center gap-1.5">
-              <Settings2 className="h-3.5 w-3.5" />
-              高级选项
-            </span>
-            {advancedOpen
-              ? <ChevronUp className="h-3.5 w-3.5" />
-              : <ChevronDown className="h-3.5 w-3.5" />
-            }
-          </button>
-        </CollapsibleTrigger>
+      {/* ── 视觉理解（多模态抽帧）── */}
+      <div className="flex items-center justify-between">
+        <Label className="text-xs">视觉理解（多模态抽帧）</Label>
+        <Controller
+          name="video_understanding"
+          control={control}
+          render={({ field }) => (
+            <Switch checked={field.value} onCheckedChange={field.onChange} />
+          )}
+        />
+      </div>
 
-        <CollapsibleContent className="mt-3 flex flex-col gap-3">
-          {/* ── 步骤选择器（始终显示，通过 steps 推导 task_type）── */}
-          <div className="flex flex-col gap-1.5">
-              <Label className="text-xs text-muted-foreground">执行步骤（可自由组合）</Label>
-              <Controller
-                name="steps"
-                control={control}
-                render={({ field }) => (
-                  <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-                    {PIPELINE_STEPS.map(opt => {
-                      const checked = field.value.includes(opt.value)
-                      const needsLocalHint =
-                        !hasDownloadStep &&
-                        (opt.value === 'transcribe' || opt.value === 'analyze')
-                      return (
-                        <div key={opt.value} className="flex items-center gap-1.5">
-                          <Checkbox
-                            id={`step-${opt.value}`}
-                            checked={checked}
-                            onCheckedChange={(isChecked) => {
-                              if (isChecked) {
-                                field.onChange([...field.value, opt.value])
-                              } else {
-                                // 至少保留一个选中项
-                                const next = field.value.filter((v: string) => v !== opt.value)
-                                if (next.length > 0) field.onChange(next)
-                              }
-                            }}
-                          />
-                          <Label
-                            htmlFor={`step-${opt.value}`}
-                            className="text-xs cursor-pointer"
-                          >
-                            {opt.label}
-                          </Label>
-                          {needsLocalHint && checked && (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-600">
-                              <AlertTriangle className="h-3 w-3" />
-                              将尝试使用本地已有文件
-                            </span>
-                          )}
-                        </div>
-                      )
-                    })}
+      {/* ── 抽帧间隔（秒）── */}
+      <div className="flex items-center justify-between gap-3">
+        <Label className="text-xs shrink-0">抽帧间隔（秒）</Label>
+        <input
+          type="number"
+          min={1}
+          max={300}
+          className="w-20 rounded-md border border-neutral-200 px-2 py-1 text-xs text-right"
+          {...register('video_interval', { valueAsNumber: true })}
+        />
+      </div>
+
+      {/* ── 网格拼图（列 × 行）── */}
+      <div className="flex items-center justify-between gap-3">
+        <Label className="text-xs shrink-0">网格拼图（列 × 行）</Label>
+        <div className="flex items-center gap-1.5">
+          <input
+            type="number"
+            min={1}
+            max={6}
+            className="w-14 rounded-md border border-neutral-200 px-2 py-1 text-xs text-right"
+            {...register('grid_cols', { valueAsNumber: true })}
+          />
+          <span className="text-xs text-muted-foreground">×</span>
+          <input
+            type="number"
+            min={1}
+            max={6}
+            className="w-14 rounded-md border border-neutral-200 px-2 py-1 text-xs text-right"
+            {...register('grid_rows', { valueAsNumber: true })}
+          />
+        </div>
+      </div>
+
+      {/* ── 下载策略（平铺） ── */}
+      {!showLocalUpload && (
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-xs text-muted-foreground">下载策略</Label>
+          <Controller
+            name="download_mode"
+            control={control}
+            render={({ field }) => (
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue placeholder="选择下载策略" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DOWNLOAD_MODE_OPTIONS.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      <span className="flex flex-col items-start">
+                        <span className="font-medium">{opt.label}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {opt.description}
+                        </span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          <p className="text-[10px] text-muted-foreground">
+            PO Token / Cookie / 代理等高级网络参数请前往「设置 → 网络设置」配置
+          </p>
+        </div>
+      )}
+
+      {/* ── 执行步骤（可自由组合）── */}
+      <div className="flex flex-col gap-1.5">
+        <Label className="text-xs text-muted-foreground">执行步骤（可自由组合）</Label>
+        <Controller
+          name="steps"
+          control={control}
+          render={({ field }) => (
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+              {PIPELINE_STEPS.map(opt => {
+                const checked = field.value.includes(opt.value)
+                const needsLocalHint =
+                  !hasDownloadStep &&
+                  (opt.value === 'transcribe' || opt.value === 'analyze')
+                return (
+                  <div key={opt.value} className="flex items-center gap-1.5">
+                    <Checkbox
+                      id={`step-${opt.value}`}
+                      checked={checked}
+                      onCheckedChange={(isChecked) => {
+                        if (isChecked) {
+                          field.onChange([...field.value, opt.value])
+                        } else {
+                          // 至少保留一个选中项
+                          const next = field.value.filter((v: string) => v !== opt.value)
+                          if (next.length > 0) field.onChange(next)
+                        }
+                      }}
+                    />
+                    <Label
+                      htmlFor={`step-${opt.value}`}
+                      className="text-xs cursor-pointer"
+                    >
+                      {opt.label}
+                    </Label>
+                    {needsLocalHint && checked && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-600">
+                        <AlertTriangle className="h-3 w-3" />
+                        将尝试使用本地已有文件
+                      </span>
+                    )}
                   </div>
-                )}
-              />
-              {errors.steps && (
-                <p className="text-xs text-red-500">{errors.steps.message}</p>
-              )}
-          </div>
-
-          {/* screenshot */}
-          <div className="flex items-center justify-between">
-            <Label className="text-xs">插入截图</Label>
-            <Controller
-              name="screenshot"
-              control={control}
-              render={({ field }) => (
-                <Switch checked={field.value} onCheckedChange={field.onChange} />
-              )}
-            />
-          </div>
-
-          {/* link */}
-          <div className="flex items-center justify-between">
-            <Label className="text-xs">保留原始链接</Label>
-            <Controller
-              name="link"
-              control={control}
-              render={({ field }) => (
-                <Switch checked={field.value} onCheckedChange={field.onChange} />
-              )}
-            />
-          </div>
-
-          {/* video_understanding */}
-          <div className="flex items-center justify-between">
-            <Label className="text-xs">视觉理解（多模态抽帧）</Label>
-            <Controller
-              name="video_understanding"
-              control={control}
-              render={({ field }) => (
-                <Switch checked={field.value} onCheckedChange={field.onChange} />
-              )}
-            />
-          </div>
-
-          {/* video_interval */}
-          <div className="flex items-center justify-between gap-3">
-            <Label className="text-xs shrink-0">抽帧间隔（秒）</Label>
-            <input
-              type="number"
-              min={1}
-              max={300}
-              className="w-20 rounded-md border border-neutral-200 px-2 py-1 text-xs text-right"
-              {...register('video_interval', { valueAsNumber: true })}
-            />
-          </div>
-
-          {/* grid_size */}
-          <div className="flex items-center justify-between gap-3">
-            <Label className="text-xs shrink-0">网格拼图（列 × 行）</Label>
-            <div className="flex items-center gap-1.5">
-              <input
-                type="number"
-                min={1}
-                max={6}
-                className="w-14 rounded-md border border-neutral-200 px-2 py-1 text-xs text-right"
-                {...register('grid_cols', { valueAsNumber: true })}
-              />
-              <span className="text-xs text-muted-foreground">×</span>
-              <input
-                type="number"
-                min={1}
-                max={6}
-                className="w-14 rounded-md border border-neutral-200 px-2 py-1 text-xs text-right"
-                {...register('grid_rows', { valueAsNumber: true })}
-              />
+                )
+              })}
             </div>
-          </div>
+          )}
+        />
+        {errors.steps && (
+          <p className="text-xs text-red-500">{errors.steps.message}</p>
+        )}
+      </div>
 
-          {/* extras */}
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs">额外说明（补充 Prompt）</Label>
-            <Textarea
-              placeholder="可填写额外的分析要求..."
-              className="min-h-[60px] text-xs"
-              {...register('extras')}
-            />
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
+      {/* ── 辅助选项（完全平铺：截图 / 链接 / 额外说明）── */}
+      <div className="flex items-center justify-between">
+        <Label className="text-xs">插入截图</Label>
+        <Controller
+          name="screenshot"
+          control={control}
+          render={({ field }) => (
+            <Switch checked={field.value} onCheckedChange={field.onChange} />
+          )}
+        />
+      </div>
+
+      <div className="flex items-center justify-between">
+        <Label className="text-xs">保留原始链接</Label>
+        <Controller
+          name="link"
+          control={control}
+          render={({ field }) => (
+            <Switch checked={field.value} onCheckedChange={field.onChange} />
+          )}
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label className="text-xs text-muted-foreground">额外说明（补充 Prompt）</Label>
+        <Textarea
+          placeholder="可填写额外的分析要求..."
+          className="min-h-[60px] text-xs"
+          {...register('extras')}
+        />
+      </div>
 
       {/* ── 错误提示 ── */}
       {submitError && (

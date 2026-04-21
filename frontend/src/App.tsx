@@ -5,6 +5,7 @@ import { HomePage } from '@/pages/HomePage/Home'
 import SettingPage from '@/pages/SettingPage/index'
 import ProvidersManagementPage from '@/pages/SettingPage/ProvidersManagementPage'
 import ModelManagementPage from '@/pages/SettingPage/ModelManagementPage'
+import NetworkSettingsPage from '@/pages/SettingPage/NetworkSettingsPage'
 import AboutPage from '@/pages/SettingPage/AboutPage'
 import NotFoundPage from '@/pages/NotFoundPage'
 
@@ -19,6 +20,7 @@ export default function App() {
             <Route index element={<Navigate to="/settings/providers" replace />} />
             <Route path="providers" element={<ProvidersManagementPage />} />
             <Route path="models" element={<ModelManagementPage />} />
+            <Route path="network" element={<NetworkSettingsPage />} />
             <Route path="about" element={<AboutPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>

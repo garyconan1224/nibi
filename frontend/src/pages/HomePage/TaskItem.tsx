@@ -60,6 +60,16 @@ const TaskItem: FC<TaskItemProps> = ({ task, onSelect }) => {
   const shortId = task.task_id.slice(0, 8)
   const progressPct = Math.round(task.progress * 100)
 
+  // 透传给步骤条：steps 用于过滤不需要的阶段（例如本地分析隐藏 DOWNLOADING）
+  const payloadSteps = Array.isArray(task.payload?.steps)
+    ? (task.payload.steps as string[])
+    : undefined
+  // 后端在下载进度回调中写入 result.download_speed（字符串，如 "1.23MiB/s"）
+  const downloadSpeed =
+    typeof task.result?.download_speed === 'string'
+      ? (task.result.download_speed as string)
+      : undefined
+
   const toggleExpand = (e: React.MouseEvent) => {
     e.stopPropagation()
     setExpanded((prev) => !prev)
@@ -96,6 +106,12 @@ const TaskItem: FC<TaskItemProps> = ({ task, onSelect }) => {
                 />
               </div>
               <span className="shrink-0 text-[11px] text-blue-600">{progressPct}%</span>
+              {/* 下载阶段在头部同步展示网速，单位沿用下载引擎原生输出（MiB/s / KiB/s） */}
+              {downloadSpeed && task.status === 'DOWNLOADING' && (
+                <span className="shrink-0 font-mono text-[11px] text-cyan-600 tabular-nums">
+                  {downloadSpeed}
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -138,7 +154,12 @@ const TaskItem: FC<TaskItemProps> = ({ task, onSelect }) => {
       {/* ── 步骤条（活跃任务） ── */}
       {isActive && (
         <div className="px-4 pb-2">
-          <ProcessingStepper status={task.status} progress={task.progress} />
+          <ProcessingStepper
+            status={task.status}
+            progress={task.progress}
+            steps={payloadSteps}
+            downloadSpeed={downloadSpeed}
+          />
         </div>
       )}
 
