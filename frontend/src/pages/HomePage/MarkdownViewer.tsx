@@ -5,8 +5,10 @@ import rehypeHighlight from 'rehype-highlight'
 import 'highlight.js/styles/github.css'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useTaskStore } from '@/store/taskStore'
 import { TaskStatus } from '@/types/task'
+import ProcessingStepper from './ProcessingStepper'
 import {
   FileText,
   GitFork,
@@ -95,12 +97,23 @@ function EmptyState() {
   )
 }
 
-// ── 处理中状态 ──────────────────────────────────────────────────
-function LoadingState() {
+// ── 处理中状态：顶部 Stepper + 内容骨架 ──────────────────────────
+function ProcessingState({ status, progress }: { status: string; progress: number }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
-      <Loader2 className="h-8 w-8 animate-spin text-primary opacity-70" />
-      <p className="text-sm">笔记正在生成中，请稍候...</p>
+    <div className="flex h-full flex-col overflow-hidden">
+      {/* 顶部：步骤进度条 */}
+      <div className="shrink-0 border-b border-neutral-200 px-4 py-3">
+        <ProcessingStepper status={status} progress={progress} />
+      </div>
+      {/* 内容区：骨架占位 */}
+      <div className="flex-1 overflow-hidden px-8 py-6">
+        <div className="space-y-4">
+          <Skeleton className="h-6 w-1/3" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-11/12" />
+          <Skeleton className="h-4 w-4/5" />
+        </div>
+      </div>
     </div>
   )
 }
@@ -331,8 +344,8 @@ export default function MarkdownViewer() {
     )
   }
 
-  // 非 SUCCESS：显示 Loading
-  if (status !== TaskStatus.SUCCESS) return <LoadingState />
+  // 非 SUCCESS：显示顶部步骤条 + 内容骨架
+  if (status !== TaskStatus.SUCCESS) return <ProcessingState status={status} progress={task.progress} />
 
   // analyze/create/storyboard/note 成功 → 按 completed_steps 展示 Tabs
   const completedSteps = (Array.isArray(result?.completed_steps) ? result.completed_steps : []) as string[]
