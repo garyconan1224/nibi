@@ -1,9 +1,12 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip.tsx'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { LangSwitcher } from '@/components/LangSwitcher'
 
 const SettingLayout = () => {
   const location = useLocation()
+  const { t } = useTranslation('settings')
 
   const menuItems = [
     { label: '提供商管理', path: '/settings/providers' },
@@ -26,7 +29,8 @@ const SettingLayout = () => {
           </div>
           <div className="text-2xl font-bold text-gray-800">VidMirror</div>
         </div>
-        <div>
+        <div className="flex items-center gap-4">
+          <LangSwitcher />
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -35,7 +39,7 @@ const SettingLayout = () => {
                 </Link>
               </TooltipTrigger>
               <TooltipContent>
-                <span>返回首页</span>
+                <span>{t('layout.backHome')}</span>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

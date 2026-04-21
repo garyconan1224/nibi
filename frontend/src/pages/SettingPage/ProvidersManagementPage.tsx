@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -71,6 +72,7 @@ const EMPTY_CREATE_FORM: CreateForm = {
 }
 
 const ProvidersManagementPage = () => {
+  const { t } = useTranslation('common')
   const [providers, setProviders]     = useState<Provider[]>([])
   const [listLoading, setListLoading] = useState(true)
   const [error, setError]             = useState<string | null>(null)
@@ -464,7 +466,7 @@ const ProvidersManagementPage = () => {
               onClick={() => { setCreateOpen(false); setCreateForm(EMPTY_CREATE_FORM) }}
               disabled={creating}
             >
-              取消
+              {t('actions.cancel')}
             </Button>
             <Button onClick={handleCreate} disabled={creating} className="gap-2">
               {creating && <Loader2 className="h-4 w-4 animate-spin" />}

@@ -1,6 +1,9 @@
 import { describe, expect, it, vi, beforeEach, beforeAll } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
+// 在测试环境下显式加载 i18n 配置，否则 t('form.title') 等会回退为 key 字面量
+import '@/locales/i18n'
+
 // Radix UI 在 jsdom 下所需 Web API 的最小补齐，必须在组件 import 之前执行
 beforeAll(() => {
   if (typeof globalThis.ResizeObserver === 'undefined') {

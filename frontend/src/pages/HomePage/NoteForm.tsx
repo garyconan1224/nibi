@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useTranslation } from 'react-i18next'
 import { z } from 'zod'
 import {
   AlertTriangle,
@@ -100,6 +101,7 @@ type FormValues = z.infer<typeof formSchema>
 
 /* ─── 组件 ─── */
 const NoteForm = () => {
+  const { t } = useTranslation('home')
   const [submitError, setSubmitError]   = useState<string | null>(null)
 
   /* ── 本地文件上传相关 state ── */
@@ -372,7 +374,7 @@ const NoteForm = () => {
       {/* ── 标题 ── */}
       <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
         <Link2 className="h-4 w-4 text-primary" />
-        <span>新建笔记</span>
+        <span>{t('form.title')}</span>
       </div>
 
       {/* ── URL 输入（仅在不显示本地上传时展示）── */}
@@ -855,7 +857,7 @@ const NoteForm = () => {
         ) : (
           <>
             <Send className="h-4 w-4" />
-            <span>开始处理</span>
+            <span>{t('form.submit')}</span>
           </>
         )}
       </Button>
