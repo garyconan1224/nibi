@@ -120,7 +120,7 @@ def retry_task(task_id: str) -> Dict[str, Any]:
 def stream_task_events(task_id: str) -> StreamingResponse:
     """Server-Sent Events：推送任务快照与新增日志行。"""
 
-    def event_stream():
+    async def event_stream():
         last = 0
         while True:
             rec = _store.get(task_id)
@@ -135,7 +135,7 @@ def stream_task_events(task_id: str) -> StreamingResponse:
             yield f"data: {json.dumps({'type': 'task', 'task': d})}\n\n"
             if d.get("status") in _TERMINAL_STATUSES:
                 break
-            time.sleep(0.2)
+            await asyncio.sleep(0.2)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
