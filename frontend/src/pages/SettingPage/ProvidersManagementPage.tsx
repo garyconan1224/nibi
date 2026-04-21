@@ -173,15 +173,35 @@ const ProvidersManagementPage = () => {
       const body: Record<string, unknown> = {
         base_url: draft.base_url,
         enabled: draft.enabled,
+        name: draft.name,
         default_models: detail.default_models,
       }
       if (draft.api_key.trim() !== '') body.api_key = draft.api_key
 
       await http.put(`/providers/${id}`, body)
       toast.success('保存成功')
-      setDetailCache(prev => { const n = { ...prev }; delete n[id]; return n })
-      setExpanded(prev => ({ ...prev, [id]: false }))
-      await fetchProviders()
+
+      // 保存成功后：更新 detailCache（回显最新数据），保留展开状态，清空 api_key 输入
+      const updatedDetail: ProviderDetail = {
+        ...detail,
+        base_url: draft.base_url,
+        enabled: draft.enabled,
+        name: draft.name,
+        // 若传入了新 key，标记已设置
+        has_api_key: draft.api_key.trim() !== '' ? true : detail.has_api_key,
+      }
+      setDetailCache(prev => ({ ...prev, [id]: updatedDetail }))
+      // 清空 api_key 输入（已保存），其他字段保留当前值
+      setDrafts(prev => ({
+        ...prev,
+        [id]: { ...prev[id], api_key: '' },
+      }))
+      // 同步更新提供商列表中的状态（enabled/name）
+      setProviders(prev =>
+        prev.map(p =>
+          p.id === id ? { ...p, enabled: draft.enabled, name: draft.name, base_url: draft.base_url } : p
+        )
+      )
     } catch (e) {
       const msg = e instanceof Error ? e.message : '保存失败'
       setError(msg)

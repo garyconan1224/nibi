@@ -278,7 +278,17 @@ const NoteForm = () => {
 
       setCurrentTask(task_id)
     } catch (err: unknown) {
-      setSubmitError(err instanceof Error ? err.message : '提交失败，请重试')
+      // 对 400 错误（如模型不可用）给出友好提示
+      const msg = err instanceof Error ? err.message : String(err)
+      const lower = msg.toLowerCase()
+      if (
+        (lower.includes('400') || lower.includes('bad request')) &&
+        (lower.includes('model') || lower.includes('模型'))
+      ) {
+        setSubmitError('当前模型不可用，请在「设置 → 提供商管理」中检查模型配置后重试')
+      } else {
+        setSubmitError(msg || '提交失败，请重试')
+      }
     }
   }
 

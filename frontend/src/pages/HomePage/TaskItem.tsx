@@ -46,8 +46,9 @@ const TaskItem: FC<TaskItemProps> = ({ task, onSelect }) => {
   const [cancelling, setCancelling] = useState(false)
   const cancelTask = useTaskStore((s) => s.cancelTask)
 
-  const isActive = !isTaskTerminal(task.status) && task.status !== 'PENDING'
-  // 仅 PENDING / DOWNLOADING / ANALYZING / SUMMARIZING 状态可取消
+  // 非终结状态均显示步骤条（含 PENDING 排队中）
+  const isActive = !isTaskTerminal(task.status)
+  // 仅非终结状态可取消
   const isCancellable = !isTaskTerminal(task.status)
 
   const handleCancel = async (e: React.MouseEvent) => {
@@ -144,8 +145,8 @@ const TaskItem: FC<TaskItemProps> = ({ task, onSelect }) => {
       {/* ── 展开区域：日志 ── */}
       {expanded && (
         <div className="border-t border-neutral-100">
-          {/* 活跃任务：使用 SSE 实时日志 */}
-          {isActive ? (
+          {/* 非终结且非 PENDING 状态：使用 SSE 实时日志；其他（含 PENDING）展示静态日志 */}
+          {isActive && task.status !== 'PENDING' ? (
             <TaskLogViewer taskId={task.task_id} />
           ) : (
             /* 已完成任务：渲染历史静态日志 */

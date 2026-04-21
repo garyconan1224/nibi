@@ -15,9 +15,25 @@ const ICON_MAP: Record<string, FC<{ className?: string }>> = {
 // 阶段在流程中的顺序索引
 const STAGE_ORDER = PROCESSING_STAGES.map((s) => s.id)
 
-/** 判断当前 status 在步骤条中的位置 */
+/**
+ * 判断当前 status 在步骤条中的位置
+ * - PENDING 视为第 0 阶段前（index = -1），步骤条显示为"等待中"
+ * - 未知状态统一返回 -1
+ */
 function getStageIndex(status: string): number {
   return STAGE_ORDER.indexOf(status as TaskStatus)
+}
+
+/**
+ * 将任意状态映射为步骤条"有效激活"的阶段索引：
+ * PENDING → 0（显示第一个阶段为待激活）
+ * 其他未知状态 → 0
+ */
+function getEffectiveIndex(status: string): number {
+  const idx = getStageIndex(status)
+  if (idx >= 0) return idx
+  // PENDING 或其他未知状态：定位到第一阶段
+  return 0
 }
 
 interface ProcessingStepperProps {
@@ -41,7 +57,12 @@ const ProcessingStepper: FC<ProcessingStepperProps> = ({ status, progress }) => 
   const isSuccess = status === TaskStatus.SUCCESS
   const isFailed = status === TaskStatus.FAILED
   const isCancelled = status === TaskStatus.CANCELLED
-  const activeIndex = getStageIndex(status)
+  const isPending = status === TaskStatus.PENDING
+
+  // 真实阶段索引（-1 表示不在阶段列表内）
+  const rawIndex = getStageIndex(status)
+  // 用于渲染的有效索引（PENDING 映射到 0，其他未知也映射到 0）
+  const activeIndex = isPending || rawIndex < 0 ? getEffectiveIndex(status) : rawIndex
 
   return (
     <div className="w-full px-1 py-2">
@@ -49,10 +70,13 @@ const ProcessingStepper: FC<ProcessingStepperProps> = ({ status, progress }) => 
         {PROCESSING_STAGES.map((stage, idx) => {
           const IconComp = ICON_MAP[stage.icon] ?? Zap
 
-          // 判断阶段状态
-          const isDone = isSuccess || (!isFailed && !isCancelled && activeIndex > idx)
-          const isActive = !isSuccess && !isFailed && !isCancelled && activeIndex === idx
-          const isFail = isFailed && activeIndex === idx
+          // PENDING 时：全部阶段为灰色"待处理"，不显示活跃态
+          // 正常运行时：activeIndex 之前为已完成，activeIndex 为活跃，之后为待处理
+          const isDone = isSuccess || (!isFailed && !isCancelled && !isPending && activeIndex > idx)
+          const isActive = !isSuccess && !isFailed && !isCancelled && !isPending && activeIndex === idx
+          // FAILED 时：若未识别到活跃阶段（rawIndex === -1），默认标红最后一个阶段
+          const failedIdx = rawIndex >= 0 ? rawIndex : PROCESSING_STAGES.length - 1
+          const isFail = isFailed && failedIdx === idx
 
           return (
             <div key={stage.id} className="flex flex-1 flex-col items-center">

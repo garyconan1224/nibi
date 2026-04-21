@@ -19,6 +19,8 @@ import {
   ArrowRight,
   Copy,
   Check,
+  Download,
+  FileDown,
 } from 'lucide-react'
 import { useReactToPrint } from 'react-to-print'
 
@@ -103,14 +105,63 @@ function LoadingState() {
   )
 }
 
+/**
+ * 将后端原始错误信息映射为面向用户的友好提示
+ * 重点处理模型相关的 400 错误（如模型不可用、模型名称错误等）
+ */
+function getFriendlyErrorMessage(raw: string): { friendly: string; hint?: string } {
+  const lower = raw.toLowerCase()
+  // HTTP 400 + 模型相关
+  if (
+    (lower.includes('400') || lower.includes('bad request')) &&
+    (lower.includes('model') || lower.includes('模型'))
+  ) {
+    return {
+      friendly: '当前模型不可用，请检查设置',
+      hint: '可能原因：所选模型名称错误、账号未开通该模型或提供商配置有误。请前往「设置 → 提供商管理」确认配置。',
+    }
+  }
+  // 20012：模型不存在
+  if (lower.includes('20012') || (lower.includes('model') && lower.includes('not') && lower.includes('exist'))) {
+    return {
+      friendly: '模型不存在或未开通',
+      hint: '请在「设置 → 提供商管理」中确认所选模型已在当前账号中开通。',
+    }
+  }
+  // 401：鉴权失败
+  if (lower.includes('401') || lower.includes('unauthorized') || lower.includes('invalid api key')) {
+    return {
+      friendly: 'API Key 验证失败',
+      hint: '请检查提供商配置中的 API Key 是否正确有效。',
+    }
+  }
+  // 429：限流
+  if (lower.includes('429') || lower.includes('rate limit')) {
+    return {
+      friendly: '请求过于频繁，触发限流',
+      hint: '请稍后重试，或降低并发请求频率。',
+    }
+  }
+  return { friendly: raw }
+}
+
 // ── 失败状态 ────────────────────────────────────────────────────
 function FailedState({ message }: { message?: string }) {
+  const { friendly, hint } = message
+    ? getFriendlyErrorMessage(message)
+    : { friendly: '', hint: undefined }
+
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
       <AlertCircle className="h-8 w-8 text-red-400" />
       <p className="text-sm font-medium text-red-600">任务处理失败</p>
       {message && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-500">{message}</p>
+        <div className="max-w-md space-y-2">
+          <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-500">{friendly}</p>
+          {hint && (
+            <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">{hint}</p>
+          )}
+        </div>
       )}
     </div>
   )
@@ -260,6 +311,7 @@ export default function MarkdownViewer() {
   })
   const printRef = useRef<HTMLDivElement>(null)
   const handlePrint = useReactToPrint({ content: () => printRef.current })
+  const [showExportMenu, setShowExportMenu] = useState(false)
 
   // 无选中任务
   if (!task) return <EmptyState />
@@ -325,13 +377,54 @@ export default function MarkdownViewer() {
         {/* 顶部操作按钮 */}
         <div className="flex items-center gap-2">
           <CopyButton text={markdown} />
-          <button
-            onClick={handlePrint}
-            title="打印笔记"
-            className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-xs text-gray-600 shadow-sm transition hover:bg-neutral-50 active:scale-95"
-          >
-            打印
-          </button>
+          {/* 导出下拉菜单 */}
+          <div className="relative">
+            <button
+              onClick={() => setShowExportMenu(v => !v)}
+              title="导出报告"
+              className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-xs text-gray-600 shadow-sm transition hover:bg-neutral-50 active:scale-95"
+            >
+              <Download className="h-3.5 w-3.5" />
+              导出
+            </button>
+            {showExportMenu && (
+              <>
+                {/* 点击外部关闭 */}
+                <div className="fixed inset-0 z-10" onClick={() => setShowExportMenu(false)} />
+                <div className="absolute right-0 z-20 mt-1 w-44 rounded-md border border-neutral-200 bg-white py-1 shadow-lg text-xs">
+                  {/* Markdown 导出 */}
+                  <button
+                    className="flex w-full items-center gap-2 px-3 py-2 text-gray-700 hover:bg-neutral-50"
+                    onClick={() => {
+                      setShowExportMenu(false)
+                      if (!markdown) return
+                      const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
+                      const url = URL.createObjectURL(blob)
+                      const a = document.createElement('a')
+                      a.href = url
+                      a.download = `report-${task.task_id.slice(0, 8)}.md`
+                      a.click()
+                      URL.revokeObjectURL(url)
+                    }}
+                  >
+                    <FileDown className="h-3.5 w-3.5 text-blue-500" />
+                    导出为 Markdown
+                  </button>
+                  {/* PDF 导出（打印另存） */}
+                  <button
+                    className="flex w-full items-center gap-2 px-3 py-2 text-gray-700 hover:bg-neutral-50"
+                    onClick={() => {
+                      setShowExportMenu(false)
+                      handlePrint()
+                    }}
+                  >
+                    <FileText className="h-3.5 w-3.5 text-red-500" />
+                    导出为 PDF（打印）
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
