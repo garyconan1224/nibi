@@ -38,24 +38,32 @@ export interface ConfigState {
   extras: string
 
   /** 操作 */
-  setConfig: (patch: Partial<Omit<ConfigState, 'setConfig'>>) => void
+  setConfig: (patch: Partial<Omit<ConfigState, 'setConfig' | 'resetConfig'>>) => void
+  /** 将所有字段重置为初始默认值 */
+  resetConfig: () => void
+}
+
+/** 初始默认值（setConfig/resetConfig 共用同一份） */
+const DEFAULT_CONFIG: Omit<ConfigState, 'setConfig' | 'resetConfig'> = {
+  defaultQuality: 'medium',
+  defaultFormats: ['bulleted', 'summary'],
+  defaultStyle: 'academic',
+
+  screenshot: false,
+  link: false,
+  video_understanding: false,
+  video_interval: 30,
+  grid_size: [2, 2],
+  extras: '',
 }
 
 export const useConfigStore = create<ConfigState>()(
   persist(
     (set) => ({
-      defaultQuality: 'medium',
-      defaultFormats: ['bulleted', 'summary'],
-      defaultStyle: 'academic',
-
-      screenshot: false,
-      link: false,
-      video_understanding: false,
-      video_interval: 30,
-      grid_size: [2, 2],
-      extras: '',
+      ...DEFAULT_CONFIG,
 
       setConfig: (patch) => set((state) => ({ ...state, ...patch })),
+      resetConfig: () => set((state) => ({ ...state, ...DEFAULT_CONFIG })),
     }),
     { name: 'config-storage' },
   ),
