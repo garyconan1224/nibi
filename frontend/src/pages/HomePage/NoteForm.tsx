@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronUp,
   FileVideo,
+  Link,
   Link2,
   Loader2,
   Send,
@@ -169,6 +170,28 @@ const NoteForm = () => {
   const watchedSteps = watch('steps')
   const hasDownloadStep = watchedSteps.includes('download')
 
+  /* 监听 URL 输入，按平台域名渲染前缀徽章/图标 */
+  const watchedUrl = watch('url')
+  const platformIcon = (() => {
+    const u = (watchedUrl || '').trim()
+    if (!u) return null
+    if (u.includes('bilibili.com')) {
+      return (
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-red-500 text-[11px] font-bold text-white">
+          B
+        </span>
+      )
+    }
+    if (u.includes('youtube.com') || u.includes('youtu.be')) {
+      return (
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-red-500 text-[9px] font-bold text-white">
+          YT
+        </span>
+      )
+    }
+    return <Link className="h-4 w-4 text-muted-foreground" />
+  })()
+
   /**
    * 是否需要显示本地文件上传区：
    * 勾选了 analyze 或 transcribe，但未勾选 download
@@ -308,14 +331,28 @@ const NoteForm = () => {
       {!showLocalUpload && (
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="url" className="text-xs text-muted-foreground">视频 URL</Label>
-          <input
-            id="url"
-            type="url"
-            placeholder="粘贴 YouTube / Bilibili 链接..."
-            disabled={isSubmitting}
-            className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
-            {...register('url')}
-          />
+          <div className="relative">
+            {/* 平台前缀：按 URL 域名展示 B/YT 徽章或链接图标 */}
+            {platformIcon && (
+              <span
+                aria-hidden
+                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2"
+              >
+                {platformIcon}
+              </span>
+            )}
+            <input
+              id="url"
+              type="url"
+              placeholder="粘贴 YouTube / Bilibili 链接..."
+              disabled={isSubmitting}
+              className={[
+                'w-full rounded-md border border-neutral-200 bg-white py-2 text-sm text-gray-800 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50',
+                platformIcon ? 'pl-10 pr-3' : 'px-3',
+              ].join(' ')}
+              {...register('url')}
+            />
+          </div>
           {errors.url && (
             <p className="text-xs text-red-500">{errors.url.message}</p>
           )}
