@@ -25,6 +25,7 @@ import {
   FileDown,
 } from 'lucide-react'
 import { useReactToPrint } from 'react-to-print'
+import { toast } from 'sonner'
 
 // 动态加载 MarkmapComponent（markmap-lib 体积大）
 const MarkmapComponent = lazy(() => import('./MarkmapComponent'))
@@ -323,7 +324,8 @@ export default function MarkdownViewer() {
     return s.tasks.find(t => t.task_id === s.currentTaskId)
   })
   const printRef = useRef<HTMLDivElement>(null)
-  const handlePrint = useReactToPrint({ content: () => printRef.current })
+  // react-to-print v3+ 改用 contentRef（v2 的 content: () => ref.current 已废弃）
+  const handlePrint = useReactToPrint({ contentRef: printRef })
   const [showExportMenu, setShowExportMenu] = useState(false)
 
   // 无选中任务
@@ -352,6 +354,11 @@ export default function MarkdownViewer() {
   const markdown = String(result?.markdown || '')
   const transcript = String(result?.transcript || '')
   const analysis = String(result?.analysis || '')
+
+  // 是否可导出笔记：note 步骤已执行（或旧任务无 completed_steps 字段）且 markdown 非空
+  // completedSteps 为空视为旧任务，沿用"允许导出"的宽松判断
+  const noteStepExecuted = completedSteps.length === 0 || completedSteps.includes('note')
+  const canExportNote = noteStepExecuted && markdown.length > 0
 
   // 步骤未执行时的占位组件
   const StepNotExecuted = ({ stepName }: { stepName: string }) => (
@@ -423,11 +430,20 @@ export default function MarkdownViewer() {
                     <FileDown className="h-3.5 w-3.5 text-blue-500" />
                     导出为 Markdown
                   </button>
-                  {/* PDF 导出（打印另存） */}
+                  {/* PDF 导出（打印另存）
+                      - disabled：note 步骤未执行或 markdown 为空时不允许点击，从 UI 规避报错
+                      - onClick：即便按钮可用，打印前再做一次 printRef.current 防御性检查，
+                        避免极端时序下（例如 forceMount 尚未完成挂载）触发 "nothing to print" 警告 */}
                   <button
-                    className="flex w-full items-center gap-2 px-3 py-2 text-gray-700 hover:bg-neutral-50"
+                    disabled={!canExportNote}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-gray-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
                     onClick={() => {
                       setShowExportMenu(false)
+                      if (!canExportNote) return
+                      if (!printRef.current) {
+                        toast.error('当前没有可打印的笔记内容')
+                        return
+                      }
                       handlePrint()
                     }}
                   >
@@ -442,7 +458,13 @@ export default function MarkdownViewer() {
       </div>
 
       {/* ── 笔记 Tab ── */}
-      <TabsContent value="note" className="min-h-0 flex-1 overflow-hidden">
+      {/* forceMount：保持 DOM 常驻，保证在其他 tab 时 printRef 仍指向有效节点；
+          data-[state=inactive]:hidden：配合 forceMount，避免非激活时视觉上与其他 tab 重叠 */}
+      <TabsContent
+        value="note"
+        forceMount
+        className="min-h-0 flex-1 overflow-hidden data-[state=inactive]:hidden"
+      >
         {completedSteps.length > 0 && !completedSteps.includes('note') ? (
           <StepNotExecuted stepName="生成笔记" />
         ) : (
