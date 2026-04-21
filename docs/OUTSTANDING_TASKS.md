@@ -71,32 +71,49 @@
 
 ### 🔴 P0（立即消除不确定性）
 1. 将当前 13 个未提交修改与 4 个未跟踪项，按 `REFACTOR_SUMMARY.md` 整理为**一个原子 commit**；同步纳入 `tests/test_three_part_model_selection.py`。
+   - **判定：✅ 已完成（非原子提交，分布式落盘）** — 内容已分布在 `d2ced8b`/`3dee5bb`/`314aa44`/`83aa312`/`10282cb`/`db19f11` 等 commit；`tests/test_three_part_model_selection.py` 已在 `d2ced8b` 中纳入。
 2. 依 `VERIFICATION_CHECKLIST.md` 跑通最小验证（Payload 三位一体字段与后端日志）。
+   - **判定：⚠️ 需人工确认** — 清单存在于根目录，执行证据需运行时日志，代码层面无法验证。
 
 ### 🟠 P1（功能缺口与显著技术债）
 3. 后端实现 `DELETE /providers/{id}`；前端 `providerStore.removeProvider` 改为真实调用并移除 TODO。
+   - **判定：✅ 已完成** — `backend/app/routes/providers.py:168`；`frontend/src/store/providerStore.ts:153-166`；commit `314aa44`。
 4. 清理冗余/错置文件：
    - `services/bilibili_nocookie_temp.py`（确认后删除或合并）。
    - `backend/app/downloaders/` 目录下的 `test_*.py` 与 `simple_test_v2.py` 迁至 `tests/backend/downloaders/`。
    - 删除 `src/vidmirror/ui/demo_sidebar.py`（如确未被引用）。
    - 移除 `pages/_legacy/*.bak` 与 `frontend/src/hooks/__tests__/usePipelineTasks.demo.ts`（迁出 `src/`）。
+   - **判定：⚠️ 部分完成（1/5）** — 仅 `usePipelineTasks.demo.ts` 已迁出（`297cf7d`）；其余 4 类文件均仍在：`bilibili_nocookie_temp.py`（498 行）、downloaders 下 4 个 test 文件、`demo_sidebar.py`、`pages/_legacy/*.bak`×3。注意：commit `c73829b` 标题"删除 bilibili_nocookie_temp.py 遗留文件"与实际变更不符。
 5. 前端测试基建：`pnpm add -D vitest @testing-library/react jsdom`，新增 `"test"` script；补 `taskStore`、`usePipelineTasks`、`NoteForm` 的 smoke tests。
+   - **判定：⚠️ 部分完成** — 基建 ✅（commit `10282cb`）；`taskStore.test.ts`、`usePipelineTasks.test.ts` ✅；**`NoteForm` smoke test ❌ 未创建**。
 6. 后端为 `video_analyzer` / `storyboard_generator` / `routes/notes.py` / `rag_qa_service` 各加 1 条 smoke test。
+   - **判定：✅ 已完成** — 4 个对应 `tests/test_*_smoke.py` 均存在；commit `db19f11`。
 
 ### 🟡 P2（扩展性与一致性）
 7. SSE：`routes/pipeline.py` 改异步生成器 + `await asyncio.sleep`；保持与 WebSocket 分支一致。
+   - **判定：✅ 已完成** — `backend/app/routes/pipeline.py:123`（`async def event_stream`）+ `:138`（`await asyncio.sleep(0.2)`），与 `:162` WebSocket 分支一致；commit `83aa312`。
 8. 统一前端 HTTP 客户端：`ProvidersManagementPage` 替换为 axios 实例（`services/client.ts`）。
+   - **判定：✅ 已完成** — `frontend/src/pages/SettingPage/ProvidersManagementPage.tsx:30` 已改为 `import { http } from '@/services/client'`，无裸 `fetch`。
 9. 设置页补齐：Model / Transcriber / Screenshot 三页。
+   - **判定：⚠️ 部分完成（1/3）** — `ModelManagementPage.tsx` ✅；另外多出 `NetworkSettingsPage.tsx`（原清单未列）；**`TranscriberPage` ❌**、**`ScreenshotPage` ❌**。
 10. 新增前端差量：ProjectSwitcher、AnalyzeView、StoryboardPanel；以 `task.type` 驱动路由与展示。
+    - **判定：❌ 未开始** — 3 个组件均未在 `frontend/src/` 中创建。
 11. 统一 Provider 数据源（择一：`/providers/*` 或兼容层 `/api/provider/list`），另一套仅后端保留。
+    - **判定：❌ 未开始** — 双轨仍并存：`backend/app/routes/providers.py`（新）+ `backend/app/routes/notes.py:315`（legacy `/provider/list`）+ `:337`（legacy `/model/list`）。
 12. 任务持久化增强：原子写盘 + 重启恢复，或引入 SQLite。
+    - **判定：❌ 未开始** — `backend/app/services/task_store.py:44-46` 仍为 `write_text(json.dumps(...))`，无 `tempfile + os.replace` 原子写，无 SQLite。
 
 ### 🟢 P3（打磨与收尾）
 13. 集成 ThemeSwitcher 与 LangSwitcher；落地 `locales/`。
+    - **判定：⚠️ 部分完成** — `ThemeSwitcher.tsx` ✅；`next-themes` / `i18next` / `react-i18next` 依赖 ✅；**`LangSwitcher` 组件 ❌**、**`locales/` 目录 ❌**。
 14. 文档治理：根 MD 归档至 `docs/history/`；更新 `README.md` 与 `CLAUDE.md` 的目录树与使用指引。
+    - **判定：❌ 未开始** — `docs/history/` 不存在；根目录仍有 14 个 MD 散落；`CLAUDE.md` 已不在仓库；`README.md` 不再引用 `BillNote_frontend`（此点隐式消除）。
 15. 依赖升级：`react-markdown >= 9`，校验 `rehype-raw` 兼容；可选安装 `@lobehub/icons` 以还原品牌图标。
+    - **判定：⚠️ 部分完成** — `react-markdown ^10.1.0` ✅、`rehype-raw ^7.0.0` ✅；**`@lobehub/icons` ❌ 未安装**（可选项）。
 16. 明确 Streamlit 的弃用时间线（兼容至 v0.3）；创建 deprecation 追踪任务。
+    - **判定：❌ 未开始** — 无独立 deprecation 文档或 issue 追踪；`grep` 仅在 `ENABLE_LOCAL.md` 与 `README.md` 见零星提及，无正式时间线。
 17. React Router v6 → v7 Data Router 迁移（非必需，可延后到 v1.5+）。
+    - **判定：⚠️ 部分完成** — `react-router-dom ^7.14.1` 版本 ✅；**API 仍为旧式**：`frontend/src/App.tsx:2,14,30` 用 `BrowserRouter + Routes + Route`，未迁移到 `createBrowserRouter + RouterProvider`。
 
 ---
 
