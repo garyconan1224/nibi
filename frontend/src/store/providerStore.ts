@@ -65,7 +65,7 @@ interface ProviderStoreState {
   /** 调用 PUT /providers/{id} 更新，成功后同步数组对应项 */
   updateProvider: (id: string, data: UpdateProviderInput) => Promise<void>
 
-  /** 删除 provider。后端暂无 DELETE 接口，仅做前端删除。 */
+  /** 调用 DELETE /providers/{id} 删除，成功后从本地数组移除 */
   removeProvider: (id: string) => Promise<void>
 }
 
@@ -151,8 +151,7 @@ export const useProviderStore = create<ProviderStoreState>()(
       },
 
       removeProvider: async (id) => {
-        // TODO: 后端暂未提供 DELETE /providers/{id} 接口，当前仅做前端删除。
-        // 等后端补齐后改为：await http.delete(`/providers/${id}`)
+        await http.delete(`/providers/${id}`)
         set(state => {
           const nextModels = { ...state.providerModels }
           delete nextModels[id]

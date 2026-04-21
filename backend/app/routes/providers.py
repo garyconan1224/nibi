@@ -165,6 +165,21 @@ def update_provider(provider_id: str, req: ProviderUpdateRequest) -> Dict[str, A
     }
 
 
+@router.delete("/{provider_id}")
+def delete_provider(provider_id: str) -> Dict[str, Any]:
+    """删除指定提供商"""
+    settings = load_settings()
+    profile = next((p for p in settings.providers if p.id == provider_id), None)
+    if profile is None:
+        raise HTTPException(status_code=404, detail=f"provider not found: {provider_id}")
+
+    new_providers = tuple(p for p in settings.providers if p.id != provider_id)
+    new_settings = replace(settings, providers=new_providers)
+    save_settings(new_settings)
+
+    return {"ok": True}
+
+
 @router.post("")
 def create_provider(req: ProviderCreateRequest) -> Dict[str, Any]:
     """新增提供商"""
