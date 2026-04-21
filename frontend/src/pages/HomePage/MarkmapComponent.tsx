@@ -62,9 +62,10 @@ export default function MarkmapComponent({ markdown }: MarkmapComponentProps) {
     }
   }, [markdown])
 
-  // 组件卸载时清理 markmap 实例（markmap-view 内部无 destroy，取消引用即可）
+  // 组件卸载时销毁 markmap 实例并释放引用
   useEffect(() => {
     return () => {
+      mmRef.current?.destroy()
       mmRef.current = null
     }
   }, [])
@@ -79,7 +80,7 @@ export default function MarkmapComponent({ markdown }: MarkmapComponentProps) {
   }
 
   return (
-    <div className="relative h-full w-full overflow-hidden">
+    <div className="relative h-full min-h-[400px] w-full overflow-hidden">
       {loading && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -94,7 +95,7 @@ export default function MarkmapComponent({ markdown }: MarkmapComponentProps) {
       {!markdown.trim() && !loading && (
         <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
           <GitFork className="h-8 w-8 opacity-30" />
-          <p className="text-sm">暂无内容可生成思维导图</p>
+          <p className="text-sm">生成成功后自动展示思维导图</p>
         </div>
       )}
     </div>
