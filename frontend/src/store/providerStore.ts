@@ -18,6 +18,22 @@ export interface Model {
   name: string  // 显示名称
 }
 
+/** 新增 provider 的入参（对应后端 ProviderCreateRequest） */
+export interface AddProviderInput {
+  name: string
+  kind: string
+  api_key?: string
+  base_url?: string
+}
+
+/** 更新 provider 的入参（对应后端 ProviderUpdateRequest，全部可选） */
+export interface UpdateProviderInput {
+  api_key?: string
+  base_url?: string
+  enabled?: boolean
+  default_models?: Record<string, string>
+}
+
 interface ProviderStoreState {
   /** 提供商列表 */
   providers: ProviderItem[]
@@ -42,6 +58,15 @@ interface ProviderStoreState {
 
   /** 拉取单个 provider 的可用模型并写入缓存 */
   fetchProviderModels: (provider_id: string) => Promise<void>
+
+  /** 调用 POST /providers 新增，成功后追加到 providers 数组 */
+  addProvider: (data: AddProviderInput) => Promise<ProviderItem>
+
+  /** 调用 PUT /providers/{id} 更新，成功后同步数组对应项 */
+  updateProvider: (id: string, data: UpdateProviderInput) => Promise<void>
+
+  /** 删除 provider。后端暂无 DELETE 接口，仅做前端删除。 */
+  removeProvider: (id: string) => Promise<void>
 }
 
 export const useProviderStore = create<ProviderStoreState>()(
@@ -91,6 +116,54 @@ export const useProviderStore = create<ProviderStoreState>()(
             modelsLoading: { ...state.modelsLoading, [provider_id]: false },
           }))
         }
+      },
+
+      addProvider: async (data) => {
+        const res = await http.post('/providers', data)
+        const payload = res.data.data ?? res.data
+        const item: ProviderItem = {
+          id: payload.id,
+          name: payload.name,
+          kind: payload.kind,
+          base_url: payload.base_url ?? '',
+          enabled: payload.enabled ?? true,
+        }
+        set(state => ({ providers: [...state.providers, item] }))
+        return item
+      },
+
+      updateProvider: async (id, data) => {
+        const res = await http.put(`/providers/${id}`, data)
+        const payload = res.data.data ?? res.data
+        set(state => ({
+          providers: state.providers.map(p =>
+            p.id === id
+              ? {
+                  ...p,
+                  name: payload.name ?? p.name,
+                  kind: payload.kind ?? p.kind,
+                  base_url: payload.base_url ?? p.base_url,
+                  enabled: typeof payload.enabled === 'boolean' ? payload.enabled : p.enabled,
+                }
+              : p,
+          ),
+        }))
+      },
+
+      removeProvider: async (id) => {
+        // TODO: 后端暂未提供 DELETE /providers/{id} 接口，当前仅做前端删除。
+        // 等后端补齐后改为：await http.delete(`/providers/${id}`)
+        set(state => {
+          const nextModels = { ...state.providerModels }
+          delete nextModels[id]
+          const nextLoading = { ...state.modelsLoading }
+          delete nextLoading[id]
+          return {
+            providers: state.providers.filter(p => p.id !== id),
+            providerModels: nextModels,
+            modelsLoading: nextLoading,
+          }
+        })
       },
     }),
     {
