@@ -218,7 +218,7 @@ TEXT_MODEL_CHOICES: tuple[str, ...] = (
 def get_backend_base_url() -> str:
     """Streamlit 与本地脚本请求后端时的根 URL（无尾部斜杠）。
 
-    优先级：VIDMIRROR_BACKEND_URL > BACKEND_URL > 默认 http://127.0.0.1:8010
+    优先级：VIDMIRROR_BACKEND_URL > BACKEND_URL > 默认 http://127.0.0.1:8000
     """
     # 优先新变量名
     raw = (os.environ.get("VIDMIRROR_BACKEND_URL") or "").strip()
@@ -226,7 +226,7 @@ def get_backend_base_url() -> str:
         return raw.rstrip("/")
 
     # 最后尝试通用变量
-    raw = (os.environ.get("BACKEND_URL") or "http://127.0.0.1:8010").strip()
+    raw = (os.environ.get("BACKEND_URL") or "http://127.0.0.1:8000").strip()
     return raw.rstrip("/")
 
 

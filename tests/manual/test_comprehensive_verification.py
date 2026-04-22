@@ -1,13 +1,13 @@
 """
 综合验证脚本：三位一体 Payload + 后端日志 + 数据持久化。
-需要启动后端：uvicorn backend.app.main:app --port 8010
+需要启动后端：uvicorn backend.app.main:app --port 8000
 """
 import sys
 import time
 import requests
 from pathlib import Path
 
-BACKEND_URL = "http://localhost:8010"
+BACKEND_URL = "http://localhost:8000"
 TIMEOUT = 5
 
 def check_backend_alive():
@@ -15,10 +15,10 @@ def check_backend_alive():
     try:
         resp = requests.get(f"{BACKEND_URL}/health", timeout=TIMEOUT)
         if resp.status_code == 200 or resp.status_code == 404:  # 有些端点返回404但证明后端在线
-            print("✓ 后端在线 (localhost:8010)")
+            print("✓ 后端在线 (localhost:8000)")
             return True
     except requests.exceptions.ConnectionError:
-        print("✗ 后端离线 - 请先运行: uvicorn backend.app.main:app --port 8010")
+        print("✗ 后端离线 - 请先运行: uvicorn backend.app.main:app --port 8000")
         return False
     except Exception as e:
         print(f"⚠ 后端检查出错: {e}")

@@ -30,7 +30,7 @@ def _parse_host_port(base_url: str) -> tuple[str, int, str]:
         raw = f"http://{raw}"
     parsed = urlparse(raw)
     host = parsed.hostname or "127.0.0.1"
-    port = parsed.port or 8010
+    port = parsed.port or 8000
 
     probe_host = host
     if host in {"0.0.0.0", "::"}:

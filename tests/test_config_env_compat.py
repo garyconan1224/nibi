@@ -44,7 +44,7 @@ def test_default_when_no_env_set(monkeypatch):
     with warnings.catch_warnings(record=True) as captured:
         warnings.simplefilter("always")
         result = get_backend_base_url()
-    assert result == "http://127.0.0.1:8010"
+    assert result == "http://127.0.0.1:8000"
     assert not any(issubclass(w.category, DeprecationWarning) for w in captured)
 
 
