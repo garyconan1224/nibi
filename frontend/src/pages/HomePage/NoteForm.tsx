@@ -370,24 +370,25 @@ const NoteForm = () => {
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className="flex flex-col gap-5 px-1"
+      className="flex flex-col gap-6"
     >
-      {/* ── 标题 ── */}
-      <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-        <Link2 className="h-4 w-4 text-primary" />
-        <span>{t('form.title')}</span>
-      </div>
+      {/* ── 标题（视觉已上移至 Section；保留节点以兼容既有测试）── */}
+      <span className="sr-only">
+        <Link2 className="h-4 w-4" />
+        {t('form.title')}
+      </span>
 
       {/* ── URL 输入（仅在不显示本地上传时展示）── */}
       {!showLocalUpload && (
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="url" className="text-xs text-muted-foreground">{t('homePage:form.labels.videoUrl')}</Label>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="url" className="text-sm font-medium text-foreground">
+            {t('homePage:form.labels.videoUrl')}
+          </Label>
           <div className="relative">
-            {/* 平台前缀：按 URL 域名展示 B/YT 徽章或链接图标 */}
             {platformIcon && (
               <span
                 aria-hidden
-                className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
               >
                 {platformIcon}
               </span>
@@ -398,14 +399,16 @@ const NoteForm = () => {
               placeholder={t('homePage:form.placeholders.pasteLink')}
               disabled={isSubmitting}
               className={[
-                'w-full rounded-md border border-neutral-200 bg-white py-2 text-sm text-gray-800 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50',
+                'w-full rounded-md border border-border bg-background py-2.5 text-sm text-foreground placeholder:text-muted-foreground',
+                'focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/25',
+                'disabled:cursor-not-allowed disabled:opacity-50',
                 platformIcon ? 'pl-10 pr-3' : 'px-3',
               ].join(' ')}
               {...register('url')}
             />
           </div>
           {errors.url && (
-            <p className="text-xs text-red-500">{translateFormError(errors.url.message, t)}</p>
+            <p className="text-xs text-rose-600">{translateFormError(errors.url.message, t)}</p>
           )}
         </div>
       )}
@@ -413,9 +416,10 @@ const NoteForm = () => {
       {/* ── 本地文件上传区（勾选 analyze/transcribe 且未勾选 download 时显示）── */}
       {showLocalUpload && (
         <div className="flex flex-col gap-2">
-          <Label className="text-xs text-muted-foreground">{t('homePage:form.labels.localAudioVideo')}</Label>
+          <Label className="text-sm font-medium text-foreground">
+            {t('homePage:form.labels.localAudioVideo')}
+          </Label>
 
-          {/* 隐藏的 file input */}
           <input
             ref={fileInputRef}
             type="file"
@@ -424,11 +428,10 @@ const NoteForm = () => {
             onChange={e => {
               const file = e.target.files?.[0]
               if (file) handleFileSelect(file)
-              e.target.value = '' // 允许重复选同一文件
+              e.target.value = ''
             }}
           />
 
-          {/* 拖拽 / 点击触发区域 */}
           <div
             role="button"
             tabIndex={0}
@@ -439,27 +442,29 @@ const NoteForm = () => {
             onDragLeave={onDragLeave}
             onDrop={onDrop}
             className={[
-              'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 cursor-pointer transition-colors',
+              'flex flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed px-4 py-7 cursor-pointer transition-colors',
               isDragOver
-                ? 'border-primary bg-primary/5 text-primary'
-                : 'border-neutral-300 bg-neutral-50 text-muted-foreground hover:border-primary/60 hover:bg-primary/5',
+                ? 'border-violet-500 bg-violet-500/5 text-violet-600'
+                : 'border-border bg-muted/30 text-muted-foreground hover:border-violet-500/60 hover:bg-violet-500/5',
               isSubmitting ? 'pointer-events-none opacity-50' : '',
             ].join(' ')}
           >
             <Upload className="h-6 w-6 shrink-0" />
             <p className="text-xs text-center leading-relaxed">
-              {t('homePage:form.upload.drag')} <span className="text-primary font-medium">{t('homePage:form.upload.clickSelect')}</span>
+              {t('homePage:form.upload.drag')}{' '}
+              <span className="text-violet-600 font-medium">
+                {t('homePage:form.upload.clickSelect')}
+              </span>
             </p>
             <p className="text-[10px] text-muted-foreground">
               {t('homePage:form.hints.supportedFormats', { formats: ACCEPTED_EXTENSIONS.join(' ') })}
             </p>
           </div>
 
-          {/* 已选文件信息 + 上传进度 */}
           {localFile && (
-            <div className="rounded-md border border-neutral-200 bg-white px-3 py-2.5 flex flex-col gap-2">
+            <div className="rounded-md border border-border bg-background px-3 py-2.5 flex flex-col gap-2">
               <div className="flex items-center gap-2">
-                <FileVideo className="h-4 w-4 shrink-0 text-primary" />
+                <FileVideo className="h-4 w-4 shrink-0 text-violet-600" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium truncate">{localFile.name}</p>
                   <p className="text-[10px] text-muted-foreground">{formatFileSize(localFile.size)}</p>
@@ -469,7 +474,7 @@ const NoteForm = () => {
                   aria-label={t('homePage:form.upload.removeFile')}
                   disabled={isSubmitting}
                   onClick={e => { e.stopPropagation(); setLocalFile(null); setUploadProgress(0) }}
-                  className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-red-500 disabled:opacity-40"
+                  className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-rose-500 disabled:opacity-40"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -485,9 +490,13 @@ const NoteForm = () => {
         </div>
       )}
 
-      {/* ── 双模型选择器：文本 + 视觉（纵向堆叠） ── */}
-      {/* 注：音频模型已弃用，改用本地 faster-whisper 转录 */}
-      <div className="grid grid-cols-1 gap-4">
+      {/* ── 模型配置 ── */}
+      <div className="flex flex-col gap-3 border-t border-border/60 pt-5">
+        <div className="flex items-baseline justify-between">
+          <h3 className="text-sm font-semibold text-foreground">模型配置</h3>
+          <span className="text-[11px] text-muted-foreground">文本与视觉模型</span>
+        </div>
+        <div className="grid grid-cols-1 gap-4">
         {([
           {
             providerField: 'text_provider_id' as const,
@@ -583,12 +592,20 @@ const NoteForm = () => {
                 )}
               />
               {errors[item.modelField] && (
-                <p className="text-xs text-red-500">{translateFormError(errors[item.modelField]?.message as string, t)}</p>
+                <p className="text-xs text-rose-600">{translateFormError(errors[item.modelField]?.message as string, t)}</p>
               )}
             </div>
           )
         })}
+        </div>
       </div>
+
+      {/* ── 输出偏好（质量 / 格式 / 风格） ── */}
+      <div className="flex flex-col gap-4 border-t border-border/60 pt-5">
+        <div className="flex items-baseline justify-between">
+          <h3 className="text-sm font-semibold text-foreground">输出偏好</h3>
+          <span className="text-[11px] text-muted-foreground">处理质量、导出格式与笔记风格</span>
+        </div>
 
       {/* ── Quality 单选 ── */}
       <div className="flex flex-col gap-1.5">
@@ -673,6 +690,14 @@ const NoteForm = () => {
           )}
         />
       </div>
+      </div>
+
+      {/* ── 视觉与高级参数 ── */}
+      <div className="flex flex-col gap-4 border-t border-border/60 pt-5">
+        <div className="flex items-baseline justify-between">
+          <h3 className="text-sm font-semibold text-foreground">视觉与抽帧</h3>
+          <span className="text-[11px] text-muted-foreground">多模态抽帧及网格拼图</span>
+        </div>
 
       {/* ── 视觉理解（多模态抽帧）── */}
       <div className="flex items-center justify-between">
@@ -693,7 +718,7 @@ const NoteForm = () => {
           type="number"
           min={1}
           max={300}
-          className="w-20 rounded-md border border-neutral-200 px-2 py-1 text-xs text-right"
+          className="w-20 rounded-md border border-border bg-background px-2 py-1 text-xs text-right"
           {...register('video_interval', { valueAsNumber: true })}
         />
       </div>
@@ -706,7 +731,7 @@ const NoteForm = () => {
             type="number"
             min={1}
             max={6}
-            className="w-14 rounded-md border border-neutral-200 px-2 py-1 text-xs text-right"
+            className="w-14 rounded-md border border-border bg-background px-2 py-1 text-xs text-right"
             {...register('grid_cols', { valueAsNumber: true })}
           />
           <span className="text-xs text-muted-foreground">×</span>
@@ -714,11 +739,19 @@ const NoteForm = () => {
             type="number"
             min={1}
             max={6}
-            className="w-14 rounded-md border border-neutral-200 px-2 py-1 text-xs text-right"
+            className="w-14 rounded-md border border-border bg-background px-2 py-1 text-xs text-right"
             {...register('grid_rows', { valueAsNumber: true })}
           />
         </div>
       </div>
+      </div>
+
+      {/* ── 执行流程 ── */}
+      <div className="flex flex-col gap-4 border-t border-border/60 pt-5">
+        <div className="flex items-baseline justify-between">
+          <h3 className="text-sm font-semibold text-foreground">执行流程</h3>
+          <span className="text-[11px] text-muted-foreground">下载策略与处理步骤</span>
+        </div>
 
       {/* ── 下载策略（平铺） ── */}
       {!showLocalUpload && (
@@ -800,45 +833,53 @@ const NoteForm = () => {
           )}
         />
         {errors.steps && (
-          <p className="text-xs text-red-500">{translateFormError(errors.steps.message, t)}</p>
+          <p className="text-xs text-rose-600">{translateFormError(errors.steps.message, t)}</p>
         )}
       </div>
-
-      {/* ── 辅助选项（完全平铺：截图 / 链接 / 额外说明）── */}
-      <div className="flex items-center justify-between">
-        <Label className="text-xs">{t('homePage:form.labels.insertScreenshot')}</Label>
-        <Controller
-          name="screenshot"
-          control={control}
-          render={({ field }) => (
-            <Switch checked={field.value} onCheckedChange={field.onChange} />
-          )}
-        />
       </div>
 
-      <div className="flex items-center justify-between">
-        <Label className="text-xs">{t('homePage:form.labels.preserveLink')}</Label>
-        <Controller
-          name="link"
-          control={control}
-          render={({ field }) => (
-            <Switch checked={field.value} onCheckedChange={field.onChange} />
-          )}
-        />
-      </div>
+      {/* ── 辅助选项 ── */}
+      <div className="flex flex-col gap-4 border-t border-border/60 pt-5">
+        <div className="flex items-baseline justify-between">
+          <h3 className="text-sm font-semibold text-foreground">辅助选项</h3>
+          <span className="text-[11px] text-muted-foreground">截图、原链接与补充说明</span>
+        </div>
 
-      <div className="flex flex-col gap-1.5">
-        <Label className="text-xs text-muted-foreground">{t('homePage:form.labels.extras')}</Label>
-        <Textarea
-          placeholder={t('homePage:form.placeholders.extrasHint')}
-          className="min-h-[60px] text-xs"
-          {...register('extras')}
-        />
+        <div className="flex items-center justify-between">
+          <Label className="text-xs">{t('homePage:form.labels.insertScreenshot')}</Label>
+          <Controller
+            name="screenshot"
+            control={control}
+            render={({ field }) => (
+              <Switch checked={field.value} onCheckedChange={field.onChange} />
+            )}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <Label className="text-xs">{t('homePage:form.labels.preserveLink')}</Label>
+          <Controller
+            name="link"
+            control={control}
+            render={({ field }) => (
+              <Switch checked={field.value} onCheckedChange={field.onChange} />
+            )}
+          />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-xs text-muted-foreground">{t('homePage:form.labels.extras')}</Label>
+          <Textarea
+            placeholder={t('homePage:form.placeholders.extrasHint')}
+            className="min-h-[60px] text-xs"
+            {...register('extras')}
+          />
+        </div>
       </div>
 
       {/* ── 错误提示 ── */}
       {submitError && (
-        <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-600">
+        <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
           {submitError}
         </p>
       )}
@@ -847,8 +888,8 @@ const NoteForm = () => {
       <Button
         type="submit"
         disabled={isSubmitting}
-        className="w-full"
-        size="sm"
+        className="w-full bg-violet-600 text-white hover:bg-violet-600/90 focus-visible:ring-violet-500/40"
+        size="default"
       >
         {isSubmitting ? (
           <>
