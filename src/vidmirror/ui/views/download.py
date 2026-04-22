@@ -171,7 +171,7 @@ def render_download_view(project_id: str) -> None:
     project = ensure_current_project()
 
     st.title("⬇️ 视频下载器")
-    st.caption("任务由后端执行（任务驱动）。请先启动：`uvicorn backend.app.main:app --port 8010`。")
+    st.caption("任务由后端执行（任务驱动）。请先启动：`uvicorn backend.app.main:app --port 8000`。")
 
     base_url = get_backend_base_url()
     alive = backend_health(base_url)

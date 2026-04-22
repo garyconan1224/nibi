@@ -369,7 +369,7 @@ def render_create_view(project_id: str) -> None:
 
     if gen:
         if not alive:
-            st.error("后端不可用，请启动：`uvicorn backend.app.main:app --host 127.0.0.1 --port 8010`")
+            st.error("后端不可用，请启动：`uvicorn backend.app.main:app --host 127.0.0.1 --port 8000`")
             if st.button("手动一键启动后端", key="creator_start_backend_on_submit", use_container_width=True):
                 with st.spinner("正在尝试启动后端..."):
                     launch_result = start_backend_once(base_url)

@@ -169,7 +169,7 @@ def render_analyze_view(project_id: str) -> None:
     alive = backend_health(base_url)
 
     st.title("🎞️ 视频画面深度分析")
-    st.caption("当前项目隔离；分析任务由后端执行。请先启动：`uvicorn backend.app.main:app --port 8010`。")
+    st.caption("当前项目隔离；分析任务由后端执行。请先启动：`uvicorn backend.app.main:app --port 8000`。")
 
     project = ensure_current_project()
     project_videos_dir = get_project_videos_dir(project.project_id)
