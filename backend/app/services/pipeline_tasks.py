@@ -22,6 +22,71 @@ from src.vidmirror.core.providers import ChatRequest
 from src.vidmirror.core.providers.registry import create_default_registry
 
 
+def _resolve_download_kwargs(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """合并 payload 与 AppSettings.download 作为 run_ytdlp_download 的 kwargs。
+
+    规则（M3)：
+    - 字符串字段（proxy / po_token / visitor_data) 与 format_selector：payload 非空时用 payload，
+      否则回落到 ``AppSettings.download``；
+    - cookie_base_dirs：payload 提供非空 list 时用 payload，否则落 settings.cookie_base_dirs；
+    - filename_template / retry_count / socket_timeout / concurrent_fragment_downloads：
+      payload 不出现 (legacy 链路从不下发) 时直接取 settings；
+    - 所有 settings 读取均用 ``isinstance`` 守卫，避免被 MagicMock 覆写时把非预期对象
+      透传给 yt-dlp（保持现有 test_pipeline_tasks.py mock 的行为不变）。
+    """
+    try:
+        settings = load_settings()
+        dl = getattr(settings, "download", None)
+    except Exception:
+        dl = None
+
+    def _s(name: str) -> str:
+        v = getattr(dl, name, "") if dl is not None else ""
+        return v if isinstance(v, str) else ""
+
+    def _i_or_none(name: str) -> Optional[int]:
+        v = getattr(dl, name, None) if dl is not None else None
+        return v if isinstance(v, int) and not isinstance(v, bool) else None
+
+    def _dirs() -> Optional[List[str]]:
+        v = getattr(dl, "cookie_base_dirs", None) if dl is not None else None
+        if isinstance(v, (list, tuple)) and v:
+            cleaned = [str(x) for x in v if isinstance(x, str) and x.strip()]
+            return cleaned or None
+        return None
+
+    # 字符串字段：payload 非空优先，否则回落 settings
+    proxy = str(payload.get("proxy") or "") or _s("http_proxy")
+    po_token = str(payload.get("po_token") or "") or _s("po_token")
+    visitor_data = str(payload.get("visitor_data") or "") or _s("visitor_data")
+    format_selector = str(payload.get("format_selector") or "") or "best"
+
+    # cookie_base_dirs：payload 的 list 优先
+    raw_dirs = payload.get("cookie_base_dirs")
+    cookie_dirs: Optional[List[str]] = None
+    if isinstance(raw_dirs, list) and raw_dirs:
+        cookie_dirs = [str(x) for x in raw_dirs]
+    else:
+        cookie_dirs = _dirs()
+
+    # filename_template：空串也视为"未提供"（避免前端误传空串）
+    filename_template = str(payload.get("filename_template") or "") or _s("filename_template")
+
+    return {
+        "browser": str(payload.get("browser") or "chrome"),
+        "proxy": proxy,
+        "po_token": po_token,
+        "visitor_data": visitor_data,
+        "format_selector": format_selector,
+        "cookie_base_dirs_list": cookie_dirs,
+        # 仅在有具体值时传入，避免空串污染 _build_attempts 的默认模板兜底
+        **({"filename_template": filename_template} if filename_template else {}),
+        "retry_count": _i_or_none("retry_count"),
+        "socket_timeout": _i_or_none("socket_timeout"),
+        "concurrent_fragment_downloads": _i_or_none("concurrency_limit"),
+    }
+
+
 def handle_download_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     """处理视频下载任务"""
     runner.set_progress(record.task_id, 0.05, "Preparing download")
@@ -31,24 +96,15 @@ def handle_download_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, An
     project_video_dir = get_project_videos_dir(record.project_id)
     project_video_dir.mkdir(parents=True, exist_ok=True)
 
-    raw_dirs = record.payload.get("cookie_base_dirs")
-    cookie_base_dirs_list: Optional[List[str]] = None
-    if isinstance(raw_dirs, list) and raw_dirs:
-        cookie_base_dirs_list = [str(x) for x in raw_dirs]
-
+    dl_kwargs = _resolve_download_kwargs(record.payload)
     out = run_ytdlp_download(
         url=url,
         output_dir=str(project_video_dir),
-        browser=str(record.payload.get("browser") or "chrome"),
-        proxy=str(record.payload.get("proxy") or ""),
-        po_token=str(record.payload.get("po_token") or ""),
-        visitor_data=str(record.payload.get("visitor_data") or ""),
-        format_selector=str(record.payload.get("format_selector") or "best"),
-        cookie_base_dirs_list=cookie_base_dirs_list,
         log=lambda m: runner.append_log(record.task_id, m),
         progress_callback=lambda p, msg: runner.set_progress(record.task_id, p, msg),
         # 将 yt-dlp 捕获的实时速度写入 task.result["download_speed"]，前端订阅展示
         speed_callback=lambda s: runner.set_download_speed(record.task_id, s),
+        **dl_kwargs,
     )
     if not out.get("ok"):
         err = (out.get("error_full") or out.get("error") or "download failed").strip()
@@ -258,24 +314,15 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         runner.store.update(task_id, status=TaskStatus.DOWNLOADING.value)
         runner.set_progress(task_id, 0.02, "开始下载视频...")
 
-        raw_dirs = payload.get("cookie_base_dirs")
-        cookie_base_dirs_list: Optional[List[str]] = (
-            [str(x) for x in raw_dirs] if isinstance(raw_dirs, list) and raw_dirs else None
-        )
-
+        dl_kwargs = _resolve_download_kwargs(payload)
         out = run_ytdlp_download(
             url=url,
             output_dir=str(project_video_dir),
-            browser=str(payload.get("browser") or "chrome"),
-            proxy=str(payload.get("proxy") or ""),
-            po_token=str(payload.get("po_token") or ""),
-            visitor_data=str(payload.get("visitor_data") or ""),
-            format_selector=str(payload.get("format_selector") or "best"),
-            cookie_base_dirs_list=cookie_base_dirs_list,
             log=lambda m: runner.append_log(task_id, m),
             progress_callback=lambda p, msg: runner.set_progress(task_id, 0.02 + p * 0.28, msg),
             # note 流水线下载阶段同样上报实时速度
             speed_callback=lambda s: runner.set_download_speed(task_id, s),
+            **dl_kwargs,
         )
         if not out.get("ok"):
             err = (out.get("error_full") or out.get("error") or "download failed").strip()
@@ -331,10 +378,15 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         try:
             with open(video_file, "rb") as f:
                 audio_bytes = f.read()
+            # 从 settings 读取 initial_prompt，支持用户自定义前置提示词提升转录精准性
+            from shared.settings_store import load_settings
+            settings = load_settings()
+            initial_prompt = settings.transcriber.initial_prompt or ""
             transcript_text = transcribe_with_fast_whisper(
                 audio_bytes,
                 model_name="base",
                 device="cpu",
+                initial_prompt=initial_prompt,
             )
         except Exception as e:
             raise RuntimeError(f"本地转录失败: {str(e)}")

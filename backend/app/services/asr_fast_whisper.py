@@ -58,7 +58,23 @@ def get_install_hint() -> str:
     return _install_hint_for_current_interpreter()
 
 
-def transcribe_with_fast_whisper(audio_bytes: bytes, *, model_name: str = "base", device: str = "cpu") -> str:
+def transcribe_with_fast_whisper(
+    audio_bytes: bytes,
+    *,
+    model_name: str = "base",
+    device: str = "cpu",
+    initial_prompt: str = "",
+) -> str:
+    """转录音频字节流为文本。
+
+    参数：
+        audio_bytes：音频二进制数据
+        model_name：Whisper 模型尺寸（tiny/base/small/medium/large-v3/large-v3-turbo 等）
+        device：计算设备（cpu/cuda/mps）
+        initial_prompt：转录前置提示词；用于提高识别精准性（仅 fast-whisper 支持）
+
+    返回：转录后的文本（多行段落用 \n 连接）
+    """
     try:
         from faster_whisper import WhisperModel
     except ImportError as err:
@@ -73,7 +89,9 @@ def transcribe_with_fast_whisper(audio_bytes: bytes, *, model_name: str = "base"
         tmp_path = Path(tmp.name)
     try:
         model = WhisperModel(model_name, device=device)
-        segments, _info = model.transcribe(str(tmp_path))
+        # 若提供前置提示词，传入 transcribe 方法以提升识别精准性
+        transcribe_kwargs = {"language": "zh"} if not initial_prompt else {"language": "zh", "initial_prompt": initial_prompt}
+        segments, _info = model.transcribe(str(tmp_path), **transcribe_kwargs)
         parts: List[str] = []
         for seg in segments:
             text = str(getattr(seg, "text", "")).strip()
