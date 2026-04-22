@@ -157,17 +157,29 @@ def _build_attempts(
     output_dir: str,
     cookie_base_dirs_list: list[str],
     progress_hook: Any,
+    filename_template: str = "%(title)s.%(ext)s",
+    retry_count: int | None = None,
+    socket_timeout: int | None = None,
+    concurrent_fragment_downloads: int | None = None,
 ) -> list[dict[str, Any]]:
+    # outtmpl 由调用者决定模板;默认保留旧硬编码以保证旧调用零行为变化
     base_opts: dict[str, Any] = {
-        "outtmpl": os.path.join(output_dir, "%(title)s.%(ext)s"),
+        "outtmpl": os.path.join(output_dir, filename_template or "%(title)s.%(ext)s"),
         "noplaylist": True,
         "quiet": True,
         "no_warnings": True,
         "nocheckcertificate": True,
         "ignoreconfig": True,
-        "concurrent_fragment_downloads": 5,
+        "concurrent_fragment_downloads": (
+            concurrent_fragment_downloads if concurrent_fragment_downloads is not None else 5
+        ),
         "progress_hooks": [progress_hook],
     }
+    # 可选数值参数:None 则不写入,避免覆盖 yt-dlp 内部默认;非 None 覆盖对应键
+    if retry_count is not None:
+        base_opts["retries"] = retry_count
+    if socket_timeout is not None:
+        base_opts["socket_timeout"] = socket_timeout
     if format_selector:
         base_opts["format"] = format_selector
     normalized_proxy = _normalize_proxy(proxy)
@@ -237,6 +249,12 @@ def run_ytdlp_download(
     progress_callback: Callable[[float, str], None] | None = None,
     # 实时下载速度回调（字符串形式，例如 "1.23MiB/s"），供上层写入任务状态供前端展示
     speed_callback: Callable[[str], None] | None = None,
+    # 阶段 3(M3)新增:来自 AppSettings.download / 前端 configStore。
+    # 默认值沿用旧硬编码,使现有调用点在不传这些参数时行为完全不变。
+    filename_template: str = "%(title)s.%(ext)s",
+    retry_count: int | None = None,
+    socket_timeout: int | None = None,
+    concurrent_fragment_downloads: int | None = None,
 ) -> dict[str, Any]:
     """
     执行多策略 yt-dlp 下载。
@@ -301,6 +319,10 @@ def run_ytdlp_download(
         output_dir=output_dir,
         cookie_base_dirs_list=dirs,
         progress_hook=_hook,
+        filename_template=filename_template,
+        retry_count=retry_count,
+        socket_timeout=socket_timeout,
+        concurrent_fragment_downloads=concurrent_fragment_downloads,
     )
 
     last_exc: Exception | None = None

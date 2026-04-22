@@ -311,46 +311,5 @@ def image_proxy(url: str) -> StreamingResponse:
         iter([resp.content]), status_code=resp.status_code, media_type=media_type
     )
 
-
-@router.get("/provider/list", response_model=BiliNoteResponse)
-def provider_list() -> BiliNoteResponse:
-    """返回 BiliNote 前端可消费的 provider 列表（从 settings_store 读取）。"""
-    settings = load_settings()
-    providers: List[Dict[str, Any]] = []
-    for p in settings.providers:
-        providers.append(
-            {
-                "id": p.id,
-                "provider_id": p.id,
-                "name": p.name,
-                "kind": p.kind,
-                "enabled": p.enabled,
-                "base_url": p.base_url,
-                "capabilities": list(p.capabilities),
-                "has_api_key": bool((p.api_key or "").strip()),
-            }
-        )
-    return _ok({"providers": providers})
-
-
-@router.get("/model/list", response_model=BiliNoteResponse)
-def model_list() -> BiliNoteResponse:
-    """汇总所有启用 provider 的 default_models 为扁平数组。"""
-    settings = load_settings()
-    models: List[Dict[str, Any]] = []
-    for p in settings.providers:
-        if not p.enabled:
-            continue
-        for capability, model_name in (p.default_models or {}).items():
-            name = str(model_name or "").strip()
-            if not name:
-                continue
-            models.append(
-                {
-                    "provider_id": p.id,
-                    "provider_name": p.name,
-                    "capability": capability,
-                    "model_name": name,
-                }
-            )
-    return _ok({"models": models})
+# 注：legacy `/api/provider/list` 与 `/api/model/list` 于 P2-11 下线；
+# 前端与 Streamlit 均已统一走 `/providers/*`（`backend/app/routes/providers.py`）。

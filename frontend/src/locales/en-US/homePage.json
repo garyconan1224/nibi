@@ -36,7 +36,13 @@
     },
     "errors": {
       "modelUnavailable": "Current model is unavailable. Please check model configuration in Settings → Provider Management and retry",
-      "submitFailed": "Submit failed, please retry"
+      "submitFailed": "Submit failed, please retry",
+      "selectTextProvider": "Please select a text model provider",
+      "selectTextModel": "Please select a text model",
+      "selectVideoProvider": "Please select a video model provider",
+      "selectVideoModel": "Please select a video model",
+      "selectFormat": "Please select at least one format",
+      "selectStep": "Please select at least one execution step"
     },
     "hints": {
       "advancedNetworkSettings": "Advanced network parameters like PO Token / Cookie / Proxy should be configured in Settings → Network Settings",
@@ -119,6 +125,7 @@
   },
   "task": {
     "cancel": "Cancel Task",
+    "retry": "Retry Task",
     "logs": {
       "collapse": "Collapse Logs",
       "empty": "No logs",

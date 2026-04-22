@@ -1,12 +1,11 @@
 """BiliNote 兼容适配层单测（Phase A.2）。
 
-覆盖 6 条：
+覆盖 5 条（P2-11 已下线 legacy `/api/provider/list`，对应测试同步移除）：
 1. 响应统一 `{code, msg, data}` 包装
 2. 状态机映射（ANALYZING→SUMMARIZING、CANCELLED→FAILED）
 3. `/api/generate_note` 成功创建任务
 4. `/api/delete_task` 只允许删除终结态
-5. `/api/provider/list` 能读到 settings
-6. `/api/upload` 落盘到项目 videos 目录
+5. `/api/upload` 落盘到项目 videos 目录
 """
 
 from __future__ import annotations
@@ -126,19 +125,6 @@ def test_delete_task_only_terminal(client: TestClient) -> None:
     assert body["code"] == 0
     assert body["data"]["deleted"] is True
     assert store.get(tid) is None
-
-
-def test_provider_list_reads_settings(client: TestClient) -> None:
-    """/api/provider/list 应能从 settings_store 读出至少 1 条 provider。"""
-    r = client.get("/api/provider/list")
-    body = r.json()
-    assert body["code"] == 0
-    providers = body["data"]["providers"]
-    assert isinstance(providers, list) and len(providers) >= 1
-    # 必要字段
-    sample = providers[0]
-    for key in ("id", "name", "kind", "enabled", "capabilities", "has_api_key"):
-        assert key in sample
 
 
 def test_upload_persists_file_in_videos_dir(client: TestClient, tmp_path: Path) -> None:

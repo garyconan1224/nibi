@@ -32,6 +32,90 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    // 构建配置：按厂商拆分 vendor chunk，配合路由级 React.lazy 实现细粒度代码分割
+    // 使用 rolldown 原生 codeSplitting.groups（manualChunks 在 rolldown-vite 下不生效），
+    // priority 越大越先匹配；jsx-runtime 必须先于 react-vendor / markdown-vendor 等匹配，
+    // 否则 rolldown 会把 react/jsx-runtime 内联到多个 chunk，导致入口强制 import markdown-vendor。
+    build: {
+      rollupOptions: {
+        output: {
+          codeSplitting: {
+            groups: [
+              {
+                name: 'react-jsx-runtime',
+                test: /[\\/]node_modules[\\/]react[\\/](jsx-runtime|jsx-dev-runtime|cjs[\\/]react-jsx-(dev-)?runtime)/,
+                priority: 100,
+              },
+              {
+                name: 'react-vendor',
+                test: /[\\/]node_modules[\\/](react|react-dom|scheduler|use-sync-external-store)[\\/]/,
+                priority: 90,
+              },
+              {
+                name: 'd3-vendor',
+                test: /[\\/]node_modules[\\/]d3(-[^\\/]+)?[\\/]/,
+                priority: 80,
+              },
+              {
+                name: 'markmap-view-vendor',
+                test: /[\\/]node_modules[\\/](markmap-view|markmap-toolbar)[\\/]/,
+                priority: 80,
+              },
+              {
+                name: 'html-parser-vendor',
+                test: /[\\/]node_modules[\\/](cheerio|htmlparser2|parse5[^\\/]*|domhandler|domutils|dom-serializer|entities|css-select|css-what|nth-check|boolbase|domelementtype)[\\/]/,
+                priority: 78,
+              },
+              {
+                name: 'markdown-it-vendor',
+                test: /[\\/]node_modules[\\/]markdown-it[^\\/]*[\\/]/,
+                priority: 76,
+              },
+              {
+                name: 'markmap-lib-vendor',
+                test: /[\\/]node_modules[\\/](markmap-lib|markmap-common|markmap-html-parser)[\\/]/,
+                priority: 74,
+              },
+              {
+                name: 'markdown-vendor',
+                test: /[\\/]node_modules[\\/](react-markdown|remark-[^\\/]+|rehype-[^\\/]+|highlight\.js|unified|mdast-[^\\/]+|hast-[^\\/]+|micromark[^\\/]*|decode-named-character-reference|character-entities[^\\/]*|property-information|space-separated-tokens|comma-separated-tokens|zwitch|vfile[^\\/]*|bail|is-plain-obj|trough|devlop)[\\/]/,
+                priority: 60,
+              },
+              {
+                name: 'radix-vendor',
+                test: /[\\/]node_modules[\\/](radix-ui|@radix-ui)[\\/]/,
+                priority: 50,
+              },
+              {
+                name: 'form-vendor',
+                test: /[\\/]node_modules[\\/](react-hook-form|@hookform[\\/]resolvers|zod)[\\/]/,
+                priority: 50,
+              },
+              {
+                name: 'i18n-vendor',
+                test: /[\\/]node_modules[\\/](i18next|react-i18next)[\\/]/,
+                priority: 50,
+              },
+              {
+                name: 'router-vendor',
+                test: /[\\/]node_modules[\\/](react-router|react-router-dom)[\\/]/,
+                priority: 50,
+              },
+              {
+                name: 'export-vendor',
+                test: /[\\/]node_modules[\\/](html-to-image|react-to-print)[\\/]/,
+                priority: 50,
+              },
+              {
+                name: 'icons-vendor',
+                test: /[\\/]node_modules[\\/](lucide-react)[\\/]/,
+                priority: 50,
+              },
+            ],
+          },
+        },
+      },
+    },
     test: {
       environment: 'jsdom',
       globals: true,

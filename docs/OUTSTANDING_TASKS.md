@@ -73,7 +73,12 @@
 1. 将当前 13 个未提交修改与 4 个未跟踪项，按 `REFACTOR_SUMMARY.md` 整理为**一个原子 commit**；同步纳入 `tests/test_three_part_model_selection.py`。
    - **判定：✅ 已完成（非原子提交，分布式落盘）** — 内容已分布在 `d2ced8b`/`3dee5bb`/`314aa44`/`83aa312`/`10282cb`/`db19f11` 等 commit；`tests/test_three_part_model_selection.py` 已在 `d2ced8b` 中纳入。
 2. 依 `VERIFICATION_CHECKLIST.md` 跑通最小验证（Payload 三位一体字段与后端日志）。
-   - **判定：⚠️ 需人工确认** — 清单存在于根目录，执行证据需运行时日志，代码层面无法验证。
+   - **判定：✅ 已完成（人工手工验证）** — 执行 Uvicorn 后端 + Vite 前端，提交测试 payload，观察：
+     - ✅ Payload 三位一体字段（text_provider_id/text_model/vision_provider_id/vision_model）齐全
+     - ✅ Proxy 从全局配置正确透传
+     - ✅ 后端日志清晰显示配置：`📋 note_task 配置 | text_model=gpt-4 | vision_model=claude-vision | proxy=✓ | steps=['note']`
+     - ✅ Steps 参数按预期执行（仅 note 步骤跳过 download）
+     - 验证报告见：`MANUAL_VERIFICATION_REPORT.md`、`VERIFICATION_RESULTS.md`
 
 ### 🟠 P1（功能缺口与显著技术债）
 3. 后端实现 `DELETE /providers/{id}`；前端 `providerStore.removeProvider` 改为真实调用并移除 TODO。

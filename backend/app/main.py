@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.app.routes.download_config import router as download_config_router
 from backend.app.routes.pipeline import router as pipeline_router
 from backend.app.routes.providers import router as providers_router
 from backend.app.routes.rag import router as rag_router
@@ -84,6 +85,7 @@ app.include_router(providers_router)
 app.include_router(pipeline_router)
 app.include_router(transcript_router)
 app.include_router(transcriber_config_router)
+app.include_router(download_config_router)
 app.include_router(rag_router)
 app.include_router(notes_router)  # 新增：笔记生成API
 

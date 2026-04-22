@@ -1,7 +1,6 @@
 {
   "form": {
-    "title": "New Note",
-    "submit": "Process"
+    "submit": "Process",
+    "title": "New Note"
   }
 }
-

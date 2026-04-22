@@ -6,13 +6,14 @@ import { z } from 'zod'
 import {
   AlertTriangle,
   FileVideo,
-  Link,
   Link2,
   Loader2,
   Send,
   Upload,
   X,
 } from 'lucide-react'
+
+import { getPlatformBadge } from '@/constant/platforms'
 
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -69,19 +70,20 @@ function deriveTaskType(steps: string[]): PipelineTaskType {
   return 'analyze'
 }
 
+// schema 中的 message 保留为 i18n key，UI 层展示错误时再通过 t() 翻译
 const formSchema = z.object({
   task_type:           z.enum(TASK_TYPES),
   // 允许空字符串（本地上传模式下 URL 为空）
   url:                 z.string(),
   // 双模型：文本 + 视觉，各自独立选择 provider 和 model
   // 注：音频模型已弃用，改用本地 faster-whisper 转录
-  text_provider_id:    z.string().min(1, { message: '请选择文本模型提供商' }),
-  text_model:          z.string().min(1, { message: '请选择文本模型' }),
-  video_provider_id:   z.string().min(1, { message: '请选择视频模型提供商' }),
-  video_model:         z.string().min(1, { message: '请选择视频模型' }),
+  text_provider_id:    z.string().min(1, { message: 'form.errors.selectTextProvider' }),
+  text_model:          z.string().min(1, { message: 'form.errors.selectTextModel' }),
+  video_provider_id:   z.string().min(1, { message: 'form.errors.selectVideoProvider' }),
+  video_model:         z.string().min(1, { message: 'form.errors.selectVideoModel' }),
   // 笔记生成偏好
   quality:             z.enum(['fast', 'medium', 'slow']),
-  formats:             z.array(z.string()).min(1, { message: '至少选择一种格式' }),
+  formats:             z.array(z.string()).min(1, { message: 'form.errors.selectFormat' }),
   style:               z.enum(['academic', 'minimalist', 'creative']),
   // 视觉理解与网格参数
   video_understanding: z.boolean(),
@@ -92,12 +94,24 @@ const formSchema = z.object({
   screenshot:          z.boolean(),
   link:                z.boolean(),
   extras:              z.string(),
-  steps:               z.array(z.string()).min(1, { message: '至少选择一个执行步骤' }),
+  steps:               z.array(z.string()).min(1, { message: 'form.errors.selectStep' }),
   // 下载策略（默认从 configStore 读取；单次任务可临时覆盖）
   download_mode:       z.enum(['balanced', 'speed', 'quality', 'audio']),
 })
 
 type FormValues = z.infer<typeof formSchema>
+
+/**
+ * 翻译表单验证错误消息：
+ * 如果 message 以 'form.errors.' 开头则视为 i18n 键，否则原样返回。
+ */
+function translateFormError(msg: string | undefined, t: (key: string) => string): string {
+  if (!msg) return ''
+  if (msg.startsWith('form.errors.')) {
+    return t(`homePage:${msg}`)
+  }
+  return msg
+}
 
 /* ─── 组件 ─── */
 const NoteForm = () => {
@@ -190,21 +204,8 @@ const NoteForm = () => {
   const platformIcon = (() => {
     const u = (watchedUrl || '').trim()
     if (!u) return null
-    if (u.includes('bilibili.com')) {
-      return (
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-red-500 text-[11px] font-bold text-white">
-          B
-        </span>
-      )
-    }
-    if (u.includes('youtube.com') || u.includes('youtu.be')) {
-      return (
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-red-500 text-[9px] font-bold text-white">
-          YT
-        </span>
-      )
-    }
-    return <Link className="h-4 w-4 text-muted-foreground" />
+    // 使用新的平台检测模块
+    return getPlatformBadge(u)
   })()
 
   /**
@@ -358,9 +359,9 @@ const NoteForm = () => {
         (lower.includes('400') || lower.includes('bad request')) &&
         (lower.includes('model') || lower.includes('模型'))
       ) {
-        setSubmitError('当前模型不可用，请在「设置 → 提供商管理」中检查模型配置后重试')
+        setSubmitError(t('homePage:form.errors.modelUnavailable'))
       } else {
-        setSubmitError(msg || '提交失败，请重试')
+        setSubmitError(msg || t('homePage:form.errors.submitFailed'))
       }
     }
   }
@@ -404,7 +405,7 @@ const NoteForm = () => {
             />
           </div>
           {errors.url && (
-            <p className="text-xs text-red-500">{errors.url.message}</p>
+            <p className="text-xs text-red-500">{translateFormError(errors.url.message, t)}</p>
           )}
         </div>
       )}
@@ -546,7 +547,7 @@ const NoteForm = () => {
                 )}
               />
               {errors[item.providerField] && (
-                <p className="text-xs text-red-500">{errors[item.providerField]?.message as string}</p>
+                <p className="text-xs text-red-500">{translateFormError(errors[item.providerField]?.message as string, t)}</p>
               )}
 
               {/* Model 选择器 */}
@@ -582,7 +583,7 @@ const NoteForm = () => {
                 )}
               />
               {errors[item.modelField] && (
-                <p className="text-xs text-red-500">{errors[item.modelField]?.message as string}</p>
+                <p className="text-xs text-red-500">{translateFormError(errors[item.modelField]?.message as string, t)}</p>
               )}
             </div>
           )
@@ -644,7 +645,7 @@ const NoteForm = () => {
           )}
         />
         {errors.formats && (
-          <p className="text-xs text-red-500">{errors.formats.message}</p>
+          <p className="text-xs text-red-500">{translateFormError(errors.formats.message, t)}</p>
         )}
       </div>
 
@@ -799,7 +800,7 @@ const NoteForm = () => {
           )}
         />
         {errors.steps && (
-          <p className="text-xs text-red-500">{errors.steps.message}</p>
+          <p className="text-xs text-red-500">{translateFormError(errors.steps.message, t)}</p>
         )}
       </div>
 

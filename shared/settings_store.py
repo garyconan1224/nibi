@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any, Literal
 
@@ -60,6 +60,72 @@ class TranscriberConfig:
             device=str(data.get("device") or "cpu"),
             groq_api_key=str(data.get("groq_api_key") or ""),
             initial_prompt=str(data.get("initial_prompt") or ""),
+        )
+
+
+# ── DownloadConfig 数值字段 clamp 边界（与前端 configStore 约束一致）──────────
+_CONCURRENCY_MIN, _CONCURRENCY_MAX = 1, 8
+_RETRY_MIN, _RETRY_MAX = 0, 10
+_SOCKET_TIMEOUT_MIN, _SOCKET_TIMEOUT_MAX = 5, 300
+
+
+def _clamp_int(value: Any, default: int, lo: int, hi: int) -> int:
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return default
+    if n < lo:
+        return lo
+    if n > hi:
+        return hi
+    return n
+
+
+def _normalize_cookie_base_dirs(raw: Any) -> tuple[str, ...]:
+    if not isinstance(raw, (list, tuple)):
+        return ()
+    out: list[str] = []
+    for item in raw:
+        s = str(item or "").strip()
+        if s and s not in out:
+            out.append(s)
+    return tuple(out)
+
+
+@dataclass(frozen=True)
+class DownloadConfig:
+    """下载器偏好（跨端生效，落 AppSettings）。
+
+    字段与前端 configStore 下载相关字段对齐：
+    - 路径/命名：output_dir / filename_template；
+    - 网络与凭据：http_proxy / po_token / visitor_data / cookie_base_dirs；
+    - 高级：concurrency_limit / retry_count / socket_timeout（均含 clamp）。
+    """
+
+    output_dir: str = ""
+    filename_template: str = "%(title)s-%(id)s.%(ext)s"
+    http_proxy: str = ""
+    po_token: str = ""
+    visitor_data: str = ""
+    cookie_base_dirs: tuple[str, ...] = ()
+    concurrency_limit: int = 2
+    retry_count: int = 3
+    socket_timeout: int = 30
+
+    @classmethod
+    def from_dict(cls, data: Any) -> "DownloadConfig":
+        if not isinstance(data, dict):
+            return cls()
+        return cls(
+            output_dir=str(data.get("output_dir") or ""),
+            filename_template=str(data.get("filename_template") or "%(title)s-%(id)s.%(ext)s"),
+            http_proxy=str(data.get("http_proxy") or ""),
+            po_token=str(data.get("po_token") or ""),
+            visitor_data=str(data.get("visitor_data") or ""),
+            cookie_base_dirs=_normalize_cookie_base_dirs(data.get("cookie_base_dirs")),
+            concurrency_limit=_clamp_int(data.get("concurrency_limit"), 2, _CONCURRENCY_MIN, _CONCURRENCY_MAX),
+            retry_count=_clamp_int(data.get("retry_count"), 3, _RETRY_MIN, _RETRY_MAX),
+            socket_timeout=_clamp_int(data.get("socket_timeout"), 30, _SOCKET_TIMEOUT_MIN, _SOCKET_TIMEOUT_MAX),
         )
 
 
@@ -131,6 +197,7 @@ class AppSettings:
     default_provider_for_embedding: str = ""
     default_provider_for_rerank: str = ""
     transcriber: TranscriberConfig = field(default_factory=TranscriberConfig)
+    download: DownloadConfig = field(default_factory=DownloadConfig)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "AppSettings":
@@ -152,6 +219,7 @@ class AppSettings:
             default_provider_for_embedding=str(data.get("default_provider_for_embedding") or defaults.get("embedding") or ""),
             default_provider_for_rerank=str(data.get("default_provider_for_rerank") or defaults.get("rerank") or ""),
             transcriber=TranscriberConfig.from_dict(data.get("transcriber")),
+            download=DownloadConfig.from_dict(data.get("download")),
         )
 
 
@@ -181,6 +249,22 @@ def save_settings(settings: AppSettings) -> None:
 def clear_settings() -> None:
     if SETTINGS_PATH.exists():
         SETTINGS_PATH.unlink()
+
+
+def delete_provider(provider_id: str) -> bool:
+    """从设置中移除指定 provider。
+
+    - 返回 ``True`` 表示找到并已删除；
+    - 返回 ``False`` 表示 provider 不存在（调用方决定是否视为幂等成功或 404）。
+
+    采用"读-改-写"的完整覆盖写：与 ``save_settings`` 保持一致的持久化路径。
+    """
+    settings = load_settings()
+    if not any(p.id == provider_id for p in settings.providers):
+        return False
+    new_providers = tuple(p for p in settings.providers if p.id != provider_id)
+    save_settings(replace(settings, providers=new_providers))
+    return True
 
 
 def _parse_providers_with_migration(data: dict[str, Any]) -> tuple[ProviderProfile, ...]:

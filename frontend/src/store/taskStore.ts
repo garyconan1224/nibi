@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { TaskRecord } from '@/types/task'
 import { isTaskTerminal } from '@/types/task'
-import { cancelPipelineTask } from '@/services/pipeline'
+import { cancelPipelineTask, retryPipelineTask } from '@/services/pipeline'
 
 interface TaskStoreState {
   // 状态
@@ -17,6 +17,7 @@ interface TaskStoreState {
   setCurrentTask: (taskId: string | null) => void
   setIsPolling: (isPolling: boolean) => void
   cancelTask: (taskId: string) => Promise<void>
+  retryTask: (taskId: string) => Promise<void>
 
   // 便利方法
   getTask: (taskId: string) => TaskRecord | undefined
@@ -81,6 +82,21 @@ export const useTaskStore = create<TaskStoreState>()(
           }))
         } catch (err) {
           console.error(`[taskStore] cancelTask ${taskId} failed:`, err)
+        }
+      },
+
+      // 调用后端 retry 接口，创建新的重试任务（后端返回新任务记录）
+      retryTask: async (taskId) => {
+        try {
+          const newTask = await retryPipelineTask(taskId)
+          // 将新的重试任务追加到列表
+          set((state) => ({
+            tasks: [newTask, ...state.tasks],
+            currentTaskId: newTask.task_id, // 自动切换到新重试任务
+          }))
+        } catch (err) {
+          console.error(`[taskStore] retryTask ${taskId} failed:`, err)
+          throw err
         }
       },
 

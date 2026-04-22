@@ -6,6 +6,7 @@ import { LangSwitcher } from '@/components/LangSwitcher'
 import { Button } from '@/components/ui/button'
 import { DirtyDot } from '@/components/ui/dirty-dot'
 import { cn } from '@/lib/utils'
+import { useSettingsShellStore } from '@/store/settingsShellStore'
 
 /**
  * 设置页通用布局（DESIGN_NOTES_SETTINGS.md §4.1）。
@@ -43,14 +44,23 @@ export interface SettingsShellProps {
   saveBar?: SaveBarState
 }
 
-const DEFAULT_TABS: TabItem[] = [
-  { path: '/settings/providers', label: 'Providers' },
-  { path: '/settings/models', label: 'Models' },
-  { path: '/settings/network', label: 'Network' },
-  { path: '/settings/transcriber', label: 'Transcriber' },
-  { path: '/settings/screenshot', label: 'Screenshot' },
-  { path: '/settings/about', label: 'About' },
-]
+/**
+ * 默认 Tab 清单构造器：基于 `t` 生成 i18n 文案，避免在模块级把运行期
+ * 的 i18n 实例冻结为硬编码字符串。
+ */
+function buildDefaultTabs(
+  t: (key: string) => string,
+): TabItem[] {
+  return [
+    { path: '/settings/providers', label: t('layout.menu.providers') },
+    { path: '/settings/models', label: t('layout.menu.models') },
+    { path: '/settings/network', label: t('layout.menu.network') },
+    { path: '/settings/download', label: t('layout.menu.download') },
+    { path: '/settings/transcriber', label: t('layout.menu.transcriber') },
+    { path: '/settings/screenshot', label: t('layout.menu.screenshot') },
+    { path: '/settings/about', label: t('layout.menu.about') },
+  ]
+}
 
 function TabBar({ tabs }: { tabs: TabItem[] }) {
   const location = useLocation()
@@ -139,10 +149,17 @@ function SaveBar({ state }: { state: SaveBarState | undefined }) {
 }
 
 export function SettingsShell({
-  tabs = DEFAULT_TABS,
+  tabs,
   saveBar,
 }: SettingsShellProps) {
   const { t } = useTranslation('settings')
+  // 订阅 store 里的 SaveBar 状态；显式 prop 优先（便于后续测试注入与特殊路由覆盖）
+  const storeSaveBar = useSettingsShellStore((s) => s.saveBarState)
+  const effectiveSaveBar = saveBar ?? storeSaveBar
+  const effectiveTabs = React.useMemo<TabItem[]>(
+    () => tabs ?? buildDefaultTabs(t),
+    [tabs, t],
+  )
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden">
       <header className="flex h-16 items-center justify-between border-b border-zinc-200 bg-white px-6">
@@ -157,13 +174,13 @@ export function SettingsShell({
         <LangSwitcher />
       </header>
 
-      <TabBar tabs={tabs} />
+      <TabBar tabs={effectiveTabs} />
 
       <main className="flex-1 overflow-auto bg-zinc-50/60">
         <Outlet />
       </main>
 
-      <SaveBar state={saveBar} />
+      <SaveBar state={effectiveSaveBar} />
     </div>
   )
 }

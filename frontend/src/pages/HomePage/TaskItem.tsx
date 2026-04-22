@@ -1,5 +1,5 @@
 import { useState, type FC } from 'react'
-import { ChevronDown, ChevronUp, AlertCircle, Info, AlertTriangle, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, AlertCircle, Info, AlertTriangle, X, RotateCcw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import {
@@ -46,18 +46,34 @@ const TaskItem: FC<TaskItemProps> = ({ task, onSelect }) => {
   const { t } = useTranslation(['homePage', 'common'])
   const [expanded, setExpanded] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [retrying, setRetrying] = useState(false)
   const cancelTask = useTaskStore((s) => s.cancelTask)
+  const retryTask = useTaskStore((s) => s.retryTask)
 
   // 非终结状态均显示步骤条（含 PENDING 排队中）
   const isActive = !isTaskTerminal(task.status)
   // 仅非终结状态可取消
   const isCancellable = !isTaskTerminal(task.status)
+  // 仅失败或取消状态可重试
+  const isRetryable = task.status === 'FAILED' || task.status === 'CANCELLED'
 
   const handleCancel = async (e: React.MouseEvent) => {
     e.stopPropagation()
     setCancelling(true)
     await cancelTask(task.task_id)
     setCancelling(false)
+  }
+
+  const handleRetry = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setRetrying(true)
+    try {
+      await retryTask(task.task_id)
+    } catch (err) {
+      console.error('Retry failed:', err)
+    } finally {
+      setRetrying(false)
+    }
   }
   const shortId = task.task_id.slice(0, 8)
   const progressPct = Math.round(task.progress * 100)
@@ -139,6 +155,20 @@ const TaskItem: FC<TaskItemProps> = ({ task, onSelect }) => {
             className="shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-40"
           >
             <X className="h-4 w-4" />
+          </button>
+        )}
+
+        {/* 重试按钮（仅失败/取消状态显示） */}
+        {isRetryable && (
+          <button
+            type="button"
+            aria-label={t('homePage:task.retry')}
+            onClick={handleRetry}
+            disabled={retrying}
+            title={t('homePage:task.retry')}
+            className="shrink-0 rounded p-1 text-gray-400 hover:bg-amber-50 hover:text-amber-600 disabled:opacity-40"
+          >
+            <RotateCcw className="h-4 w-4" />
           </button>
         )}
 

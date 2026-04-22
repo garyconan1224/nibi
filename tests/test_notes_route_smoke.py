@@ -1,8 +1,10 @@
 """backend/app/routes/notes.py 最小 smoke 测试。
 
 - 验证模块可 import 且暴露 APIRouter
-- 用 FastAPI TestClient 访问 ``GET /api/provider/list`` 确认 200 OK
+- 用 FastAPI TestClient 访问 ``GET /api/task_status/{id}`` 确认 200 OK
   且响应为 ``{code, msg, data}`` 三字段的 BiliNote 兼容结构。
+
+（P2-11 已下线 legacy `/api/provider/list`；Provider 列表统一走 `/providers/*`。）
 """
 
 from __future__ import annotations
@@ -21,8 +23,8 @@ def test_notes_module_imports() -> None:
     assert len(notes.router.routes) > 0
 
 
-def test_provider_list_endpoint_returns_200() -> None:
-    """/api/provider/list 可被调用，返回 200 且符合 BiliNote 响应封装。"""
+def test_task_status_endpoint_response_envelope() -> None:
+    """/api/task_status/<不存在> 可被调用，返回 200 且符合 BiliNote 响应封装。"""
     from backend.app.routes.notes import router as notes_router
 
     # 用一个独立 FastAPI 实例，避免连带启动 main.py 的 lifespan/seed 逻辑
@@ -30,13 +32,12 @@ def test_provider_list_endpoint_returns_200() -> None:
     app.include_router(notes_router)
 
     client = TestClient(app)
-    resp = client.get("/api/provider/list")
+    resp = client.get("/api/task_status/nonexistent-xxx")
 
     assert resp.status_code == 200
     body = resp.json()
     # BiliNote 统一响应契约：{code, msg, data}
     assert set(body.keys()) == {"code", "msg", "data"}
-    assert body["code"] == 0
-    assert "providers" in body["data"]
-    assert isinstance(body["data"]["providers"], list)
+    # 不存在的任务 code 应为 1
+    assert body["code"] == 1
 

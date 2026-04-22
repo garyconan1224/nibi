@@ -3,6 +3,8 @@ from __future__ import annotations
 """Persistent task store."""
 
 import json
+import os
+import tempfile
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -42,8 +44,28 @@ class TaskStore:
                     self._records[rec.task_id] = rec
 
     def _save(self) -> None:
+        # 原子写入：先在同目录下写入临时文件 + fsync，再 os.replace 原子替换，
+        # 保证进程中断/磁盘抖动时目标文件始终是上一版有效 JSON，避免读到半行数据。
         payload = [r.to_dict() for r in self._records.values()]
-        self.path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        data = json.dumps(payload, ensure_ascii=False, indent=2)
+        tmp_fd, tmp_name = tempfile.mkstemp(
+            prefix=f".{self.path.name}.",
+            suffix=".tmp",
+            dir=str(self.path.parent),
+        )
+        tmp_path = Path(tmp_name)
+        try:
+            with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+                f.write(data)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, self.path)
+        except Exception:
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise
 
     def create(self, record: TaskRecord) -> TaskRecord:
         with self._lock:

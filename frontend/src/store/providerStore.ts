@@ -18,6 +18,8 @@ export interface ProviderItem {
   enabled: boolean    // 是否启用
   kind: ProviderKind  // 收敛为联合类型
   has_api_key: boolean // 后端标志：是否已配置 api_key（不下发明文）
+  /** 后端 capabilities 元组；Models 页用于过滤（chat/vision/…） */
+  capabilities?: string[]
   logo?: string       // 可选 logo URL
 }
 
@@ -137,6 +139,7 @@ export const useProviderStore = create<ProviderStoreState>()(
           base_url: payload.base_url ?? '',
           enabled: payload.enabled ?? true,
           has_api_key: Boolean(payload.has_api_key),
+          capabilities: Array.isArray(payload.capabilities) ? payload.capabilities : undefined,
         }
         set(state => ({ providers: [...state.providers, item] }))
         return item

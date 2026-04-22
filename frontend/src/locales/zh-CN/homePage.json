@@ -34,7 +34,13 @@
     },
     "errors": {
       "modelUnavailable": "当前模型不可用，请在「设置 → 提供商管理」中检查模型配置后重试",
-      "submitFailed": "提交失败，请重试"
+      "submitFailed": "提交失败，请重试",
+      "selectTextProvider": "请选择文本模型提供商",
+      "selectTextModel": "请选择文本模型",
+      "selectVideoProvider": "请选择视频模型提供商",
+      "selectVideoModel": "请选择视频模型",
+      "selectFormat": "至少选择一种格式",
+      "selectStep": "至少选择一个执行步骤"
     },
     "hints": {
       "advancedNetworkSettings": "PO Token / Cookie / 代理等高级网络参数请前往「设置 → 网络设置」配置",
@@ -117,6 +123,7 @@
   },
   "task": {
     "cancel": "取消任务",
+    "retry": "重试任务",
     "logs": {
       "collapse": "收起日志",
       "empty": "暂无日志",

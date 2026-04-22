@@ -1,7 +1,7 @@
-import SettingLayout from '@/layouts/SettingLayout'
+import SettingsShell from '@/layouts/SettingsShell'
 
 export const SettingPage = () => {
-  return <SettingLayout />
+  return <SettingsShell />
 }
 
 export default SettingPage

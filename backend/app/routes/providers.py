@@ -9,7 +9,12 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from shared.settings_store import load_settings, save_settings, ProviderProfile
+from shared.settings_store import (
+    ProviderProfile,
+    delete_provider as _delete_provider_in_store,
+    load_settings,
+    save_settings,
+)
 from src.vidmirror.core.providers.registry import create_default_registry
 
 router = APIRouter(prefix="/providers", tags=["providers"])
@@ -172,17 +177,14 @@ def update_provider(provider_id: str, req: ProviderUpdateRequest) -> Dict[str, A
 
 @router.delete("/{provider_id}")
 def delete_provider(provider_id: str) -> Dict[str, Any]:
-    """删除指定提供商"""
-    settings = load_settings()
-    profile = next((p for p in settings.providers if p.id == provider_id), None)
-    if profile is None:
-        raise HTTPException(status_code=404, detail=f"provider not found: {provider_id}")
+    """删除指定提供商（幂等）。
 
-    new_providers = tuple(p for p in settings.providers if p.id != provider_id)
-    new_settings = replace(settings, providers=new_providers)
-    save_settings(new_settings)
-
-    return {"ok": True}
+    契约（SETTINGS_REPLICA_PLAN.md §3.2 M1）：
+    - 成功删除 → ``{"code": 0}``；
+    - provider 不存在 → 同样返回 ``{"code": 0}``（幂等），避免前端重复点击/并发时的 404 抖动。
+    """
+    _delete_provider_in_store(provider_id)
+    return {"code": 0}
 
 
 @router.post("")

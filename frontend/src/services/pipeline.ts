@@ -44,3 +44,14 @@ export async function cancelPipelineTask(taskId: string): Promise<void> {
   await http.post(`${PIPELINE_TASKS_URL}/${taskId}/cancel`)
 }
 
+/**
+ * 重试失败的 pipeline 任务
+ * POST /pipeline/tasks/{task_id}/retry
+ *
+ * 返回新创建的重试任务记录
+ */
+export async function retryPipelineTask(taskId: string) {
+  const res = await http.post(`${PIPELINE_TASKS_URL}/${taskId}/retry`)
+  return res.data
+}
+
