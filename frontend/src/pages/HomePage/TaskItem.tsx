@@ -1,5 +1,6 @@
 import { useState, type FC } from 'react'
 import { ChevronDown, ChevronUp, AlertCircle, Info, AlertTriangle, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import {
   type TaskRecord,
@@ -42,6 +43,7 @@ interface TaskItemProps {
  * - 若任务正在进行，展开后显示实时 TaskLogViewer（SSE）
  */
 const TaskItem: FC<TaskItemProps> = ({ task, onSelect }) => {
+  const { t } = useTranslation(['homePage', 'common'])
   const [expanded, setExpanded] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const cancelTask = useTaskStore((s) => s.cancelTask)
@@ -130,10 +132,10 @@ const TaskItem: FC<TaskItemProps> = ({ task, onSelect }) => {
         {isCancellable && (
           <button
             type="button"
-            aria-label="取消任务"
+            aria-label={t('homePage:task.cancel')}
             onClick={handleCancel}
             disabled={cancelling}
-            title="取消任务"
+            title={t('homePage:task.cancel')}
             className="shrink-0 rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-40"
           >
             <X className="h-4 w-4" />
@@ -143,7 +145,7 @@ const TaskItem: FC<TaskItemProps> = ({ task, onSelect }) => {
         {/* 展开日志按钮 */}
         <button
           type="button"
-          aria-label={expanded ? '收起日志' : '展开日志'}
+          aria-label={expanded ? t('homePage:task.logs.collapse') : t('homePage:task.logs.expand')}
           onClick={toggleExpand}
           className="shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
         >
@@ -173,7 +175,7 @@ const TaskItem: FC<TaskItemProps> = ({ task, onSelect }) => {
             /* 已完成任务：渲染历史静态日志 */
             <div className="max-h-48 overflow-y-auto bg-gray-950 px-4 py-3 font-mono text-xs">
               {task.log.length === 0 ? (
-                <p className="text-gray-500">暂无日志</p>
+                <p className="text-gray-500">{t('homePage:task.logs.empty')}</p>
               ) : (
                 task.log.map((entry, i) => {
                   const LevelIcon = LOG_LEVEL_ICON[entry.level]

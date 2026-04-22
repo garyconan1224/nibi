@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Loader2, GitFork } from 'lucide-react'
 import type { Markmap } from 'markmap-view'
 import { transformMarkdown, createMarkmap } from '@/lib/markmap'
@@ -17,6 +18,7 @@ interface MarkmapComponentProps {
  * - 支持缩放 / 平移（markmap-view 内置）
  */
 export default function MarkmapComponent({ markdown }: MarkmapComponentProps) {
+  const { t } = useTranslation('homePage')
   const svgRef = useRef<SVGSVGElement>(null)
   const mmRef = useRef<Markmap | null>(null)
   const [loading, setLoading] = useState(true)
@@ -48,7 +50,7 @@ export default function MarkmapComponent({ markdown }: MarkmapComponentProps) {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : '思维导图渲染失败')
+          setError(err instanceof Error ? err.message : t('viewer.loadMarkmap'))
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -60,7 +62,7 @@ export default function MarkmapComponent({ markdown }: MarkmapComponentProps) {
     return () => {
       cancelled = true
     }
-  }, [markdown])
+  }, [markdown, t])
 
   // 组件卸载时销毁 markmap 实例并释放引用
   useEffect(() => {
@@ -84,7 +86,7 @@ export default function MarkmapComponent({ markdown }: MarkmapComponentProps) {
       {loading && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          <span className="ml-2 text-sm text-muted-foreground">加载思维导图...</span>
+          <span className="ml-2 text-sm text-muted-foreground">{t('viewer.loadMarkmap')}</span>
         </div>
       )}
       <svg
@@ -95,7 +97,7 @@ export default function MarkmapComponent({ markdown }: MarkmapComponentProps) {
       {!markdown.trim() && !loading && (
         <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
           <GitFork className="h-8 w-8 opacity-30" />
-          <p className="text-sm">生成成功后自动展示思维导图</p>
+          <p className="text-sm">{t('tabs.mindmap')}</p>
         </div>
       )}
     </div>

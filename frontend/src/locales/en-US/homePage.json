@@ -1,0 +1,139 @@
+{
+  "dashboard": {
+    "allProjects": "All Projects",
+    "empty": {
+      "noMatch": "No matching tasks",
+      "noTasks": "No tasks yet"
+    },
+    "polling": "Polling",
+    "projectSwitch": "Switch Project",
+    "refresh": "Refresh Task List",
+    "searchPlaceholder": "Search task ID / type / status…",
+    "stats": {
+      "filtered": ", {{count}} after filtering",
+      "filtered_one": "dashboard.stats.filtered",
+      "filtered_other": "dashboard.stats.filtered",
+      "total": "Total {{count}} tasks",
+      "total_one": "dashboard.stats.total",
+      "total_other": "dashboard.stats.total"
+    },
+    "title": "Task Center"
+  },
+  "export": {
+    "button": "Export Note",
+    "copied": "Copied",
+    "copy": "Copy",
+    "copyMarkdown": "Copy MD",
+    "download": "Download",
+    "downloadMarkdown": "Export as Markdown",
+    "downloadPdf": "Export as PDF (Print)",
+    "menu": "Export Report"
+  },
+  "form": {
+    "empty": {
+      "noModels": "No models",
+      "noProviders": "No providers"
+    },
+    "errors": {
+      "modelUnavailable": "Current model is unavailable. Please check model configuration in Settings → Provider Management and retry",
+      "submitFailed": "Submit failed, please retry"
+    },
+    "hints": {
+      "advancedNetworkSettings": "Advanced network parameters like PO Token / Cookie / Proxy should be configured in Settings → Network Settings",
+      "localFileHint": "Will try to use local files available",
+      "submitting": "Submitting...",
+      "supportedFormats": "Supports {{formats}}",
+      "supportedPlatforms": "Supports YouTube, Bilibili, and other platform links. Notes will be automatically generated after submission."
+    },
+    "labels": {
+      "downloadStrategy": "Download Strategy",
+      "extras": "Additional Notes (Extra Prompt)",
+      "formats": "Note Formats (Multi-select)",
+      "frameInterval": "Frame Interval (seconds)",
+      "gridSize": "Grid Collage (Columns × Rows)",
+      "insertScreenshot": "Insert Screenshot",
+      "localAudioVideo": "Local Audio/Video File",
+      "preserveLink": "Preserve Original Link",
+      "processingQuality": "Processing Quality",
+      "steps": "Execution Steps (Customizable)",
+      "style": "Note Style",
+      "textModel": "Text Model",
+      "textModelHint": "Script / Summary / Abstract",
+      "videoModel": "Video Model",
+      "videoModelHint": "Visual Analysis / Frame Extraction",
+      "videoUrl": "Video URL",
+      "visualUnderstanding": "Visual Understanding (Multi-modal Frame Extraction)"
+    },
+    "placeholders": {
+      "extrasHint": "You can fill in additional analysis requirements...",
+      "pasteLink": "Paste YouTube / Bilibili link...",
+      "selectDownloadMode": "Select download strategy",
+      "selectModel": "Select model",
+      "selectProvider": "Select provider"
+    },
+    "submit": "Start Processing",
+    "title": "Create Note",
+    "upload": {
+      "aria": "Upload local video or audio file",
+      "clickSelect": "Click to select",
+      "drag": "Drag video / audio here, or",
+      "removeFile": "Remove file"
+    },
+    "validation": {
+      "formatRequired": "Please select at least one format",
+      "stepsRequired": "Please select at least one execution step",
+      "textModelRequired": "Please select a text model",
+      "textProviderRequired": "Please select a text model provider",
+      "videoModelRequired": "Please select a video model",
+      "videoProviderRequired": "Please select a video model provider"
+    }
+  },
+  "logs": {
+    "connected": "Real-time log connected",
+    "connectionClosed": "SSE connection closed, log updates stopped",
+    "disconnected": "Disconnected",
+    "waiting": "Waiting for logs..."
+  },
+  "meta": {
+    "cover": "Cover",
+    "duration": "Duration",
+    "source": "Source",
+    "title": "Title",
+    "type": "Task Type"
+  },
+  "mindmap": {
+    "exportHtml": "Export HTML",
+    "save": "Save Mindmap",
+    "zoom": "Zoom"
+  },
+  "preview": {
+    "loadFailed": "Load Failed",
+    "refresh": "Refresh Preview"
+  },
+  "tabs": {
+    "analysis": "Analysis",
+    "meta": "Metadata",
+    "mindmap": "Mindmap",
+    "note": "Note",
+    "transcript": "Transcript"
+  },
+  "task": {
+    "cancel": "Cancel Task",
+    "logs": {
+      "collapse": "Collapse Logs",
+      "empty": "No logs",
+      "expand": "Expand Logs"
+    }
+  },
+  "viewer": {
+    "analysisMissingContent": "No analysis content",
+    "downloadSuccess": "Download Complete",
+    "emptyNote": "Note content is empty.",
+    "emptySelect": "Please select a task to view the note",
+    "failedTitle": "Task processing failed",
+    "loadMarkmap": "Loading mindmap module...",
+    "noPrintContent": "No printable note content available",
+    "stepNotExecuted": "The \"{{stepName}}\" step was not executed in this task",
+    "transcriptEmpty": "No transcript content"
+  }
+}

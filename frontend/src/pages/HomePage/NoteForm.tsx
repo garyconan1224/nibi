@@ -101,7 +101,7 @@ type FormValues = z.infer<typeof formSchema>
 
 /* ─── 组件 ─── */
 const NoteForm = () => {
-  const { t } = useTranslation('home')
+  const { t } = useTranslation(['homePage', 'common'])
   const [submitError, setSubmitError]   = useState<string | null>(null)
 
   /* ── 本地文件上传相关 state ── */
@@ -380,7 +380,7 @@ const NoteForm = () => {
       {/* ── URL 输入（仅在不显示本地上传时展示）── */}
       {!showLocalUpload && (
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="url" className="text-xs text-muted-foreground">视频 URL</Label>
+          <Label htmlFor="url" className="text-xs text-muted-foreground">{t('homePage:form.labels.videoUrl')}</Label>
           <div className="relative">
             {/* 平台前缀：按 URL 域名展示 B/YT 徽章或链接图标 */}
             {platformIcon && (
@@ -394,7 +394,7 @@ const NoteForm = () => {
             <input
               id="url"
               type="url"
-              placeholder="粘贴 YouTube / Bilibili 链接..."
+              placeholder={t('homePage:form.placeholders.pasteLink')}
               disabled={isSubmitting}
               className={[
                 'w-full rounded-md border border-neutral-200 bg-white py-2 text-sm text-gray-800 placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-50',
@@ -412,7 +412,7 @@ const NoteForm = () => {
       {/* ── 本地文件上传区（勾选 analyze/transcribe 且未勾选 download 时显示）── */}
       {showLocalUpload && (
         <div className="flex flex-col gap-2">
-          <Label className="text-xs text-muted-foreground">本地音视频文件</Label>
+          <Label className="text-xs text-muted-foreground">{t('homePage:form.labels.localAudioVideo')}</Label>
 
           {/* 隐藏的 file input */}
           <input
@@ -431,7 +431,7 @@ const NoteForm = () => {
           <div
             role="button"
             tabIndex={0}
-            aria-label="上传本地视频或音频文件"
+            aria-label={t('homePage:form.upload.aria')}
             onClick={() => fileInputRef.current?.click()}
             onKeyDown={e => e.key === 'Enter' && fileInputRef.current?.click()}
             onDragOver={onDragOver}
@@ -447,10 +447,10 @@ const NoteForm = () => {
           >
             <Upload className="h-6 w-6 shrink-0" />
             <p className="text-xs text-center leading-relaxed">
-              拖拽视频 / 音频到此处，或 <span className="text-primary font-medium">点击选择</span>
+              {t('homePage:form.upload.drag')} <span className="text-primary font-medium">{t('homePage:form.upload.clickSelect')}</span>
             </p>
             <p className="text-[10px] text-muted-foreground">
-              支持 {ACCEPTED_EXTENSIONS.join(' ')}
+              {t('homePage:form.hints.supportedFormats', { formats: ACCEPTED_EXTENSIONS.join(' ') })}
             </p>
           </div>
 
@@ -465,7 +465,7 @@ const NoteForm = () => {
                 </div>
                 <button
                   type="button"
-                  aria-label="移除文件"
+                  aria-label={t('homePage:form.upload.removeFile')}
                   disabled={isSubmitting}
                   onClick={e => { e.stopPropagation(); setLocalFile(null); setUploadProgress(0) }}
                   className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-red-500 disabled:opacity-40"
@@ -491,14 +491,14 @@ const NoteForm = () => {
           {
             providerField: 'text_provider_id' as const,
             modelField: 'text_model' as const,
-            label: '文本模型',
-            hint: '脚本 / 摘要 / 总结',
+            label: 'homePage:form.labels.textModel',
+            hint: 'homePage:form.labels.textModelHint',
           },
           {
             providerField: 'video_provider_id' as const,
             modelField: 'video_model' as const,
-            label: '视频模型',
-            hint: '视觉分析 / 抽帧',
+            label: 'homePage:form.labels.videoModel',
+            hint: 'homePage:form.labels.videoModelHint',
           },
         ] as const).map(item => {
           const watchedProviderId = watch(item.providerField)
@@ -511,8 +511,8 @@ const NoteForm = () => {
           return (
             <div key={item.label} className="flex flex-col gap-1.5">
               <Label className="text-xs text-muted-foreground">
-                {item.label}
-                <span className="ml-1 text-[10px] text-muted-foreground/70">{item.hint}</span>
+                {t(item.label as any)}
+                <span className="ml-1 text-[10px] text-muted-foreground/70">{t(item.hint as any)}</span>
               </Label>
               {/* Provider 选择器 */}
               <Controller
@@ -521,11 +521,11 @@ const NoteForm = () => {
                 render={({ field }) => (
                   <Select value={field.value} onValueChange={field.onChange}>
                     <SelectTrigger className="h-8 text-xs truncate">
-                      <SelectValue placeholder="选择提供商" />
+                      <SelectValue placeholder={t('homePage:form.placeholders.selectProvider')} />
                     </SelectTrigger>
                     <SelectContent className="max-h-[300px] overflow-y-auto">
                       {providers.length === 0 && (
-                        <SelectItem value="_none" disabled>暂无提供商</SelectItem>
+                        <SelectItem value="_none" disabled>{t('homePage:form.empty.noProviders')}</SelectItem>
                       )}
                       {providers
                         .filter(p => p.enabled)
@@ -556,14 +556,14 @@ const NoteForm = () => {
                 render={({ field }) => (
                   <Select value={field.value} onValueChange={field.onChange}>
                     <SelectTrigger className="h-8 text-xs truncate">
-                      <SelectValue placeholder={isLoading ? '加载中...' : '选择模型'} />
+                      <SelectValue placeholder={isLoading ? t('homePage:form.placeholders.selectModel') : t('homePage:form.placeholders.selectModel')} />
                     </SelectTrigger>
                     <SelectContent className="max-h-[300px] overflow-y-auto">
                       {isLoading && (
-                        <SelectItem value="_loading" disabled>加载中...</SelectItem>
+                        <SelectItem value="_loading" disabled>{t('homePage:form.placeholders.selectModel')}</SelectItem>
                       )}
                       {!isLoading && dynamicModels.length === 0 && fallbackModels.length === 0 && (
-                        <SelectItem value="_none" disabled>暂无模型</SelectItem>
+                        <SelectItem value="_none" disabled>{t('homePage:form.empty.noModels')}</SelectItem>
                       )}
                       {dynamicModels.length > 0
                         ? dynamicModels.map(m => (
@@ -591,7 +591,7 @@ const NoteForm = () => {
 
       {/* ── Quality 单选 ── */}
       <div className="flex flex-col gap-1.5">
-        <Label className="text-xs text-muted-foreground">处理质量</Label>
+        <Label className="text-xs text-muted-foreground">{t('homePage:form.labels.processingQuality')}</Label>
         <Controller
           name="quality"
           control={control}
@@ -616,7 +616,7 @@ const NoteForm = () => {
 
       {/* ── Format 多选 ── */}
       <div className="flex flex-col gap-1.5">
-        <Label className="text-xs text-muted-foreground">笔记格式（可多选）</Label>
+        <Label className="text-xs text-muted-foreground">{t('homePage:form.labels.formats')}</Label>
         <Controller
           name="formats"
           control={control}
@@ -650,7 +650,7 @@ const NoteForm = () => {
 
       {/* ── Style 单选 ── */}
       <div className="flex flex-col gap-1.5">
-        <Label className="text-xs text-muted-foreground">笔记风格</Label>
+        <Label className="text-xs text-muted-foreground">{t('homePage:form.labels.style')}</Label>
         <Controller
           name="style"
           control={control}
@@ -675,7 +675,7 @@ const NoteForm = () => {
 
       {/* ── 视觉理解（多模态抽帧）── */}
       <div className="flex items-center justify-between">
-        <Label className="text-xs">视觉理解（多模态抽帧）</Label>
+        <Label className="text-xs">{t('homePage:form.labels.visualUnderstanding')}</Label>
         <Controller
           name="video_understanding"
           control={control}
@@ -687,7 +687,7 @@ const NoteForm = () => {
 
       {/* ── 抽帧间隔（秒）── */}
       <div className="flex items-center justify-between gap-3">
-        <Label className="text-xs shrink-0">抽帧间隔（秒）</Label>
+        <Label className="text-xs shrink-0">{t('homePage:form.labels.frameInterval')}</Label>
         <input
           type="number"
           min={1}
@@ -699,7 +699,7 @@ const NoteForm = () => {
 
       {/* ── 网格拼图（列 × 行）── */}
       <div className="flex items-center justify-between gap-3">
-        <Label className="text-xs shrink-0">网格拼图（列 × 行）</Label>
+        <Label className="text-xs shrink-0">{t('homePage:form.labels.gridSize')}</Label>
         <div className="flex items-center gap-1.5">
           <input
             type="number"
@@ -722,14 +722,14 @@ const NoteForm = () => {
       {/* ── 下载策略（平铺） ── */}
       {!showLocalUpload && (
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs text-muted-foreground">下载策略</Label>
+          <Label className="text-xs text-muted-foreground">{t('homePage:form.labels.downloadStrategy')}</Label>
           <Controller
             name="download_mode"
             control={control}
             render={({ field }) => (
               <Select value={field.value} onValueChange={field.onChange}>
                 <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="选择下载策略" />
+                  <SelectValue placeholder={t('homePage:form.placeholders.selectDownloadMode')} />
                 </SelectTrigger>
                 <SelectContent>
                   {DOWNLOAD_MODE_OPTIONS.map(opt => (
@@ -747,14 +747,14 @@ const NoteForm = () => {
             )}
           />
           <p className="text-[10px] text-muted-foreground">
-            PO Token / Cookie / 代理等高级网络参数请前往「设置 → 网络设置」配置
+            {t('homePage:form.hints.advancedNetworkSettings')}
           </p>
         </div>
       )}
 
       {/* ── 执行步骤（可自由组合）── */}
       <div className="flex flex-col gap-1.5">
-        <Label className="text-xs text-muted-foreground">执行步骤（可自由组合）</Label>
+        <Label className="text-xs text-muted-foreground">{t('homePage:form.labels.steps')}</Label>
         <Controller
           name="steps"
           control={control}
@@ -789,7 +789,7 @@ const NoteForm = () => {
                     {needsLocalHint && checked && (
                       <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-600">
                         <AlertTriangle className="h-3 w-3" />
-                        将尝试使用本地已有文件
+                        {t('homePage:form.hints.localFileHint')}
                       </span>
                     )}
                   </div>
@@ -805,7 +805,7 @@ const NoteForm = () => {
 
       {/* ── 辅助选项（完全平铺：截图 / 链接 / 额外说明）── */}
       <div className="flex items-center justify-between">
-        <Label className="text-xs">插入截图</Label>
+        <Label className="text-xs">{t('homePage:form.labels.insertScreenshot')}</Label>
         <Controller
           name="screenshot"
           control={control}
@@ -816,7 +816,7 @@ const NoteForm = () => {
       </div>
 
       <div className="flex items-center justify-between">
-        <Label className="text-xs">保留原始链接</Label>
+        <Label className="text-xs">{t('homePage:form.labels.preserveLink')}</Label>
         <Controller
           name="link"
           control={control}
@@ -827,9 +827,9 @@ const NoteForm = () => {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label className="text-xs text-muted-foreground">额外说明（补充 Prompt）</Label>
+        <Label className="text-xs text-muted-foreground">{t('homePage:form.labels.extras')}</Label>
         <Textarea
-          placeholder="可填写额外的分析要求..."
+          placeholder={t('homePage:form.placeholders.extrasHint')}
           className="min-h-[60px] text-xs"
           {...register('extras')}
         />
@@ -852,7 +852,7 @@ const NoteForm = () => {
         {isSubmitting ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span>提交中...</span>
+            <span>{t('homePage:form.hints.submitting')}</span>
           </>
         ) : (
           <>
@@ -864,7 +864,7 @@ const NoteForm = () => {
 
       {/* ── 提示文案 ── */}
       <p className="text-[11px] leading-relaxed text-muted-foreground">
-        支持 YouTube、Bilibili 等平台链接。提交后将自动下载并生成笔记。
+        {t('homePage:form.hints.supportedPlatforms')}
       </p>
     </form>
   )

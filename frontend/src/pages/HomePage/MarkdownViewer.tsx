@@ -1,4 +1,5 @@
 import { lazy, Suspense, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -90,10 +91,11 @@ const mdComponents: React.ComponentProps<typeof ReactMarkdown>['components'] = {
 
 // ── 空状态 ──────────────────────────────────────────────────────
 function EmptyState() {
+  const { t } = useTranslation('homePage')
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
       <FileText className="h-10 w-10 opacity-30" />
-      <p className="text-sm">请选择一个任务以查看笔记</p>
+      <p className="text-sm">{t('viewer.emptySelect')}</p>
     </div>
   )
 }
@@ -161,6 +163,7 @@ function getFriendlyErrorMessage(raw: string): { friendly: string; hint?: string
 
 // ── 失败状态 ────────────────────────────────────────────────────
 function FailedState({ message }: { message?: string }) {
+  const { t } = useTranslation('homePage')
   const { friendly, hint } = message
     ? getFriendlyErrorMessage(message)
     : { friendly: '', hint: undefined }
@@ -168,7 +171,7 @@ function FailedState({ message }: { message?: string }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
       <AlertCircle className="h-8 w-8 text-red-400" />
-      <p className="text-sm font-medium text-red-600">任务处理失败</p>
+      <p className="text-sm font-medium text-red-600">{t('viewer.failedTitle')}</p>
       {message && (
         <div className="max-w-md space-y-2">
           <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-500">{friendly}</p>
@@ -213,6 +216,7 @@ function DownloadSuccessState({ fileName, savePath }: { fileName?: string; saveP
 
 // ── 复制按钮 ────────────────────────────────────────────────────
 function CopyButton({ text }: { text: string }) {
+  const { t } = useTranslation('homePage')
   const [copied, setCopied] = useState(false)
   const handleCopy = async () => {
     try {
@@ -226,11 +230,11 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      title="复制 Markdown"
+      title={t('export.copyMarkdown')}
       className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-xs text-gray-600 shadow-sm transition hover:bg-neutral-50 active:scale-95"
     >
       {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
-      {copied ? '已复制' : '复制 MD'}
+      {copied ? t('export.copied') : t('export.copyMarkdown')}
     </button>
   )
 }
@@ -241,6 +245,7 @@ function MetaTab({ result, taskType, payload }: {
   taskType: string
   payload: Record<string, unknown>
 }) {
+  const { t } = useTranslation('homePage')
   const audioMeta = (result?.audio_meta as Record<string, unknown>) || {}
   const title = String(audioMeta.title || '')
   const coverUrl = String(audioMeta.cover_url || '')
@@ -267,19 +272,19 @@ function MetaTab({ result, taskType, payload }: {
         <div className="space-y-3 text-sm">
           {title && (
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">标题</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{t('meta.title')}</p>
               <p className="mt-0.5 font-medium text-gray-800">{title}</p>
             </div>
           )}
           {duration > 0 && (
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">时长</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{t('meta.duration')}</p>
               <p className="mt-0.5 text-gray-700">{formatDuration(duration)}</p>
             </div>
           )}
           {url && (
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">来源</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{t('meta.source')}</p>
               <a href={url} target="_blank" rel="noopener noreferrer"
                 className="mt-0.5 block break-all text-primary underline underline-offset-2 hover:opacity-80">
                 {url}
@@ -287,7 +292,7 @@ function MetaTab({ result, taskType, payload }: {
             </div>
           )}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">任务类型</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{t('meta.type')}</p>
             <p className="mt-0.5 text-gray-700">{taskType}</p>
           </div>
         </div>
@@ -298,11 +303,12 @@ function MetaTab({ result, taskType, payload }: {
 
 // ── 字幕 Tab ────────────────────────────────────────────────────
 function TranscriptTab({ transcript }: { transcript: string }) {
+  const { t } = useTranslation('homePage')
   if (!transcript.trim()) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
         <Captions className="h-8 w-8 opacity-30" />
-        <p className="text-sm">暂无字幕内容</p>
+        <p className="text-sm">{t('viewer.transcriptEmpty')}</p>
       </div>
     )
   }
@@ -317,6 +323,7 @@ function TranscriptTab({ transcript }: { transcript: string }) {
 
 // ── 主组件 ──────────────────────────────────────────────────────
 export default function MarkdownViewer() {
+  const { t } = useTranslation('homePage')
   // 直接订阅 tasks + currentTaskId，保证任务状态更新时组件能响应式重渲染。
   // 原来用 s => s.getCurrentTask（订阅函数引用，永不变化），导致任务完成后不刷新。
   const task = useTaskStore(s => {
@@ -364,7 +371,7 @@ export default function MarkdownViewer() {
   const StepNotExecuted = ({ stepName }: { stepName: string }) => (
     <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
       <Info className="h-8 w-8 opacity-30" />
-      <p className="text-sm">「{stepName}」步骤未在本次任务中执行</p>
+      <p className="text-sm">{t('viewer.stepNotExecuted', { stepName })}</p>
     </div>
   )
 
@@ -375,23 +382,23 @@ export default function MarkdownViewer() {
         <TabsList>
           <TabsTrigger value="note">
             <FileText className="h-3.5 w-3.5" />
-            笔记
+            {t('tabs.note')}
           </TabsTrigger>
           <TabsTrigger value="mindmap">
             <GitFork className="h-3.5 w-3.5" />
-            思维导图
+            {t('tabs.mindmap')}
           </TabsTrigger>
           <TabsTrigger value="transcript">
             <Captions className="h-3.5 w-3.5" />
-            字幕
+            {t('tabs.transcript')}
           </TabsTrigger>
           <TabsTrigger value="analysis">
             <Eye className="h-3.5 w-3.5" />
-            分析
+            {t('tabs.analysis')}
           </TabsTrigger>
           <TabsTrigger value="meta">
             <Info className="h-3.5 w-3.5" />
-            元信息
+            {t('tabs.meta')}
           </TabsTrigger>
         </TabsList>
         {/* 顶部操作按钮 */}
@@ -401,11 +408,11 @@ export default function MarkdownViewer() {
           <div className="relative">
             <button
               onClick={() => setShowExportMenu(v => !v)}
-              title="导出报告"
+              title={t('export.menu')}
               className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-xs text-gray-600 shadow-sm transition hover:bg-neutral-50 active:scale-95"
             >
               <Download className="h-3.5 w-3.5" />
-              导出
+              {t('export.download')}
             </button>
             {showExportMenu && (
               <>
@@ -428,7 +435,7 @@ export default function MarkdownViewer() {
                     }}
                   >
                     <FileDown className="h-3.5 w-3.5 text-blue-500" />
-                    导出为 Markdown
+                    {t('export.downloadMarkdown')}
                   </button>
                   {/* PDF 导出（打印另存）
                       - disabled：note 步骤未执行或 markdown 为空时不允许点击，从 UI 规避报错
@@ -441,14 +448,14 @@ export default function MarkdownViewer() {
                       setShowExportMenu(false)
                       if (!canExportNote) return
                       if (!printRef.current) {
-                        toast.error('当前没有可打印的笔记内容')
+                        toast.error(t('viewer.noPrintContent'))
                         return
                       }
                       handlePrint()
                     }}
                   >
                     <FileText className="h-3.5 w-3.5 text-red-500" />
-                    导出为 PDF（打印）
+                    {t('export.downloadPdf')}
                   </button>
                 </div>
               </>
@@ -466,7 +473,7 @@ export default function MarkdownViewer() {
         className="min-h-0 flex-1 overflow-hidden data-[state=inactive]:hidden"
       >
         {completedSteps.length > 0 && !completedSteps.includes('note') ? (
-          <StepNotExecuted stepName="生成笔记" />
+          <StepNotExecuted stepName={t('tabs.note')} />
         ) : (
           <ScrollArea className="h-full">
             <div ref={printRef} className="px-8 py-6">
@@ -481,7 +488,7 @@ export default function MarkdownViewer() {
                   {markdown}
                 </ReactMarkdown>
               ) : (
-                <p className="text-sm text-muted-foreground">笔记内容为空。</p>
+                <p className="text-sm text-muted-foreground">{t('viewer.emptyNote')}</p>
               )}
             </div>
           </ScrollArea>
@@ -491,12 +498,12 @@ export default function MarkdownViewer() {
       {/* ── 思维导图 Tab ── */}
       <TabsContent value="mindmap" className="min-h-0 flex-1 overflow-hidden">
         {completedSteps.length > 0 && !completedSteps.includes('note') ? (
-          <StepNotExecuted stepName="生成笔记" />
+          <StepNotExecuted stepName={t('tabs.note')} />
         ) : (
           <Suspense fallback={
             <div className="flex h-full items-center justify-center gap-2 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
-              <span className="text-sm">加载思维导图模块...</span>
+              <span className="text-sm">{t('viewer.loadMarkmap')}</span>
             </div>
           }>
             <MarkmapComponent markdown={markdown} />
@@ -507,7 +514,7 @@ export default function MarkdownViewer() {
       {/* ── 字幕 Tab ── */}
       <TabsContent value="transcript" className="min-h-0 flex-1 overflow-hidden">
         {completedSteps.length > 0 && !completedSteps.includes('transcribe') ? (
-          <StepNotExecuted stepName="转录音频" />
+          <StepNotExecuted stepName={t('tabs.transcript')} />
         ) : (
           <TranscriptTab transcript={transcript} />
         )}
@@ -516,7 +523,7 @@ export default function MarkdownViewer() {
       {/* ── 分析 Tab ── */}
       <TabsContent value="analysis" className="min-h-0 flex-1 overflow-hidden">
         {completedSteps.length > 0 && !completedSteps.includes('analyze') ? (
-          <StepNotExecuted stepName="视觉分析" />
+          <StepNotExecuted stepName={t('tabs.analysis')} />
         ) : analysis.trim() ? (
           <ScrollArea className="h-full">
             <div className="px-8 py-6">
@@ -534,7 +541,7 @@ export default function MarkdownViewer() {
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
             <Eye className="h-8 w-8 opacity-30" />
-            <p className="text-sm">暂无分析内容</p>
+            <p className="text-sm">{t('viewer.analysisMissingContent')}</p>
           </div>
         )}
       </TabsContent>

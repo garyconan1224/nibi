@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FC } from 'react'
 import { AlertCircle, Info, AlertTriangle, WifiOff } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { useTaskStore } from '@/store/taskStore'
 import type { TaskLogEntry } from '@/types/task'
@@ -41,6 +42,7 @@ interface TaskLogViewerProps {
  * 流式渲染日志行，自动滚动到底部，断开后显示重连提示。
  */
 const TaskLogViewer: FC<TaskLogViewerProps> = ({ taskId }) => {
+  const { t } = useTranslation(['homePage', 'common'])
   const [logs, setLogs] = useState<TaskLogEntry[]>([])
   const [connected, setConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -83,7 +85,7 @@ const TaskLogViewer: FC<TaskLogViewerProps> = ({ taskId }) => {
 
     es.onerror = () => {
       setConnected(false)
-      setError('SSE 连接已断开，日志停止更新')
+      setError(t('homePage:logs.connectionClosed'))
       es.close()
     }
 
@@ -122,12 +124,12 @@ const TaskLogViewer: FC<TaskLogViewerProps> = ({ taskId }) => {
         {connected ? (
           <>
             <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-            实时日志连接中
+            {t('homePage:logs.connected')}
           </>
         ) : (
           <>
             <WifiOff className="h-3 w-3" />
-            {error ?? '未连接'}
+            {error ?? t('homePage:logs.disconnected')}
           </>
         )}
       </div>
@@ -139,7 +141,7 @@ const TaskLogViewer: FC<TaskLogViewerProps> = ({ taskId }) => {
         className="max-h-56 overflow-y-auto bg-gray-950 px-4 py-3 font-mono text-xs"
       >
         {logs.length === 0 && (
-          <p className="text-gray-600">等待日志...</p>
+          <p className="text-gray-600">{t('homePage:logs.waiting')}</p>
         )}
         {logs.map((entry, i) => {
           const cfg = LEVEL_CONFIG[entry.level]

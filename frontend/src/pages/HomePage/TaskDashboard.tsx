@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type FC } from 'react'
 import { RefreshCw, ListChecks, Search, FolderOpen } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useTaskStore } from '@/store/taskStore'
@@ -20,6 +21,7 @@ interface TaskDashboardProps {
  * - 支持项目 ID 文本过滤、手动刷新
  */
 const TaskDashboard: FC<TaskDashboardProps> = ({ projectId: propProjectId }) => {
+  const { t } = useTranslation(['homePage', 'common'])
   const [filterText, setFilterText] = useState('')
   const [isRefreshing, setIsRefreshing] = useState(false)
   /** 项目切换选择的 project_id（''=全部） */
@@ -98,13 +100,13 @@ const TaskDashboard: FC<TaskDashboardProps> = ({ projectId: propProjectId }) => 
       {/* ── 顶部栏 ── */}
       <header className="flex shrink-0 items-center gap-2 border-b border-neutral-100 px-3 py-2">
         <ListChecks className="h-4 w-4 shrink-0 text-gray-500" />
-        <span className="text-sm font-semibold text-gray-700">任务中心</span>
+        <span className="text-sm font-semibold text-gray-700">{t('homePage:dashboard.title')}</span>
 
         {/* 实时轮询指示 */}
         {isPolling && (
           <span className="ml-auto flex items-center gap-1 text-[10px] text-gray-400">
             <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-blue-400" />
-            轮询中
+            {t('homePage:dashboard.polling')}
           </span>
         )}
 
@@ -113,7 +115,7 @@ const TaskDashboard: FC<TaskDashboardProps> = ({ projectId: propProjectId }) => 
           type="button"
           onClick={handleRefresh}
           disabled={isRefreshing}
-          title="刷新任务列表"
+          title={t('homePage:dashboard.refresh')}
           className={cn(
             'ml-1 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed',
             isRefreshing && 'animate-spin text-blue-500',
@@ -132,9 +134,9 @@ const TaskDashboard: FC<TaskDashboardProps> = ({ projectId: propProjectId }) => 
               value={selectedProjectId}
               onChange={(e) => setSelectedProjectId(e.target.value)}
               className="flex-1 bg-transparent text-xs text-gray-700 outline-none cursor-pointer"
-              title="切换项目"
+              title={t('homePage:dashboard.projectSwitch')}
             >
-              <option value="">全部项目</option>
+              <option value="">{t('homePage:dashboard.allProjects')}</option>
               {projectOptions.map(pid => (
                 <option key={pid} value={pid}>{pid.slice(0, 8)}…</option>
               ))}
@@ -149,7 +151,7 @@ const TaskDashboard: FC<TaskDashboardProps> = ({ projectId: propProjectId }) => 
           <Search className="h-3.5 w-3.5 shrink-0 text-gray-400" />
           <input
             type="text"
-            placeholder="搜索任务 ID / 类型 / 状态…"
+            placeholder={t('homePage:dashboard.searchPlaceholder')}
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
             className="flex-1 bg-transparent text-xs text-gray-700 outline-none placeholder:text-gray-400"
@@ -164,7 +166,7 @@ const TaskDashboard: FC<TaskDashboardProps> = ({ projectId: propProjectId }) => 
             <div className="py-12 text-center">
               <ListChecks className="mx-auto mb-2 h-8 w-8 text-gray-200" />
               <p className="text-xs text-gray-400">
-                {filterText ? '没有匹配的任务' : '暂无任务记录'}
+                {filterText ? t('homePage:dashboard.empty.noMatch') : t('homePage:dashboard.empty.noTasks')}
               </p>
             </div>
           ) : (
@@ -181,9 +183,9 @@ const TaskDashboard: FC<TaskDashboardProps> = ({ projectId: propProjectId }) => 
 
       {/* ── 底部统计 ── */}
       <div className="shrink-0 border-t border-neutral-100 px-3 py-1.5 text-[10px] text-gray-400">
-        共 {tasks.length} 条任务
+        {t('homePage:dashboard.stats.total', { count: tasks.length })}
         {filterText && sortedTasks.length !== tasks.length && (
-          <span>，过滤后 {sortedTasks.length} 条</span>
+          <span>{t('homePage:dashboard.stats.filtered', { count: sortedTasks.length })}</span>
         )}
       </div>
     </div>
