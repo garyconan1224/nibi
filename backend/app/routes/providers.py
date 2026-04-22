@@ -88,7 +88,7 @@ async def get_provider_models(provider_id: str) -> Dict[str, Any]:
 
 @router.get("/{provider_id}")
 def get_provider(provider_id: str) -> Dict[str, Any]:
-    """获取单个提供商完整信息（含 api_key）"""
+    """获取单个提供商详情；**响应不再回传 api_key 明文**，仅保留 has_api_key 标识。"""
     settings = load_settings()
     profile = next((p for p in settings.providers if p.id == provider_id), None)
     if profile is None:
@@ -100,7 +100,6 @@ def get_provider(provider_id: str) -> Dict[str, Any]:
         "enabled": profile.enabled,
         "capabilities": list(profile.capabilities),
         "base_url": profile.base_url,
-        "api_key": profile.api_key,
         "has_api_key": bool(profile.api_key.strip()),
         "default_models": profile.default_models,
         "rate_limit_rpm": profile.rate_limit_rpm,
@@ -124,7 +123,13 @@ def test_provider(req: ProviderTestRequest) -> Dict[str, str]:
 
 @router.put("/{provider_id}")
 def update_provider(provider_id: str, req: ProviderUpdateRequest) -> Dict[str, Any]:
-    """更新提供商配置"""
+    """更新提供商配置。
+
+    **api_key 语义修订**（见 DESIGN_NOTES_SETTINGS.md D10）：
+    - ``None``（未传）→ 保持原值不变；
+    - ``""`` 空串 → **视为"不修改"**，沿用数据库原值，避免因前端草稿空串误清空密钥；
+    - 非空字符串 → 覆盖为新值。
+    """
     settings = load_settings()
     profile = next((p for p in settings.providers if p.id == provider_id), None)
     if profile is None:
@@ -132,7 +137,8 @@ def update_provider(provider_id: str, req: ProviderUpdateRequest) -> Dict[str, A
 
     # 更新字段（因为 ProviderProfile 是 frozen dataclass，需要重新构造）
     profile_dict = asdict(profile)
-    if req.api_key is not None:
+    # 仅当 api_key 为"非空字符串"时才覆盖；None/空串均保留原值
+    if req.api_key is not None and req.api_key != "":
         profile_dict["api_key"] = req.api_key
     if req.base_url is not None:
         profile_dict["base_url"] = req.base_url
@@ -159,7 +165,6 @@ def update_provider(provider_id: str, req: ProviderUpdateRequest) -> Dict[str, A
         "enabled": new_profile.enabled,
         "capabilities": list(new_profile.capabilities),
         "base_url": new_profile.base_url,
-        "api_key": new_profile.api_key,
         "has_api_key": bool(new_profile.api_key.strip()),
         "default_models": new_profile.default_models,
     }
@@ -212,6 +217,7 @@ def create_provider(req: ProviderCreateRequest) -> Dict[str, Any]:
     new_settings = replace(settings, providers=new_providers)
     save_settings(new_settings)
 
+    # 响应不回传 api_key 明文，仅保留 has_api_key 标识
     return {
         "id": new_profile.id,
         "name": new_profile.name,
@@ -219,7 +225,6 @@ def create_provider(req: ProviderCreateRequest) -> Dict[str, Any]:
         "enabled": new_profile.enabled,
         "capabilities": list(new_profile.capabilities),
         "base_url": new_profile.base_url,
-        "api_key": new_profile.api_key,
         "has_api_key": bool(new_profile.api_key.strip()),
         "default_models": new_profile.default_models,
     }

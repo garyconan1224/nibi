@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.app.routes.pipeline import router as pipeline_router
 from backend.app.routes.providers import router as providers_router
 from backend.app.routes.rag import router as rag_router
+from backend.app.routes.transcriber_config import router as transcriber_config_router
 from backend.app.routes.transcript import router as transcript_router
 from backend.app.routes.notes import router as notes_router
 from shared.settings_store import ProviderProfile, load_settings, save_settings
@@ -82,6 +83,7 @@ app.add_middleware(
 app.include_router(providers_router)
 app.include_router(pipeline_router)
 app.include_router(transcript_router)
+app.include_router(transcriber_config_router)
 app.include_router(rag_router)
 app.include_router(notes_router)  # 新增：笔记生成API
 

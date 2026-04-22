@@ -22,6 +22,45 @@ SETTINGS_PATH: Path = SETTINGS_DIR / "settings.json"
 
 ProviderKind = Literal["openai_compatible", "anthropic"]
 ProviderCapability = Literal["chat", "vision", "embedding", "rerank"]
+TranscriberType = Literal["fast-whisper", "bcut", "kuaishou", "groq", "mlx-whisper"]
+
+_ALLOWED_TRANSCRIBER_TYPES: tuple[TranscriberType, ...] = (
+    "fast-whisper",
+    "bcut",
+    "kuaishou",
+    "groq",
+    "mlx-whisper",
+)
+
+
+@dataclass(frozen=True)
+class TranscriberConfig:
+    """音频转写引擎偏好（跨端生效，落 AppSettings）。
+
+    字段与前端 configStore.TranscriberConfig 对齐（采用下划线命名，前端侧转驼峰）。
+    """
+
+    type: TranscriberType = "fast-whisper"
+    whisper_model_size: str = "medium"
+    language: str = "zh"
+    device: str = "cpu"
+    groq_api_key: str = ""
+    initial_prompt: str = ""
+
+    @classmethod
+    def from_dict(cls, data: Any) -> "TranscriberConfig":
+        if not isinstance(data, dict):
+            return cls()
+        raw_type = str(data.get("type") or "fast-whisper").strip()
+        t: TranscriberType = raw_type if raw_type in _ALLOWED_TRANSCRIBER_TYPES else "fast-whisper"  # type: ignore[assignment]
+        return cls(
+            type=t,
+            whisper_model_size=str(data.get("whisper_model_size") or "medium"),
+            language=str(data.get("language") or "zh"),
+            device=str(data.get("device") or "cpu"),
+            groq_api_key=str(data.get("groq_api_key") or ""),
+            initial_prompt=str(data.get("initial_prompt") or ""),
+        )
 
 
 @dataclass(frozen=True)
@@ -91,6 +130,7 @@ class AppSettings:
     default_provider_for_vision: str = ""
     default_provider_for_embedding: str = ""
     default_provider_for_rerank: str = ""
+    transcriber: TranscriberConfig = field(default_factory=TranscriberConfig)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "AppSettings":
@@ -111,6 +151,7 @@ class AppSettings:
             default_provider_for_vision=str(data.get("default_provider_for_vision") or defaults.get("vision") or ""),
             default_provider_for_embedding=str(data.get("default_provider_for_embedding") or defaults.get("embedding") or ""),
             default_provider_for_rerank=str(data.get("default_provider_for_rerank") or defaults.get("rerank") or ""),
+            transcriber=TranscriberConfig.from_dict(data.get("transcriber")),
         )
 
 
