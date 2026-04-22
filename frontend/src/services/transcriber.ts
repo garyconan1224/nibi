@@ -10,12 +10,13 @@ import { http } from './client'
 import type { WhisperModelSize, TranscriberType } from '@/store/configStore'
 
 /** 冻结契约：后端返回体 = 前端提交体（设置页在 M2 全量对齐） */
-export interface TranscriberConfigPayload {
+export interface TranscriberConfigPayload extends Record<string, unknown> {
   type: TranscriberType
   whisper_model_size: WhisperModelSize
   language: string
   device: 'cpu' | 'cuda' | 'mps'
   groq_api_key: string
+  /** ASR 初始提示词（Faster Whisper 前置 prompt） */
   initial_prompt: string
 }
 
@@ -50,16 +51,27 @@ export async function updateTranscriberConfig(
 }
 
 /**
- * 获取可用的转写引擎列表（用于 Select 组件）
+ * 获取可用的转写引擎列表（用于 Select 组件）。
+ *
+ * MLX Whisper 仅在 macOS 平台可用；其他平台返回列表中会排除该选项，
+ * 同时 TranscriberPage 会对已选中 mlx-whisper 但非 Mac 的情况显示警告
+ * （可作为后续补齐项，暂时仅依赖前端平台检测）。
  */
 export function getAvailableTranscriberTypes() {
-  return [
+  const baseTypes = [
     { value: 'fast-whisper', label: 'Faster Whisper（本地）' },
     { value: 'bcut', label: '必剪（在线）' },
     { value: 'kuaishou', label: '快手（在线）' },
     { value: 'groq', label: 'Groq（在线）' },
-    { value: 'mlx-whisper', label: 'MLX Whisper（仅macOS）' },
   ]
+
+  // 仅在 macOS 平台显示 MLX Whisper 选项
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.userAgent)
+  if (isMac) {
+    baseTypes.push({ value: 'mlx-whisper', label: 'MLX Whisper（仅macOS）' })
+  }
+
+  return baseTypes
 }
 
 /**
