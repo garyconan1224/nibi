@@ -51,17 +51,84 @@
     "visitorDataPlaceholder": "YouTube Visitor Data (Optional)"
   },
   "screenshot": {
-    "cardDescription": "Control keyframe extraction, grid montage size and vision understanding trigger conditions",
-    "cardTitle": "Screenshot & Frame Extraction",
-    "placeholderMessage": "This page is a placeholder skeleton. Detailed form items will be added in future versions.",
+    "title": "Video Screenshot",
     "subtitle": "Configure default parameters for frame extraction, montage and vision understanding",
-    "title": "Video Screenshot"
+    "interval": {
+      "title": "Default Frame Interval",
+      "description": "How often (in seconds) to extract a key frame"
+    },
+    "grid": {
+      "title": "Grid Montage Size",
+      "description": "Select grid size. 3x3 is recommended for balanced performance and quality"
+    },
+    "quality": {
+      "title": "Image Quality",
+      "description": "Higher quality results in larger file sizes"
+    },
+    "embed": {
+      "title": "Auto Embed in Notes",
+      "description": "Whether to automatically include screenshot grids when generating notes"
+    }
   },
   "transcriber": {
-    "cardDescription": "Supports fast-whisper / groq-whisper / bcut / kuaishou",
-    "cardTitle": "Transcription Engine",
-    "placeholderMessage": "This page is a placeholder skeleton. Detailed form items will be added in future versions.",
+    "title": "Audio Transcription",
     "subtitle": "Configure speech recognition engine and default parameters (ASR Provider)",
-    "title": "Audio Transcription"
+    "engine": {
+      "title": "Transcription Engine",
+      "description": "Select the engine to use for audio transcription",
+      "type": "Engine Type",
+      "modelSize": "Whisper Model",
+      "groqApiKey": "Groq API Key"
+    },
+    "language": {
+      "title": "Language",
+      "description": "Select target language or auto-detect"
+    },
+    "device": {
+      "title": "Compute Device",
+      "description": "Select compute device for transcription (CPU or GPU)"
+    }
+  },
+  "common": {
+    "save": "Save",
+    "saving": "Saving...",
+    "savSuccess": "Configuration saved successfully",
+    "cancel": "Cancel"
+  },
+  "shell": {
+    "tabs": {
+      "providers": "Providers",
+      "models": "Models",
+      "network": "Network",
+      "transcriber": "Transcriber",
+      "screenshot": "Screenshot",
+      "about": "About"
+    },
+    "saveBar": {
+      "dirtyCount": "{{count}} unsaved change(s)",
+      "allSaved": "All changes saved",
+      "save": "Save",
+      "saving": "Saving...",
+      "reset": "Reset",
+      "export": "Export"
+    }
+  },
+  "dirty": {
+    "leaveConfirm": "You have unsaved changes. Leave anyway?",
+    "unsavedBadge": "Unsaved"
+  },
+  "providers": {
+    "apiKey": {
+      "label": "API Key",
+      "placeholder": "Leave empty to keep unchanged",
+      "hint": "Existing API keys are only overwritten when a non-empty value is submitted.",
+      "configured": "Configured",
+      "notConfigured": "Not configured"
+    },
+    "emptyState": {
+      "title": "No providers yet",
+      "description": "Click \"Add\" in the top right to connect OpenAI / Anthropic / Google / Ollama, etc.",
+      "action": "Add provider"
+    }
   }
 }

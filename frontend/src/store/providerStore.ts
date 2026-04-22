@@ -2,13 +2,22 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { http } from '@/services/client'
 
-/** Provider 条目（与后端 GET /providers 响应字段对齐） */
+/** Provider 类型（DESIGN_NOTES_SETTINGS.md §3.2，冻结联合类型） */
+export type ProviderKind =
+  | 'openai_compatible'
+  | 'anthropic'
+  | 'google'
+  | 'ollama'
+  | 'openai'
+
+/** Provider 条目（与后端 GET /providers 响应字段对齐，api_key 脱敏） */
 export interface ProviderItem {
   id: string          // 提供商唯一标识（provider_id）
   name: string        // 显示名称
   base_url: string    // 接口地址
   enabled: boolean    // 是否启用
-  kind: string        // openai_compatible | anthropic | ...
+  kind: ProviderKind  // 收敛为联合类型
+  has_api_key: boolean // 后端标志：是否已配置 api_key（不下发明文）
   logo?: string       // 可选 logo URL
 }
 
@@ -21,7 +30,7 @@ export interface Model {
 /** 新增 provider 的入参（对应后端 ProviderCreateRequest） */
 export interface AddProviderInput {
   name: string
-  kind: string
+  kind: ProviderKind
   api_key?: string
   base_url?: string
 }
@@ -127,23 +136,31 @@ export const useProviderStore = create<ProviderStoreState>()(
           kind: payload.kind,
           base_url: payload.base_url ?? '',
           enabled: payload.enabled ?? true,
+          has_api_key: Boolean(payload.has_api_key),
         }
         set(state => ({ providers: [...state.providers, item] }))
         return item
       },
 
       updateProvider: async (id, data) => {
-        const res = await http.put(`/providers/${id}`, data)
-        const payload = res.data.data ?? res.data
+        // D10 / §3.4：api_key === '' 视为"不修改"，不下发字段
+        const payload: UpdateProviderInput = { ...data }
+        if (payload.api_key === '') {
+          delete payload.api_key
+        }
+        const res = await http.put(`/providers/${id}`, payload)
+        const body = res.data.data ?? res.data
         set(state => ({
           providers: state.providers.map(p =>
             p.id === id
               ? {
                   ...p,
-                  name: payload.name ?? p.name,
-                  kind: payload.kind ?? p.kind,
-                  base_url: payload.base_url ?? p.base_url,
-                  enabled: typeof payload.enabled === 'boolean' ? payload.enabled : p.enabled,
+                  name: body.name ?? p.name,
+                  kind: body.kind ?? p.kind,
+                  base_url: body.base_url ?? p.base_url,
+                  enabled: typeof body.enabled === 'boolean' ? body.enabled : p.enabled,
+                  has_api_key:
+                    typeof body.has_api_key === 'boolean' ? body.has_api_key : p.has_api_key,
                 }
               : p,
           ),
