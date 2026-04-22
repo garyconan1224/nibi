@@ -13,7 +13,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
-import { toast } from 'sonner'
+import '@testing-library/jest-dom'
 
 // Mock dependencies
 vi.mock('sonner', () => ({

@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
  * - 插画 / icon + 主副标题 + 可选 CTA；
  * - 没有提供 illustration 时 fallback 为虚线框 + lucide Inbox 图标。
  */
-export interface EmptyStateProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface EmptyStateProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
   title: React.ReactNode
   description?: React.ReactNode
   /** 插画：可传 <img /> 或自定义 ReactNode；留空使用 fallback 图标 */

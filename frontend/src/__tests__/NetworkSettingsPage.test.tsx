@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeAll, beforeEach, afterEach } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 
 // 测试环境需要 i18n 实例，否则 t(...) 会回退为 key 字面量
@@ -76,7 +76,6 @@ describe('NetworkSettingsPage · SaveBar & DirtyDot', () => {
     })
 
     // DirtyDot 应出现在 httpProxy label 右侧
-    const dirtyDots = screen.queryAllByRole('img', { hidden: true })
     // 由于 DirtyDot 是自绘 SVG，检查 [data-slot="dirty-dot"] 选择器
     const dirtyDotElement = document.querySelector('[data-slot="dirty-dot"]')
     expect(dirtyDotElement).not.toBeNull()

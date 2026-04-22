@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
  *
  * 仅做"容器 + 可折叠"，不内嵌业务字段（字段由 <FieldRow /> 组合）。
  */
-export interface SectionProps extends React.HTMLAttributes<HTMLElement> {
+export interface SectionProps extends Omit<React.HTMLAttributes<HTMLElement>, 'title'> {
   /** 区块标题（必填） */
   title: React.ReactNode
   /** 副标题 / 描述（可选） */
