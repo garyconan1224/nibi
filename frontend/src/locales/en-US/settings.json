@@ -1,13 +1,27 @@
 {
   "about": {
-    "appDescription": "A powerful video processing tool",
+    "title": "About",
+    "subtitle": "Application info, version, and technology stack details",
     "appName": "VidMirror",
+    "appDescription": "A powerful video processing tool",
     "appSummary": "VidMirror is a feature-rich video processing application with support for multiple AI provider integrations.",
     "projectName": "Project Name",
-    "subtitle": "Application information and version",
-    "title": "About",
-    "version": "Version",
-    "versionNumber": "v0.5.0"
+    "versionNumber": "v0.2.0",
+    "appInfoTitle": "Application Info",
+    "appInfoDescription": "View core information and current running version of VidMirror",
+    "versionLabel": "Version",
+    "statusLabel": "Status",
+    "statusActive": "Running",
+    "dependenciesTitle": "Technology Stack & Dependencies",
+    "dependenciesDescription": "Core frontend and backend frameworks and libraries",
+    "frontendStack": "Frontend Stack",
+    "backendStack": "Backend Stack",
+    "licenseTitle": "License & Open Source",
+    "licenseDescription": "Learn about licensing and access the source code",
+    "mitLicense": "MIT License",
+    "licenseText": "VidMirror is licensed under the MIT License. You are free to use, modify, and distribute the software, but must retain the original copyright notice.",
+    "githubTitle": "GitHub Project",
+    "githubDescription": "View the project source code on GitHub, submit issues, or contribute code."
   },
   "layout": {
     "backHome": "Back to Home",
