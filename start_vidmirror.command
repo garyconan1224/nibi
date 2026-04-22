@@ -180,5 +180,6 @@ echo ""
 
 # 保持脚本窗口打开，显示提示信息
 sleep 2
-read -p "脚本执行完毕，按 Enter 关闭此窗口..."
+# zsh 不支持 bash 的 `read -p "..."` 语法，这里使用 zsh 原生写法 `read "?..."`
+read "?脚本执行完毕，按 Enter 关闭此窗口..." _ignored
 
