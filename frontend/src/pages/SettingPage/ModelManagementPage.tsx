@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { useTranslation } from 'react-i18next'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Loader2, RefreshCw, ChevronDown, ChevronRight, AlertCircle, Bot } from 'lucide-react'
@@ -28,6 +29,7 @@ interface ProviderWithModels extends Provider {
 }
 
 const ModelManagementPage = () => {
+  const { t } = useTranslation('settings')
   const [providers, setProviders] = useState<ProviderWithModels[]>([])
   const [listLoading, setListLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -46,7 +48,7 @@ const ModelManagementPage = () => {
       })))
       setError(null)
     } catch (e) {
-      const msg = e instanceof Error ? e.message : '加载提供商失败'
+      const msg = e instanceof Error ? e.message : t('model.fetchProvidersFailed')
       setError(msg)
       toast.error(msg)
     } finally {
@@ -80,7 +82,7 @@ const ModelManagementPage = () => {
           : p
       ))
     } catch (e) {
-      const msg = e instanceof Error ? e.message : '获取模型失败'
+      const msg = e instanceof Error ? e.message : t('model.fetchModelsFailed')
       setProviders(prev => prev.map(p =>
         p.id === id ? { ...p, modelError: msg, loadingModels: false } : p
       ))
@@ -101,7 +103,7 @@ const ModelManagementPage = () => {
           : p
       ))
     } catch (e) {
-      const msg = e instanceof Error ? e.message : '刷新失败'
+      const msg = e instanceof Error ? e.message : t('model.refreshFailed')
       setProviders(prev => prev.map(p =>
         p.id === id ? { ...p, modelError: msg, loadingModels: false } : p
       ))
@@ -113,7 +115,7 @@ const ModelManagementPage = () => {
     return (
       <div className="flex h-full items-center justify-center gap-2 text-muted-foreground">
         <Loader2 className="h-5 w-5 animate-spin" />
-        <span>加载中…</span>
+        <span>{t('model.loading')}</span>
       </div>
     )
   }
@@ -123,12 +125,12 @@ const ModelManagementPage = () => {
       {/* 顶部标题栏 */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">模型管理</h1>
-          <p className="text-sm text-muted-foreground">查看各提供商支持的模型列表</p>
+          <h1 className="text-2xl font-bold">{t('model.title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('model.subtitle')}</p>
         </div>
         <Button variant="outline" size="sm" className="gap-2" onClick={fetchProviders}>
           <RefreshCw className="h-4 w-4" />
-          刷新
+          {t('model.refresh')}
         </Button>
       </div>
 
@@ -145,7 +147,7 @@ const ModelManagementPage = () => {
       <div className="space-y-3">
         {providers.length === 0 && (
           <div className="rounded-lg border border-dashed p-10 text-center text-muted-foreground text-sm">
-            暂无提供商，请先在「提供商管理」中添加配置
+            {t('model.noProviders')}
           </div>
         )}
 
@@ -168,7 +170,7 @@ const ModelManagementPage = () => {
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                   provider.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
                 }`}>
-                  {provider.enabled ? '已启用' : '已禁用'}
+                  {provider.enabled ? t('model.statusEnabled') : t('model.statusDisabled')}
                 </span>
                 {provider.expanded && (
                   <Button
@@ -177,7 +179,7 @@ const ModelManagementPage = () => {
                     className="gap-1 shrink-0 h-7 px-2"
                     onClick={e => { e.stopPropagation(); refreshModels(provider.id) }}
                     disabled={provider.loadingModels}
-                    title="刷新模型列表"
+                    title={t('model.refreshModelsTitle')}
                   >
                     <RefreshCw className={`h-3.5 w-3.5 ${provider.loadingModels ? 'animate-spin' : ''}`} />
                   </Button>
@@ -190,18 +192,18 @@ const ModelManagementPage = () => {
               <CardContent className="border-t bg-slate-50 pt-4 pb-5">
                 {provider.loadingModels ? (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" /> 正在从提供商接口获取模型列表…
+                    <Loader2 className="h-4 w-4 animate-spin" /> {t('model.fetchingModels')}
                   </div>
                 ) : provider.modelError ? (
                   <div className="flex items-start gap-2 rounded-md bg-red-50 p-3 text-xs text-red-600">
                     <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-medium mb-1">获取模型列表失败</p>
+                      <p className="font-medium mb-1">{t('model.fetchModelsFailed')}</p>
                       <p>{provider.modelError}</p>
                     </div>
                   </div>
                 ) : provider.models.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">该提供商暂无可用模型</p>
+                  <p className="text-sm text-muted-foreground">{t('model.noModels')}</p>
                 ) : (
                   <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                     {provider.models.map(model => (

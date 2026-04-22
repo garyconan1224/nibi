@@ -1,7 +1,67 @@
 {
+  "about": {
+    "appDescription": "一个强大的视频处理工具",
+    "appName": "VidMirror",
+    "appSummary": "VidMirror 是一个功能丰富的视频处理应用，支持多个 AI 提供商集成。",
+    "projectName": "项目名称",
+    "subtitle": "应用信息和版本",
+    "title": "关于",
+    "version": "版本号",
+    "versionNumber": "v0.5.0"
+  },
   "layout": {
     "backHome": "返回首页",
     "language": "语言"
+  },
+  "model": {
+    "fetchingModels": "正在从提供商接口获取模型列表…",
+    "fetchModelsFailed": "获取模型列表失败",
+    "fetchProvidersFailed": "加载提供商失败",
+    "loading": "加载中…",
+    "noModels": "该提供商暂无可用模型",
+    "noProviders": "暂无提供商，请先在「提供商管理」中添加配置",
+    "refresh": "刷新",
+    "refreshFailed": "刷新失败",
+    "refreshModelsTitle": "刷新模型列表",
+    "statusDisabled": "已禁用",
+    "statusEnabled": "已启用",
+    "subtitle": "查看各提供商支持的模型列表",
+    "title": "模型管理"
+  },
+  "network": {
+    "cookieDirsDescription": "留空将使用内置默认目录；目录下可放置 cookies.txt 或 bilibili_cookies.txt",
+    "cookieDirsLabel": "Cookie 文件目录",
+    "cookieDirsPlaceholder": "每行一个绝对路径，例如：\n/Users/you/cookies\n/data/cookies",
+    "downloadEnhancementCardDescription": "用于突破风控与限流；可选，留空即使用默认策略",
+    "downloadEnhancementCardTitle": "下载增强",
+    "downloadEnhancementSaveButton": "保存下载增强",
+    "downloadEnhancementSaved": "下载增强配置已保存",
+    "poTokenLabel": "PO Token",
+    "poTokenPlaceholder": "YouTube PO Token（可选）",
+    "proxyDescription": "访问海外平台时的网络代理；留空表示直连",
+    "proxyLabel": "代理地址",
+    "proxyPlaceholder": "示例：http://127.0.0.1:7890 或 socks5://127.0.0.1:1080",
+    "proxySaveButton": "保存代理",
+    "proxySaved": "网络代理已保存",
+    "proxySupport": "支持 http:// 或 socks5:// 协议，仅在媒体抓取阶段生效",
+    "proxyTitle": "网络代理服务器",
+    "subtitle": "配置外网访问与媒体下载相关的全局参数",
+    "title": "网络设置",
+    "visitorDataLabel": "Visitor Data",
+    "visitorDataPlaceholder": "YouTube Visitor Data（可选）"
+  },
+  "screenshot": {
+    "cardDescription": "控制关键帧提取、网格拼图尺寸及视觉理解触发条件",
+    "cardTitle": "截图与抽帧",
+    "placeholderMessage": "该页面为占位骨架，具体表单项将在后续版本中补齐。",
+    "subtitle": "配置抽帧、拼图与视觉理解的默认参数",
+    "title": "视频截图"
+  },
+  "transcriber": {
+    "cardDescription": "支持 fast-whisper / groq-whisper / bcut / kuaishou",
+    "cardTitle": "转写引擎",
+    "placeholderMessage": "该页面为占位骨架，具体表单项将在后续版本中补齐。",
+    "subtitle": "配置语音识别引擎及默认参数（ASR Provider）",
+    "title": "音频转写"
   }
 }
-

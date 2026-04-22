@@ -1,7 +1,67 @@
 {
+  "about": {
+    "appDescription": "A powerful video processing tool",
+    "appName": "VidMirror",
+    "appSummary": "VidMirror is a feature-rich video processing application with support for multiple AI provider integrations.",
+    "projectName": "Project Name",
+    "subtitle": "Application information and version",
+    "title": "About",
+    "version": "Version",
+    "versionNumber": "v0.5.0"
+  },
   "layout": {
     "backHome": "Back to Home",
     "language": "Language"
+  },
+  "model": {
+    "fetchingModels": "Fetching model list from provider API…",
+    "fetchModelsFailed": "Failed to fetch models",
+    "fetchProvidersFailed": "Failed to load providers",
+    "loading": "Loading…",
+    "noModels": "This provider has no available models",
+    "noProviders": "No providers found. Please add configuration in \"Provider Management\" first",
+    "refresh": "Refresh",
+    "refreshFailed": "Refresh failed",
+    "refreshModelsTitle": "Refresh model list",
+    "statusDisabled": "Disabled",
+    "statusEnabled": "Enabled",
+    "subtitle": "View models supported by each provider",
+    "title": "Model Management"
+  },
+  "network": {
+    "cookieDirsDescription": "Leave empty to use built-in default directories. You can place cookies.txt or bilibili_cookies.txt in these directories",
+    "cookieDirsLabel": "Cookie Files Directory",
+    "cookieDirsPlaceholder": "One absolute path per line, for example:\n/Users/you/cookies\n/data/cookies",
+    "downloadEnhancementCardDescription": "Used to bypass rate limiting and anti-bot measures. Optional; leaving empty uses default strategy",
+    "downloadEnhancementCardTitle": "Download Enhancement",
+    "downloadEnhancementSaveButton": "Save Download Enhancement",
+    "downloadEnhancementSaved": "Download enhancement configuration saved",
+    "poTokenLabel": "PO Token",
+    "poTokenPlaceholder": "YouTube PO Token (Optional)",
+    "proxyDescription": "HTTP/SOCKS5 proxy for accessing overseas platforms. Leave empty for direct connection",
+    "proxyLabel": "Proxy Address",
+    "proxyPlaceholder": "Example: http://127.0.0.1:7890 or socks5://127.0.0.1:1080",
+    "proxySaveButton": "Save Proxy",
+    "proxySaved": "Network proxy saved",
+    "proxySupport": "Supports http:// or socks5:// protocols, only effective during media fetching",
+    "proxyTitle": "Network Proxy Server",
+    "subtitle": "Configure global parameters for external network access and media download",
+    "title": "Network Settings",
+    "visitorDataLabel": "Visitor Data",
+    "visitorDataPlaceholder": "YouTube Visitor Data (Optional)"
+  },
+  "screenshot": {
+    "cardDescription": "Control keyframe extraction, grid montage size and vision understanding trigger conditions",
+    "cardTitle": "Screenshot & Frame Extraction",
+    "placeholderMessage": "This page is a placeholder skeleton. Detailed form items will be added in future versions.",
+    "subtitle": "Configure default parameters for frame extraction, montage and vision understanding",
+    "title": "Video Screenshot"
+  },
+  "transcriber": {
+    "cardDescription": "Supports fast-whisper / groq-whisper / bcut / kuaishou",
+    "cardTitle": "Transcription Engine",
+    "placeholderMessage": "This page is a placeholder skeleton. Detailed form items will be added in future versions.",
+    "subtitle": "Configure speech recognition engine and default parameters (ASR Provider)",
+    "title": "Audio Transcription"
   }
 }
-
