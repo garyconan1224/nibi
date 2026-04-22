@@ -1,234 +1,282 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { Camera, Grid3X3, Image as ImageIcon } from 'lucide-react'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
+  SelectValue,
 } from '@/components/ui/select'
-import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Camera, Save, AlertCircle } from 'lucide-react'
+import { Section } from '@/components/ui/section'
+import { FieldRow } from '@/components/ui/field-row'
 import { useConfigStore } from '@/store/configStore'
+import { useSettingsShellStore } from '@/store/settingsShellStore'
+import { useDirtyGuard } from '@/hooks/useDirtyGuard'
 import {
-  fetchScreenshotConfig,
   updateScreenshotConfig,
   getQualityLevels,
   getGridPresets,
 } from '@/services/screenshot'
+import type { ScreenshotConfig } from '@/store/configStore'
 
 /**
- * 视频截图设置页（实现）。
- * 管理抽帧间隔、网格拼图尺寸、图片压缩质量、视觉理解默认参数等配置。
+ * 视频截图设置页（DESIGN_NOTES_SETTINGS.md §4.3 · Screenshot）。
+ *
+ * - 三 Section：抽帧间隔 / 拼图尺寸 / 图片质量 & 嵌入；
+ * - 草稿-快照模型：本地 draft + useDirtyGuard(screenshotSettings) 基线；
+ * - 顶层 SaveBar 由 settingsShellStore 桥接，不再使用页内 Save 按钮；
+ * - 保存流程：后端 POST /screenshot_config → 成功后落 configStore.screenshotSettings。
  */
+interface ScreenshotDraft extends Record<string, unknown> {
+  defaultInterval: number
+  /** UI 侧以 "colsxrows" 字符串承载，便于 Select 绑定 */
+  gridSize: string
+  jpegQuality: number
+  embedInNote: boolean
+}
+
+/** 将 store 中的 gridSize 元组规范化为 "colsxrows" 字符串 */
+function toGridKey(tuple: [number, number]): string {
+  return `${tuple[0]}x${tuple[1]}`
+}
+
+/** 将 "colsxrows" 还原为元组；非法值返回 null */
+function parseGridKey(key: string): [number, number] | null {
+  const parts = key.split('x').map(Number)
+  if (parts.length !== 2) return null
+  const [c, r] = parts
+  if (!Number.isFinite(c) || !Number.isFinite(r)) return null
+  if (c < 1 || c > 10 || r < 1 || r > 10) return null
+  return [c, r]
+}
+
 const ScreenshotPage = () => {
   const { t } = useTranslation('settings')
-  const configStore = useConfigStore()
 
-  // 本地表单状态
-  const [defaultInterval, setDefaultInterval] = useState(configStore.screenshotSettings.defaultInterval)
-  const [gridSize, setGridSize] = useState(`${configStore.screenshotSettings.gridSize[0]}x${configStore.screenshotSettings.gridSize[1]}`)
-  const [jpegQuality, setJpegQuality] = useState(configStore.screenshotSettings.jpegQuality)
-  const [embedInNote, setEmbedInNote] = useState(configStore.screenshotSettings.embedInNote)
+  // 分片订阅 configStore：仅在截图配置变化时 re-render
+  const screenshotSettings = useConfigStore((s) => s.screenshotSettings)
+  const setConfig          = useConfigStore((s) => s.setConfig)
 
+  const setSaveBar   = useSettingsShellStore((s) => s.setSaveBar)
+  const resetSaveBar = useSettingsShellStore((s) => s.resetSaveBar)
+
+  // 基线快照：来自持久化 store；gridSize 元组映射为字符串
+  const baseline = useMemo<ScreenshotDraft>(
+    () => ({
+      defaultInterval: screenshotSettings.defaultInterval,
+      gridSize: toGridKey(screenshotSettings.gridSize),
+      jpegQuality: screenshotSettings.jpegQuality,
+      embedInNote: screenshotSettings.embedInNote,
+    }),
+    [screenshotSettings],
+  )
+
+  const [draft, setDraft] = useState<ScreenshotDraft>(baseline)
   const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
+  const [gridError, setGridError] = useState<string | null>(null)
 
-  // 同步后端配置（可选）
+  // 基线刷新：仅在 store 侧值变化时同步（避免本地草稿被外部回填覆盖）
+  // 仅当基线实际变化时才更新 draft（通过对象值比对，不仅是引用）
   useEffect(() => {
-    const load = async () => {
-      try {
-        await fetchScreenshotConfig()
-        // 可选：与前端状态同步（取决于需求）
-      } catch (err) {
-        console.error('Failed to fetch screenshot config:', err)
-      }
+    const baselineChanged =
+      draft.defaultInterval !== baseline.defaultInterval ||
+      draft.gridSize !== baseline.gridSize ||
+      draft.jpegQuality !== baseline.jpegQuality ||
+      draft.embedInNote !== baseline.embedInNote
+    if (baselineChanged) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDraft(baseline)
     }
-    load()
+  }, [baseline, draft])
+
+  const guard = useDirtyGuard<ScreenshotDraft>({
+    initial: baseline,
+    current: draft,
+    message: t('dirty.leaveConfirm'),
+  })
+
+  const patch = useCallback((p: Partial<ScreenshotDraft>) => {
+    setDraft((prev) => ({ ...prev, ...p }))
+    setGridError(null)
   }, [])
 
-  // 处理保存
-  const handleSave = async () => {
+  const handleReset = useCallback(() => {
+    setDraft(baseline)
+    setGridError(null)
+  }, [baseline])
+
+  const handleSave = useCallback(async () => {
+    const grid = parseGridKey(draft.gridSize)
+    if (!grid) {
+      setGridError(t('screenshot.grid.invalid', '网格大小必须为 1-10 的整数'))
+      return
+    }
+    setIsSaving(true)
     try {
-      setIsSaving(true)
-      setError(null)
-      setSuccess(false)
-
-      const [cols, rows] = gridSize.split('x').map(Number)
-      if (!cols || !rows || cols < 1 || cols > 10 || rows < 1 || rows > 10) {
-        setError('网格大小必须为 1-10 的整数')
-        setIsSaving(false)
-        return
+      const nextConfig: ScreenshotConfig = {
+        defaultInterval: draft.defaultInterval,
+        gridSize: grid,
+        jpegQuality: draft.jpegQuality,
+        embedInNote: draft.embedInNote,
       }
-
-      // 更新后端配置
-      await updateScreenshotConfig({
-        defaultInterval,
-        gridSize: [cols, rows],
-        jpegQuality,
-        embedInNote,
-      })
-
-      // 更新前端 store
-      configStore.setConfig({
-        screenshotSettings: {
-          defaultInterval,
-          gridSize: [cols, rows],
-          jpegQuality,
-          embedInNote,
-        },
-      })
-
-      setSuccess(true)
-      setTimeout(() => setSuccess(false), 3000)
+      // 先尝试落后端；失败时保留草稿不触达 store
+      await updateScreenshotConfig(nextConfig)
+      setConfig({ screenshotSettings: nextConfig })
+      const next: ScreenshotDraft = {
+        defaultInterval: nextConfig.defaultInterval,
+        gridSize: toGridKey(nextConfig.gridSize),
+        jpegQuality: nextConfig.jpegQuality,
+        embedInNote: nextConfig.embedInNote,
+      }
+      setDraft(next)
+      guard.commit(next)
+      toast.success(t('screenshot.saved', '截图配置已保存'))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save configuration')
+      const msg = err instanceof Error ? err.message : String(err)
+      toast.error(t('screenshot.saveFailed', '截图配置保存失败') + (msg ? `：${msg}` : ''))
     } finally {
       setIsSaving(false)
     }
-  }
+  }, [draft, setConfig, guard, t])
 
+  // SaveBar 桥：推送脏计数 + 保存/重置回调；卸载归零
+  useEffect(() => {
+    setSaveBar({
+      dirtyCount: guard.dirtyCount,
+      saving: isSaving,
+      onSave: handleSave,
+      onReset: handleReset,
+    })
+    return () => resetSaveBar()
+  }, [guard.dirtyCount, isSaving, handleSave, handleReset, setSaveBar, resetSaveBar])
 
+  const dirty = guard.dirtyMap
+  const gridTuple = parseGridKey(draft.gridSize)
 
   return (
-    <div className="p-6 max-w-3xl space-y-6">
-      {/* 页面标题 */}
+    <div className="mx-auto max-w-3xl space-y-8 p-6">
       <div>
-        <h1 className="text-2xl font-bold">{t('screenshot.title')}</h1>
-        <p className="text-sm text-muted-foreground">
-          {t('screenshot.subtitle')}
-        </p>
+        <h1 className="text-[28px] font-semibold tracking-tight">{t('screenshot.title')}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{t('screenshot.subtitle')}</p>
       </div>
 
-      {/* 错误提示 */}
-      {error && (
-        <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          <AlertCircle className="h-4 w-4" />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {/* 成功提示 */}
-      {success && (
-        <div className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700">
-          ✓ {t('settings.common.savSuccess') || '配置已保存'}
-        </div>
-      )}
-
-      {/* 截图配置卡 */}
-      <Card>
-        <CardHeader className="pb-4">
-          <div className="flex items-center gap-2">
-            <Camera className="h-5 w-5 text-primary" />
-            <div>
-              <CardTitle>{t('screenshot.title')}</CardTitle>
-              <CardDescription>
-                {t('screenshot.subtitle')}
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-
-          {/* 默认抽帧间隔 */}
-          <div className="space-y-2">
-            <Label>{t('screenshot.interval.title') || '默认抽帧间隔'}</Label>
-            <div className="flex items-center gap-4">
-              <input
-                type="range"
-                min="1"
-                max="60"
-                step="1"
-                value={defaultInterval}
-                onChange={(e) => setDefaultInterval(Number(e.target.value))}
-                className="flex-1 h-2 bg-neutral-200 rounded-lg appearance-none cursor-pointer"
-              />
-              <span className="text-sm font-semibold w-12 text-right">{defaultInterval}s</span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {t('screenshot.interval.description') || '每多少秒抽取一帧关键画面'}
-            </p>
-          </div>
-
-          {/* 网格拼图大小 */}
-          <div className="space-y-2">
-            <Label>{t('screenshot.grid.title') || '网格拼图大小'}</Label>
-            <div className="flex gap-2">
-              <Select value={gridSize} onValueChange={setGridSize}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {getGridPresets().map((preset) => (
-                    <SelectItem key={preset.label} value={`${preset.value[0]}x${preset.value[1]}`}>
-                      {preset.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="text-sm text-muted-foreground pt-2">
-                {(() => {
-                  const [cols, rows] = gridSize.split('x').map(Number)
-                  return `总共 ${cols * rows} 帧`
-                })()}
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {t('screenshot.grid.description') || '选择网格尺寸，推荐 3x3 用于平衡性能与质量'}
-            </p>
-          </div>
-
-          {/* JPEG 质量 */}
-          <div className="space-y-2">
-            <Label>{t('screenshot.quality.title') || '图片质量'}</Label>
-            <Select
-              value={String(jpegQuality)}
-              onValueChange={(val) => setJpegQuality(Number(val))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {getQualityLevels().map((opt) => (
-                  <SelectItem key={opt.value} value={String(opt.value)}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              {t('screenshot.quality.description') || '越高的质量会产生更大的文件'}
-            </p>
-          </div>
-
-          {/* 嵌入笔记 */}
-          <div className="flex items-center justify-between p-3 rounded-md border border-neutral-200 bg-neutral-50">
-            <div className="space-y-1">
-              <Label className="text-base">{t('screenshot.embed.title') || '自动嵌入笔记'}</Label>
-              <p className="text-xs text-muted-foreground">
-                {t('screenshot.embed.description') || '生成笔记时是否自动包含截图网格'}
-              </p>
-            </div>
-            <Switch checked={embedInNote} onCheckedChange={setEmbedInNote} />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* 保存按钮 */}
-      <div className="flex gap-2">
-        <Button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="gap-2"
+      {/* ── Section A · 抽帧参数 ── */}
+      <Section
+        icon={<Camera className="size-4" />}
+        title={t('screenshot.interval.title')}
+        description={t('screenshot.interval.description')}
+      >
+        <FieldRow
+          htmlFor="screenshot-interval"
+          label={t('screenshot.interval.title')}
+          hint={t('screenshot.interval.description')}
+          dirty={dirty.defaultInterval}
         >
-          <Save className="h-4 w-4" />
-          {isSaving ? (t('settings.common.saving') || '保存中...') : (t('settings.common.save') || '保存')}
-        </Button>
-      </div>
+          <div className="flex items-center gap-4">
+            <input
+              id="screenshot-interval"
+              type="range"
+              min={1}
+              max={60}
+              step={1}
+              value={draft.defaultInterval}
+              onChange={(e) => patch({ defaultInterval: Number(e.target.value) })}
+              className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-zinc-200"
+              aria-label={t('screenshot.interval.title')}
+            />
+            <span className="w-14 text-right text-sm font-semibold tabular-nums">
+              {draft.defaultInterval}s
+            </span>
+          </div>
+        </FieldRow>
+      </Section>
+
+      {/* ── Section B · 网格拼图 ── */}
+      <Section
+        icon={<Grid3X3 className="size-4" />}
+        title={t('screenshot.grid.title')}
+        description={t('screenshot.grid.description')}
+      >
+        <FieldRow
+          htmlFor="screenshot-grid"
+          label={t('screenshot.grid.title')}
+          hint={
+            gridTuple
+              ? t('screenshot.grid.totalFrames', '总共 {{count}} 帧', {
+                  count: gridTuple[0] * gridTuple[1],
+                })
+              : undefined
+          }
+          error={gridError ?? undefined}
+          dirty={dirty.gridSize}
+        >
+          <Select
+            value={draft.gridSize}
+            onValueChange={(v) => patch({ gridSize: v })}
+          >
+            <SelectTrigger id="screenshot-grid">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {getGridPresets().map((preset) => (
+                <SelectItem
+                  key={preset.label}
+                  value={`${preset.value[0]}x${preset.value[1]}`}
+                >
+                  {preset.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FieldRow>
+      </Section>
+
+      {/* ── Section C · 画质与嵌入 ── */}
+      <Section
+        icon={<ImageIcon className="size-4" />}
+        title={t('screenshot.quality.title')}
+        description={t('screenshot.quality.description')}
+      >
+        <FieldRow
+          htmlFor="screenshot-quality"
+          label={t('screenshot.quality.title')}
+          hint={t('screenshot.quality.description')}
+          dirty={dirty.jpegQuality}
+        >
+          <Select
+            value={String(draft.jpegQuality)}
+            onValueChange={(v) => patch({ jpegQuality: Number(v) })}
+          >
+            <SelectTrigger id="screenshot-quality">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {getQualityLevels().map((opt) => (
+                <SelectItem key={opt.value} value={String(opt.value)}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FieldRow>
+
+        <FieldRow
+          htmlFor="screenshot-embed"
+          label={t('screenshot.embed.title')}
+          hint={t('screenshot.embed.description')}
+          dirty={dirty.embedInNote}
+          inline
+        >
+          <Switch
+            id="screenshot-embed"
+            checked={draft.embedInNote}
+            onCheckedChange={(v) => patch({ embedInNote: v })}
+          />
+        </FieldRow>
+      </Section>
     </div>
   )
 }

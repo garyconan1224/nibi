@@ -139,13 +139,17 @@
   "screenshot": {
     "title": "Video Screenshot",
     "subtitle": "Configure default parameters for frame extraction, montage and vision understanding",
+    "saved": "Screenshot configuration saved",
+    "saveFailed": "Failed to save screenshot configuration",
     "interval": {
       "title": "Default Frame Interval",
       "description": "How often (in seconds) to extract a key frame"
     },
     "grid": {
       "title": "Grid Montage Size",
-      "description": "Select grid size. 3x3 is recommended for balanced performance and quality"
+      "description": "Select grid size. 3x3 is recommended for balanced performance and quality",
+      "totalFrames": "{{count}} frames total",
+      "invalid": "Grid size must be an integer between 1 and 10"
     },
     "quality": {
       "title": "Image Quality",

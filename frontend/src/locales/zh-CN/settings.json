@@ -139,13 +139,17 @@
   "screenshot": {
     "title": "视频截图",
     "subtitle": "配置抽帧、拼图与视觉理解的默认参数",
+    "saved": "截图配置已保存",
+    "saveFailed": "截图配置保存失败",
     "interval": {
       "title": "默认抽帧间隔",
       "description": "每多少秒抽取一帧关键画面"
     },
     "grid": {
       "title": "网格拼图大小",
-      "description": "选择网格尺寸，推荐 3x3 用于平衡性能与质量"
+      "description": "选择网格尺寸，推荐 3x3 用于平衡性能与质量",
+      "totalFrames": "总共 {{count}} 帧",
+      "invalid": "网格大小必须为 1-10 的整数"
     },
     "quality": {
       "title": "图片质量",

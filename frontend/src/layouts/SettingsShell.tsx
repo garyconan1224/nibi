@@ -69,7 +69,7 @@ function TabBar({ tabs }: { tabs: TabItem[] }) {
     <nav
       role="tablist"
       aria-label="settings-navigation"
-      className="flex items-center justify-center gap-1 border-b border-zinc-200 bg-white px-6"
+      className="flex items-center justify-center gap-1 border-b border-border bg-background px-6"
     >
       {tabs.map((tab) => {
         const active = location.pathname === tab.path
@@ -106,7 +106,7 @@ function SaveBar({ state }: { state: SaveBarState | undefined }) {
       role="toolbar"
       aria-label="save-bar"
       className={cn(
-        'sticky bottom-0 flex h-14 items-center justify-between gap-3 border-t border-zinc-200 bg-white/90 px-6 backdrop-blur',
+        'sticky bottom-0 flex h-14 items-center justify-between gap-3 border-t border-border bg-background/90 px-6 backdrop-blur',
       )}
     >
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -163,7 +163,7 @@ export function SettingsShell({
   )
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden">
-      <header className="flex h-16 items-center justify-between border-b border-zinc-200 bg-white px-6">
+      <header className="flex h-16 items-center justify-between border-b border-border bg-background px-6">
         <Link
           to="/"
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
@@ -177,7 +177,7 @@ export function SettingsShell({
 
       <TabBar tabs={effectiveTabs} />
 
-      <main className="flex-1 overflow-auto bg-zinc-50/60">
+      <main className="flex-1 overflow-auto bg-muted/40">
         <Outlet />
       </main>
 

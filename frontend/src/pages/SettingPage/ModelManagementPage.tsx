@@ -73,6 +73,7 @@ const ModelManagementPage = () => {
     } catch (e) {
       const msg = e instanceof Error ? e.message : t('model.fetchProvidersFailed')
       setError(msg)
+      // 仅在第一次触发错误时显示 toast，避免重复提示
       toast.error(msg)
     } finally {
       setListLoading(false)
@@ -101,7 +102,7 @@ const ModelManagementPage = () => {
       const data = res.data.data ?? res.data
       setProviders(prev => prev.map(p =>
         p.id === id
-          ? { ...p, models: data.models ?? [], modelError: data.error, loadingModels: false }
+          ? { ...p, models: data.models ?? [], modelError: undefined, loadingModels: false }
           : p
       ))
     } catch (e) {
@@ -109,6 +110,10 @@ const ModelManagementPage = () => {
       setProviders(prev => prev.map(p =>
         p.id === id ? { ...p, modelError: msg, loadingModels: false } : p
       ))
+      // 仅在无全局错误时显示 toast 提示，避免重复
+      if (!error) {
+        toast.error(msg)
+      }
     }
   }
 
@@ -122,14 +127,17 @@ const ModelManagementPage = () => {
       const data = res.data.data ?? res.data
       setProviders(prev => prev.map(p =>
         p.id === id
-          ? { ...p, models: data.models ?? [], modelError: data.error, loadingModels: false }
+          ? { ...p, models: data.models ?? [], modelError: undefined, loadingModels: false }
           : p
       ))
+      // 刷新成功，清除全局错误
+      setError(null)
     } catch (e) {
       const msg = e instanceof Error ? e.message : t('model.refreshFailed')
       setProviders(prev => prev.map(p =>
         p.id === id ? { ...p, modelError: msg, loadingModels: false } : p
       ))
+      toast.error(msg)
     }
   }
 

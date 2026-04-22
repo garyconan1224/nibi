@@ -10,7 +10,7 @@
  * 端点就绪后仅需替换 `url` 即可接入，不需修改业务代码。
  */
 
-const BASE = import.meta.env.VITE_BACKEND_BASE_URL ?? 'http://127.0.0.1:8010'
+const BASE = import.meta.env.VITE_BACKEND_BASE_URL ?? 'http://127.0.0.1:8000'
 
 export interface SseHandlers<T = unknown> {
   /** 默认 message 事件回调（解析为 T） */

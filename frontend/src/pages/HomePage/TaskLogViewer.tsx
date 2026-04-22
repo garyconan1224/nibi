@@ -28,7 +28,7 @@ interface SseTaskEvent {
 
 type SseEvent = SseLogEvent | SseTaskEvent
 
-const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL ?? 'http://127.0.0.1:8010'
+const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL ?? 'http://127.0.0.1:8000'
 
 interface TaskLogViewerProps {
   /** 目标任务 ID */

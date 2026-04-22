@@ -62,7 +62,7 @@ export default function AboutPage() {
         icon={<Server className="size-4" />}
       >
         <div className="space-y-4">
-          <div className="rounded-lg border border-zinc-200 bg-white p-4">
+          <div className="rounded-lg border border-border bg-card text-card-foreground p-4">
             <div className="flex items-center gap-4">
               <div className="flex size-12 items-center justify-center rounded-lg bg-violet-100">
                 <Server className="size-6 text-violet-600" />
@@ -81,7 +81,7 @@ export default function AboutPage() {
 
           {/* 版本信息行 */}
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            <div className="rounded-lg border border-zinc-200 bg-white p-3">
+            <div className="rounded-lg border border-border bg-card text-card-foreground p-3">
               <div className="text-xs font-medium text-muted-foreground">
                 {t('about.versionLabel')}
               </div>
@@ -89,7 +89,7 @@ export default function AboutPage() {
                 {dynamicVersion}
               </div>
             </div>
-            <div className="rounded-lg border border-zinc-200 bg-white p-3">
+            <div className="rounded-lg border border-border bg-card text-card-foreground p-3">
               <div className="text-xs font-medium text-muted-foreground">
                 {t('about.statusLabel')}
               </div>
@@ -118,7 +118,7 @@ export default function AboutPage() {
               {FRONTEND_DEPS.map((dep) => (
                 <div
                   key={dep.name}
-                  className="rounded-lg border border-zinc-200 bg-white p-3"
+                  className="rounded-lg border border-border bg-card text-card-foreground p-3"
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -147,7 +147,7 @@ export default function AboutPage() {
               {BACKEND_DEPS.map((dep) => (
                 <div
                   key={dep.name}
-                  className="rounded-lg border border-zinc-200 bg-white p-3"
+                  className="rounded-lg border border-border bg-card text-card-foreground p-3"
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -176,7 +176,7 @@ export default function AboutPage() {
         icon={<Github className="size-4" />}
       >
         <div className="space-y-4">
-          <div className="rounded-lg border border-zinc-200 bg-white p-4">
+          <div className="rounded-lg border border-border bg-card text-card-foreground p-4">
             <div className="flex items-start gap-3">
               <FileText className="mt-1 size-5 shrink-0 text-violet-600" />
               <div>
@@ -188,7 +188,7 @@ export default function AboutPage() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-zinc-200 bg-white p-4">
+          <div className="rounded-lg border border-border bg-card text-card-foreground p-4">
             <div className="flex items-start gap-3">
               <Github className="mt-1 size-5 shrink-0 text-violet-600" />
               <div>

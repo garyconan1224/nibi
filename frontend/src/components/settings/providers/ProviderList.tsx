@@ -103,16 +103,24 @@ export function ProviderList({
             {filtered.map((p) => {
               const active = p.id === selectedId
               const dirty = dirtyIds.has(p.id)
+              // 外层使用 div[role=option] 避免 <button> 嵌套 <button> 的 HTML 违规；
+              // 行本身通过 click + keydown 维持键盘可达性，行内删除才是真正的 <button>。
               return (
                 <li key={p.id}>
-                  <button
-                    type="button"
+                  <div
                     role="option"
                     aria-selected={active}
+                    tabIndex={0}
                     data-dirty={dirty || undefined}
                     onClick={() => onSelect(p.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        onSelect(p.id)
+                      }
+                    }}
                     className={cn(
-                      'group flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors',
+                      'group flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-400',
                       active
                         ? 'bg-violet-50 text-violet-900 ring-1 ring-violet-200'
                         : 'text-foreground hover:bg-zinc-50',
@@ -133,26 +141,24 @@ export function ProviderList({
                     >
                       {p.enabled ? t('badge.enabled') : t('badge.disabled')}
                     </span>
-                    <span
-                      role="button"
-                      tabIndex={0}
+                    <button
+                      type="button"
                       aria-label={t('actions.delete')}
                       onClick={(e) => {
                         e.stopPropagation()
                         onDelete(p)
                       }}
                       onKeyDown={(e) => {
+                        // 阻止空格/Enter 冒泡到外层 option 触发 onSelect
                         if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault()
                           e.stopPropagation()
-                          onDelete(p)
                         }
                       }}
-                      className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100 focus:opacity-100"
+                      className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100 focus:opacity-100 focus-visible:ring-2 focus-visible:ring-rose-300"
                     >
                       <Trash2 className="size-3.5" />
-                    </span>
-                  </button>
+                    </button>
+                  </div>
                 </li>
               )
             })}

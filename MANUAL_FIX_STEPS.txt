@@ -1,0 +1,166 @@
+================================================================================
+           VidMirror 脚本权限修复 - 手动步骤指南
+================================================================================
+
+【问题症状】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+双击 start_vidmirror.command 文件时显示：
+  ❌ "无法执行，因为你没有正确的访问权限"
+  或
+  ❌ "需要下载的项目不能打开，因为来自未被信任的开发者"
+
+【原因分析】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. 文件缺少执行权限（-rw-r--r-- 而非 -rwxr-xr-x）
+2. macOS 添加了隔离属性 (com.apple.quarantine)
+3. macOS 安全机制阻止了未授权的脚本运行
+
+【快速修复 - 3 行命令】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+在终端中逐行复制粘贴执行：
+
+# 第 1 步：赋予所有脚本执行权限
+chmod +x /Users/conan/Desktop/nibi/start_vidmirror.command
+chmod +x /Users/conan/Desktop/nibi/start_vidmirror_advanced.command
+chmod +x /Users/conan/Desktop/nibi/INSTALL_DESKTOP_SHORTCUT.sh
+
+# 第 2 步：移除隔离属性（可忽略错误）
+xattr -d com.apple.quarantine /Users/conan/Desktop/nibi/start_vidmirror.command 2>/dev/null
+xattr -d com.apple.quarantine /Users/conan/Desktop/nibi/start_vidmirror_advanced.command 2>/dev/null
+xattr -d com.apple.quarantine /Users/conan/Desktop/nibi/INSTALL_DESKTOP_SHORTCUT.sh 2>/dev/null
+
+# 第 3 步：验证修复
+ls -lh /Users/conan/Desktop/nibi/start_vidmirror*.command
+
+修复成功标志：
+  权限显示为 -rwxr-xr-x（包含 x 标记）
+
+【详细步骤】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+步骤 1：打开终端
+
+  a) 按 ⌘ + 空格 打开 Spotlight
+  b) 输入 "terminal" 或 "终端"
+  c) 按 Enter 打开 Terminal.app
+
+步骤 2：进入项目目录（可选）
+
+  cd /Users/conan/Desktop/nibi
+
+步骤 3：赋予执行权限
+
+  对每个脚本运行：
+  $ chmod +x 文件名
+
+  完整命令：
+  $ chmod +x start_vidmirror.command
+  $ chmod +x start_vidmirror_advanced.command
+  $ chmod +x INSTALL_DESKTOP_SHORTCUT.sh
+
+步骤 4：移除隔离属性
+
+  对每个脚本运行：
+  $ xattr -d com.apple.quarantine 文件名
+
+  完整命令（错误可忽略）：
+  $ xattr -d com.apple.quarantine start_vidmirror.command 2>/dev/null
+  $ xattr -d com.apple.quarantine start_vidmirror_advanced.command 2>/dev/null
+  $ xattr -d com.apple.quarantine INSTALL_DESKTOP_SHORTCUT.sh 2>/dev/null
+
+步骤 5：验证
+
+  查看权限：
+  $ ls -lh start_vidmirror.command
+
+  期望输出：
+  -rwxr-xr-x ... start_vidmirror.command
+   ^^^^^^
+   包含 x（可执行）
+
+  检查隔离属性：
+  $ xattr -l start_vidmirror.command
+
+  期望输出：
+  （空或无 com.apple.quarantine）
+
+【使用修复脚本】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+如果你喜欢自动化，使用以下脚本：
+
+选项 A：Bash 脚本
+  $ bash /Users/conan/Desktop/nibi/FIX_PERMISSIONS.sh
+
+选项 B：Python 脚本
+  $ python3 /Users/conan/Desktop/nibi/fix_permissions.py
+
+【修复后测试】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+修复完成后，尝试：
+
+1. 直接双击脚本（应该能打开）
+2. 或在终端运行：
+   $ /Users/conan/Desktop/nibi/start_vidmirror.command
+
+【应急方案 - 如果修复不成功】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+如果上述方法都不行，使用右键菜单：
+
+1. 打开 Finder
+2. 导航到 /Users/conan/Desktop/nibi
+3. 右键点击 start_vidmirror.command（或 Ctrl+点击）
+4. 选择"打开"选项
+5. macOS 会显示安全警告对话
+6. 点击"打开"按钮
+7. macOS 会记住信任，之后可直接双击
+
+【诊断命令】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+检查文件权限：
+  $ ls -lh /Users/conan/Desktop/nibi/start_vidmirror.command
+
+检查隔离属性：
+  $ xattr -l /Users/conan/Desktop/nibi/start_vidmirror.command
+
+检查可执行性：
+  $ test -x /Users/conan/Desktop/nibi/start_vidmirror.command && \
+    echo "✅ 可执行" || echo "❌ 不可执行"
+
+【常见错误】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+错误："command not found: chmod"
+→ 使用完整路径：/bin/chmod +x 文件名
+
+错误："Operation not permitted"
+→ 文件可能被锁定，使用 Finder 检查属性
+
+错误："No such file or directory"
+→ 检查文件路径是否正确
+
+【如何获取帮助】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+详细文档：
+  • PERMISSION_FIX_GUIDE.md (完整权限修复指南)
+  • START_GUIDE.md (完整使用手册)
+  • QUICKSTART.md (快速开始)
+
+修复脚本：
+  • FIX_PERMISSIONS.sh (Bash 自动修复)
+  • fix_permissions.py (Python 自动修复)
+
+================================================================================
+
+创建日期：2026-04-22
+目标脚本：VidMirror macOS 启动脚本
+
+================================================================================
+
