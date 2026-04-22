@@ -71,15 +71,15 @@ on run
             -- 后端窗口
             create tab with default profile
             tell current session
-                write text "cd '/Users/conan/Desktop/nibi' && python3.11 -m uvicorn backend.app.main:app --reload --port 8010"
+                write text "cd '/Users/conan/Desktop/nibi' && python3.11 -m uvicorn backend.app.main:app --reload --port 8000"
             end tell
-            
+
             delay 3
-            
+
             -- 前端窗口
             create tab with default profile
             tell current session
-                write text "cd '/Users/conan/Desktop/nibi/frontend' && npm run dev"
+                write text "cd '/Users/conan/Desktop/nibi/frontend' && VITE_BACKEND_BASE_URL=http://127.0.0.1:8000 npm run dev"
             end tell
         end tell
     end tell
@@ -90,9 +90,9 @@ else
 on run
     tell application "Terminal"
         activate
-        do script "cd '/Users/conan/Desktop/nibi' && python3.11 -m uvicorn backend.app.main:app --reload --port 8010"
+        do script "cd '/Users/conan/Desktop/nibi' && python3.11 -m uvicorn backend.app.main:app --reload --port 8000"
         delay 3
-        do script "cd '/Users/conan/Desktop/nibi/frontend' && npm run dev"
+        do script "cd '/Users/conan/Desktop/nibi/frontend' && VITE_BACKEND_BASE_URL=http://127.0.0.1:8000 npm run dev"
     end tell
 end run
 APPLESCRIPT
@@ -105,7 +105,7 @@ echo "╔═══════════════════════�
 echo "║         📍 服务地址                     ║"
 echo "╠═════════════════════════════════════════╣"
 echo "║ 前端: http://localhost:5174            ║"
-echo "║ 后端: http://localhost:8010            ║"
+echo "║ 后端: http://localhost:8000            ║"
 echo "╚═════════════════════════════════════════╝"
 echo ""
 log_info "💡 更多信息请查看 START_GUIDE.md"

@@ -89,7 +89,7 @@ check_port() {
     return 0
 }
 
-BACKEND_PORT=8010
+BACKEND_PORT=8000
 FRONTEND_PORT=5174
 
 check_port $BACKEND_PORT "后端" || log_warn "后端可能已在运行"
@@ -104,19 +104,19 @@ osascript <<'APPLESCRIPT'
 on run
     tell application "Terminal"
         activate
-        
+
         -- 创建第一个窗口，运行后端
-        do script "cd '/Users/conan/Desktop/nibi' && python3.11 -m uvicorn backend.app.main:app --reload --port 8010"
+        do script "cd '/Users/conan/Desktop/nibi' && python3.11 -m uvicorn backend.app.main:app --reload --port 8000"
         set backendTab to (result)
-        
+
         delay 3
-        
+
         -- 创建第二个窗口，运行前端
-        do script "cd '/Users/conan/Desktop/nibi/frontend' && npm run dev"
+        do script "cd '/Users/conan/Desktop/nibi/frontend' && VITE_BACKEND_BASE_URL=http://127.0.0.1:8000 npm run dev"
         set frontendTab to (result)
-        
+
         delay 1
-        
+
     end tell
 end run
 APPLESCRIPT
@@ -128,8 +128,8 @@ echo "╔═══════════════════════�
 echo "║         📍 服务地址                     ║"
 echo "╠═════════════════════════════════════════╣"
 echo "║ 前端: http://localhost:5174            ║"
-echo "║ 后端: http://localhost:8010            ║"
-echo "║ 健康检查: http://localhost:8010/health ║"
+echo "║ 后端: http://localhost:8000            ║"
+echo "║ 健康检查: http://localhost:8000/health ║"
 echo "╚═════════════════════════════════════════╝"
 echo ""
 log_info "💡 提示："
