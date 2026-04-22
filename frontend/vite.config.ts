@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, __dirname)
-  const apiBaseUrl = env.VITE_BACKEND_BASE_URL || 'http://127.0.0.1:8010'
+  const apiBaseUrl = env.VITE_BACKEND_BASE_URL || 'http://127.0.0.1:8000'
 
   return {
     plugins: [react(), tailwindcss()],
@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      port: 5173,
+      port: 5175,
       proxy: {
         '/api': {
           target: apiBaseUrl,
