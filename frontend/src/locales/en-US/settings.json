@@ -19,6 +19,7 @@
       "download": "Download",
       "transcriber": "Transcriber",
       "screenshot": "Screenshot",
+      "monitor": "Monitor",
       "about": "About"
     }
   },
@@ -224,6 +225,29 @@
       "title": "No providers yet",
       "description": "Click \"Add\" in the top right to connect OpenAI / Anthropic / Google / Ollama, etc.",
       "action": "Add provider"
+    }
+  },
+  "monitor": {
+    "title": "Deployment Monitor",
+    "subtitle": "Live backend service status, system resource usage and runtime logs",
+    "status": {
+      "online": "Online",
+      "offline": "Offline"
+    },
+    "version": "Version",
+    "uptime": "Uptime",
+    "stats": {
+      "title": "System Metrics",
+      "description": "CPU / Memory / Disk usage (refreshed every 5 seconds)",
+      "cpu": "CPU Usage",
+      "cpuHint": "{{logical}} threads / {{physical}} physical cores",
+      "memory": "Memory Usage",
+      "disk": "Disk Usage"
+    },
+    "logs": {
+      "title": "Runtime Logs",
+      "description": "Recent backend task logs (virtual scrolling, up to 5000 lines)",
+      "empty": "No logs yet"
     }
   }
 }

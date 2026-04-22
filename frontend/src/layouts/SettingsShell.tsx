@@ -58,6 +58,7 @@ function buildDefaultTabs(
     { path: '/settings/download', label: t('layout.menu.download') },
     { path: '/settings/transcriber', label: t('layout.menu.transcriber') },
     { path: '/settings/screenshot', label: t('layout.menu.screenshot') },
+    { path: '/settings/monitor', label: t('layout.menu.monitor') },
     { path: '/settings/about', label: t('layout.menu.about') },
   ]
 }

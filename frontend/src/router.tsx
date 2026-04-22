@@ -21,6 +21,7 @@ const DownloadSettingsPage = lazy(
 )
 const TranscriberPage = lazy(() => import('@/pages/SettingPage/TranscriberPage'))
 const ScreenshotPage = lazy(() => import('@/pages/SettingPage/ScreenshotPage'))
+const DeployMonitorPage = lazy(() => import('@/pages/SettingPage/DeployMonitorPage'))
 const AboutPage = lazy(() => import('@/pages/SettingPage/AboutPage'))
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
 
@@ -54,6 +55,7 @@ export const router = createBrowserRouter([
           { path: 'download', element: withSuspense(<DownloadSettingsPage />) },
           { path: 'transcriber', element: withSuspense(<TranscriberPage />) },
           { path: 'screenshot', element: withSuspense(<ScreenshotPage />) },
+          { path: 'monitor', element: withSuspense(<DeployMonitorPage />) },
           { path: 'about', element: withSuspense(<AboutPage />) },
           { path: '*', element: withSuspense(<NotFoundPage />) },
         ],

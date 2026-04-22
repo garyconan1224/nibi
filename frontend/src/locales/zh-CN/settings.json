@@ -19,6 +19,7 @@
       "download": "下载",
       "transcriber": "转写",
       "screenshot": "截图",
+      "monitor": "监控",
       "about": "关于"
     }
   },
@@ -224,6 +225,29 @@
       "title": "还没有添加任何提供商",
       "description": "在右上角点击「新增」以接入 OpenAI / Anthropic / Google / Ollama 等。",
       "action": "新增提供商"
+    }
+  },
+  "monitor": {
+    "title": "部署监控",
+    "subtitle": "实时查看后端服务状态、系统资源占用与运行日志",
+    "status": {
+      "online": "在线",
+      "offline": "离线"
+    },
+    "version": "版本",
+    "uptime": "运行时长",
+    "stats": {
+      "title": "系统指标",
+      "description": "CPU / 内存 / 磁盘 使用率（每 5 秒刷新）",
+      "cpu": "CPU 使用率",
+      "cpuHint": "{{logical}} 线程 / {{physical}} 物理核心",
+      "memory": "内存使用率",
+      "disk": "磁盘使用率"
+    },
+    "logs": {
+      "title": "运行日志",
+      "description": "最近的后端任务日志（虚拟滚动，最多保留 5000 行）",
+      "empty": "暂无日志"
     }
   }
 }

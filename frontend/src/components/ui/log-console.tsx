@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { List, useListRef } from 'react-window'
+import { List, useListRef, type RowComponentProps } from 'react-window'
 import { cn } from '@/lib/utils'
 
 /**
@@ -52,24 +52,17 @@ function formatTs(ts: number): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
-/**
- * react-window v2 的 rowComponent 原型：接收 `{ index, style, ariaAttributes, ...rowProps }`
- */
+/** 行组件接收的业务 props（react-window v2 会再合入 index/style/ariaAttributes） */
+interface LogRowProps {
+  lines: LogLine[]
+}
+
 function LogRow({
   index,
   style,
   ariaAttributes,
   lines,
-}: {
-  index: number
-  style: React.CSSProperties
-  ariaAttributes: {
-    'aria-posinset': number
-    'aria-setsize': number
-    role: 'listitem'
-  }
-  lines: LogLine[]
-}) {
+}: RowComponentProps<LogRowProps>) {
   const line = lines[index]
   if (!line) return null
   const color = LEVEL_COLORS[line.level ?? 'info']
