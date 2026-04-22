@@ -78,6 +78,40 @@ if ! command -v npm &> /dev/null; then
 fi
 log_success "检测到 npm"
 
+# 后端依赖自检（使用 $PYTHON_BIN -m pip 绑定解释器，避免多版本 Python 导致依赖装错位置）
+ensure_backend_deps() {
+    local missing=()
+    for mod in psutil fastapi uvicorn pydantic dotenv httpx tenacity requests; do
+        if ! "$PYTHON_BIN" -c "import ${mod}" >/dev/null 2>&1; then
+            missing+=("$mod")
+        fi
+    done
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        log_warn "检测到后端依赖缺失: ${missing[*]}"
+        log_info "使用 $PYTHON_BIN -m pip 自动安装 requirements.txt ..."
+        "$PYTHON_BIN" -m pip install -r "$PROJECT_DIR/requirements.txt" || {
+            log_error "后端依赖安装失败，请手动执行：$PYTHON_BIN -m pip install -r requirements.txt"
+            exit 1
+        }
+        log_success "后端依赖安装完成"
+    else
+        log_success "后端关键依赖齐全"
+    fi
+}
+ensure_backend_deps
+
+# 前端依赖自检
+if [[ ! -d "$PROJECT_DIR/frontend/node_modules" ]]; then
+    log_warn "frontend/node_modules 不存在，自动执行 npm install ..."
+    (cd "$PROJECT_DIR/frontend" && npm install) || {
+        log_error "前端依赖安装失败"
+        exit 1
+    }
+    log_success "前端依赖安装完成"
+else
+    log_success "前端 node_modules 已存在"
+fi
+
 # 检查端口占用
 check_port() {
     local port=$1
@@ -99,20 +133,20 @@ echo ""
 log_info "准备启动后端和前端服务..."
 echo ""
 
-# 使用 osascript 在两个独立的 Terminal 窗口中启动服务
-osascript <<'APPLESCRIPT'
+# 使用 osascript 在两个独立的 Terminal 窗口中启动服务（不带引号的 heredoc，以便展开 $PYTHON_BIN / $PROJECT_DIR）
+osascript <<APPLESCRIPT
 on run
     tell application "Terminal"
         activate
 
         -- 创建第一个窗口，运行后端
-        do script "cd '/Users/conan/Desktop/nibi' && python3.11 -m uvicorn backend.app.main:app --reload --port 8000"
+        do script "cd '$PROJECT_DIR' && $PYTHON_BIN -m uvicorn backend.app.main:app --reload --port $BACKEND_PORT"
         set backendTab to (result)
 
         delay 3
 
         -- 创建第二个窗口，运行前端
-        do script "cd '/Users/conan/Desktop/nibi/frontend' && VITE_BACKEND_BASE_URL=http://127.0.0.1:8000 npm run dev"
+        do script "cd '$PROJECT_DIR/frontend' && VITE_BACKEND_BASE_URL=http://127.0.0.1:$BACKEND_PORT npm run dev"
         set frontendTab to (result)
 
         delay 1
