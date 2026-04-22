@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AudioLines, Cpu } from 'lucide-react'
+import { AlertCircle, AudioLines, Cpu } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfigStore } from '@/store/configStore'
 import { useSettingsShellStore } from '@/store/settingsShellStore'
@@ -25,6 +25,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import type { TranscriberType } from '@/store/configStore'
 
 /**
@@ -208,6 +209,18 @@ const TranscriberPage = () => {
             )
           })}
         </div>
+
+        {/* 在线引擎 ToS 提示（仅当选中在线引擎时显示） */}
+        {draft.type !== 'fast-whisper' && draft.type !== 'mlx-whisper' && (
+          <div className="mt-4">
+            <Alert variant="default" className="border-amber-200 bg-amber-50">
+              <AlertCircle className="size-4 text-amber-700" />
+              <AlertDescription className="text-sm text-amber-800">
+                {t(`transcriber.engine.tosWarning.${draft.type}`)}
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
 
         {/* Whisper 模型大小（仅 fast-whisper） */}
         {draft.type === 'fast-whisper' && (
