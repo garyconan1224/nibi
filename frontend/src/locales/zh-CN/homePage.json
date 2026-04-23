@@ -96,6 +96,7 @@
     "connected": "实时日志连接中",
     "connectionClosed": "SSE 连接已断开，日志停止更新",
     "disconnected": "未连接",
+    "reconnecting": "正在尝试重连...",
     "waiting": "等待日志..."
   },
   "meta": {

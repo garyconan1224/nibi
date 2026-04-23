@@ -11,7 +11,9 @@ import {
   getWhisperModelSizes,
   getDeviceOptions,
   getLanguageOptions,
+  fetchWhisperModelsStatus,
   type TranscriberConfigPayload,
+  type WhisperModelStatus,
 } from '@/services/transcriber'
 import { Section } from '@/components/ui/section'
 import { FieldRow } from '@/components/ui/field-row'
@@ -38,6 +40,45 @@ import type { TranscriberType } from '@/store/configStore'
  * - i18n 支持：所有文案从 settings.json 中拉取。
  */
 
+/**
+ * Whisper 模型缓存状态徽章。
+ *
+ * 三态展示（按优先级）：
+ *   1. `pending_mb > 0`  → 下载中 X%（或 X MB 已就绪），橙色进行中样式；
+ *   2. `cached === true` → 已就绪，绿色 outline；
+ *   3. 其他              → 待下载 N MB / 大小未知，中性灰色。
+ */
+const ModelStatusBadge = ({ status }: { status: WhisperModelStatus }) => {
+  if (status.pending_mb > 0) {
+    const total = status.estimated_size_mb
+    const doneTotal = status.done_mb + status.pending_mb
+    const pct = total > 0 ? Math.min(99, Math.round((doneTotal / total) * 100)) : null
+    return (
+      <Badge variant="secondary" className="bg-amber-100 text-amber-800 text-[10px]">
+        {pct !== null ? `下载中 ${pct}%` : `下载中 ${doneTotal.toFixed(0)} MB`}
+      </Badge>
+    )
+  }
+  if (status.cached) {
+    return (
+      <Badge variant="outline" className="border-emerald-500 text-emerald-700 text-[10px]">
+        已就绪
+      </Badge>
+    )
+  }
+  const sizeLabel =
+    status.estimated_size_mb > 0
+      ? status.estimated_size_mb >= 1024
+        ? `${(status.estimated_size_mb / 1024).toFixed(1)} GB`
+        : `${status.estimated_size_mb} MB`
+      : '大小未知'
+  return (
+    <Badge variant="outline" className="text-[10px] text-muted-foreground">
+      待下载 {sizeLabel}
+    </Badge>
+  )
+}
+
 const TranscriberPage = () => {
   const { t } = useTranslation('settings')
 
@@ -63,6 +104,35 @@ const TranscriberPage = () => {
   // 草稿状态（本地 form state）
   const [draft, setDraft] = useState<TranscriberConfigPayload>(baseline)
   const [isSaving, setIsSaving] = useState(false)
+
+  // Whisper 模型缓存状态（从 /transcriber_config/models 拉取）。
+  // 任一模型处于 pending_mb > 0 的下载中状态时，自动 3s 轮询刷新。
+  const [modelStatuses, setModelStatuses] = useState<WhisperModelStatus[]>([])
+  const [cacheDir, setCacheDir] = useState<string>('')
+
+  const refreshModelStatuses = useCallback(async () => {
+    try {
+      const res = await fetchWhisperModelsStatus()
+      setModelStatuses(res.models)
+      setCacheDir(res.cache_dir)
+    } catch {
+      // 静默失败：模型状态仅是增强信息，不阻塞表单
+    }
+  }, [])
+
+  useEffect(() => {
+    if (draft.type !== 'fast-whisper') return
+    refreshModelStatuses()
+  }, [draft.type, refreshModelStatuses])
+
+  // 任一模型正在下载（pending_mb > 0）时启动 3 秒轮询；全部稳定后停止
+  useEffect(() => {
+    if (draft.type !== 'fast-whisper') return
+    const hasDownloading = modelStatuses.some((m) => m.pending_mb > 0)
+    if (!hasDownloading) return
+    const timer = setInterval(refreshModelStatuses, 3000)
+    return () => clearInterval(timer)
+  }, [draft.type, modelStatuses, refreshModelStatuses])
 
   // 基线刷新：仅在 store 侧值变化时同步
   useEffect(() => {
@@ -239,14 +309,29 @@ const TranscriberPage = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {getWhisperModelSizes().map((size) => (
-                    <SelectItem key={size} value={size}>
-                      {size}
-                    </SelectItem>
-                  ))}
+                  {getWhisperModelSizes().map((size) => {
+                    const status = modelStatuses.find((m) => m.name === size)
+                    return (
+                      <SelectItem key={size} value={size}>
+                        <span className="flex items-center gap-2">
+                          <span>{size}</span>
+                          {status && (
+                            <ModelStatusBadge status={status} />
+                          )}
+                        </span>
+                      </SelectItem>
+                    )
+                  })}
                 </SelectContent>
               </Select>
             </FieldRow>
+
+            {/* 缓存位置提示：下载慢时用户可自行排查磁盘空间/网络 */}
+            {cacheDir && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                模型缓存目录：<code className="rounded bg-muted px-1 py-0.5 text-[11px]">{cacheDir}</code>
+              </p>
+            )}
           </div>
         )}
 

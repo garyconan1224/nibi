@@ -20,7 +20,25 @@ from shared.settings_store import (
     save_settings,
 )
 
+from backend.app.services.asr_fast_whisper import (
+    _MODEL_APPROX_SIZE_MB,
+    _hf_hub_cache_dir,
+    _scan_model_cache_bytes,
+    is_model_cached,
+)
+
 router = APIRouter(tags=["transcriber"])
+
+# 暴露在 /transcriber_config/models 中的模型枚举；与 shared.settings_store 中允许的
+# WhisperModelSize 保持一致。加入 large-v3-turbo 以便 UI 可选（首次调用时才会拉取）。
+_WHISPER_MODEL_SIZES: tuple[str, ...] = (
+    "tiny",
+    "base",
+    "small",
+    "medium",
+    "large-v3",
+    "large-v3-turbo",
+)
 
 # 与 shared.settings_store._ALLOWED_TRANSCRIBER_TYPES 保持一致
 _ALLOWED_TYPES: tuple[str, ...] = (
@@ -89,3 +107,43 @@ def update_transcriber_config(req: TranscriberConfigUpdateRequest) -> Dict[str, 
     save_settings(replace(settings, transcriber=new_cfg))
     return _serialize(new_cfg)
 
+
+@router.get("/transcriber_config/models")
+def get_whisper_models_status() -> Dict[str, Any]:
+    """列出所有支持的 Whisper 模型的本地缓存状态。
+
+    返回结构：
+        {
+          "cache_dir": "/Users/.../.cache/huggingface/hub",
+          "models": [
+            {
+              "name": "base",
+              "cached": true,
+              "estimated_size_mb": 145,
+              "done_mb": 141,
+              "pending_mb": 0
+            },
+            ...
+          ]
+        }
+    - `cached` 由 `is_model_cached` 判定（snapshots 存在 + 无 .incomplete + ≥85% 预估）；
+    - `pending_mb > 0` 表示后台正在下载，前端可据此轮询刷新。
+    失败视为"未缓存"，不抛 500。
+    """
+    models: list[Dict[str, Any]] = []
+    for name in _WHISPER_MODEL_SIZES:
+        try:
+            done, pending = _scan_model_cache_bytes(name)
+            cached = is_model_cached(name)
+        except Exception:  # noqa: BLE001 -- 路由层守护：单模型探测失败不影响整体响应
+            done, pending, cached = 0, 0, False
+        models.append(
+            {
+                "name": name,
+                "cached": cached,
+                "estimated_size_mb": _MODEL_APPROX_SIZE_MB.get(name, 0),
+                "done_mb": round(done / 1024 / 1024, 1),
+                "pending_mb": round(pending / 1024 / 1024, 1),
+            }
+        )
+    return {"cache_dir": str(_hf_hub_cache_dir()), "models": models}

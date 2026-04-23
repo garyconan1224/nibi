@@ -98,6 +98,7 @@
     "connected": "Real-time log connected",
     "connectionClosed": "SSE connection closed, log updates stopped",
     "disconnected": "Disconnected",
+    "reconnecting": "Reconnecting...",
     "waiting": "Waiting for logs..."
   },
   "meta": {

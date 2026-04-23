@@ -81,6 +81,35 @@ export function getWhisperModelSizes() {
   return ['tiny', 'base', 'small', 'medium', 'large-v3', 'large-v3-turbo']
 }
 
+/** 单个 Whisper 模型的本地缓存状态（来自 /transcriber_config/models）。 */
+export interface WhisperModelStatus {
+  name: string
+  cached: boolean
+  /** 仓库预估总大小（MB）；0 表示未知 */
+  estimated_size_mb: number
+  /** 已下载完成的 blob 字节数（MB） */
+  done_mb: number
+  /** .incomplete 临时文件当前大小（MB）；>0 表示正在下载 */
+  pending_mb: number
+}
+
+export interface WhisperModelsStatusResponse {
+  /** HuggingFace hub 缓存根目录，用于在 UI 中提示用户 */
+  cache_dir: string
+  models: WhisperModelStatus[]
+}
+
+/**
+ * 查询所有 Whisper 模型的本地缓存状态。
+ *
+ * 用于设置页的模型选择器上标注 "已就绪" / "待下载 N MB" / "下载中 X%"；
+ * 调用方在检测到 `pending_mb > 0` 时可自行开启定时轮询（建议 3s 间隔）。
+ */
+export async function fetchWhisperModelsStatus(): Promise<WhisperModelsStatusResponse> {
+  const res = await http.get<WhisperModelsStatusResponse>('/transcriber_config/models')
+  return res.data
+}
+
 /**
  * 获取设备选项
  */

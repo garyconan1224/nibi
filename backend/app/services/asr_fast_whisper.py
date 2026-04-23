@@ -219,6 +219,24 @@ def _load_model(
         # 预估总下载字节数（查表）；未知时为 0 → 日志不附 "预估" / 进度走时间平滑兜底
         expected_bytes = _estimated_total_bytes(model_name)
 
+        # 在看门狗启动前一次性告知缓存路径与命中情况，方便用户：
+        #   1) 下载慢时自行检查该目录磁盘空间 / 网络
+        #   2) 已缓存场景下确认不会触发额外下载
+        already_cached = is_model_cached(model_name)
+        if log_callback is not None:
+            try:
+                cache_hint = _hf_repo_dir(model_name)
+                if already_cached:
+                    log_callback(f"📦 使用本地缓存 | {cache_hint}")
+                else:
+                    expected_mb = expected_bytes / 1024 / 1024 if expected_bytes else 0
+                    size_str = f"预估 {expected_mb:.0f} MB" if expected_mb else "大小未知"
+                    log_callback(
+                        f"📦 模型未缓存，将下载至 {_hf_hub_cache_dir()} | {size_str}"
+                    )
+            except Exception:  # noqa: BLE001
+                pass
+
         def _safe_log(msg: str) -> None:
             if log_callback is None:
                 return
