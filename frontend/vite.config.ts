@@ -9,8 +9,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, __dirname)
+  // 同时加载根目录和 frontend 目录的 .env*，后者覆盖前者
+  // 空 prefix '' 使 VITE_PORT 等非 VITE_ 前缀变量也能被 Node 侧 config 读取
+  const rootEnvDir = path.resolve(__dirname, '..')
+  const env = {
+    ...loadEnv(mode, rootEnvDir, ''),
+    ...loadEnv(mode, __dirname, ''),
+  }
   const apiBaseUrl = env.VITE_BACKEND_BASE_URL || 'http://127.0.0.1:8000'
+  const devPort = Number(env.VITE_PORT) || 5173
 
   return {
     plugins: [react(), tailwindcss()],
@@ -20,7 +27,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      port: 5175,
+      port: devPort,
       proxy: {
         '/api': {
           target: apiBaseUrl,

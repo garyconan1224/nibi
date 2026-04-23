@@ -13,6 +13,11 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+# 项目根目录（backend/app/main.py → backend/app → backend → root）
+_ROOT_DIR: Path = Path(__file__).resolve().parent.parent.parent
+# 在模块顶层加载根目录 .env，使后续 os.getenv（CORS、VITE_PORT 等）立即可用
+load_dotenv(_ROOT_DIR / ".env", override=False)
+
 from backend.app.routes.admin import router as admin_router
 from backend.app.routes.download_config import router as download_config_router
 from backend.app.routes.pipeline import router as pipeline_router
@@ -28,13 +33,9 @@ _APP_START_TS: float = time.time()
 # 应用版本号；与 FastAPI title/version 保持一致，供 /health 回显
 _APP_VERSION: str = "0.2.0"
 
-# 项目根目录（backend/app/main.py → backend/app → backend → root）
-_ROOT_DIR: Path = Path(__file__).resolve().parent.parent.parent
-
 
 def _seed_siliconflow_provider() -> None:
     """若 .env 含 SILICONFLOW_API_KEY 且存储中还没有该 provider，则自动创建。"""
-    load_dotenv(_ROOT_DIR / ".env", override=False)
     api_key = os.getenv("SILICONFLOW_API_KEY", "").strip()
     if not api_key:
         return
@@ -71,18 +72,33 @@ async def lifespan(app: FastAPI):
     yield
 
 
+def _build_cors_origins() -> list[str]:
+    """根据环境变量动态生成开发期 CORS 白名单。
+
+    优先级：
+      1. ``CORS_ALLOW_ORIGINS``  — 逗号分隔完整 origin 列表，若非空则直接使用
+      2. ``VITE_PORT``           — 单一端口号，自动展开 localhost/127.0.0.1 两种 origin
+      3. 默认                    — 端口回退 5173
+    """
+    explicit = os.getenv("CORS_ALLOW_ORIGINS", "").strip()
+    if explicit:
+        return [o.strip() for o in explicit.split(",") if o.strip()]
+
+    raw_port = os.getenv("VITE_PORT", "5173").strip()
+    try:
+        port = int(raw_port)
+    except ValueError:
+        port = 5173
+    return [f"http://localhost:{port}", f"http://127.0.0.1:{port}"]
+
+
 app = FastAPI(title="VidMirror API", version=_APP_VERSION, lifespan=lifespan)
 
-# 允许前端开发服务器跨域访问
-# 浏览器把 localhost 和 127.0.0.1 视为不同源，两个都要加
+# 允许前端开发服务器跨域访问；origin 列表由根 .env 中 VITE_PORT/CORS_ALLOW_ORIGINS 决定
+# 浏览器把 localhost 和 127.0.0.1 视为不同源，自动展开两种变体
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5174",
-    ],
+    allow_origins=_build_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
