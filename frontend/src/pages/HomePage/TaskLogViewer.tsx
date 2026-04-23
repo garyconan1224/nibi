@@ -84,16 +84,23 @@ const TaskLogViewer: FC<TaskLogViewerProps> = ({ taskId }) => {
     }
 
     es.onerror = () => {
-      setConnected(false)
-      setError(t('homePage:logs.connectionClosed'))
-      es.close()
+      // 不手动 close()：让 EventSource 自带的重连机制恢复连接（默认 ~3s 后重试），
+      // 避免某次瞬时错误（例如后端重启、代理超时、HF 下载阶段 CPU 打满导致的丢包）
+      // 永久卡在"未连接"。仅当连接进入 CLOSED（readyState=2）时才切到错误态。
+      if (es.readyState === EventSource.CLOSED) {
+        setConnected(false)
+        setError(t('homePage:logs.connectionClosed'))
+      } else {
+        // CONNECTING（浏览器自动重连中）——保持 connected=false 但不打死 connection
+        setConnected(false)
+      }
     }
 
     return () => {
       es.close()
       esRef.current = null
     }
-  }, [taskId, updateTask])
+  }, [taskId, updateTask, t])
 
   // ── 粘性底部：监听用户手动滚动 ───────────────────────────────
   const handleScroll = () => {

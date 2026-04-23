@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """Local ASR with faster-whisper."""
 
+import os
 import sys
 import tempfile
 import threading
@@ -17,6 +18,49 @@ _last_probe_error: Optional[Tuple[str, str, str]] = None
 # 进程内 WhisperModel 缓存，按 (model_name, device, compute_type) 复用；避免多次触发 HF 下载 / 模型再初始化
 _MODEL_CACHE: dict[tuple[str, str, str], Any] = {}
 _MODEL_LOCK = threading.Lock()
+
+# HuggingFace hub 缓存根目录；用于下载期间扫描 .incomplete 文件估算进度
+# 遵循官方优先级：HF_HUB_CACHE > HF_HOME/hub > ~/.cache/huggingface/hub
+def _hf_hub_cache_dir() -> Path:
+    env_hub = os.getenv("HF_HUB_CACHE")
+    if env_hub:
+        return Path(env_hub).expanduser()
+    hf_home = os.getenv("HF_HOME")
+    if hf_home:
+        return Path(hf_home).expanduser() / "hub"
+    return Path.home() / ".cache" / "huggingface" / "hub"
+
+
+def _hf_repo_dir(model_name: str) -> Path:
+    """按 faster-whisper 约定拼 HF repo 缓存目录（Systran/faster-whisper-<size>）。"""
+    # 允许用户直接传仓库全名（如 "Systran/faster-whisper-large-v3"），否则按 size 自动补前缀
+    repo = model_name if "/" in model_name else f"Systran/faster-whisper-{model_name}"
+    return _hf_hub_cache_dir() / f"models--{repo.replace('/', '--')}"
+
+
+def _scan_model_cache_bytes(model_name: str) -> Tuple[int, int]:
+    """扫描指定模型在 HF 缓存里的 (已完成字节数, 下载中字节数)。
+
+    用于下载心跳：已完成 = blobs 下非 .incomplete 的 weight 文件；下载中 = .incomplete 文件当前大小。
+    缓存目录或文件不存在时返回 (0, 0)，不抛异常。
+    """
+    repo_dir = _hf_repo_dir(model_name)
+    blobs = repo_dir / "blobs"
+    if not blobs.is_dir():
+        return 0, 0
+    done = 0
+    pending = 0
+    try:
+        for p in blobs.iterdir():
+            if not p.is_file():
+                continue
+            if p.name.endswith(".incomplete"):
+                pending += p.stat().st_size
+            else:
+                done += p.stat().st_size
+    except OSError:
+        pass
+    return done, pending
 
 
 def _install_hint_for_current_interpreter() -> str:
@@ -64,11 +108,20 @@ def get_install_hint() -> str:
     return _install_hint_for_current_interpreter()
 
 
-def _load_model(model_name: str, device: str, compute_type: str) -> Any:
+def _load_model(
+    model_name: str,
+    device: str,
+    compute_type: str,
+    *,
+    log_callback: Optional[Callable[[str], None]] = None,
+    progress_callback: Optional[Callable[[float, str], None]] = None,
+) -> Any:
     """按 (model_name, device, compute_type) 加载并缓存 WhisperModel。
 
-    首次加载会触发 HuggingFace 权重下载（base≈140MB / medium≈1.5GB），由上层写日志；
-    同一进程内同参数复用，避免在流水线多次转录时反复初始化。
+    首次加载会触发 HuggingFace 权重下载（base≈140MB / medium≈1.5GB / large≈3GB）。
+    为了避免"无反馈静默"假死体验（HF 下载本身不透出 tqdm 到我们的回调链），
+    这里起一个看门狗线程：每 3 秒扫一次缓存目录，把已下载 / .incomplete 字节数
+    以日志 + progress 的形式回推给上层。同参数模型仅加载一次，后续调用直接命中缓存。
     """
     try:
         from faster_whisper import WhisperModel
@@ -80,11 +133,75 @@ def _load_model(model_name: str, device: str, compute_type: str) -> Any:
         ) from err
 
     key = (model_name, device, compute_type)
+
+    # 命中缓存直接返回；避免在持锁路径中启动无意义的看门狗
+    cached = _MODEL_CACHE.get(key)
+    if cached is not None:
+        return cached
+
     with _MODEL_LOCK:
+        # double-checked locking：进入临界区后复查，避免并发重复构造
         cached = _MODEL_CACHE.get(key)
         if cached is not None:
             return cached
-        model = WhisperModel(model_name, device=device, compute_type=compute_type)
+
+        stop_evt = threading.Event()
+
+        def _watcher() -> None:
+            """周期性上报下载 / 加载进度，直到主线程完成 WhisperModel 构造。"""
+            start_ts = time.perf_counter()
+            last_total = -1
+            # 启动延迟：短下载（缓存已命中等）不要刷无谓日志
+            if stop_evt.wait(3.0):
+                return
+            while not stop_evt.is_set():
+                done, pending = _scan_model_cache_bytes(model_name)
+                total_mb = (done + pending) / 1024 / 1024
+                elapsed = time.perf_counter() - start_ts
+                if pending > 0 and (done + pending) != last_total:
+                    # 正在下载：输出当前已就绪大小 + 历时
+                    if log_callback is not None:
+                        try:
+                            log_callback(
+                                f"⏳ 下载模型中 | {total_mb:.0f} MB 已就绪 | 已用 {elapsed:.0f}s"
+                            )
+                        except Exception:  # noqa: BLE001
+                            pass
+                    last_total = done + pending
+                elif pending == 0 and done > 0:
+                    # 下载完成但仍在初始化（ctranslate2 mmap 权重）：仅心跳
+                    if log_callback is not None:
+                        try:
+                            log_callback(
+                                f"⏳ 初始化模型中 | 权重 {done / 1024 / 1024:.0f} MB 已就绪 | 已用 {elapsed:.0f}s"
+                            )
+                        except Exception:  # noqa: BLE001
+                            pass
+                else:
+                    # 缓存目录尚未出现（HF hub 还在解析 metadata）：通用心跳
+                    if log_callback is not None:
+                        try:
+                            log_callback(f"⏳ 加载模型中 | 已用 {elapsed:.0f}s")
+                        except Exception:  # noqa: BLE001
+                            pass
+                # 让进度条在模型加载期间缓慢爬升，避免长时间冻结造成死锁错觉
+                # 上层 pipeline 把 ratio ∈ [0,1] 映射到 0.32~0.50；这里给出 ratio ≤ 0.15，
+                # 映射后对应 UI 进度 ≤ 0.347，留足空间给真正的解码阶段。
+                if progress_callback is not None:
+                    smooth = elapsed / (elapsed + 60.0)  # 60s→0.5, 300s→0.83, 始终 < 1
+                    try:
+                        progress_callback(smooth * 0.15, f"加载模型中 | {elapsed:.0f}s")
+                    except Exception:  # noqa: BLE001
+                        pass
+                stop_evt.wait(3.0)
+
+        watcher = threading.Thread(target=_watcher, name="whisper-load-watcher", daemon=True)
+        watcher.start()
+        try:
+            model = WhisperModel(model_name, device=device, compute_type=compute_type)
+        finally:
+            stop_evt.set()
+            watcher.join(timeout=1.0)
         _MODEL_CACHE[key] = model
         return model
 
@@ -143,7 +260,14 @@ def transcribe_file_with_fast_whisper(
 
     _emit_log(f"🧠 加载 Whisper 模型 | size={model_name} device={device} compute_type={ct}")
     t0 = time.perf_counter()
-    model = _load_model(model_name, device, ct)
+    # 把 log/progress 回调下推到 _load_model：HF 首次下载期间会由看门狗线程回推 .incomplete 大小 + 心跳
+    model = _load_model(
+        model_name,
+        device,
+        ct,
+        log_callback=log_callback,
+        progress_callback=progress_callback,
+    )
     _emit_log(f"✅ 模型就绪 | 耗时 {time.perf_counter() - t0:.1f}s")
 
     # 允许 initial_prompt 为空字符串时不传；language 为空字符串时让 whisper 自动检测
