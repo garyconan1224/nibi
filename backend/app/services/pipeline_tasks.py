@@ -343,7 +343,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             is_fast_whisper_available,
             get_install_hint,
             get_last_probe_error,
-            transcribe_with_fast_whisper,
+            transcribe_file_with_fast_whisper,
         )
         if not is_fast_whisper_available():
             hint = get_install_hint()
@@ -358,38 +358,60 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             raise RuntimeError(f"本地转录引擎未安装。{hint}")
 
         # 预检查 B：本地是否存在可转录的视频文件
-        if "download" not in steps:
-            videos = find_videos(project_video_dir)
-            if not videos:
-                raise ValueError("本地视频文件不存在，请先执行下载步骤")
+        # 优先用 download 步骤返回的 save_path；若路径失效（多流合并/清理）则回退到目录扫描（按 mtime 取最新）
+        video_file = ""
+        if download_save_path and Path(download_save_path).is_file():
+            video_file = download_save_path
         else:
-            # download 步骤已执行，使用 download_save_path
-            videos = [download_save_path] if download_save_path else find_videos(project_video_dir)
+            if download_save_path:
+                runner.append_log(
+                    task_id,
+                    f"⚠️  download_save_path 失效: {download_save_path!r}，回退到目录扫描",
+                )
+            videos = find_videos(project_video_dir)
+            if videos:
+                # 按修改时间取最新（find_videos 返回字典序，最新文件未必在首位）
+                videos_sorted = sorted(videos, key=lambda p: p.stat().st_mtime, reverse=True)
+                video_file = str(videos_sorted[0])
 
-        video_file = videos[0] if videos else ""
-        if not video_file:
-            raise ValueError("无可用的本地视频文件进行转录")
+        if not video_file or not Path(video_file).is_file():
+            raise ValueError(
+                f"无可用的本地视频文件进行转录 (project_video_dir={project_video_dir})"
+            )
 
         runner.store.update(task_id, status=TaskStatus.TRANSCRIBING.value)
         runner.set_progress(task_id, 0.32, "开始转录音频...")
-        runner.append_log(task_id, f"📄 本地转录 | 视频文件={Path(video_file).name}")
 
-        # 读取文件字节并转录（引擎已通过预检查，这里仅处理 I/O 或运行时错误）
+        # 从 TranscriberConfig 读取用户偏好（模型尺寸/设备/语言/前置提示词），
+        # 替代早期硬编码 base+cpu+zh；这样用户在设置页切换 medium/large 或指定 cuda 才会真正生效。
+        tcfg = load_settings().transcriber
+        runner.append_log(
+            task_id,
+            f"📄 本地转录 | 文件={Path(video_file).name} "
+            f"model={tcfg.whisper_model_size} device={tcfg.device} language={tcfg.language or 'auto'}",
+        )
+
+        # 进度回调：将转录内部 0~1 的完成度压缩到 pipeline 的 0.32~0.50 区间，与 analyze/note 阶段衔接
+        def _on_progress(ratio: float, msg: str) -> None:
+            mapped = 0.32 + 0.18 * max(0.0, min(1.0, ratio))
+            runner.set_progress(task_id, mapped, msg)
+
+        def _on_log(msg: str) -> None:
+            runner.append_log(task_id, msg)
+
         try:
-            with open(video_file, "rb") as f:
-                audio_bytes = f.read()
-            # 从 settings 读取 initial_prompt，支持用户自定义前置提示词提升转录精准性
-            from shared.settings_store import load_settings
-            settings = load_settings()
-            initial_prompt = settings.transcriber.initial_prompt or ""
-            transcript_text = transcribe_with_fast_whisper(
-                audio_bytes,
-                model_name="base",
-                device="cpu",
-                initial_prompt=initial_prompt,
+            transcript_text = transcribe_file_with_fast_whisper(
+                video_file,
+                model_name=tcfg.whisper_model_size or "base",
+                device=tcfg.device or "cpu",
+                language=tcfg.language or "",
+                initial_prompt=tcfg.initial_prompt or "",
+                log_callback=_on_log,
+                progress_callback=_on_progress,
             )
         except Exception as e:
-            raise RuntimeError(f"本地转录失败: {str(e)}")
+            # 保留原异常链（from e），便于前端/日志看到完整 traceback 定位动态库 / ffmpeg / 权限问题
+            raise RuntimeError(f"本地转录失败: {e}") from e
 
         completed_steps.append("transcribe")
         _persist_intermediate(runner, task_id, {
