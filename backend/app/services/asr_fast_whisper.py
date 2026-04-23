@@ -38,29 +38,99 @@ def _hf_repo_dir(model_name: str) -> Path:
     return _hf_hub_cache_dir() / f"models--{repo.replace('/', '--')}"
 
 
+# faster-whisper (Systran/faster-whisper-*) 仓库的近似总下载大小（MB）。
+# 来源：HuggingFace 仓库 "Files and versions" 页面；只需 ±10% 精度用于进度估算。
+# 未列出的模型名走动态兜底（return 0 → 估算未知，进度回退到时间平滑曲线）。
+_MODEL_APPROX_SIZE_MB: dict[str, int] = {
+    "tiny":              75,
+    "tiny.en":           75,
+    "base":             145,
+    "base.en":          145,
+    "small":            485,
+    "small.en":         485,
+    "medium":          1530,
+    "medium.en":       1530,
+    "large-v1":        3100,
+    "large-v2":        3100,
+    "large-v3":        3100,
+    "large-v3-turbo":  1620,
+    "turbo":           1620,
+    "distil-small.en":  335,
+    "distil-medium.en": 790,
+    "distil-large-v2": 1510,
+    "distil-large-v3": 1510,
+}
+
+
+def _estimated_total_bytes(model_name: str) -> int:
+    """查表返回目标模型的预估总下载字节数；未知时返回 0。
+
+    对传入的仓库全名（"Systran/faster-whisper-medium"）取末尾 size 部分再查表，
+    兼容用户在 Settings 中直接填写仓库路径的情况。
+    """
+    key = model_name.split("/")[-1]
+    # 去掉可选的 faster-whisper- 前缀（极少数自定义仓库复用官方命名）
+    if key.startswith("faster-whisper-"):
+        key = key[len("faster-whisper-") :]
+    return _MODEL_APPROX_SIZE_MB.get(key, 0) * 1024 * 1024
+
+
 def _scan_model_cache_bytes(model_name: str) -> Tuple[int, int]:
     """扫描指定模型在 HF 缓存里的 (已完成字节数, 下载中字节数)。
 
     用于下载心跳：已完成 = blobs 下非 .incomplete 的 weight 文件；下载中 = .incomplete 文件当前大小。
-    缓存目录或文件不存在时返回 (0, 0)，不抛异常。
+    缓存目录或文件不存在时返回 (0, 0)，**任何 OSError / PermissionError / race 都吞掉**，
+    保证监控回调不会把主转录链路拖崩。
     """
-    repo_dir = _hf_repo_dir(model_name)
-    blobs = repo_dir / "blobs"
-    if not blobs.is_dir():
-        return 0, 0
-    done = 0
-    pending = 0
     try:
+        repo_dir = _hf_repo_dir(model_name)
+        blobs = repo_dir / "blobs"
+        if not blobs.is_dir():
+            return 0, 0
+        done = 0
+        pending = 0
         for p in blobs.iterdir():
-            if not p.is_file():
+            try:
+                if not p.is_file():
+                    continue
+                size = p.stat().st_size
+            except OSError:
+                # 文件可能在扫描瞬间被 HF hub 重命名（atomic rename），跳过即可
                 continue
             if p.name.endswith(".incomplete"):
-                pending += p.stat().st_size
+                pending += size
             else:
-                done += p.stat().st_size
-    except OSError:
-        pass
-    return done, pending
+                done += size
+        return done, pending
+    except Exception:  # noqa: BLE001 -- 扫描失败绝不抛回调用方
+        return 0, 0
+
+
+def is_model_cached(model_name: str) -> bool:
+    """检测指定 Whisper 模型是否已**完整**存在于本地 HF 缓存。
+
+    判定条件（全部成立才返回 True）：
+      1. 仓库缓存目录存在且包含 snapshots/（HF hub 下载成功后才会写 snapshots 符号链接树）
+      2. blobs 目录下**没有**任何 .incomplete 临时文件
+      3. 已完成字节数达到预估总量的 85%（未知模型放宽到只要 > 0）—— 允许 ±15% 版本差异
+
+    任意一步异常都视为"未缓存"，调用方应按首次加载处理。
+    """
+    try:
+        repo_dir = _hf_repo_dir(model_name)
+        if not repo_dir.is_dir():
+            return False
+        if not (repo_dir / "snapshots").is_dir():
+            return False
+        done, pending = _scan_model_cache_bytes(model_name)
+        if pending > 0:
+            return False
+        expected = _estimated_total_bytes(model_name)
+        if expected <= 0:
+            return done > 0
+        return done >= int(expected * 0.85)
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _install_hint_for_current_interpreter() -> str:
@@ -146,53 +216,77 @@ def _load_model(
             return cached
 
         stop_evt = threading.Event()
+        # 预估总下载字节数（查表）；未知时为 0 → 日志不附 "预估" / 进度走时间平滑兜底
+        expected_bytes = _estimated_total_bytes(model_name)
+
+        def _safe_log(msg: str) -> None:
+            if log_callback is None:
+                return
+            try:
+                log_callback(msg)
+            except Exception:  # noqa: BLE001
+                pass
+
+        def _safe_progress(ratio: float, msg: str) -> None:
+            if progress_callback is None:
+                return
+            try:
+                progress_callback(max(0.0, min(1.0, ratio)), msg)
+            except Exception:  # noqa: BLE001
+                pass
 
         def _watcher() -> None:
-            """周期性上报下载 / 加载进度，直到主线程完成 WhisperModel 构造。"""
+            """周期性上报下载 / 加载进度，直到主线程完成 WhisperModel 构造。
+
+            三种状态对应三种日志格式：
+              * 下载中    → "⏳ 正在下载模型 | 已就绪 X MB / 预估 Y MB (Z%) | 已用 Ts"
+              * 初始化    → "⏳ 初始化模型中 | 权重 X MB | 已用 Ts"
+              * 元数据    → "⏳ 加载模型中 | 已用 Ts"
+            进度条策略：
+              * 下载中且预估已知 → 直接映射 (done / expected)，上限 0.18
+              * 否则            → 时间平滑曲线 elapsed/(elapsed+60) * 0.15
+            """
             start_ts = time.perf_counter()
             last_total = -1
-            # 启动延迟：短下载（缓存已命中等）不要刷无谓日志
+            # 启动延迟：模型已缓存时 WhisperModel 构造 <1s，不需要刷心跳
             if stop_evt.wait(3.0):
                 return
             while not stop_evt.is_set():
                 done, pending = _scan_model_cache_bytes(model_name)
-                total_mb = (done + pending) / 1024 / 1024
+                total_now = done + pending
                 elapsed = time.perf_counter() - start_ts
-                if pending > 0 and (done + pending) != last_total:
-                    # 正在下载：输出当前已就绪大小 + 历时
-                    if log_callback is not None:
-                        try:
-                            log_callback(
-                                f"⏳ 下载模型中 | {total_mb:.0f} MB 已就绪 | 已用 {elapsed:.0f}s"
-                            )
-                        except Exception:  # noqa: BLE001
-                            pass
-                    last_total = done + pending
+
+                if pending > 0 and total_now != last_total:
+                    ready_mb = total_now / 1024 / 1024
+                    if expected_bytes > 0:
+                        expected_mb = expected_bytes / 1024 / 1024
+                        pct = min(99, int(total_now / expected_bytes * 100))
+                        _safe_log(
+                            f"⏳ 正在下载模型 | 已就绪 {ready_mb:.0f} MB / 预估 {expected_mb:.0f} MB "
+                            f"({pct}%) | 已用 {elapsed:.0f}s"
+                        )
+                    else:
+                        _safe_log(
+                            f"⏳ 正在下载模型 | 已就绪 {ready_mb:.0f} MB | 已用 {elapsed:.0f}s"
+                        )
+                    last_total = total_now
                 elif pending == 0 and done > 0:
-                    # 下载完成但仍在初始化（ctranslate2 mmap 权重）：仅心跳
-                    if log_callback is not None:
-                        try:
-                            log_callback(
-                                f"⏳ 初始化模型中 | 权重 {done / 1024 / 1024:.0f} MB 已就绪 | 已用 {elapsed:.0f}s"
-                            )
-                        except Exception:  # noqa: BLE001
-                            pass
+                    _safe_log(
+                        f"⏳ 初始化模型中 | 权重 {done / 1024 / 1024:.0f} MB | 已用 {elapsed:.0f}s"
+                    )
                 else:
-                    # 缓存目录尚未出现（HF hub 还在解析 metadata）：通用心跳
-                    if log_callback is not None:
-                        try:
-                            log_callback(f"⏳ 加载模型中 | 已用 {elapsed:.0f}s")
-                        except Exception:  # noqa: BLE001
-                            pass
-                # 让进度条在模型加载期间缓慢爬升，避免长时间冻结造成死锁错觉
-                # 上层 pipeline 把 ratio ∈ [0,1] 映射到 0.32~0.50；这里给出 ratio ≤ 0.15，
-                # 映射后对应 UI 进度 ≤ 0.347，留足空间给真正的解码阶段。
-                if progress_callback is not None:
-                    smooth = elapsed / (elapsed + 60.0)  # 60s→0.5, 300s→0.83, 始终 < 1
-                    try:
-                        progress_callback(smooth * 0.15, f"加载模型中 | {elapsed:.0f}s")
-                    except Exception:  # noqa: BLE001
-                        pass
+                    _safe_log(f"⏳ 加载模型中 | 已用 {elapsed:.0f}s")
+
+                # 进度映射：优先用真实下载百分比，退化到时间平滑曲线
+                # 上层 pipeline 把 ratio∈[0,1] 映射到 0.32→0.50 条段；这里把天花板压在 0.18，
+                # 对应 UI 进度 ~0.352，给真正解码留出空间。
+                if expected_bytes > 0 and total_now > 0:
+                    ratio = min(0.18, total_now / expected_bytes * 0.18)
+                    _safe_progress(ratio, f"下载模型 | {elapsed:.0f}s")
+                else:
+                    smooth = elapsed / (elapsed + 60.0)  # 60s→0.5, 300s→0.83
+                    _safe_progress(smooth * 0.15, f"加载模型中 | {elapsed:.0f}s")
+
                 stop_evt.wait(3.0)
 
         watcher = threading.Thread(target=_watcher, name="whisper-load-watcher", daemon=True)
