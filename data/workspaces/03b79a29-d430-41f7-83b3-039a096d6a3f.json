@@ -1,0 +1,57 @@
+{
+  "workspace_id": "03b79a29-d430-41f7-83b3-039a096d6a3f",
+  "name": "改名后",
+  "project_id": "",
+  "status": "active",
+  "background": {
+    "content_type": "",
+    "participants": [
+      "张三",
+      "李四"
+    ],
+    "topic": "测试主题",
+    "glossary": [],
+    "purpose": ""
+  },
+  "items": [
+    {
+      "item_id": "749e3902-80d8-4b37-bef1-9aa22e1321f6",
+      "type": "audio",
+      "source": "local",
+      "source_value": "/local/a.mp3",
+      "name": "a.mp3",
+      "status": "pending",
+      "results": {},
+      "related_task_ids": [],
+      "created_at": "2026-05-02T17:56:40.580001+00:00",
+      "updated_at": "2026-05-02T17:56:40.580003+00:00"
+    },
+    {
+      "item_id": "d83125c6-6941-4250-b27c-c5e4091dddfc",
+      "type": "image",
+      "source": "local",
+      "source_value": "/local/i.jpg",
+      "name": "i.jpg",
+      "status": "pending",
+      "results": {},
+      "related_task_ids": [],
+      "created_at": "2026-05-02T17:56:40.582141+00:00",
+      "updated_at": "2026-05-02T17:56:40.582144+00:00"
+    },
+    {
+      "item_id": "c6ce8dbd-b856-46bb-bb15-9ce3d63690b8",
+      "type": "text",
+      "source": "local",
+      "source_value": "/local/t.md",
+      "name": "t.md",
+      "status": "pending",
+      "results": {},
+      "related_task_ids": [],
+      "created_at": "2026-05-02T17:56:40.584118+00:00",
+      "updated_at": "2026-05-02T17:56:40.584120+00:00"
+    }
+  ],
+  "favorites": [],
+  "created_at": "2026-05-02T17:56:40.574547+00:00",
+  "updated_at": "2026-05-02T17:56:40.597219+00:00"
+}

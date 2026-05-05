@@ -1,0 +1,94 @@
+{
+  "workspace_id": "b7ecf8fa-f7df-46f7-a424-30ee009c9501",
+  "name": "端到端测试-preflight",
+  "project_id": "e2e-test",
+  "status": "active",
+  "background": {
+    "content_type": "",
+    "participants": [],
+    "topic": "",
+    "glossary": [],
+    "purpose": ""
+  },
+  "items": [
+    {
+      "item_id": "80e413fa-238e-42c5-a436-4f79a0fc265d",
+      "type": "video",
+      "source": "url",
+      "source_value": "https://www.bilibili.com/video/BV1TestPreflight",
+      "name": "BV1TestPreflight",
+      "status": "processing",
+      "preflight": {
+        "background_overrides": {
+          "content_type": "宣传片",
+          "participants": [
+            "品牌方",
+            "导演"
+          ],
+          "topic": "新品发布",
+          "glossary": [
+            "Pocket 4"
+          ],
+          "purpose": "复刻参考"
+        },
+        "models": {
+          "vision": "sf-vision",
+          "text": "sf-text"
+        },
+        "tasks": {
+          "frame_prompts": false,
+          "video_summary": true
+        }
+      },
+      "results": {},
+      "related_task_ids": [
+        "download-stub-0001",
+        "download-stub-0002"
+      ],
+      "created_at": "2026-05-02T18:06:26.797796+00:00",
+      "updated_at": "2026-05-02T18:06:26.812811+00:00"
+    },
+    {
+      "item_id": "9163797a-c15a-4a6c-8e23-01ea5fcc957c",
+      "type": "image",
+      "source": "local",
+      "source_value": "/some/img.jpg",
+      "name": "img.jpg",
+      "status": "pending",
+      "preflight": {
+        "background_overrides": {},
+        "models": {},
+        "tasks": {}
+      },
+      "results": {},
+      "related_task_ids": [],
+      "created_at": "2026-05-02T18:06:26.809670+00:00",
+      "updated_at": "2026-05-02T18:06:26.809674+00:00"
+    },
+    {
+      "item_id": "cea16b81-a048-4db8-be63-f7e29faa36c7",
+      "type": "video",
+      "source": "local",
+      "source_value": "/local/video.mp4",
+      "name": "local.mp4",
+      "status": "processing",
+      "preflight": {
+        "background_overrides": {},
+        "models": {
+          "vision": "sf-vision",
+          "text": "sf-text"
+        },
+        "tasks": {}
+      },
+      "results": {},
+      "related_task_ids": [
+        "analyze-stub-0003"
+      ],
+      "created_at": "2026-05-02T18:06:26.815907+00:00",
+      "updated_at": "2026-05-02T18:06:26.820605+00:00"
+    }
+  ],
+  "favorites": [],
+  "created_at": "2026-05-02T18:06:26.794965+00:00",
+  "updated_at": "2026-05-02T18:06:26.820607+00:00"
+}

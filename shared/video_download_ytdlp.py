@@ -113,6 +113,40 @@ def _clean_ansi(text: str) -> str:
     return ansi_escape.sub("", text)
 
 
+_INTERMEDIATE_STREAM_RE = re.compile(r"\.f\d{3,6}\.[A-Za-z0-9]+$")
+_FINAL_MEDIA_EXTS: frozenset[str] = frozenset(
+    {".mp4", ".mkv", ".webm", ".mov", ".flv", ".m4a", ".mp3", ".wav", ".aac", ".opus"}
+)
+
+
+def _find_latest_final_media(output_dir: str) -> str:
+    """扫描 output_dir 找最新的最终媒体文件（排除带 .fNNNNN.ext 的 yt-dlp 临时流）。
+
+    多流合并下载场景下，progress_hook 只拿到中间流文件名，合并完成不会回调；
+    此函数作为磁盘兜底，按 mtime 取最近产出的非中间文件。
+    """
+    if not output_dir or not os.path.isdir(output_dir):
+        return ""
+    candidates: list[tuple[float, str]] = []
+    try:
+        for name in os.listdir(output_dir):
+            full = os.path.join(output_dir, name)
+            if not os.path.isfile(full):
+                continue
+            if _INTERMEDIATE_STREAM_RE.search(name):
+                continue
+            ext = os.path.splitext(name)[1].lower()
+            if ext not in _FINAL_MEDIA_EXTS:
+                continue
+            candidates.append((os.path.getmtime(full), full))
+    except OSError:
+        return ""
+    if not candidates:
+        return ""
+    candidates.sort(reverse=True)
+    return candidates[0][1]
+
+
 def _transcode_to_mp4_if_needed(path: str) -> str:
     src = (path or "").strip()
     if not src or not os.path.isfile(src):
@@ -309,6 +343,21 @@ def run_ytdlp_download(
                 }
             )
 
+    def _pp_hook(d: dict[str, Any]) -> None:
+        """postprocessor 完成事件：捕获 Merger/VideoConvertor 输出的最终文件路径。
+
+        多流下载时 progress_hook 拿到的是中间流文件（.fNNNNN.ext），合并后中间文件被清理；
+        此 hook 在 postprocessor 结束时覆盖 save_path 为合并后真实存在的文件。
+        """
+        if d.get("status") != "finished":
+            return
+        info = d.get("info_dict") or {}
+        filepath = info.get("filepath") or info.get("_filename") or ""
+        if filepath and os.path.isfile(filepath):
+            abs_path = os.path.abspath(filepath)
+            task_state["save_path"] = abs_path
+            task_state["file_name"] = os.path.basename(abs_path)
+
     attempts = _build_attempts(
         url=url,
         browser=browser,
@@ -324,6 +373,9 @@ def run_ytdlp_download(
         socket_timeout=socket_timeout,
         concurrent_fragment_downloads=concurrent_fragment_downloads,
     )
+    # 注入 postprocessor_hooks 以捕获合并/转码后的最终文件路径（_build_attempts 未感知此 hook）
+    for opts in attempts:
+        opts["postprocessor_hooks"] = [_pp_hook]
 
     last_exc: Exception | None = None
     for i, opts in enumerate(attempts):
@@ -333,6 +385,13 @@ def run_ytdlp_download(
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([url])
             final_path = task_state.get("save_path", "")
+            # 磁盘兜底：若 hook 记录的路径不存在（多流合并后中间文件被清理），扫描 output_dir 取最新产出
+            if not final_path or not os.path.isfile(final_path):
+                fallback = _find_latest_final_media(output_dir)
+                if fallback:
+                    if log:
+                        log(f"路径兜底：hook 路径 {final_path!r} 失效，扫描到 {os.path.basename(fallback)}")
+                    final_path = fallback
             converted = _transcode_to_mp4_if_needed(final_path)
             task_state["save_path"] = converted
             task_state["file_name"] = os.path.basename(converted) if converted else ""

@@ -1,0 +1,476 @@
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import {
+  ArrowLeft,
+  Plus,
+  Trash2,
+  FileImage,
+  FileVideo,
+  FileAudio,
+  FileText,
+  PlayCircle,
+  Settings2,
+} from 'lucide-react'
+
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/ui/empty-state'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+
+import PreflightConfigPanel from '@/components/workspace/PreflightConfigPanel'
+import {
+  addWorkspaceItem,
+  getWorkspace,
+  removeWorkspaceItem,
+  savePreflight,
+  startItemPipeline,
+} from '@/services/workspaces'
+import {
+  ITEM_TYPE_COLOR,
+  ITEM_TYPE_TEXT,
+  WORKSPACE_STATUS_TEXT,
+  type ItemSource,
+  type ItemType,
+  type PreflightSaveRequest,
+  type WorkspaceItem,
+  type WorkspaceRecord,
+} from '@/types/workspace'
+
+/**
+ * 工作空间详情页（设计文档 2.4「任务详情页」最小版）。
+ *
+ * 路由：/workspaces/:id
+ *
+ * 当前实现：
+ *   - 顶部：返回 + 名称 + 状态徽章
+ *   - 左侧主区：素材列表 + 「添加内容」按钮
+ *   - 右侧侧栏：占位（后续接入 LLM 对话 + 复刻清单 + 导出按钮）
+ *
+ * 后续扩展：
+ *   - 添加素材后弹出「前置配置面板」（背景信息 + 模型选择 + 任务勾选）
+ *   - 点击素材跳转到对应的视频/音频/图片/文字结果详情页
+ */
+export default function WorkspaceDetail() {
+  const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+
+  const [workspace, setWorkspace] = useState<WorkspaceRecord | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // 添加素材模态状态
+  const [addOpen, setAddOpen] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [newItemType, setNewItemType] = useState<ItemType>('video')
+  const [newItemSource, setNewItemSource] = useState<ItemSource>('url')
+  const [newItemValue, setNewItemValue] = useState('')
+  const [newItemName, setNewItemName] = useState('')
+
+  // 前置配置面板状态——保存当前正在配置的 item 引用
+  const [preflightItem, setPreflightItem] = useState<WorkspaceItem | null>(null)
+  const [preflightSubmitting, setPreflightSubmitting] = useState(false)
+
+  const refresh = async () => {
+    if (!id) return
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await getWorkspace(id)
+      setWorkspace(data)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '加载失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    refresh()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
+
+  const handleAdd = async () => {
+    if (!id || !newItemValue.trim()) return
+    setAdding(true)
+    try {
+      const updated = await addWorkspaceItem(id, {
+        type: newItemType,
+        source: newItemSource,
+        source_value: newItemValue.trim(),
+        name: newItemName.trim() || undefined,
+      })
+      setWorkspace(updated)
+      setAddOpen(false)
+      setNewItemValue('')
+      setNewItemName('')
+      // 添加完毕，直接打开前置配置面板，等用户填好就一键开始分析
+      const newest = updated.items[updated.items.length - 1]
+      if (newest) setPreflightItem(newest)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '添加失败')
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  const handleRemoveItem = async (itemId: string) => {
+    if (!id) return
+    try {
+      const updated = await removeWorkspaceItem(id, itemId)
+      setWorkspace(updated)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '移除失败')
+    }
+  }
+
+  const handleConfigureItem = (item: WorkspaceItem) => {
+    setPreflightItem(item)
+  }
+
+  const handlePreflightSave = async (config: PreflightSaveRequest) => {
+    if (!id || !preflightItem) return
+    setPreflightSubmitting(true)
+    try {
+      // 先保存配置
+      const afterSave = await savePreflight(id, preflightItem.item_id, config)
+      setWorkspace(afterSave)
+      // 再触发 pipeline 任务
+      try {
+        const started = await startItemPipeline(id, preflightItem.item_id)
+        setWorkspace(started.workspace)
+      } catch (startErr: unknown) {
+        // 配置已存上但触发失败——给出明确提示，配置不丢
+        setError(
+          startErr instanceof Error
+            ? `配置已保存，但触发分析失败：${startErr.message}`
+            : '配置已保存，但触发分析失败',
+        )
+      }
+      setPreflightItem(null)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '保存失败')
+    } finally {
+      setPreflightSubmitting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="mx-auto w-full max-w-6xl space-y-4 p-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    )
+  }
+
+  if (!workspace) {
+    return (
+      <div className="mx-auto w-full max-w-6xl space-y-4 p-6">
+        <Button variant="ghost" onClick={() => navigate('/workspaces')}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          返回工作空间列表
+        </Button>
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+          {error ?? '工作空间不存在或已被删除。'}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mx-auto w-full max-w-6xl space-y-6 p-6">
+      {/* 顶部：面包屑式导航 */}
+      <div className="flex items-center gap-3">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate('/workspaces')}
+        >
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          工作空间
+        </Button>
+        <span className="text-muted-foreground">/</span>
+        <span className="font-medium">{workspace.name}</span>
+        <Badge variant="outline" className="ml-2">
+          {WORKSPACE_STATUS_TEXT[workspace.status]}
+        </Badge>
+      </div>
+
+      {error && (
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+
+      {/* 主体：左主区 + 右侧栏 */}
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        {/* 左：素材列表 */}
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-lg">素材列表</CardTitle>
+              <Button size="sm" onClick={() => setAddOpen(true)}>
+                <Plus className="mr-1 h-4 w-4" />
+                添加内容
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {workspace.items.length === 0 ? (
+                <EmptyState
+                  title="还没有素材"
+                  description="点击右上角「添加内容」放入第一个视频/音频/图片/文字。"
+                />
+              ) : (
+                <div className="space-y-2">
+                  {workspace.items.map((it) => (
+                    <ItemRow
+                      key={it.item_id}
+                      item={it}
+                      onConfigure={() => handleConfigureItem(it)}
+                      onRemove={() => handleRemoveItem(it.item_id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* 右：侧栏占位 */}
+        <aside className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">任务级 LLM 对话</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">
+                跨素材问答（接通后端 RAG 后启用）。
+              </p>
+              <Button variant="outline" size="sm" disabled className="mt-3 w-full">
+                即将上线
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">复刻清单</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">
+                收藏的参考帧 / 图片会出现在这里。当前 {workspace.favorites.length} 项。
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">导出工作包</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Button variant="outline" size="sm" disabled className="w-full">
+                即将上线
+              </Button>
+            </CardContent>
+          </Card>
+        </aside>
+      </div>
+
+      {/* 添加素材模态 */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>添加内容</DialogTitle>
+            <DialogDescription>
+              支持网络链接和本地文件路径。后续会自动路由到对应的分析分支。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>素材类型</Label>
+                <Select
+                  value={newItemType}
+                  onValueChange={(v) => setNewItemType(v as ItemType)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="video">视频</SelectItem>
+                    <SelectItem value="audio">音频</SelectItem>
+                    <SelectItem value="image">图片</SelectItem>
+                    <SelectItem value="text">文字</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>来源</Label>
+                <Select
+                  value={newItemSource}
+                  onValueChange={(v) => setNewItemSource(v as ItemSource)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="url">网络链接</SelectItem>
+                    <SelectItem value="local">本地路径</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="item-value">
+                {newItemSource === 'url' ? '链接 URL' : '本地文件路径'}
+              </Label>
+              <Input
+                id="item-value"
+                autoFocus
+                placeholder={
+                  newItemSource === 'url'
+                    ? 'https://www.bilibili.com/video/BV1...'
+                    : '/Users/you/Desktop/video.mp4'
+                }
+                value={newItemValue}
+                onChange={(e) => setNewItemValue(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="item-name">显示名（可选）</Label>
+              <Input
+                id="item-name"
+                placeholder="不填则自动从链接/路径推导"
+                value={newItemName}
+                onChange={(e) => setNewItemName(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAddOpen(false)}
+              disabled={adding}
+            >
+              取消
+            </Button>
+            <Button
+              onClick={handleAdd}
+              disabled={!newItemValue.trim() || adding}
+            >
+              {adding ? '添加中…' : '添加'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 前置配置面板：从素材行的「配置并开始」/「重新配置」唤出 */}
+      {preflightItem && (
+        <PreflightConfigPanel
+          open={!!preflightItem}
+          onOpenChange={(open) => !open && setPreflightItem(null)}
+          item={preflightItem}
+          onSave={handlePreflightSave}
+          submitting={preflightSubmitting}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── 子组件：单条素材行 ────────────────────────────────────
+
+const TYPE_ICON_MAP: Record<ItemType, typeof FileVideo> = {
+  video: FileVideo,
+  audio: FileAudio,
+  image: FileImage,
+  text: FileText,
+}
+
+function ItemRow({
+  item,
+  onConfigure,
+  onRemove,
+}: {
+  item: WorkspaceItem
+  onConfigure: () => void
+  onRemove: () => void
+}) {
+  const Icon = TYPE_ICON_MAP[item.type]
+  const taskCount = item.related_task_ids.length
+  // pending = 还没配过/没起任务；processing = 已经触发；done/failed = 终态
+  const canStart = item.status === 'pending'
+  return (
+    <div className="group flex items-center gap-3 rounded-md border p-3 transition-colors hover:bg-muted/50">
+      <div
+        className={`flex h-9 w-9 items-center justify-center rounded ${ITEM_TYPE_COLOR[item.type]}`}
+      >
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium">{item.name}</div>
+        <div className="truncate text-xs text-muted-foreground">
+          {ITEM_TYPE_TEXT[item.type]} · {item.source === 'url' ? '链接' : '本地'} ·{' '}
+          {item.source_value}
+          {taskCount > 0 && (
+            <span className="ml-2">· 已触发 {taskCount} 个任务</span>
+          )}
+        </div>
+      </div>
+      <Badge variant="secondary" className="shrink-0">
+        {item.status === 'pending'
+          ? '待处理'
+          : item.status === 'processing'
+            ? '处理中'
+            : item.status === 'done'
+              ? '完成'
+              : '失败'}
+      </Badge>
+      <Button
+        size="sm"
+        variant={canStart ? 'default' : 'outline'}
+        onClick={onConfigure}
+        className="shrink-0"
+      >
+        {canStart ? (
+          <>
+            <PlayCircle className="mr-1 h-3.5 w-3.5" />
+            配置并开始
+          </>
+        ) : (
+          <>
+            <Settings2 className="mr-1 h-3.5 w-3.5" />
+            重新配置
+          </>
+        )}
+      </Button>
+      <button
+        type="button"
+        className="rounded p-1 text-muted-foreground opacity-0 transition hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+        aria-label="移除素材"
+        onClick={onRemove}
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
+  )
+}

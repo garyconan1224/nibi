@@ -25,7 +25,10 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 from html import escape as _esc
 
-import cv2
+try:
+    import cv2
+except ImportError:
+    cv2 = None  # type: ignore[assignment]
 
 from shared.config import (
     API_CONCURRENCY,

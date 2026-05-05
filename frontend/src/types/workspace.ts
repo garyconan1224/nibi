@@ -1,0 +1,122 @@
+// 与后端 backend/app/models/workspace.py 对齐的类型定义
+
+export type ItemType = 'video' | 'audio' | 'image' | 'text'
+export type ItemSource = 'url' | 'local'
+export type ItemStatus = 'pending' | 'processing' | 'done' | 'failed'
+export type WorkspaceStatus = 'active' | 'processing' | 'completed' | 'archived'
+
+/** 前置配置（设计文档第 4 章）。 */
+export interface PreflightConfig {
+  /** 覆盖 workspace 级背景信息的字段（一般留空，跟 workspace 走） */
+  background_overrides: Partial<WorkspaceBackground>
+  /** 模型选择：vision/text/video → provider_id */
+  models: { vision?: string; text?: string; video?: string }
+  /** 任务勾选项 + 子参数；结构按 item.type 不同 */
+  tasks: Record<string, unknown>
+}
+
+/** 工作空间内单个素材 */
+export interface WorkspaceItem {
+  item_id: string
+  type: ItemType
+  source: ItemSource
+  source_value: string
+  name: string
+  status: ItemStatus
+  preflight: PreflightConfig
+  results: Record<string, unknown>
+  related_task_ids: string[]
+  created_at: string
+  updated_at: string
+}
+
+/** 前置配置「背景信息」 */
+export interface WorkspaceBackground {
+  content_type: string
+  participants: string[]
+  topic: string
+  glossary: string[]
+  purpose: string
+}
+
+/** 工作空间记录 */
+export interface WorkspaceRecord {
+  workspace_id: string
+  name: string
+  project_id: string
+  status: WorkspaceStatus
+  background: WorkspaceBackground
+  items: WorkspaceItem[]
+  favorites: string[]
+  created_at: string
+  updated_at: string
+}
+
+/** 创建工作空间请求体 */
+export interface WorkspaceCreateRequest {
+  name: string
+  project_id?: string
+  background?: Partial<WorkspaceBackground>
+}
+
+/** 更新工作空间请求体（所有字段可选） */
+export interface WorkspaceUpdateRequest {
+  name?: string
+  status?: WorkspaceStatus
+  background?: Partial<WorkspaceBackground>
+}
+
+/** 添加素材请求体 */
+export interface ItemAddRequest {
+  type: ItemType
+  source: ItemSource
+  source_value: string
+  name?: string
+}
+
+/** 保存前置配置请求体 */
+export interface PreflightSaveRequest {
+  background_overrides?: Partial<WorkspaceBackground>
+  models?: PreflightConfig['models']
+  tasks?: PreflightConfig['tasks']
+}
+
+/** start 接口的返回 */
+export interface StartItemResponse {
+  workspace: WorkspaceRecord
+  task_id: string
+  task_type: 'download' | 'analyze' | 'create' | 'storyboard' | 'note'
+}
+
+/** 中文展示文案——状态 */
+export const WORKSPACE_STATUS_TEXT: Record<WorkspaceStatus, string> = {
+  active: '进行中',
+  processing: '处理中',
+  completed: '已完成',
+  archived: '已归档',
+}
+
+/** 中文展示文案——素材类型 */
+export const ITEM_TYPE_TEXT: Record<ItemType, string> = {
+  video: '视频',
+  audio: '音频',
+  image: '图片',
+  text: '文字',
+}
+
+/** 各类型对应的语义色（对齐设计文档 1.3 颜色语义） */
+export const ITEM_TYPE_COLOR: Record<ItemType, string> = {
+  video: 'bg-purple-100 text-purple-700',
+  audio: 'bg-teal-100 text-teal-700',
+  image: 'bg-blue-100 text-blue-700',
+  text: 'bg-gray-100 text-gray-700',
+}
+
+/** 统计工作空间内不同类型素材的数量 */
+export function countItemsByType(ws: WorkspaceRecord): Record<ItemType, number> {
+  const acc: Record<ItemType, number> = { video: 0, audio: 0, image: 0, text: 0 }
+  for (const it of ws.items) {
+    acc[it.type] = (acc[it.type] ?? 0) + 1
+  }
+  return acc
+}
