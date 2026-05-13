@@ -1,0 +1,46 @@
+import { beforeEach, describe, expect, it } from 'vitest'
+import { useTaskStore } from '@/store/taskStore'
+import type { TaskRecord } from '@/types/task'
+
+// 构造最小 TaskRecord，保留必需字段即可
+const makeTask = (overrides: Partial<TaskRecord> = {}): TaskRecord => ({
+  task_id: 't-001',
+  project_id: 'p-001',
+  task_type: 'analyze',
+  payload: {},
+  status: 'PENDING',
+  progress: 0,
+  log: [],
+  result: {},
+  error: '',
+  retry_of: '',
+  cancel_requested: false,
+  created_at: '',
+  updated_at: '',
+  ...overrides,
+})
+
+describe('taskStore smoke tests', () => {
+  beforeEach(() => {
+    // 每个用例前重置 store，隔离 persist middleware 可能的残留
+    useTaskStore.setState({ tasks: [], currentTaskId: null, isPolling: false })
+  })
+
+  it('初始状态 tasks 为空数组', () => {
+    expect(useTaskStore.getState().tasks).toEqual([])
+  })
+
+  it('addTask 后 tasks 数组长度 +1', () => {
+    const before = useTaskStore.getState().tasks.length
+    useTaskStore.getState().addTask(makeTask({ task_id: 't-add-1' }))
+    expect(useTaskStore.getState().tasks.length).toBe(before + 1)
+  })
+
+  it('updateTask 后对应任务的 status 更新正确', () => {
+    useTaskStore.getState().addTask(makeTask({ task_id: 't-upd-1', status: 'PENDING' }))
+    useTaskStore.getState().updateTask('t-upd-1', { status: 'SUCCESS' })
+    const updated = useTaskStore.getState().tasks.find((t) => t.task_id === 't-upd-1')
+    expect(updated?.status).toBe('SUCCESS')
+  })
+})
+

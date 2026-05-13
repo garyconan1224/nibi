@@ -1,8 +1,8 @@
 # VidMirror — AI 视频创作工作台
 
-[![QA E2E](https://github.com/<OWNER>/<REPO>/actions/workflows/qa-e2e.yml/badge.svg)](https://github.com/<OWNER>/<REPO>/actions/workflows/qa-e2e.yml)
-[![Lint](https://github.com/<OWNER>/<REPO>/actions/workflows/lint.yml/badge.svg)](https://github.com/<OWNER>/<REPO>/actions/workflows/lint.yml)
-[![Backend Tests](https://github.com/<OWNER>/<REPO>/actions/workflows/backend-tests.yml/badge.svg)](https://github.com/<OWNER>/<REPO>/actions/workflows/backend-tests.yml)
+[![QA E2E](https://github.com/garyconan1224/vidmirror/actions/workflows/qa-e2e.yml/badge.svg)](https://github.com/garyconan1224/vidmirror/actions/workflows/qa-e2e.yml)
+[![Lint](https://github.com/garyconan1224/vidmirror/actions/workflows/lint.yml/badge.svg)](https://github.com/garyconan1224/vidmirror/actions/workflows/lint.yml)
+[![Backend Tests](https://github.com/garyconan1224/vidmirror/actions/workflows/backend-tests.yml/badge.svg)](https://github.com/garyconan1224/vidmirror/actions/workflows/backend-tests.yml)
 
 > ⚠️ **Deprecation Notice**：Streamlit 旧前端（`app.py` / `pages/`）计划于 **v0.4** 移除，v0.3 为最后一个兼容版本。新部署请直接使用 `frontend/` 下的 React 前端。详见 [`docs/DEPRECATION.md`](./docs/DEPRECATION.md)。
 
@@ -41,7 +41,7 @@
 ```bash
 pip install -r requirements.txt
 # 终端 1：任务中心（SSE/WebSocket）
-uvicorn backend.app.main:app --host 127.0.0.1 --port 8010
+uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
 
 # 终端 2：React 前端（默认入口）
 cd frontend && pnpm install && pnpm dev
@@ -50,7 +50,7 @@ cd frontend && pnpm install && pnpm dev
 streamlit run app.py
 ```
 
-可选环境变量：`VIDMIRROR_BACKEND_URL` / `BACKEND_URL`（默认 `http://127.0.0.1:8010`，与后端端口一致即可）。自 v0.3 起仅支持 `VIDMIRROR_BACKEND_URL`。
+可选环境变量：`VIDMIRROR_BACKEND_URL` / `BACKEND_URL`（默认 `http://127.0.0.1:8000`，与后端端口一致即可）。自 v0.3 起仅支持 `VIDMIRROR_BACKEND_URL`。
 
 任务日志流式接口（便于调试或外部脚本订阅）：
 
@@ -92,4 +92,4 @@ Phase-B / 重构 / 校验类文档已归档至 [`docs/history/`](./docs/history/
 
 ## 徽章链接说明
 
-当前仓库在本地环境，无法自动识别 GitHub 远程地址。将上方徽章中的 `<OWNER>/<REPO>` 替换为你的实际仓库路径后即可显示真实状态。
+上方徽章指向当前私有仓库 `garyconan1224/vidmirror`，推送后即可显示对应 GitHub Actions 状态。

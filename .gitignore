@@ -10,9 +10,12 @@ __pycache__/
 .pytest_cache/
 data/videos/
 data/json_data/
+data/cookies/
+data/workspaces/
 projects/
 runtime.log
 *.log
+*.zip
 .DS_Store
 .local/
 data/projects/
