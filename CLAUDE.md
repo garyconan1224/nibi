@@ -217,6 +217,56 @@ python3 tests/e2e_qa.py
 
 ---
 
+## 多 Agent 协作 — 防撞规则（强制）
+
+> 本项目同时存在 **Claude 官方**（claude.ai/code）、**Claude 小米**（小米 AI 助手内嵌）、**Codex**（OpenAI coding agent）三个 AI 执行端。
+> 三者各有独立 worktree，互相看不见对方的变更，因此必须靠下面这套规则避免平行实现同一需求。
+
+### 身份与职责
+
+| Agent | 分支前缀 | 职责 |
+|-------|---------|------|
+| Claude 官方 | `claude-official/<task>` | **业务功能构建**：后端接口、前端页面、测试、文档 |
+| Claude 小米 | `claude-xiaomi/<task>` | **业务功能构建**（与官方相同职责，错开任务不重叠） |
+| Codex | `codex/qa-<task>` 或 `codex/review-<task>` | **只做检查**：运行测试、比较分支、审查 diff、给下一步建议。**不写新业务功能** |
+
+### 每次会话必须先跑的启动检查
+
+```bash
+git fetch --all --prune
+git status --short --branch
+git worktree list
+git branch -a
+git log --oneline HEAD..main
+```
+
+### 四种情况必须停下来问用户
+
+1. **同主题 worktree 存在**：`git worktree list` 里出现其他 agent 路径下的同主题分支（如 `claude/phase1d-*` 和 `codex/phase1d-*` 同时存在）。
+2. **同主题远端分支存在**：`git branch -a` 出现 `remotes/origin/<other-agent>/<same-task>`。
+3. **main 分支有不认识的未合并 commit**：`git log HEAD..main` 非空，且那些 commit 来自另一个 agent。
+4. **工作区有不属于当前任务的未提交改动**：`git status` 显示与当前子任务无关的文件被修改。
+
+停下来后用这个模板报告：
+> 我在启动检查时发现 [描述冲突]。
+> 候选方案：A（以 X 为主线，放弃 Y）/ B（以 Y 为主线，放弃 X）/ C（人工挑选合并）。
+> 请你决定后我再继续。
+
+### 分支生命周期
+
+1. **开工时**：`git checkout -b claude-official/<task>`，随即 `git push -u origin <branch>`「占座」，让其他 agent 能看见。
+2. **收工时**：commit 后通知用户 merge，**不自行 merge 到 main**。
+3. **废弃时**：stash 备份，等用户决定是否保留，不直接删除。
+
+### 不要做的事（多 agent 专项）
+
+- ❌ 不要把另一个 agent 的 worktree 分支当作 main 来 rebase。
+- ❌ 不要 apply 或 cherry-pick 另一个 agent 的 stash / commit，除非用户明确指令。
+- ❌ 不要在检测到同主题 worktree 时继续实现功能——先报告，等用户决定谁是主线。
+- ❌ 不要在同一会话里同时扮演多个 agent 的角色。
+
+---
+
 ## 不要做的事
 
 - ❌ 不要主动重构无关代码（哪怕你觉得它写得丑）。
