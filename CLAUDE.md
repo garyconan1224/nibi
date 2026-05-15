@@ -124,6 +124,27 @@ python3 tests/e2e_qa.py
 
 ## 计划与边界
 
+> 📌 **唯一标准（Single Source of Truth）**：`/Users/conan/Desktop/nibi/nibi-spec-v2.md`
+> 这份文件（"Nibi / VidMirror 主规范 v2，合并版"）以 v1.1 设计契约为骨架、叠加总规划 v1 路线图，是 Phase 0 → 1J 的权威仲裁层。所有 Phase 编号、决议、模型分工、验收标准都以它为准。
+>
+> **优先级（冲突仲裁，自上而下）**：
+> 1. `nibi-spec-v2.md`（唯一标准）
+> 2. `vidmirror-handoff/project/system_design_v1.1.md`（v1.1 设计契约真相源）
+> 3. `vidmirror-handoff/project/VidMirror.html` + `project/styles.css` + `project/components/*`（视觉骨架）
+> 4. `users-conan-claude-plans-nibi-vidmirror-modular-kurzweil.md`（总规划 v1：Phase 路线 / 模型分工 / 风险表）
+> 5. `docs/OUTSTANDING_TASKS.md`、`docs/AI_HANDOFF.md`（运行时进度快照）
+> 6. `plan.md` + `system_design_for_claude_design_v1.md`（**已 deprecated**，仅作历史，不维护不改）
+>
+> **VidMirror handoff 原型路径（重要）**：zip 已解压到 `/Users/conan/Desktop/nibi/vidmirror-handoff/`，真正的项目目录是 `vidmirror-handoff/project/`，里面有：
+> - `project/VidMirror.html`（837 行主原型）
+> - `project/components/`（shell / topbar / sidebar / 12 个详情组件 JSX）
+> - `project/styles.css` + `project/styles-preflight.css`
+> - `project/system_design_v1.1.md`（v1.1 真本，比项目根 v1 更新）
+>
+> 总规划与本规则里凡是写「zip 内」「zip/components/...」「zip/styles.css」「v1.1 §X」的，统一对应到 `vidmirror-handoff/project/` 下对应文件。
+>
+> **新会话启动必读顺序**：① `nibi-spec-v2.md` → ② `AGENTS.md` → ③ `docs/AI_HANDOFF.md` → ④ `docs/OUTSTANDING_TASKS.md`。其他文件按需读。
+
 > ⚠️ **重要**：`plan.md` 描述的是 Phase 0 / 1A 阶段（任务系统初建），但**实际代码已远超那里**——已实现 providers、pipeline、transcript、RAG、workspaces、settings 多页面等。当前分支名（如 `feat/settings-phase2-m0`）和 `README.md` 里的「Phase-2 重构」才是真实状态。
 >
 > 因此：
