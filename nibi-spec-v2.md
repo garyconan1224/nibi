@@ -74,8 +74,8 @@
 | 1C | 设置 → 模型管理 | 2h | main | 否 | Sonnet | ✅ |
 | 1D | 任务详情骨架 + 输入层 | 3h | claude-official/phase1d-* | 是 | Opus | ✅ |
 | 1E | 前置配置面板 | 2h | claude-official/phase1e-* | 是 | Sonnet+Opus | ✅（已合并） |
-| **1F** | **Pipeline + SSE 进度条** | **3h** | **`claude-official/phase1f-pipeline-sse`** | **是（必须新开）** | **Opus 4.7** | **🟡 下一步** |
-| 1G | 视频结果页 + 三轨时间轴 | 5h | claude-official/phase1g-video-result | 是 | Opus | ⏳ |
+| 1F | Pipeline + SSE 进度条 | 3h | feat/phase1f-pipeline-sse | 是 | Opus 4.7 + 小米起步 | ✅（commit 03a2c8c，e2e 通过，待 merge） |
+| **1G** | **视频结果页 + 三轨时间轴** | **5h** | **feat/phase1g-video-result** | **是（必须新开）** | **Opus 4.7** | **🟡 下一步** |
 | 1H | 图片结果页 | 2h | main | 否 | ⭐小米 2.5 Pro / Sonnet | ⏳ |
 | 1I | 工作包 zip 导出 | 2h | main | 否 | ⭐小米 2.5 Pro / Sonnet | ⏳ |
 | 1J | 老代码清理 + Phase 1 收口 | 1h | main | 否 | ⭐小米 2.5 Pro / Haiku | ⏳ 收尾后 tag `v1.0.0-mvp` |
