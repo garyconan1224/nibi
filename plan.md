@@ -82,13 +82,19 @@
 
 ---
 
-## Phase 1D：输入层 — 本地文件（约 2 小时）
+## Phase 1D'：输入层 — 本地文件上传（对齐现实，约 2 小时）
 
-- [ ] 1D.1 Item 模型 + 多对一关联到 Task
-- [ ] 1D.2 `POST /tasks/{id}/items` 接收文件
-- [ ] 1D.3 magic bytes 识别文件类型（python-magic 库）
-- [ ] 1D.4 前端拖拽上传（react-dropzone）
-- [ ] 1D.5 上传进度条
+> 现实校正：当前主线不是 `Task -> Item`，而是 `Workspace -> WorkspaceItem`。
+> `TaskRecord` 已由 pipeline runner 占用，表示一次具体执行记录，不再作为顶层任务容器。
+> 因此本阶段不新增 `/tasks/{id}/items`，改为扩展现有 `/workspaces/{id}/items`。
+
+- [x] 1D'.1 复用已有 `WorkspaceItem` 模型，不新增 Item 表/模型
+- [x] 1D'.2 `POST /workspaces/{id}/items/upload` 接收 multipart 文件，500MB 上限，拒绝空文件，落盘后登记为 local item
+- [x] 1D'.3 用文件扩展名 + MIME 推断 `video|audio|image|text`，暂不引入 `python-magic`
+- [x] 1D'.4 工作空间详情页增加原生拖拽/选择上传，不引入 `react-dropzone`
+- [x] 1D'.5 上传进度条接入 axios `onUploadProgress`
+
+心得：`plan.md` 的旧 Task/Item 层级已过时；1D 改成贴合现有 Workspace 结构的小步上传接入，避免重复造轮子和新增不必要依赖。本轮只融合 Claude 备选实现中的后端安全校验和测试，不融合另一套 UI 入口。
 
 **打 tag**：`v0.5.0-phase1d`
 

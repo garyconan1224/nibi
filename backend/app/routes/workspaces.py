@@ -18,12 +18,15 @@ from __future__ import annotations
   DELETE /workspaces/{ws_id}/favorites/{id}    取消收藏
 """
 
+import re
+import shutil
 import uuid
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from backend.app.models.tasks import TERMINAL_STATUS_VALUES
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from backend.app.models.workspace import (
@@ -36,6 +39,7 @@ from backend.app.models.workspace import (
     WorkspaceStatus,
 )
 from backend.app.services.workspace_store import WorkspaceStore
+from shared.config import DATA_DIR
 
 # 复用 pipeline 路由的 runner / store 单例，避免重复初始化任务引擎
 from backend.app.routes.pipeline import _runner as _pipeline_runner
@@ -44,6 +48,36 @@ router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
 # 进程级单例 store（与 pipeline 路由的 _store 同模式）
 _store = WorkspaceStore()
+
+WORKSPACE_UPLOAD_ROOT: Path = DATA_DIR / "workspaces"
+MAX_UPLOAD_BYTES = 500 * 1024 * 1024
+UPLOAD_CHUNK_BYTES = 1024 * 1024
+_SAFE_UPLOAD_NAME_RE = re.compile(r"[^A-Za-z0-9._\u4e00-\u9fff\-]+")
+_EXTENSION_TYPE_MAP: Dict[str, str] = {
+    ".mp4": ItemType.VIDEO.value,
+    ".mov": ItemType.VIDEO.value,
+    ".avi": ItemType.VIDEO.value,
+    ".mkv": ItemType.VIDEO.value,
+    ".flv": ItemType.VIDEO.value,
+    ".wmv": ItemType.VIDEO.value,
+    ".webm": ItemType.VIDEO.value,
+    ".mp3": ItemType.AUDIO.value,
+    ".wav": ItemType.AUDIO.value,
+    ".m4a": ItemType.AUDIO.value,
+    ".aac": ItemType.AUDIO.value,
+    ".flac": ItemType.AUDIO.value,
+    ".ogg": ItemType.AUDIO.value,
+    ".jpg": ItemType.IMAGE.value,
+    ".jpeg": ItemType.IMAGE.value,
+    ".png": ItemType.IMAGE.value,
+    ".gif": ItemType.IMAGE.value,
+    ".webp": ItemType.IMAGE.value,
+    ".txt": ItemType.TEXT.value,
+    ".md": ItemType.TEXT.value,
+    ".srt": ItemType.TEXT.value,
+    ".vtt": ItemType.TEXT.value,
+    ".json": ItemType.TEXT.value,
+}
 
 
 # ── Pydantic 请求/响应模型 ─────────────────────────────────
@@ -115,6 +149,64 @@ def _derive_item_name(source_value: str) -> str:
     # 取最后一段（path 的 basename 或 URL 的 last segment）
     seg = raw.replace("\\", "/").rstrip("/").split("/")[-1]
     return seg or raw[:40]
+
+
+def _sanitize_upload_name(name: str) -> str:
+    """保留文件名本体，替换危险字符，避免跨目录写入。"""
+    raw = Path(name or "").name or "upload.bin"
+    safe = _SAFE_UPLOAD_NAME_RE.sub("_", raw).strip("._")
+    return safe or "upload.bin"
+
+
+def _unique_upload_path(upload_dir: Path, safe_name: str) -> Path:
+    """避免同名上传覆盖已有文件。"""
+    candidate = upload_dir / safe_name
+    if not candidate.exists():
+        return candidate
+
+    stem = candidate.stem or "upload"
+    suffix = candidate.suffix
+    for idx in range(1, 10_000):
+        candidate = upload_dir / f"{stem}_{idx}{suffix}"
+        if not candidate.exists():
+            return candidate
+    raise HTTPException(status_code=500, detail="failed to allocate upload filename")
+
+
+def _cleanup_workspace_uploads(workspace_id: str) -> None:
+    """删除本服务为该 workspace 管理的上传目录。"""
+    upload_dir = (WORKSPACE_UPLOAD_ROOT / workspace_id).resolve()
+    root = WORKSPACE_UPLOAD_ROOT.resolve()
+    try:
+        upload_dir.relative_to(root)
+    except ValueError:
+        return
+    shutil.rmtree(upload_dir, ignore_errors=True)
+
+
+def _infer_upload_item_type(filename: str, content_type: Optional[str]) -> str:
+    """按扩展名优先、MIME 兜底推断素材类型。"""
+    ext = Path(filename or "").suffix.lower()
+    if ext in _EXTENSION_TYPE_MAP:
+        return _EXTENSION_TYPE_MAP[ext]
+
+    mime = (content_type or "").lower()
+    if mime.startswith("video/"):
+        return ItemType.VIDEO.value
+    if mime.startswith("audio/"):
+        return ItemType.AUDIO.value
+    if mime.startswith("image/"):
+        return ItemType.IMAGE.value
+    if mime.startswith("text/"):
+        return ItemType.TEXT.value
+
+    raise HTTPException(
+        status_code=400,
+        detail=(
+            "unsupported upload file type; expected video/audio/image/text "
+            "extension or MIME type"
+        ),
+    )
 
 
 # ── 派生字段计算（Phase 1A，v1.1 §2.2）────────────────────
@@ -255,6 +347,7 @@ def delete_workspace(workspace_id: str) -> Dict[str, Any]:
                 "(check filesystem permissions on data/workspaces/)"
             ),
         )
+    _cleanup_workspace_uploads(workspace_id)
     return {"deleted": True, "workspace_id": workspace_id}
 
 
@@ -280,6 +373,75 @@ def add_item(workspace_id: str, req: ItemAddRequest) -> Dict[str, Any]:
     try:
         rec = _store.add_item(workspace_id, item)
     except KeyError as err:
+        raise HTTPException(status_code=404, detail=str(err)) from err
+    return rec.to_dict()
+
+
+@router.post("/{workspace_id}/items/upload")
+async def upload_item(
+    workspace_id: str,
+    file: UploadFile = File(...),
+    name: str = Form(default=""),
+    item_type: Optional[str] = Form(default=None, alias="type"),
+) -> Dict[str, Any]:
+    """上传本地文件并登记为工作空间素材。"""
+    if _store.get(workspace_id) is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+
+    explicit_type = (item_type or "").strip()
+    if explicit_type:
+        _ensure_valid_item_type(explicit_type)
+        resolved_type = explicit_type
+    else:
+        resolved_type = _infer_upload_item_type(file.filename or "", file.content_type)
+
+    upload_dir = WORKSPACE_UPLOAD_ROOT / workspace_id
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    safe_name = _sanitize_upload_name(file.filename or "upload.bin")
+    dest = _unique_upload_path(upload_dir, safe_name)
+
+    total_bytes = 0
+    try:
+        with dest.open("wb") as out:
+            while True:
+                chunk = await file.read(UPLOAD_CHUNK_BYTES)
+                if not chunk:
+                    break
+                total_bytes += len(chunk)
+                if total_bytes > MAX_UPLOAD_BYTES:
+                    raise HTTPException(status_code=413, detail="uploaded file exceeds 500MB limit")
+                out.write(chunk)
+        if total_bytes == 0:
+            raise HTTPException(status_code=400, detail="uploaded file cannot be empty")
+    except HTTPException:
+        try:
+            dest.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise
+    except Exception as err:  # noqa: BLE001
+        try:
+            dest.unlink(missing_ok=True)
+        except OSError:
+            pass
+        raise HTTPException(status_code=500, detail=f"upload failed: {err}") from err
+    finally:
+        await file.close()
+
+    item = WorkspaceItem(
+        item_id=str(uuid.uuid4()),
+        type=resolved_type,
+        source="local",
+        source_value=str(dest.resolve()),
+        name=(name.strip() or safe_name),
+    )
+    try:
+        rec = _store.add_item(workspace_id, item)
+    except KeyError as err:
+        try:
+            dest.unlink(missing_ok=True)
+        except OSError:
+            pass
         raise HTTPException(status_code=404, detail=str(err)) from err
     return rec.to_dict()
 

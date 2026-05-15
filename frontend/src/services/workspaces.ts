@@ -8,6 +8,7 @@
 import { http } from './client'
 import type {
   ItemAddRequest,
+  ItemType,
   PreflightSaveRequest,
   StartItemResponse,
   WorkspaceCreateRequest,
@@ -58,6 +59,41 @@ export async function addWorkspaceItem(
   req: ItemAddRequest,
 ): Promise<WorkspaceRecord> {
   const res = await http.post<WorkspaceRecord>(`${BASE}/${workspaceId}/items`, req)
+  return res.data
+}
+
+interface WorkspaceItemUploadOptions {
+  name?: string
+  type?: ItemType
+  onProgress?: (percent: number) => void
+}
+
+/** POST /workspaces/{id}/items/upload — 上传文件并登记为素材 */
+export async function uploadWorkspaceItem(
+  workspaceId: string,
+  file: File,
+  options: WorkspaceItemUploadOptions = {},
+): Promise<WorkspaceRecord> {
+  const formData = new FormData()
+  formData.append('file', file)
+  if (options.name) formData.append('name', options.name)
+  if (options.type) formData.append('type', options.type)
+
+  const res = await http.post<WorkspaceRecord>(
+    `${BASE}/${workspaceId}/items/upload`,
+    formData,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress(progressEvent) {
+        if (options.onProgress && progressEvent.total) {
+          const percent = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total,
+          )
+          options.onProgress(percent)
+        }
+      },
+    },
+  )
   return res.data
 }
 
