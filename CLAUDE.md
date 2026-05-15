@@ -145,6 +145,13 @@ python3 tests/e2e_qa.py
 >
 > **新会话启动必读顺序**：① `nibi-spec-v2.md` → ② `AGENTS.md` → ③ `docs/AI_HANDOFF.md` → ④ `docs/OUTSTANDING_TASKS.md`。其他文件按需读。
 
+> 🚀 **Phase 启动速查**（开工前对照 `nibi-spec-v2.md` §3 表确认）：
+> - **简单阶段**（Phase 0 / 1A / 1B / 1C / 1H / 1I / 1J）：**Sonnet 或 Haiku**，**不开 worktree**，直接在 main 上做。
+> - **复杂阶段**（1D / 1F / 1G）：**Opus 4.7**，**必须新开 worktree**，分支用 `claude-official/phase<编号>-<短名>`，开工立即 `git push -u origin <branch>` 占座，**绝不在主 worktree `/Users/conan/Desktop/nibi` 直接改代码**（主 worktree 只用于 merge / 同步）。
+> - **当前下一步（Phase 1F）**：Opus 4.7 + 新 worktree + 分支 `claude-official/phase1f-pipeline-sse`。
+> - **模型升级触发**（即使简单阶段也要升 Opus）：跨文件 ≥ 5 / schema 迁移 + 老数据兼容 / 加密鉴权 API key / AI 自己说"不太确定哪个方案对"。
+> - **模型降级触发**：单文件 < 50 行 / CSS 微调 / 文档改写 / 模板代码 / pytest happy path → 切 Haiku 或小米 2.5 Pro。
+
 > ⚠️ **重要**：`plan.md` 描述的是 Phase 0 / 1A 阶段（任务系统初建），但**实际代码已远超那里**——已实现 providers、pipeline、transcript、RAG、workspaces、settings 多页面等。当前分支名（如 `feat/settings-phase2-m0`）和 `README.md` 里的「Phase-2 重构」才是真实状态。
 >
 > 因此：

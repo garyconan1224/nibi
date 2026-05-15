@@ -66,21 +66,25 @@
 
 **所有 Phase 编号以本表为准**。详细目标 / 必读 / 改动 / 完成标准见总规划 §7 对应小节。
 
-| Phase | 名称 | 估时 | 分支 | 模型 | 状态（2026-05-16） |
-|---|---|---|---|---|---|
-| 0 | 设计令牌 + AppShell | 2h | main | Sonnet | ✅ |
-| 1A | 任务列表 API 补字段 | 1h | main | Sonnet | ✅ |
-| 1B | 任务列表前端 | 3h | main | Sonnet | ✅ |
-| 1C | 设置 → 模型管理 | 2h | main | Sonnet | ✅ |
-| 1D | 任务详情骨架 + 输入层 | 3h | feat/1d-* | Opus | ✅ |
-| 1E | 前置配置面板 | 2h | claude-official/phase1e-* | Sonnet+Opus | ✅（已合并） |
-| **1F** | **Pipeline + SSE 进度条** | **3h** | **feat/1f-pipeline-sse** | **Opus** | **🟡 下一步** |
-| 1G | 视频结果页 + 三轨时间轴 | 5h | feat/1g-video-result | Opus | ⏳ |
-| 1H | 图片结果页 | 2h | main | Sonnet/Haiku | ⏳ |
-| 1I | 工作包 zip 导出 | 2h | main | Sonnet | ⏳ |
-| 1J | 老代码清理 + Phase 1 收口 | 1h | main | Haiku | ⏳ 收尾后 tag `v1.0.0-mvp` |
+| Phase | 名称 | 估时 | 分支 | Worktree | 模型 | 状态（2026-05-16） |
+|---|---|---|---|---|---|---|
+| 0 | 设计令牌 + AppShell | 2h | main | 否 | Sonnet | ✅ |
+| 1A | 任务列表 API 补字段 | 1h | main | 否 | Sonnet | ✅ |
+| 1B | 任务列表前端 | 3h | main | 否 | Sonnet | ✅ |
+| 1C | 设置 → 模型管理 | 2h | main | 否 | Sonnet | ✅ |
+| 1D | 任务详情骨架 + 输入层 | 3h | claude-official/phase1d-* | 是 | Opus | ✅ |
+| 1E | 前置配置面板 | 2h | claude-official/phase1e-* | 是 | Sonnet+Opus | ✅（已合并） |
+| **1F** | **Pipeline + SSE 进度条** | **3h** | **`claude-official/phase1f-pipeline-sse`** | **是（必须新开）** | **Opus 4.7** | **🟡 下一步** |
+| 1G | 视频结果页 + 三轨时间轴 | 5h | claude-official/phase1g-video-result | 是 | Opus | ⏳ |
+| 1H | 图片结果页 | 2h | main | 否 | Sonnet/Haiku | ⏳ |
+| 1I | 工作包 zip 导出 | 2h | main | 否 | Sonnet | ⏳ |
+| 1J | 老代码清理 + Phase 1 收口 | 1h | main | 否 | Haiku | ⏳ 收尾后 tag `v1.0.0-mvp` |
 
 **强制顺序**：1F 必须在 1G 之前完成（1G 的三轨进度依赖 1F 的 SSE）。其余顺序按编号执行。
+
+**分支命名仲裁**：多 agent 规则（CLAUDE.md）优先于总规划 Q3 的 `feat/` 前缀 — 所有 Claude 官方构建任务统一用 `claude-official/<task>`，开工立即 `git push -u origin <branch>` 占座。
+
+**Worktree 规则**：复杂阶段（1D/1F/1G）**必须新开 worktree**，不在主 worktree `/Users/conan/Desktop/nibi` 直接改代码（主 worktree 只用于 merge/同步）。简单阶段（1A/1B/1C/1H/1I/1J/Phase 0）可直接在 main 上工作（或仍开 worktree，看个人偏好）。
 
 ---
 
