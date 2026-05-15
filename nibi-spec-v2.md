@@ -82,20 +82,21 @@
 
 **强制顺序**：1F 必须在 1G 之前完成（1G 的三轨进度依赖 1F 的 SSE）。其余顺序按编号执行。
 
-**分支命名仲裁**：多 agent 规则（CLAUDE.md）优先于总规划 Q3 的 `feat/` 前缀 — 所有 Claude 官方构建任务统一用 `claude-official/<task>`，开工立即 `git push -u origin <branch>` 占座。
+**分支命名**：复杂阶段开 `feat/<编号>-<短名>` 或 `claude-official/<task>` 都可，由用户选；不再要求立即 push 占座（单 agent 串行不需要）。
 
-**Worktree 规则**：复杂阶段（1D/1F/1G）**必须新开 worktree**，不在主 worktree `/Users/conan/Desktop/nibi` 直接改代码（主 worktree 只用于 merge/同步）。简单阶段（1A/1B/1C/1H/1I/1J/Phase 0）可直接在 main 上工作（或仍开 worktree，看个人偏好）。
+**Worktree 规则**：复杂阶段（1D/1F/1G）建议新开 worktree，便于回滚和并行试验；不在主 worktree `/Users/conan/Desktop/nibi` 直接改代码（主 worktree 只用于 merge/同步）。简单阶段（1A/1B/1C/1H/1I/1J/Phase 0）可直接在 main 上工作。
 
 ---
 
-## 4. 多 Agent 协作（强制）
+## 4. 工具串行交接（不再多 agent 并发）
 
-详见 [CLAUDE.md](CLAUDE.md) 「多 Agent 协作 — 防撞规则」一节。本节只给最短摘要：
+详见 [CLAUDE.md](CLAUDE.md) 「工具串行交接」一节。要点：
 
-- **Claude 官方 / 小米**：构建（业务功能）。分支前缀 `claude-official/<task>` 或 `claude-xiaomi/<task>`。
-- **Codex**：只做检查（测试 / 比较 / review），不写业务功能。分支前缀 `codex/qa-<task>` 或 `codex/review-<task>`。
-- 开工立即 `git push -u origin <branch>` 占座；收工不自行 merge。
-- 检测到同主题 worktree / 同主题远端分支 / main 有不认识的未合并 commit / 工作区有不相关脏改动 — **停下问用户**。
+- 一次只在一个 AI 工具里做一个子任务；做完 commit + merge 进 main 后再换工具。
+- 开工先跑精简启动检查：`git status` / `git log -5` / `git branch --show-current`。
+- 三种情况停下问用户：脏工作区 + 不属本任务 / main 最近 commit 与认知对不上 / 当前分支不是预期分支。
+- 收工不自行 merge；用户决定何时清理旧分支。
+- 历史上的「Claude 官方 / 小米 / Codex 三角色分工 + 占座 push」**整体作废**，仅作历史遗留分支命名理解之用。
 
 ---
 

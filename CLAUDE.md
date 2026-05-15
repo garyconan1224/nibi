@@ -147,10 +147,11 @@ python3 tests/e2e_qa.py
 
 > 🚀 **Phase 启动速查**（开工前对照 `nibi-spec-v2.md` §3 表确认）：
 > - **简单阶段**（Phase 0 / 1A / 1B / 1C / 1H / 1I / 1J）：**Sonnet 或 Haiku**，**不开 worktree**，直接在 main 上做。
-> - **复杂阶段**（1D / 1F / 1G）：**Opus 4.7**，**必须新开 worktree**，分支用 `claude-official/phase<编号>-<短名>`，开工立即 `git push -u origin <branch>` 占座，**绝不在主 worktree `/Users/conan/Desktop/nibi` 直接改代码**（主 worktree 只用于 merge / 同步）。
-> - **当前下一步（Phase 1F）**：Opus 4.7 + 新 worktree + 分支 `claude-official/phase1f-pipeline-sse`。
+> - **复杂阶段**（1D / 1F / 1G）：**Opus 4.7**，**建议新开 worktree**，分支用 `feat/phase<编号>-<短名>` 或 `claude-official/phase<编号>-<短名>` 任一，**不在主 worktree `/Users/conan/Desktop/nibi` 直接改代码**（主 worktree 只用于 merge / 同步）。
+> - **当前下一步（Phase 1F）**：Opus 4.7 + 新 worktree + 分支 `feat/phase1f-pipeline-sse`（或同义 `claude-official/phase1f-pipeline-sse`）。
+> - **不再做的事**：不再立即 `git push` 占座（用户已确认单 agent 串行）。
 > - **模型升级触发**（即使简单阶段也要升 Opus）：跨文件 ≥ 5 / schema 迁移 + 老数据兼容 / 加密鉴权 API key / AI 自己说"不太确定哪个方案对"。
-> - **模型降级触发**：单文件 < 50 行 / CSS 微调 / 文档改写 / 模板代码 / pytest happy path → 切 Haiku 或小米 2.5 Pro。
+> - **模型降级触发**：单文件 < 50 行 / CSS 微调 / 文档改写 / 模板代码 / pytest happy path → 切 Haiku。
 
 > ⚠️ **重要**：`plan.md` 描述的是 Phase 0 / 1A 阶段（任务系统初建），但**实际代码已远超那里**——已实现 providers、pipeline、transcript、RAG、workspaces、settings 多页面等。当前分支名（如 `feat/settings-phase2-m0`）和 `README.md` 里的「Phase-2 重构」才是真实状态。
 >
@@ -245,53 +246,35 @@ python3 tests/e2e_qa.py
 
 ---
 
-## 多 Agent 协作 — 防撞规则（强制）
+## 工具串行交接（不再多 agent 并发）
 
-> 本项目同时存在 **Claude 官方**（claude.ai/code）、**Claude 小米**（小米 AI 助手内嵌）、**Codex**（OpenAI coding agent）三个 AI 执行端。
-> 三者各有独立 worktree，互相看不见对方的变更，因此必须靠下面这套规则避免平行实现同一需求。
+> **协作模式**：用户**单 agent 串行**工作 —— 一次只在一个 AI 工具里做一个子任务，做完 commit + merge 进 main 之后再换另一个工具继续。**不再多个 AI 同时改同一个项目**，所以历史上的「多 agent 防撞规则」整体作废。
 
-### 身份与职责
-
-| Agent | 分支前缀 | 职责 |
-|-------|---------|------|
-| Claude 官方 | `claude-official/<task>` | **业务功能构建**：后端接口、前端页面、测试、文档 |
-| Claude 小米 | `claude-xiaomi/<task>` | **业务功能构建**（与官方相同职责，错开任务不重叠） |
-| Codex | `codex/qa-<task>` 或 `codex/review-<task>` | **只做检查**：运行测试、比较分支、审查 diff、给下一步建议。**不写新业务功能** |
-
-### 每次会话必须先跑的启动检查
+### 每次会话开始的启动检查（精简版）
 
 ```bash
-git fetch --all --prune
-git status --short --branch
-git worktree list
-git branch -a
-git log --oneline HEAD..main
+git status --short --branch       # 必须 clean（或只有本次任务相关改动）
+git log --oneline -5              # 看 main 上次留到哪
+git branch --show-current         # 确认当前分支
 ```
 
-### 四种情况必须停下来问用户
+**三种情况必须停下来问用户**：
+1. 工作区有未提交改动，且看上去**不属于本次说好的子任务**（很可能是上次换工具时漏 commit 的工作）。
+2. main 最近 commit 与你认知的"上次留下的状态"对不上（可能你正在覆盖别的工具刚做的工作）。
+3. 当前分支不是预期分支（比如想做 1F 却在某个旧 worktree 分支上）。
 
-1. **同主题 worktree 存在**：`git worktree list` 里出现其他 agent 路径下的同主题分支（如 `claude/phase1d-*` 和 `codex/phase1d-*` 同时存在）。
-2. **同主题远端分支存在**：`git branch -a` 出现 `remotes/origin/<other-agent>/<same-task>`。
-3. **main 分支有不认识的未合并 commit**：`git log HEAD..main` 非空，且那些 commit 来自另一个 agent。
-4. **工作区有不属于当前任务的未提交改动**：`git status` 显示与当前子任务无关的文件被修改。
+### 分支生命周期（简化）
 
-停下来后用这个模板报告：
-> 我在启动检查时发现 [描述冲突]。
-> 候选方案：A（以 X 为主线，放弃 Y）/ B（以 Y 为主线，放弃 X）/ C（人工挑选合并）。
-> 请你决定后我再继续。
+1. **开工**：复杂阶段（`nibi-spec-v2.md` §3 标"是"的）开 `feat/<编号>-<短名>` 或 `claude-official/<task>` 都行，由用户选；简单阶段直接打 main。
+2. **收工**：commit 后通知用户 merge，**不自行 merge 到 main**（破坏性操作仍需用户授权）。
+3. **完工后**：用户决定何时把旧分支删掉（参考 main 上已合并的分支即可安全 `git branch -d`）。
 
-### 分支生命周期
+### 不要做的事
 
-1. **开工时**：`git checkout -b claude-official/<task>`，随即 `git push -u origin <branch>`「占座」，让其他 agent 能看见。
-2. **收工时**：commit 后通知用户 merge，**不自行 merge 到 main**。
-3. **废弃时**：stash 备份，等用户决定是否保留，不直接删除。
-
-### 不要做的事（多 agent 专项）
-
-- ❌ 不要把另一个 agent 的 worktree 分支当作 main 来 rebase。
-- ❌ 不要 apply 或 cherry-pick 另一个 agent 的 stash / commit，除非用户明确指令。
-- ❌ 不要在检测到同主题 worktree 时继续实现功能——先报告，等用户决定谁是主线。
-- ❌ 不要在同一会话里同时扮演多个 agent 的角色。
+- ❌ 不要 cherry-pick / rebase 旧 worktree 上的 commit，除非用户明确指令（很可能是历史遗留实验，不一定有价值）。
+- ❌ 不要主动 push 占座 —— 串行模式不需要。
+- ❌ 不要在没看清 diff 的情况下删未合并分支（即便它"看起来是旧的"）。
+- ❌ 不要因为分支名带 `claude-official/` 或 `codex/` 就推断它属于不同 agent —— 这是历史命名残留，不再有职责区分。
 
 ---
 
