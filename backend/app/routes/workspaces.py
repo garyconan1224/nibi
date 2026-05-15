@@ -21,6 +21,8 @@ from __future__ import annotations
 import uuid
 from typing import Any, Dict, List, Optional
 
+from backend.app.models.tasks import TERMINAL_STATUS_VALUES
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -115,6 +117,79 @@ def _derive_item_name(source_value: str) -> str:
     return seg or raw[:40]
 
 
+# ── 派生字段计算（Phase 1A，v1.1 §2.2）────────────────────
+
+
+def _cover_thumbnail(rec: WorkspaceRecord) -> Optional[str]:
+    """从第一个 video item 的结果里提取封面缩略图路径，找不到返回 None。
+
+    按优先级尝试四个路径：
+      item.results.cover_thumbnail
+      item.results.frames[0].thumbnail
+      item.results.frames[0].frame_image_path
+      item.results.frames[0].frame_image
+    """
+    for item in rec.items:
+        if item.type != "video":
+            continue
+        r = item.results or {}
+        if r.get("cover_thumbnail"):
+            return str(r["cover_thumbnail"])
+        frames = r.get("frames") or []
+        if frames and isinstance(frames[0], dict):
+            f0 = frames[0]
+            for key in ("thumbnail", "frame_image_path", "frame_image"):
+                if f0.get(key):
+                    return str(f0[key])
+    return None
+
+
+def _current_step(rec: WorkspaceRecord) -> Optional[str]:
+    """取 workspace 内最新一个非终结任务的 status 字符串，没有则返回 None。
+
+    遍历所有 item.related_task_ids，在 pipeline task_store 里查状态，
+    排除 SUCCESS / FAILED / CANCELLED，取 updated_at 最大的那条。
+    """
+    best_status: Optional[str] = None
+    best_updated: str = ""
+
+    for item in rec.items:
+        for tid in item.related_task_ids:
+            task = _pipeline_runner.store.get(tid)
+            if task is None:
+                continue
+            if task.status in TERMINAL_STATUS_VALUES:
+                continue
+            if task.updated_at > best_updated:
+                best_updated = task.updated_at
+                best_status = task.status
+
+    return best_status
+
+
+def _items_count_by_type(rec: WorkspaceRecord) -> Dict[str, int]:
+    """统计 workspace 内各类素材数量，四类全返回（无则为 0）。"""
+    counts: Dict[str, int] = {"video": 0, "audio": 0, "image": 0, "text": 0}
+    for item in rec.items:
+        t = item.type
+        if t in counts:
+            counts[t] += 1
+    return counts
+
+
+def _enrich_workspace(rec: WorkspaceRecord) -> Dict[str, Any]:
+    """把 WorkspaceRecord.to_dict() 合并上 Phase 1A 派生字段后返回。
+
+    派生字段在路由层计算，不写回 WorkspaceStore。
+    """
+    d = rec.to_dict()
+    d["current_step"] = _current_step(rec)
+    d["items_count_by_type"] = _items_count_by_type(rec)
+    d["cover_thumbnail"] = _cover_thumbnail(rec)
+    d["last_active_at"] = rec.updated_at
+    return d
+
+
 # ── Workspace CRUD ───────────────────────────────────────
 
 
@@ -135,7 +210,7 @@ def create_workspace(req: WorkspaceCreateRequest) -> Dict[str, Any]:
 @router.get("")
 def list_workspaces(project_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """列出所有工作空间，可按 project_id 过滤。"""
-    return [r.to_dict() for r in _store.list_all(project_id=project_id)]
+    return [_enrich_workspace(r) for r in _store.list_all(project_id=project_id)]
 
 
 @router.get("/{workspace_id}")
@@ -143,7 +218,7 @@ def get_workspace(workspace_id: str) -> Dict[str, Any]:
     rec = _store.get(workspace_id)
     if rec is None:
         raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
-    return rec.to_dict()
+    return _enrich_workspace(rec)
 
 
 @router.patch("/{workspace_id}")
