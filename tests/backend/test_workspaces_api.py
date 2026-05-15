@@ -7,6 +7,7 @@ from __future__ import annotations
   error path  — 查不存在的 workspace_id 返回 404
 """
 
+import io
 from pathlib import Path
 
 import pytest
@@ -107,6 +108,90 @@ def test_items_count_by_type_after_adding_items(client: TestClient) -> None:
     assert counts["image"] == 1
     assert counts["audio"] == 0
     assert counts["text"] == 0
+
+
+def test_upload_item_persists_file_and_registers_item(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """上传本地文件后，应落盘并登记为 workspace local item。"""
+    monkeypatch.setattr(
+        ws_module,
+        "WORKSPACE_UPLOAD_ROOT",
+        tmp_path / "workspace_uploads",
+        raising=False,
+    )
+
+    resp = client.post("/workspaces", json={"name": "上传测试"})
+    ws_id = resp.json()["workspace_id"]
+
+    payload = b"fake-video-bytes"
+    files = {"file": ("hello world.mp4", io.BytesIO(payload), "video/mp4")}
+    resp = client.post(f"/workspaces/{ws_id}/items/upload", files=files)
+
+    assert resp.status_code == 200
+    ws = resp.json()
+    assert len(ws["items"]) == 1
+    item = ws["items"][0]
+    assert item["type"] == "video"
+    assert item["source"] == "local"
+    assert item["name"] == "hello_world.mp4"
+
+    stored = Path(item["source_value"])
+    assert stored.is_file()
+    assert stored.read_bytes() == payload
+
+    resp = client.delete(f"/workspaces/{ws_id}")
+    assert resp.status_code == 200
+    assert not stored.exists()
+
+
+def test_upload_item_workspace_not_found(client: TestClient) -> None:
+    """上传到不存在的 workspace 应返回 404。"""
+    files = {"file": ("hello.mp4", io.BytesIO(b"video"), "video/mp4")}
+    resp = client.post("/workspaces/missing/items/upload", files=files)
+
+    assert resp.status_code == 404
+
+
+def test_upload_item_rejects_empty_file(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """空文件不应落盘或登记为素材。"""
+    upload_root = tmp_path / "workspace_uploads"
+    monkeypatch.setattr(ws_module, "WORKSPACE_UPLOAD_ROOT", upload_root, raising=False)
+
+    resp = client.post("/workspaces", json={"name": "空文件测试"})
+    ws_id = resp.json()["workspace_id"]
+
+    files = {"file": ("empty.txt", io.BytesIO(b""), "text/plain")}
+    resp = client.post(f"/workspaces/{ws_id}/items/upload", files=files)
+
+    assert resp.status_code == 400
+    assert resp.json()["detail"] == "uploaded file cannot be empty"
+    assert not any(p.is_file() for p in upload_root.rglob("*"))
+    ws = client.get(f"/workspaces/{ws_id}").json()
+    assert ws["items"] == []
+
+
+def test_upload_item_rejects_oversized_file(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """超过上传上限的文件不应保留部分文件或登记为素材。"""
+    upload_root = tmp_path / "workspace_uploads"
+    monkeypatch.setattr(ws_module, "WORKSPACE_UPLOAD_ROOT", upload_root, raising=False)
+    monkeypatch.setattr(ws_module, "MAX_UPLOAD_BYTES", 4, raising=False)
+
+    resp = client.post("/workspaces", json={"name": "超限测试"})
+    ws_id = resp.json()["workspace_id"]
+
+    files = {"file": ("big.txt", io.BytesIO(b"12345"), "text/plain")}
+    resp = client.post(f"/workspaces/{ws_id}/items/upload", files=files)
+
+    assert resp.status_code == 413
+    assert resp.json()["detail"] == "uploaded file exceeds 500MB limit"
+    assert not any(p.is_file() for p in upload_root.rglob("*"))
+    ws = client.get(f"/workspaces/{ws_id}").json()
+    assert ws["items"] == []
 
 
 # ── Error path ────────────────────────────────────────────────────────────────
