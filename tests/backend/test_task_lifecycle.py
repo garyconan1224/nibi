@@ -16,7 +16,7 @@ def test_task_lifecycle_create_and_retry(tmp_path: Path) -> None:
 
     runner.register("dummy", handler)
     created = runner.create_task("p1", "dummy", {"x": 1})
-    assert created.status in (TaskStatus.PENDING.value, TaskStatus.DOWNLOADING.value)
+    assert created.status in (TaskStatus.PENDING.value, TaskStatus.DOWNLOAD.value)
 
     # wait briefly for worker
     import time
@@ -26,7 +26,7 @@ def test_task_lifecycle_create_and_retry(tmp_path: Path) -> None:
     assert done is not None
     assert done.status in (
         TaskStatus.SUCCESS.value,
-        TaskStatus.DOWNLOADING.value,
+        TaskStatus.DOWNLOAD.value,
         TaskStatus.PENDING.value,
     )
 

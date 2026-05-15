@@ -9,30 +9,42 @@ from typing import Any, Dict, FrozenSet, List, Literal
 
 
 class TaskStatus(str, Enum):
-    """Pipeline 任务状态机（继承 str 以便 JSON 直接序列化为字符串）。"""
+    """Pipeline 任务状态机（继承 str 以便 JSON 直接序列化为字符串）。
+
+    阶段名对齐 v1.1 §11：download / probe / frames / asr / vlm / sum / store。
+    """
 
     PENDING = "PENDING"
-    PARSING = "PARSING"
-    DOWNLOADING = "DOWNLOADING"
-    TRANSCRIBING = "TRANSCRIBING"
-    ANALYZING = "ANALYZING"      # nibi 特有：视觉分析
-    SUMMARIZING = "SUMMARIZING"
+    DOWNLOAD = "DOWNLOAD"      # 下载（仅链接来源）
+    PROBE = "PROBE"            # 探测（格式/时长/字幕轨）
+    FRAMES = "FRAMES"          # 截帧（画面准备）
+    ASR = "ASR"                # 转写（Whisper）
+    VLM = "VLM"                # 视觉分析（逐帧提示词）
+    SUM = "SUM"                # 总结（LLM 生成总结）
+    STORE = "STORE"            # 入库（写入任务数据库）
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
 
 
-# 历史遗留小写状态 → 新 Enum 的映射。
-# 覆盖范围：phase-1 早期命名（running/done/error/queued）与 phase-2 命名
-# （succeeded/failed/cancelled）。
+# 历史遗留状态 → 新 Enum 的映射。
+# 覆盖范围：phase-1 早期命名（running/done/error/queued）、
+# phase-2 命名（succeeded/failed/cancelled），
+# 以及 1F 之前的阶段名（PARSING/DOWNLOADING/TRANSCRIBING/ANALYZING/SUMMARIZING）。
 LEGACY_STATUS_MAP: Dict[str, TaskStatus] = {
-    "running": TaskStatus.DOWNLOADING,
+    "running": TaskStatus.DOWNLOAD,
     "done": TaskStatus.SUCCESS,
     "error": TaskStatus.FAILED,
     "queued": TaskStatus.PENDING,
     "succeeded": TaskStatus.SUCCESS,
     "failed": TaskStatus.FAILED,
     "cancelled": TaskStatus.CANCELLED,
+    # 1F 之前的阶段名
+    "PARSING": TaskStatus.PROBE,
+    "DOWNLOADING": TaskStatus.DOWNLOAD,
+    "TRANSCRIBING": TaskStatus.ASR,
+    "ANALYZING": TaskStatus.VLM,
+    "SUMMARIZING": TaskStatus.SUM,
 }
 
 

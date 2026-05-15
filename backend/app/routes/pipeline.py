@@ -118,10 +118,23 @@ def retry_task(task_id: str) -> Dict[str, Any]:
 
 @router.get("/tasks/{task_id}/events")
 def stream_task_events(task_id: str) -> StreamingResponse:
-    """Server-Sent Events：推送任务快照与新增日志行。"""
+    """Server-Sent Events：推送任务快照与新增日志行。
+
+    Phase 1F 优化（对齐 v1.1 §11 + 风险表「30s 心跳防反代断连」）：
+    - 任务快照仅在 status / progress 变化时下发，减少前端无谓重渲染。
+    - 静默 ≥ 30s 时主动下发 `: heartbeat` SSE 注释行作为 keepalive。
+    - 轮询间隔提升到 0.5s（原 0.2s 过密）。
+    """
+
+    HEARTBEAT_INTERVAL_S = 30.0
+    POLL_INTERVAL_S = 0.5
 
     async def event_stream():
-        last = 0
+        last_log_idx = 0
+        last_status: Optional[str] = None
+        last_progress: Optional[float] = None
+        last_send_ts = time.monotonic()
+
         while True:
             rec = _store.get(task_id)
             if rec is None:
@@ -129,22 +142,49 @@ def stream_task_events(task_id: str) -> StreamingResponse:
                 break
             d = rec.to_dict()
             logs = d.get("log") or []
-            while last < len(logs):
-                yield f"data: {json.dumps({'type': 'log', 'entry': logs[last]})}\n\n"
-                last += 1
-            yield f"data: {json.dumps({'type': 'task', 'task': d})}\n\n"
-            if d.get("status") in _TERMINAL_STATUSES:
+            while last_log_idx < len(logs):
+                yield f"data: {json.dumps({'type': 'log', 'entry': logs[last_log_idx]})}\n\n"
+                last_log_idx += 1
+                last_send_ts = time.monotonic()
+
+            cur_status = d.get("status")
+            cur_progress = d.get("progress")
+            changed = (cur_status != last_status) or (cur_progress != last_progress)
+            if changed:
+                yield f"data: {json.dumps({'type': 'task', 'task': d})}\n\n"
+                last_status, last_progress = cur_status, cur_progress
+                last_send_ts = time.monotonic()
+
+            if cur_status in _TERMINAL_STATUSES:
+                # 终结前确保前端拿到最终快照（即便上面已发过也再发一次，幂等）
+                if not changed:
+                    yield f"data: {json.dumps({'type': 'task', 'task': d})}\n\n"
                 break
-            await asyncio.sleep(0.2)
+
+            # 心跳：静默超过 30s 时发送 SSE 注释行（不会被 EventSource 当成事件）
+            if time.monotonic() - last_send_ts >= HEARTBEAT_INTERVAL_S:
+                yield ": heartbeat\n\n"
+                last_send_ts = time.monotonic()
+
+            await asyncio.sleep(POLL_INTERVAL_S)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 @router.websocket("/tasks/{task_id}/ws")
 async def stream_task_ws(websocket: WebSocket, task_id: str) -> None:
-    """WebSocket：与 /events 相同信息，JSON 帧。"""
+    """WebSocket：与 /events 相同信息，JSON 帧。
+
+    与 SSE 版本一致：去重 + 30s 心跳 ping。
+    """
+    HEARTBEAT_INTERVAL_S = 30.0
+    POLL_INTERVAL_S = 0.5
+
     await websocket.accept()
-    last = 0
+    last_log_idx = 0
+    last_status: Optional[str] = None
+    last_progress: Optional[float] = None
+    last_send_ts = time.monotonic()
     try:
         while True:
             rec = _store.get(task_id)
@@ -153,12 +193,28 @@ async def stream_task_ws(websocket: WebSocket, task_id: str) -> None:
                 break
             d = rec.to_dict()
             logs = d.get("log") or []
-            while last < len(logs):
-                await websocket.send_json({"type": "log", "entry": logs[last]})
-                last += 1
-            await websocket.send_json({"type": "task", "task": d})
-            if d.get("status") in _TERMINAL_STATUSES:
+            while last_log_idx < len(logs):
+                await websocket.send_json({"type": "log", "entry": logs[last_log_idx]})
+                last_log_idx += 1
+                last_send_ts = time.monotonic()
+
+            cur_status = d.get("status")
+            cur_progress = d.get("progress")
+            changed = (cur_status != last_status) or (cur_progress != last_progress)
+            if changed:
+                await websocket.send_json({"type": "task", "task": d})
+                last_status, last_progress = cur_status, cur_progress
+                last_send_ts = time.monotonic()
+
+            if cur_status in _TERMINAL_STATUSES:
+                if not changed:
+                    await websocket.send_json({"type": "task", "task": d})
                 break
-            await asyncio.sleep(0.2)
+
+            if time.monotonic() - last_send_ts >= HEARTBEAT_INTERVAL_S:
+                await websocket.send_json({"type": "ping"})
+                last_send_ts = time.monotonic()
+
+            await asyncio.sleep(POLL_INTERVAL_S)
     except WebSocketDisconnect:
         return

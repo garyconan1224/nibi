@@ -7,22 +7,22 @@ pipeline 任务引擎（`backend/app/routes/pipeline.py` 的 `_store` / `_runner
 避免出现第二套独立任务引擎。
 
 - 响应统一包装为 ``{"code": 0, "msg": "", "data": {...}}``。
-- 任务状态机映射：VidMirror 独有的 ``ANALYZING`` → BiliNote 语义 ``SUMMARIZING``；
-  ``CANCELLED`` → ``FAILED``（message 标注"已取消"）。
+- 任务状态机映射：内部 v1.1 §11 阶段名 → BiliNote 7 态
+  （PENDING/PARSING/DOWNLOADING/TRANSCRIBING/SUMMARIZING/SUCCESS/FAILED）。
 - 路由前缀 ``/api``，与现有 ``/pipeline`` / ``/providers`` 共存。
 """
 
 import json
 import re
 from pathlib import Path
-from typing import Any, Dict, FrozenSet, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 import httpx
 from fastapi import APIRouter, File, Form, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from backend.app.models.tasks import TERMINAL_STATUS_VALUES, TaskStatus
+from backend.app.models.tasks import LEGACY_STATUS_MAP, TERMINAL_STATUS_VALUES, TaskStatus
 from backend.app.routes.pipeline import _runner as _pipeline_runner
 from backend.app.routes.pipeline import _store as _pipeline_store
 from shared.config import ROOT_DIR, ensure_project_dirs, get_project_videos_dir
@@ -78,28 +78,31 @@ def _resolve_project_id(project_id: Optional[str]) -> str:
 
 # ── 状态机映射 ────────────────────────────────────────────────
 # BiliNote 前端仅识别 7 态：PENDING/PARSING/DOWNLOADING/TRANSCRIBING/SUMMARIZING/SUCCESS/FAILED
-_BILINOTE_ACCEPTED: FrozenSet[str] = frozenset(
-    {
-        TaskStatus.PENDING.value,
-        TaskStatus.PARSING.value,
-        TaskStatus.DOWNLOADING.value,
-        TaskStatus.TRANSCRIBING.value,
-        TaskStatus.SUMMARIZING.value,
-        TaskStatus.SUCCESS.value,
-        TaskStatus.FAILED.value,
-    }
-)
+# 内部 v1.1 §11 阶段名 → BiliNote 兼容名 的映射。
+_BILINOTE_STATUS_MAP: Dict[str, str] = {
+    TaskStatus.PENDING.value: "PENDING",
+    TaskStatus.DOWNLOAD.value: "DOWNLOADING",
+    TaskStatus.PROBE.value: "PARSING",
+    TaskStatus.FRAMES.value: "PARSING",
+    TaskStatus.ASR.value: "TRANSCRIBING",
+    TaskStatus.VLM.value: "SUMMARIZING",
+    TaskStatus.SUM.value: "SUMMARIZING",
+    TaskStatus.STORE.value: "SUMMARIZING",
+    TaskStatus.SUCCESS.value: "SUCCESS",
+    TaskStatus.FAILED.value: "FAILED",
+    TaskStatus.CANCELLED.value: "FAILED",
+}
 
 
 def _map_status_for_bilinote(status: str) -> str:
-    if status == TaskStatus.ANALYZING.value:
-        return TaskStatus.SUMMARIZING.value
-    if status == TaskStatus.CANCELLED.value:
-        return TaskStatus.FAILED.value
-    if status in _BILINOTE_ACCEPTED:
-        return status
-    # 未知值兜底为 PENDING，避免前端状态机崩掉
-    return TaskStatus.PENDING.value
+    mapped = _BILINOTE_STATUS_MAP.get(status)
+    if mapped is not None:
+        return mapped
+    # 兼容旧状态名
+    old_mapped = LEGACY_STATUS_MAP.get(status)
+    if old_mapped is not None:
+        return _BILINOTE_STATUS_MAP.get(old_mapped.value, "PENDING")
+    return "PENDING"
 
 
 # ── 请求模型 ──────────────────────────────────────────────────

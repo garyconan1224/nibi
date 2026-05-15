@@ -1,11 +1,13 @@
-// 任务状态枚举（与后端 TaskStatus 对应）
+// 任务状态枚举（与后端 TaskStatus 对齐 v1.1 §11）
 export enum TaskStatus {
   PENDING = 'PENDING',
-  PARSING = 'PARSING',
-  DOWNLOADING = 'DOWNLOADING',
-  TRANSCRIBING = 'TRANSCRIBING',
-  ANALYZING = 'ANALYZING',      // nibi 特有：视觉分析
-  SUMMARIZING = 'SUMMARIZING',
+  DOWNLOAD = 'DOWNLOAD',    // 下载（仅链接来源）
+  PROBE = 'PROBE',          // 探测（格式/时长/字幕轨）
+  FRAMES = 'FRAMES',        // 截帧（画面准备）
+  ASR = 'ASR',              // 转写（Whisper）
+  VLM = 'VLM',              // 视觉分析（逐帧提示词）
+  SUM = 'SUM',              // 总结（LLM 生成总结）
+  STORE = 'STORE',          // 入库（写入任务数据库）
   SUCCESS = 'SUCCESS',
   FAILED = 'FAILED',
   CANCELLED = 'CANCELLED',
@@ -35,20 +37,36 @@ export interface TaskRecord {
   updated_at: string                   // ISO 时间戳
 }
 
-// 五阶段处理流程（用于 ProcessingStepper）
+// 七阶段处理流程（对齐 v1.1 §11，用于 ProcessingStepper）
 export interface ProcessingStage {
   id: TaskStatus
   name: string
   icon: string                         // lucide-react 图标名
+  color: string                        // 颜色 token
 }
 
+// 注意：顺序按当前 pipeline 的实际运行时为准（DOWNLOAD→PROBE→ASR→FRAMES→SUM→STORE）。
+// v1.1 §11 spec 的语序是 download→probe→frames→asr→vlm→sum→store；
+// 现有 pipeline_tasks.py 中 transcribe (ASR) 早于 analyze (FRAMES)，
+// 待 Phase 1G 把 analyze 拆为 FRAMES（截帧）+ VLM（视觉分析）并调整执行顺序后，
+// 再让 UI 顺序与 spec 完全一致。
 export const PROCESSING_STAGES: ProcessingStage[] = [
-  { id: TaskStatus.PARSING, name: '解析', icon: 'Zap' },
-  { id: TaskStatus.DOWNLOADING, name: '下载', icon: 'Download' },
-  { id: TaskStatus.TRANSCRIBING, name: '转录', icon: 'Subtitles' },
-  { id: TaskStatus.ANALYZING, name: '分析', icon: 'Eye' },
-  { id: TaskStatus.SUMMARIZING, name: '总结', icon: 'BookMarked' },
+  { id: TaskStatus.DOWNLOAD, name: '下载', icon: 'Download', color: 'blue' },
+  { id: TaskStatus.PROBE, name: '探测', icon: 'Search', color: 'gray' },
+  { id: TaskStatus.ASR, name: '转写', icon: 'Subtitles', color: 'rose' },
+  { id: TaskStatus.FRAMES, name: '截帧', icon: 'Image', color: 'amber' },
+  { id: TaskStatus.VLM, name: '视觉分析', icon: 'Eye', color: 'purple' },
+  { id: TaskStatus.SUM, name: '总结', icon: 'BookMarked', color: 'emerald' },
+  { id: TaskStatus.STORE, name: '入库', icon: 'Database', color: 'slate' },
 ]
+
+// pipeline step → 阶段映射（用于按 payload.steps 过滤可见阶段）
+export const STEP_TO_STAGE: Record<string, TaskStatus> = {
+  download: TaskStatus.DOWNLOAD,
+  transcribe: TaskStatus.ASR,
+  analyze: TaskStatus.FRAMES,
+  note: TaskStatus.SUM,
+}
 
 // 任务列表查询响应
 export interface TaskListResponse {
@@ -127,11 +145,13 @@ export const isTaskTerminal = (status: string): boolean => {
 export const getStatusText = (status: string): string => {
   const statusMap: Record<string, string> = {
     [TaskStatus.PENDING]: '待处理',
-    [TaskStatus.PARSING]: '解析中',
-    [TaskStatus.DOWNLOADING]: '下载中',
-    [TaskStatus.TRANSCRIBING]: '转录中',
-    [TaskStatus.ANALYZING]: '分析中',
-    [TaskStatus.SUMMARIZING]: '总结中',
+    [TaskStatus.DOWNLOAD]: '下载中',
+    [TaskStatus.PROBE]: '探测中',
+    [TaskStatus.FRAMES]: '截帧中',
+    [TaskStatus.ASR]: '转录中',
+    [TaskStatus.VLM]: '视觉分析中',
+    [TaskStatus.SUM]: '总结中',
+    [TaskStatus.STORE]: '入库中',
     [TaskStatus.SUCCESS]: '成功',
     [TaskStatus.FAILED]: '失败',
     [TaskStatus.CANCELLED]: '已取消',
@@ -143,15 +163,16 @@ export const getStatusText = (status: string): string => {
 export const getStatusColor = (status: string): string => {
   const colorMap: Record<string, string> = {
     [TaskStatus.PENDING]: 'bg-gray-100 text-gray-700',
-    [TaskStatus.PARSING]: 'bg-blue-100 text-blue-700',
-    [TaskStatus.DOWNLOADING]: 'bg-cyan-100 text-cyan-700',
-    [TaskStatus.TRANSCRIBING]: 'bg-purple-100 text-purple-700',
-    [TaskStatus.ANALYZING]: 'bg-orange-100 text-orange-700',
-    [TaskStatus.SUMMARIZING]: 'bg-green-100 text-green-700',
+    [TaskStatus.DOWNLOAD]: 'bg-cyan-100 text-cyan-700',
+    [TaskStatus.PROBE]: 'bg-gray-100 text-gray-600',
+    [TaskStatus.FRAMES]: 'bg-amber-100 text-amber-700',
+    [TaskStatus.ASR]: 'bg-rose-100 text-rose-700',
+    [TaskStatus.VLM]: 'bg-purple-100 text-purple-700',
+    [TaskStatus.SUM]: 'bg-emerald-100 text-emerald-700',
+    [TaskStatus.STORE]: 'bg-slate-100 text-slate-600',
     [TaskStatus.SUCCESS]: 'bg-emerald-100 text-emerald-700',
     [TaskStatus.FAILED]: 'bg-red-100 text-red-700',
     [TaskStatus.CANCELLED]: 'bg-slate-100 text-slate-700',
   }
   return colorMap[status] || 'bg-gray-100 text-gray-700'
 }
-
