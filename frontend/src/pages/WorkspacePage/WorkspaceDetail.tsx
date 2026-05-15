@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Plus,
   Trash2,
+  Pencil,
   FileImage,
   FileVideo,
   FileAudio,
@@ -34,14 +35,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 import PreflightConfigPanel from '@/components/workspace/PreflightConfigPanel'
 import {
   addWorkspaceItem,
+  deleteWorkspace,
   getWorkspace,
   removeWorkspaceItem,
   savePreflight,
   startItemPipeline,
+  updateWorkspace,
 } from '@/services/workspaces'
 import {
   ITEM_TYPE_COLOR,
@@ -76,6 +89,13 @@ export default function WorkspaceDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // 工作空间级操作
+  const [renameOpen, setRenameOpen] = useState(false)
+  const [renameName, setRenameName] = useState('')
+  const [renaming, setRenaming] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
   // 添加素材模态状态
   const [addOpen, setAddOpen] = useState(false)
   const [adding, setAdding] = useState(false)
@@ -106,6 +126,47 @@ export default function WorkspaceDetail() {
     refresh()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  const openRenameDialog = () => {
+    if (!workspace) return
+    setRenameName(workspace.name)
+    setRenameOpen(true)
+  }
+
+  const handleRename = async () => {
+    if (!id || !workspace) return
+    const name = renameName.trim()
+    if (!name || name === workspace.name) {
+      setRenameOpen(false)
+      return
+    }
+    setRenaming(true)
+    setError(null)
+    try {
+      const updated = await updateWorkspace(id, { name })
+      setWorkspace(updated)
+      setRenameOpen(false)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '重命名失败')
+    } finally {
+      setRenaming(false)
+    }
+  }
+
+  const handleDeleteWorkspace = async () => {
+    if (!id) return
+    setDeleting(true)
+    setError(null)
+    try {
+      await deleteWorkspace(id)
+      setDeleteOpen(false)
+      navigate('/workspaces')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '删除失败')
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const handleAdd = async () => {
     if (!id || !newItemValue.trim()) return
@@ -213,6 +274,20 @@ export default function WorkspaceDetail() {
         <Badge variant="outline" className="ml-2">
           {WORKSPACE_STATUS_TEXT[workspace.status]}
         </Badge>
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={openRenameDialog}>
+            <Pencil className="mr-1 h-4 w-4" />
+            改名
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 className="mr-1 h-4 w-4" />
+            删除
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -382,6 +457,68 @@ export default function WorkspaceDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 改名模态 */}
+      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>重命名工作空间</DialogTitle>
+            <DialogDescription>
+              修改后会立即同步到工作空间列表和详情页。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label htmlFor="rename-workspace-name">工作空间名称</Label>
+            <Input
+              id="rename-workspace-name"
+              autoFocus
+              value={renameName}
+              onChange={(e) => setRenameName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && renameName.trim() && !renaming) {
+                  handleRename()
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRenameOpen(false)}
+              disabled={renaming}
+            >
+              取消
+            </Button>
+            <Button
+              onClick={handleRename}
+              disabled={!renameName.trim() || renaming}
+            >
+              {renaming ? '保存中…' : '保存'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 删除工作空间确认 */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除？</AlertDialogTitle>
+            <AlertDialogDescription>
+              将永久删除工作空间「{workspace.name}」及其内所有素材的引用。此操作不可撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteWorkspace}
+              disabled={deleting}
+            >
+              {deleting ? '删除中…' : '删除'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* 前置配置面板：从素材行的「配置并开始」/「重新配置」唤出 */}
       {preflightItem && (
