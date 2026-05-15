@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import axios from 'axios'
 import {
   ArrowLeft,
   Plus,
@@ -103,6 +104,7 @@ export default function WorkspaceDetail() {
   // 添加素材模态状态
   const [addOpen, setAddOpen] = useState(false)
   const [adding, setAdding] = useState(false)
+  const [addError, setAddError] = useState<string | null>(null)
   const [newItemType, setNewItemType] = useState<ItemType>('video')
   const [newItemSource, setNewItemSource] = useState<ItemSource>('url')
   const [newItemValue, setNewItemValue] = useState('')
@@ -182,6 +184,27 @@ export default function WorkspaceDetail() {
     setUploadFile(null)
     setUploadProgress(0)
     setUploadDragOver(false)
+    setAddError(null)
+  }
+
+  const isValidNetworkUrl = (raw: string): boolean => {
+    const value = raw.trim()
+    if (!value) return false
+    try {
+      const u = new URL(value)
+      return (u.protocol === 'http:' || u.protocol === 'https:') && !!u.host
+    } catch {
+      return false
+    }
+  }
+
+  const extractErrorMessage = (err: unknown, fallback: string): string => {
+    if (axios.isAxiosError(err)) {
+      const detail = (err.response?.data as { detail?: unknown } | undefined)
+        ?.detail
+      if (typeof detail === 'string') return detail
+    }
+    return err instanceof Error ? err.message : fallback
   }
 
   const handleUploadFileSelect = (file: File) => {
@@ -199,8 +222,14 @@ export default function WorkspaceDetail() {
     if (newItemSource === 'local' && !uploadFile && !newItemValue.trim()) return
     if (newItemSource !== 'local' && !newItemValue.trim()) return
 
+    if (newItemSource === 'url' && !isValidNetworkUrl(newItemValue)) {
+      setAddError('请输入有效的网络链接，必须以 http:// 或 https:// 开头')
+      return
+    }
+
     setAdding(true)
     setError(null)
+    setAddError(null)
     try {
       const updated =
         newItemSource === 'local' && uploadFile
@@ -221,7 +250,7 @@ export default function WorkspaceDetail() {
       const newest = updated.items[updated.items.length - 1]
       if (newest) setPreflightItem(newest)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : '添加失败')
+      setAddError(extractErrorMessage(err, '添加失败'))
     } finally {
       setAdding(false)
     }
@@ -426,6 +455,14 @@ export default function WorkspaceDetail() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {addError && (
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/50 bg-destructive/10 p-2 text-sm text-destructive"
+              >
+                {addError}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>素材类型</Label>
@@ -452,6 +489,7 @@ export default function WorkspaceDetail() {
                     setNewItemSource(v as ItemSource)
                     setUploadFile(null)
                     setUploadProgress(0)
+                    setAddError(null)
                   }}
                 >
                   <SelectTrigger>

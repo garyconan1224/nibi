@@ -23,6 +23,7 @@ import shutil
 import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 from backend.app.models.tasks import TERMINAL_STATUS_VALUES
 
@@ -139,6 +140,29 @@ def _ensure_valid_status(s: Optional[str]) -> None:
             status_code=400,
             detail=f"invalid status: {s}",
         ) from err
+
+
+def _validate_network_url(raw: str) -> str:
+    """校验网络链接：必须是 http/https 且 host 非空。
+
+    Why: source=url 直接交给下游 yt-dlp / 下载器，空白或畸形字符串会在
+    pipeline 深处才报错，对用户不友好。这里在入口阻断。
+    """
+    value = raw.strip()
+    if not value:
+        raise HTTPException(status_code=400, detail="URL cannot be empty")
+    try:
+        parsed = urlparse(value)
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=f"invalid URL: {err}") from err
+    if parsed.scheme.lower() not in ("http", "https"):
+        raise HTTPException(
+            status_code=400,
+            detail="URL must start with http:// or https://",
+        )
+    if not parsed.netloc:
+        raise HTTPException(status_code=400, detail="URL host cannot be empty")
+    return value
 
 
 def _derive_item_name(source_value: str) -> str:
@@ -363,12 +387,17 @@ def add_item(workspace_id: str, req: ItemAddRequest) -> Dict[str, Any]:
     if not req.source_value.strip():
         raise HTTPException(status_code=400, detail="source_value cannot be empty")
 
+    if req.source == "url":
+        normalized_value = _validate_network_url(req.source_value)
+    else:
+        normalized_value = req.source_value.strip()
+
     item = WorkspaceItem(
         item_id=str(uuid.uuid4()),
         type=req.type,
         source=req.source,
-        source_value=req.source_value.strip(),
-        name=(req.name.strip() or _derive_item_name(req.source_value)),
+        source_value=normalized_value,
+        name=(req.name.strip() or _derive_item_name(normalized_value)),
     )
     try:
         rec = _store.add_item(workspace_id, item)

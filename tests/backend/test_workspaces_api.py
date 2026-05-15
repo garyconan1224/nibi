@@ -194,6 +194,56 @@ def test_upload_item_rejects_oversized_file(
     assert ws["items"] == []
 
 
+# ── Phase 1E — 网络链接添加 ──────────────────────────────────────────────────
+
+
+def test_add_url_item_happy_path(client: TestClient) -> None:
+    """提交合法 http URL 时素材成功登记，并出现在工作空间详情里。"""
+    ws_id = client.post("/workspaces", json={"name": "URL 测试"}).json()["workspace_id"]
+    resp = client.post(
+        f"/workspaces/{ws_id}/items",
+        json={
+            "type": "video",
+            "source": "url",
+            "source_value": "  https://www.bilibili.com/video/BV1xx411c7mD  ",
+        },
+    )
+    assert resp.status_code == 200
+    ws = resp.json()
+    assert len(ws["items"]) == 1
+    item = ws["items"][0]
+    assert item["source"] == "url"
+    # 校验通过后存储的是 strip 过的值
+    assert item["source_value"] == "https://www.bilibili.com/video/BV1xx411c7mD"
+
+
+@pytest.mark.parametrize(
+    "bad_url,expected_keyword",
+    [
+        ("not a url", "http"),
+        ("ftp://example.com/a.mp4", "http"),
+        ("https://", "host"),
+        ("   ", "empty"),
+    ],
+)
+def test_add_url_item_rejects_invalid_url(
+    client: TestClient, bad_url: str, expected_keyword: str
+) -> None:
+    """非 http(s) / 缺 host / 空白 URL 一律返回 400。"""
+    ws_id = client.post("/workspaces", json={"name": "URL 错误测试"}).json()[
+        "workspace_id"
+    ]
+    resp = client.post(
+        f"/workspaces/{ws_id}/items",
+        json={"type": "video", "source": "url", "source_value": bad_url},
+    )
+    assert resp.status_code == 400
+    assert expected_keyword in resp.json()["detail"].lower()
+    # 错误请求不应留下任何 item
+    ws = client.get(f"/workspaces/{ws_id}").json()
+    assert ws["items"] == []
+
+
 # ── Error path ────────────────────────────────────────────────────────────────
 
 
