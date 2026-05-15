@@ -263,8 +263,8 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     支持的步骤：download / transcribe / analyze / note
     未指定 steps 时默认全量执行。
 
-    状态机流转（task_runner._run 已将入口置为 DOWNLOADING）：
-      各步骤对应状态 → (全部完成) → SUCCESS
+    状态机流转（对齐 v1.1 §11）：
+      DOWNLOAD → PROBE → FRAMES → ASR → VLM → SUM → STORE → SUCCESS
     """
     payload = record.payload
     task_id = record.task_id
@@ -311,7 +311,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
 
     # ── 3. download 步骤 ───────────────────────────────────────
     if "download" in steps:
-        runner.store.update(task_id, status=TaskStatus.DOWNLOADING.value)
+        runner.store.update(task_id, status=TaskStatus.DOWNLOAD.value)
         runner.set_progress(task_id, 0.02, "开始下载视频...")
 
         dl_kwargs = _resolve_download_kwargs(payload)
@@ -334,6 +334,13 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             "completed_steps": completed_steps[:],
             "video_file": download_save_path,
         })
+
+    # ── 3.5. PROBE 阶段（pipeline 框架级，对齐 v1.1 §11）─────────
+    # 探测：标记任务进入探测期。位置：download 之后、各处理步骤之前。
+    # 当前仅做轻量级状态推进 + 进度条占位；未来可接入 ffprobe 媒体嗅探、
+    # 字幕轨检测、媒体合法性校验等。
+    runner.store.update(task_id, status=TaskStatus.PROBE.value)
+    runner.set_progress(task_id, 0.30, "探测媒体元数据...")
 
     # ── 4. transcribe 步骤 ─────────────────────────────────────
     if "transcribe" in steps:
@@ -379,7 +386,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 f"无可用的本地视频文件进行转录 (project_video_dir={project_video_dir})"
             )
 
-        runner.store.update(task_id, status=TaskStatus.TRANSCRIBING.value)
+        runner.store.update(task_id, status=TaskStatus.ASR.value)
         runner.set_progress(task_id, 0.32, "开始转录音频...")
 
         # 从 TranscriberConfig 读取用户偏好（模型尺寸/设备/语言/前置提示词），
@@ -429,7 +436,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         if not videos:
             raise ValueError("本地视频文件不存在，请先执行下载步骤")
 
-        runner.store.update(task_id, status=TaskStatus.ANALYZING.value)
+        runner.store.update(task_id, status=TaskStatus.FRAMES.value)
         runner.set_progress(task_id, 0.50, "开始视觉帧分析...")
 
         state = run_batch_analysis(
@@ -468,7 +475,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
 
     # ── 6. note 步骤（汇总 markdown）──────────────────────────
     if "note" in steps:
-        runner.store.update(task_id, status=TaskStatus.SUMMARIZING.value)
+        runner.store.update(task_id, status=TaskStatus.SUM.value)
         runner.set_progress(task_id, 0.90, "整理笔记内容...")
 
         # 数据源优先级：analyze 产出 > transcribe 文本 > 空字符串
@@ -483,6 +490,12 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             "markdown": markdown,
             "completed_steps": completed_steps[:],
         })
+
+    # ── 6.5. STORE 阶段（pipeline 框架级，对齐 v1.1 §11）─────────
+    # 入库：标记进入持久化阶段。当前流水线中间产物已通过
+    # _persist_intermediate 即时落盘，此处为最终一次性确认 + UI 收尾。
+    runner.store.update(task_id, status=TaskStatus.STORE.value)
+    runner.set_progress(task_id, 0.95, "归档任务结果...")
 
     # ── 7. 构建最终返回结果 ────────────────────────────────────
     runner.set_progress(task_id, 0.98, "任务完成")

@@ -1,74 +1,92 @@
 import type { FC } from 'react'
-import { Zap, Download, Subtitles, Eye, BookMarked, CheckCircle2, XCircle } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { TaskStatus, PROCESSING_STAGES } from '@/types/task'
-
-// 图标映射（与 PROCESSING_STAGES 中 icon 字段对应）
-const ICON_MAP: Record<string, FC<{ className?: string }>> = {
-  Zap,
+import {
   Download,
+  Search,
+  Image,
   Subtitles,
   Eye,
   BookMarked,
+  Database,
+  CheckCircle2,
+  XCircle,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { TaskStatus, PROCESSING_STAGES, STEP_TO_STAGE } from '@/types/task'
+
+// 图标映射（与 PROCESSING_STAGES 中 icon 字段对应）
+const ICON_MAP: Record<string, FC<{ className?: string }>> = {
+  Download,
+  Search,
+  Image,
+  Subtitles,
+  Eye,
+  BookMarked,
+  Database,
 }
 
-// 阶段在流程中的顺序索引
-const STAGE_ORDER = PROCESSING_STAGES.map((s) => s.id)
-
-// 阶段 → pipeline step 字符串映射：用于按 task.payload.steps 过滤渲染
-// PARSING 为 UI 通用的准备阶段，不对应具体 pipeline step，始终保留
-const STAGE_TO_STEP: Partial<Record<TaskStatus, string>> = {
-  [TaskStatus.DOWNLOADING]: 'download',
-  [TaskStatus.TRANSCRIBING]: 'transcribe',
-  [TaskStatus.ANALYZING]: 'analyze',
-  [TaskStatus.SUMMARIZING]: 'note',
+// 颜色 → Tailwind class 映射（对齐 v1.1 §13 颜色语义）
+const COLOR_ACTIVE: Record<string, string> = {
+  blue: 'border-blue-500 bg-blue-50 text-blue-600 shadow-blue-100',
+  gray: 'border-gray-400 bg-gray-50 text-gray-500 shadow-gray-100',
+  amber: 'border-amber-500 bg-amber-50 text-amber-600 shadow-amber-100',
+  rose: 'border-rose-500 bg-rose-50 text-rose-600 shadow-rose-100',
+  purple: 'border-purple-500 bg-purple-50 text-purple-600 shadow-purple-100',
+  emerald: 'border-emerald-500 bg-emerald-50 text-emerald-600 shadow-emerald-100',
+  slate: 'border-slate-400 bg-slate-50 text-slate-500 shadow-slate-100',
 }
 
-/**
- * 判断当前 status 在步骤条中的位置
- * - PENDING 视为第 0 阶段前（index = -1），步骤条显示为"等待中"
- * - 未知状态统一返回 -1
- */
-function getStageIndex(status: string): number {
-  return STAGE_ORDER.indexOf(status as TaskStatus)
+const COLOR_DONE: Record<string, string> = {
+  blue: 'border-blue-500 bg-blue-500 text-white',
+  gray: 'border-gray-400 bg-gray-400 text-white',
+  amber: 'border-amber-500 bg-amber-500 text-white',
+  rose: 'border-rose-500 bg-rose-500 text-white',
+  purple: 'border-purple-500 bg-purple-500 text-white',
+  emerald: 'border-emerald-500 bg-emerald-500 text-white',
+  slate: 'border-slate-400 bg-slate-400 text-white',
 }
 
-/**
- * 将任意状态映射为步骤条"有效激活"的阶段索引：
- * PENDING → 0（显示第一个阶段为待激活）
- * 其他未知状态 → 0
- */
-function getEffectiveIndex(status: string): number {
-  const idx = getStageIndex(status)
-  if (idx >= 0) return idx
-  // PENDING 或其他未知状态：定位到第一阶段
-  return 0
+const COLOR_TEXT: Record<string, string> = {
+  blue: 'text-blue-600',
+  gray: 'text-gray-500',
+  amber: 'text-amber-600',
+  rose: 'text-rose-600',
+  purple: 'text-purple-600',
+  emerald: 'text-emerald-600',
+  slate: 'text-slate-500',
+}
+
+const COLOR_BAR: Record<string, string> = {
+  blue: 'bg-blue-500',
+  gray: 'bg-gray-400',
+  amber: 'bg-amber-500',
+  rose: 'bg-rose-500',
+  purple: 'bg-purple-500',
+  emerald: 'bg-emerald-500',
+  slate: 'bg-slate-400',
+}
+
+const COLOR_BAR_BG: Record<string, string> = {
+  blue: 'bg-blue-100',
+  gray: 'bg-gray-100',
+  amber: 'bg-amber-100',
+  rose: 'bg-rose-100',
+  purple: 'bg-purple-100',
+  emerald: 'bg-emerald-100',
+  slate: 'bg-slate-100',
 }
 
 interface ProcessingStepperProps {
-  /** 任务当前状态 */
   status: string
-  /** 进度值 0~1，用于活跃阶段的进度条 */
   progress: number
-  /**
-   * 可选：任务 payload 中的步骤编排。
-   * 若提供，则未选中对应 step 的阶段将被隐藏（例如本地分析任务隐藏 DOWNLOADING）。
-   * 未提供时保持原有 5 段全量渲染，兼容历史任务。
-   */
   steps?: string[]
-  /** 可选：实时下载速度字符串（如 "1.23MiB/s"），在 DOWNLOADING 活跃时展示 */
   downloadSpeed?: string
 }
 
 /**
  * ProcessingStepper
  *
- * 展示五阶段任务流程：PARSING → DOWNLOADING → TRANSCRIBING → ANALYZING → SUMMARIZING
- * - 已完成阶段：蓝色实心✓
- * - 活跃阶段：蓝色高亮 + 进度条动画
- * - 待处理阶段：灰色
- * - SUCCESS：全部绿色✓
- * - FAILED：活跃阶段显示红色✗
+ * 展示七阶段任务流程（对齐 v1.1 §11）：
+ * DOWNLOAD → PROBE → FRAMES → ASR → VLM → SUM → STORE
  */
 const ProcessingStepper: FC<ProcessingStepperProps> = ({ status, progress, steps, downloadSpeed }) => {
   const isSuccess = status === TaskStatus.SUCCESS
@@ -76,69 +94,64 @@ const ProcessingStepper: FC<ProcessingStepperProps> = ({ status, progress, steps
   const isCancelled = status === TaskStatus.CANCELLED
   const isPending = status === TaskStatus.PENDING
 
-  // 根据 steps 过滤阶段：steps 为空或未传时保持原 5 段；否则只保留 PARSING + 被选中对应的 step 阶段
+  // 根据 steps 过滤阶段。
+  // 注意：PROBE / STORE 是 pipeline 框架级阶段（探测/入库），无论用户勾选什么 steps 都会触发，
+  // 因此在 UI 中始终显示；VLM 当前未启用（Phase 1G 实装），按用户 steps 决定是否显示。
   const visibleStages =
     steps && steps.length > 0
       ? PROCESSING_STAGES.filter((stage) => {
-          const mapped = STAGE_TO_STEP[stage.id]
-          // PARSING 无对应 step，始终保留作为起始展示
-          return mapped === undefined || steps.includes(mapped)
+          if (stage.id === TaskStatus.PROBE || stage.id === TaskStatus.STORE) return true
+          return Object.entries(STEP_TO_STAGE).some(
+            ([stepName, mappedStage]) => steps.includes(stepName) && mappedStage === stage.id,
+          )
         })
       : PROCESSING_STAGES
 
-  // 在"可见阶段数组"内计算当前活跃位置（保持视觉顺序不跳跃）
-  const rawIndexInAll = getStageIndex(status)
-  const activeStatusId = rawIndexInAll >= 0 ? (status as TaskStatus) : null
-  const visibleActiveIndex = activeStatusId
-    ? visibleStages.findIndex((s) => s.id === activeStatusId)
-    : -1
-  // PENDING / 未知状态：定位到可见阶段的第一项（= 0）；保留 getEffectiveIndex 以兼容后续扩展
-  void getEffectiveIndex
-  const activeIndex = isPending || visibleActiveIndex < 0 ? 0 : visibleActiveIndex
+  // 当前活跃阶段在可见阶段中的索引
+  const activeStageIdx = visibleStages.findIndex((s) => s.id === status)
+  // PENDING 或未知状态：定位到第一阶段
+  const activeIndex = isPending || activeStageIdx < 0 ? 0 : activeStageIdx
 
   return (
     <div className="w-full px-1 py-2">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-0.5">
         {visibleStages.map((stage, idx) => {
-          const IconComp = ICON_MAP[stage.icon] ?? Zap
+          const IconComp = ICON_MAP[stage.icon] ?? Download
+          const color = stage.color
 
-          // PENDING 时：全部阶段为灰色"待处理"，不显示活跃态
-          // 正常运行时：activeIndex 之前为已完成，activeIndex 为活跃，之后为待处理
           const isDone = isSuccess || (!isFailed && !isCancelled && !isPending && activeIndex > idx)
           const isActive = !isSuccess && !isFailed && !isCancelled && !isPending && activeIndex === idx
-          // FAILED 时：若能识别阶段则标红该阶段，否则标红可见阶段中的最后一个
-          const failedIdx = visibleActiveIndex >= 0 ? visibleActiveIndex : visibleStages.length - 1
+          const failedIdx = activeStageIdx >= 0 ? activeStageIdx : visibleStages.length - 1
           const isFail = isFailed && failedIdx === idx
-          // 下载速度仅在 DOWNLOADING 活跃阶段展示
-          const showSpeed = isActive && stage.id === TaskStatus.DOWNLOADING && !!downloadSpeed
+          const showSpeed = isActive && stage.id === TaskStatus.DOWNLOAD && !!downloadSpeed
 
           return (
-            <div key={stage.id} className="flex flex-1 flex-col items-center">
+            <div key={stage.id} className="flex flex-1 flex-col items-center min-w-0">
               {/* 图标圆圈 */}
               <div
                 className={cn(
-                  'flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all duration-300',
-                  isDone && 'border-blue-500 bg-blue-500 text-white',
-                  isActive && 'border-blue-500 bg-blue-50 text-blue-600 shadow-md shadow-blue-100',
+                  'flex h-8 w-8 items-center justify-center rounded-full border-2 transition-all duration-300',
+                  isDone && COLOR_DONE[color],
+                  isActive && `${COLOR_ACTIVE[color]} shadow-md`,
                   isFail && 'border-red-500 bg-red-50 text-red-600',
                   !isDone && !isActive && !isFail && 'border-gray-200 bg-white text-gray-300',
                 )}
               >
                 {isDone ? (
-                  <CheckCircle2 className="h-5 w-5" />
+                  <CheckCircle2 className="h-4 w-4" />
                 ) : isFail ? (
-                  <XCircle className="h-5 w-5" />
+                  <XCircle className="h-4 w-4" />
                 ) : (
-                  <IconComp className="h-4 w-4" />
+                  <IconComp className="h-3.5 w-3.5" />
                 )}
               </div>
 
               {/* 阶段名称 */}
               <span
                 className={cn(
-                  'mt-1.5 text-[11px] font-medium leading-tight',
-                  isDone && 'text-blue-600',
-                  isActive && 'text-blue-700',
+                  'mt-1 text-[10px] font-medium leading-tight text-center',
+                  isDone && COLOR_TEXT[color],
+                  isActive && COLOR_TEXT[color],
                   isFail && 'text-red-600',
                   !isDone && !isActive && !isFail && 'text-gray-400',
                 )}
@@ -148,48 +161,37 @@ const ProcessingStepper: FC<ProcessingStepperProps> = ({ status, progress, steps
 
               {/* 活跃阶段进度条 */}
               {isActive && (
-                <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-blue-100">
+                <div className={cn('mt-1 h-1 w-full overflow-hidden rounded-full', COLOR_BAR_BG[color])}>
                   <div
-                    className="h-full rounded-full bg-blue-500 transition-all duration-500"
+                    className={cn('h-full rounded-full transition-all duration-500', COLOR_BAR[color])}
                     style={{ width: `${Math.round(progress * 100)}%` }}
                   />
                 </div>
               )}
 
-              {/* 下载阶段实时网速（仅 DOWNLOADING 活跃时） */}
+              {/* 下载阶段实时网速 */}
               {showSpeed && (
-                <span className="mt-0.5 text-[10px] font-mono text-blue-600 tabular-nums">
+                <span className="mt-0.5 text-[9px] font-mono text-blue-600 tabular-nums">
                   {downloadSpeed}
                 </span>
-              )}
-
-              {/* 连接线（最后一个不显示） */}
-              {idx < visibleStages.length - 1 && (
-                <div
-                  className={cn(
-                    'absolute mt-4 hidden h-0.5 w-full translate-x-1/2',
-                    // 使用伪元素替代，连接线通过父容器外部实现
-                  )}
-                />
               )}
             </div>
           )
         })}
       </div>
 
-      {/* SUCCESS 全局提示 */}
+      {/* 全局状态提示 */}
       {isSuccess && (
-        <p className="mt-2 text-center text-xs font-medium text-emerald-600">✅ 全部完成</p>
+        <p className="mt-2 text-center text-xs font-medium text-emerald-600">全部完成</p>
       )}
       {isFailed && (
-        <p className="mt-2 text-center text-xs font-medium text-red-500">❌ 处理失败</p>
+        <p className="mt-2 text-center text-xs font-medium text-red-500">处理失败</p>
       )}
       {isCancelled && (
-        <p className="mt-2 text-center text-xs font-medium text-slate-500">⏹ 已取消</p>
+        <p className="mt-2 text-center text-xs font-medium text-slate-500">已取消</p>
       )}
     </div>
   )
 }
 
 export default ProcessingStepper
-

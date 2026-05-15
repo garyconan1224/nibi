@@ -72,9 +72,9 @@ class TaskRunner:
             self.store.append_log(task_id, f"Unsupported task type: {record.task_type}", level="error")
             return
 
-        # "running" 不在新 Enum 内；沿用 LEGACY_MAP 将其规范化为 DOWNLOADING
+        # "running" 不在新 Enum 内；沿用 LEGACY_MAP 将其规范化为 DOWNLOAD
         # （pipeline 主链路起点为下载阶段，语义对齐）。
-        self.store.update(task_id, status=TaskStatus.DOWNLOADING.value, progress=0.01)
+        self.store.update(task_id, status=TaskStatus.DOWNLOAD.value, progress=0.01)
         self.store.append_log(task_id, "Task started")
         try:
             result = handler(record, self)

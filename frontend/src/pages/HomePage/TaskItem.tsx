@@ -10,6 +10,7 @@ import {
   isTaskTerminal,
 } from '@/types/task'
 import { useTaskStore } from '@/store/taskStore'
+import { useTaskSse } from '@/hooks/useTaskSse'
 import ProcessingStepper from './ProcessingStepper'
 import TaskLogViewer from './TaskLogViewer'
 
@@ -52,6 +53,10 @@ const TaskItem: FC<TaskItemProps> = ({ task, onSelect }) => {
 
   // 非终结状态均显示步骤条（含 PENDING 排队中）
   const isActive = !isTaskTerminal(task.status)
+
+  // Phase 1F：活跃任务通过 SSE 实时接收阶段/进度更新，替代 3s 轮询。
+  // 注意：usePipelineTasks 的轮询仍保留作为兜底（任务发现 + SSE 异常时的最终一致性）。
+  useTaskSse(task.task_id, isActive)
   // 仅非终结状态可取消
   const isCancellable = !isTaskTerminal(task.status)
   // 仅失败或取消状态可重试
@@ -125,7 +130,7 @@ const TaskItem: FC<TaskItemProps> = ({ task, onSelect }) => {
               </div>
               <span className="shrink-0 text-[11px] text-blue-600">{progressPct}%</span>
               {/* 下载阶段在头部同步展示网速，单位沿用下载引擎原生输出（MiB/s / KiB/s） */}
-              {downloadSpeed && task.status === 'DOWNLOADING' && (
+              {downloadSpeed && task.status === 'DOWNLOAD' && (
                 <span className="shrink-0 font-mono text-[11px] text-cyan-600 tabular-nums">
                   {downloadSpeed}
                 </span>

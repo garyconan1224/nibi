@@ -28,8 +28,9 @@ def test_task_status_construct_from_value() -> None:
     assert TaskStatus("SUCCESS") is TaskStatus.SUCCESS
 
 
-def test_legacy_running_maps_to_downloading() -> None:
-    assert LEGACY_STATUS_MAP["running"] == TaskStatus.DOWNLOADING
+def test_legacy_running_maps_to_download() -> None:
+    """phase-1 早期 'running' 映射到新 DOWNLOAD（语义对齐 v1.1 §11）。"""
+    assert LEGACY_STATUS_MAP["running"] == TaskStatus.DOWNLOAD
 
 
 def test_legacy_done_maps_to_success() -> None:
@@ -84,7 +85,7 @@ def test_task_record_from_dict_coerces_legacy_lowercase_status() -> None:
     assert rec_failed.status == TaskStatus.FAILED.value == "FAILED"
 
     rec_running = TaskRecord.from_dict({"task_id": "t3", "status": "running"})
-    assert rec_running.status == TaskStatus.DOWNLOADING.value == "DOWNLOADING"
+    assert rec_running.status == TaskStatus.DOWNLOAD.value == "DOWNLOAD"
 
     rec_unknown = TaskRecord.from_dict({"task_id": "t4", "status": "garbage"})
     assert rec_unknown.status == TaskStatus.PENDING.value == "PENDING"

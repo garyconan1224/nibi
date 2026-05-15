@@ -60,28 +60,31 @@ def test_response_envelope_shape(client: TestClient) -> None:
     assert "not found" in body["msg"]
 
 
-def test_status_mapping_analyzing_and_cancelled(client: TestClient) -> None:
-    """VidMirror 独有状态应被映射为 BiliNote 可识别的 7 态之一。
+def test_status_mapping_vlm_and_cancelled(client: TestClient) -> None:
+    """v1.1 §11 新阶段名应被映射为 BiliNote 可识别的 7 态之一。
 
     直接用 `store.create` 绕过 runner 的 worker，避免 handler 异步把状态改掉。
+    VLM（视觉分析）保留旧 ANALYZING → SUMMARIZING 的语义路径。
     """
     store = notes_module._pipeline_store
-    tid = "fake-anz-0001"
+    tid = "fake-vlm-0001"
     store.create(
         TaskRecord(
             task_id=tid,
             project_id="p_test",
             task_type="note",
             payload={"url": "x"},
-            status=TaskStatus.ANALYZING.value,
+            status=TaskStatus.VLM.value,
         )
     )
     r = client.get(f"/api/task_status/{tid}")
-    assert r.json()["data"]["status"] == TaskStatus.SUMMARIZING.value
+    # BiliNote 兼容输出固定为旧名 "SUMMARIZING"（不是 TaskStatus 枚举值）
+    assert r.json()["data"]["status"] == "SUMMARIZING"
 
     store.update(tid, status=TaskStatus.CANCELLED.value)
     body = client.get(f"/api/task_status/{tid}").json()
-    assert body["data"]["status"] == TaskStatus.FAILED.value
+    # 取消态映射为 BiliNote 的 "FAILED" + 标注消息
+    assert body["data"]["status"] == "FAILED"
     assert body["data"]["message"] == "已取消"
 
 
@@ -114,7 +117,7 @@ def test_delete_task_only_terminal(client: TestClient) -> None:
             project_id="p_test",
             task_type="note",
             payload={"url": "x"},
-            status=TaskStatus.DOWNLOADING.value,
+            status=TaskStatus.DOWNLOAD.value,
         )
     )
     r = client.post("/api/delete_task", json={"task_id": tid})

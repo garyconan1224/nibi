@@ -256,3 +256,45 @@ class TestScenarioC:
         # analysis 为空时，markdown 应使用 transcript 内容
         assert result["analysis"] == ""
         assert result["markdown"] == "降级转录内容"
+
+
+# ── Phase 1F：验证 PROBE / STORE 框架级阶段被触发 ────────────────────────────
+
+class TestPhase1FStageTransitions:
+    """Phase 1F 完成标准：除用户勾选的 steps 外，pipeline 必须额外推进
+    PROBE（download 之后）和 STORE（最终 SUCCESS 之前）两个框架级阶段，
+    对齐 v1.1 §11 全流程进度可视化要求。
+    """
+
+    def test_probe_and_store_phases_emit_log_messages(self, tmp_path: Path) -> None:
+        """download-only 场景下，任务日志应包含 PROBE 与 STORE 阶段的进度消息。
+
+        PROBE 进度消息："探测媒体元数据..."
+        STORE 进度消息："归档任务结果..."
+        """
+        fake_video = tmp_path / "videos" / "test.mp4"
+        fake_video.parent.mkdir(parents=True, exist_ok=True)
+        fake_video.touch()
+
+        with (
+            patch("backend.app.services.pipeline_tasks.run_ytdlp_download",
+                  return_value={"ok": True, "save_path": str(fake_video)}),
+            patch("backend.app.services.pipeline_tasks.get_project_videos_dir",
+                  return_value=fake_video.parent),
+            patch("backend.app.services.pipeline_tasks.get_project_json_dir",
+                  return_value=tmp_path / "json"),
+            patch("backend.app.services.pipeline_tasks.load_settings",
+                  return_value=MagicMock(openai_api_key="", vision_model="gpt-4o", text_model="gpt-4o")),
+        ):
+            runner, rec = _make_runner(tmp_path, steps=["download"])
+            done = _wait_for_terminal(runner.store, rec.task_id)
+
+        assert done.status == TaskStatus.SUCCESS.value, done.error
+        # TaskLogEntry 是 dataclass，含 ts/level/message 属性
+        log_messages = " | ".join(entry.message for entry in (done.log or []))
+        assert "探测媒体元数据" in log_messages, (
+            f"PROBE 阶段消息缺失，日志：{log_messages}"
+        )
+        assert "归档任务结果" in log_messages, (
+            f"STORE 阶段消息缺失，日志：{log_messages}"
+        )
