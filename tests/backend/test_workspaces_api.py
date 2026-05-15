@@ -251,3 +251,41 @@ def test_get_workspace_not_found(client: TestClient) -> None:
     """查不存在的 workspace_id 返回 404。"""
     resp = client.get("/workspaces/nonexistent-id")
     assert resp.status_code == 404
+
+
+# ── Phase 1G: 视频结果页聚合接口 ─────────────────────────────────────────────
+
+
+def test_get_item_result_returns_demo_fixture_when_results_empty(client: TestClient) -> None:
+    """happy path：results 空时返回 demo fixture，含 frames + transcript + tracks_meta。"""
+    ws_id = client.post("/workspaces", json={"name": "1G demo"}).json()["workspace_id"]
+    add = client.post(
+        f"/workspaces/{ws_id}/items",
+        json={
+            "type": "video",
+            "source": "url",
+            "source_value": "https://example.com/sample.mp4",
+            "name": "示例视频",
+        },
+    ).json()
+    item_id = add["items"][0]["item_id"]
+
+    resp = client.get(f"/workspaces/{ws_id}/items/{item_id}/result")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["source"] == "demo_fixture"
+    assert body["video"]["item_id"] == item_id
+    assert body["video"]["duration_sec"] > 0
+    assert isinstance(body["frames"], list) and len(body["frames"]) >= 3
+    assert isinstance(body["transcript"], list) and len(body["transcript"]) >= 3
+    assert body["tracks_meta"]["frame_count"] == len(body["frames"])
+    first_frame = body["frames"][0]
+    for key in ("idx", "ts", "sec", "prompt_mj", "prompt_sd", "tags"):
+        assert key in first_frame
+
+
+def test_get_item_result_item_not_found(client: TestClient) -> None:
+    """error path：item_id 不存在返回 404。"""
+    ws_id = client.post("/workspaces", json={"name": "1G 404"}).json()["workspace_id"]
+    resp = client.get(f"/workspaces/{ws_id}/items/nonexistent/result")
+    assert resp.status_code == 404

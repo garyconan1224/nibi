@@ -26,6 +26,7 @@ const AboutPage = lazy(() => import('@/pages/SettingPage/AboutPage'))
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
 const WorkspaceList = lazy(() => import('@/pages/WorkspacePage/WorkspaceList'))
 const WorkspaceDetail = lazy(() => import('@/pages/WorkspacePage/WorkspaceDetail'))
+const VideoResultPage = lazy(() => import('@/pages/result/VideoResultPage'))
 
 // 懒加载 fallback：保持极简，避免把额外依赖拉进主 chunk
 const RouteFallback = () => (
@@ -48,6 +49,10 @@ export const router = createBrowserRouter([
       { path: 'home', element: withSuspense(<HomePage />) },
       { path: 'workspaces', element: withSuspense(<WorkspaceList />) },
       { path: 'workspaces/:id', element: withSuspense(<WorkspaceDetail />) },
+      {
+        path: 'workspaces/:workspaceId/items/:itemId/result',
+        element: withSuspense(<VideoResultPage />),
+      },
       {
         path: 'settings',
         element: withSuspense(<SettingPage />),

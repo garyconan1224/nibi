@@ -39,6 +39,7 @@ from backend.app.models.workspace import (
     WorkspaceRecord,
     WorkspaceStatus,
 )
+from backend.app.services.video_result_demo import build_demo_video_result
 from backend.app.services.workspace_store import WorkspaceStore
 from shared.config import DATA_DIR
 
@@ -630,3 +631,59 @@ def start_item_pipeline(workspace_id: str, item_id: str) -> Dict[str, Any]:
         "task_id": task_rec.task_id,
         "task_type": task_type,
     }
+
+
+# ── Phase 1G: 视频结果页聚合接口 ───────────────────────
+
+
+def _video_result_has_real_data(results: Dict[str, Any]) -> bool:
+    """判断 item.results 里是否已经有可用的 frames + transcript。"""
+    if not isinstance(results, dict):
+        return False
+    frames = results.get("frames")
+    transcript = results.get("transcript")
+    return bool(frames) and isinstance(frames, list) and isinstance(transcript, list)
+
+
+@router.get("/{workspace_id}/items/{item_id}/result")
+def get_item_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
+    """视频结果页聚合数据（v1.1 §5.3 三轨时间轴所需）。
+
+    优先返回 item.results 里的真数据；当 results 尚未由分析管线填充时，
+    退化到 video_result_demo.build_demo_video_result，保证前端三轨可见。
+    """
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+
+    if item.type != ItemType.VIDEO.value:
+        raise HTTPException(
+            status_code=400,
+            detail=f"item type {item.type!r} has no video result (only 'video' supported in Phase 1G)",
+        )
+
+    if _video_result_has_real_data(item.results):
+        payload = dict(item.results)
+        payload.setdefault("source", "item_results")
+        payload.setdefault(
+            "video",
+            {
+                "item_id": item.item_id,
+                "title": item.name,
+                "url": item.source_value if item.source == "url" else "",
+                "duration_sec": payload.get("tracks_meta", {}).get("total_sec", 0),
+                "duration_str": "",
+            },
+        )
+        payload.setdefault(
+            "tracks_meta",
+            {
+                "total_sec": 0,
+                "frame_count": len(payload.get("frames", [])),
+                "transcript_count": len(payload.get("transcript", [])),
+            },
+        )
+        return payload
+
+    return build_demo_video_result(item.item_id, item.name)
