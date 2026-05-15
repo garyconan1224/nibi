@@ -153,3 +153,54 @@ export async function startItemPipeline(
   )
   return res.data
 }
+
+// ── Phase 1G: 视频结果页聚合 ──────────────────────────────
+
+export interface VideoResultFrame {
+  idx: number
+  ts: string
+  sec: number
+  shot_type: string
+  title: string
+  subtitle: string
+  description: string
+  prompt_mj: string
+  prompt_sd: { positive: string; negative: string }
+  prompt_video: string
+  tags: Record<string, string[]>
+}
+
+export interface VideoResultTranscriptLine {
+  t_sec: number
+  t_str: string
+  text: string
+}
+
+export interface VideoResult {
+  source: 'demo_fixture' | 'item_results'
+  video: {
+    item_id: string
+    title: string
+    url: string
+    duration_sec: number
+    duration_str: string
+  }
+  frames: VideoResultFrame[]
+  transcript: VideoResultTranscriptLine[]
+  tracks_meta: {
+    total_sec: number
+    frame_count: number
+    transcript_count: number
+  }
+}
+
+/** GET /workspaces/{id}/items/{itemId}/result — 视频三轨聚合数据 */
+export async function getItemResult(
+  workspaceId: string,
+  itemId: string,
+): Promise<VideoResult> {
+  const res = await http.get<VideoResult>(
+    `${BASE}/${workspaceId}/items/${itemId}/result`,
+  )
+  return res.data
+}
