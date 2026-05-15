@@ -145,13 +145,12 @@ python3 tests/e2e_qa.py
 >
 > **新会话启动必读顺序**：① `nibi-spec-v2.md` → ② `AGENTS.md` → ③ `docs/AI_HANDOFF.md` → ④ `docs/OUTSTANDING_TASKS.md`。其他文件按需读。
 
-> 🚀 **Phase 启动速查**（开工前对照 `nibi-spec-v2.md` §3 表确认）：
-> - **简单阶段**（Phase 0 / 1A / 1B / 1C / 1H / 1I / 1J）：**Sonnet 或 Haiku**，**不开 worktree**，直接在 main 上做。
-> - **复杂阶段**（1D / 1F / 1G）：**Opus 4.7**，**建议新开 worktree**，分支用 `feat/phase<编号>-<短名>` 或 `claude-official/phase<编号>-<短名>` 任一，**不在主 worktree `/Users/conan/Desktop/nibi` 直接改代码**（主 worktree 只用于 merge / 同步）。
+> 🚀 **Phase 启动速查**（开工前对照 `nibi-spec-v2.md` §3 表确认，模型详细规则见下文「模型选择策略」章）：
+> - **简单阶段**（Phase 0 / 1A / 1B / 1C / 1H / 1I / 1J）：**小米 2.5 Pro（终端，⭐免费优先）** / Sonnet / Haiku，**不开 worktree**，直接在 main 上做。日常 git / 跑测试 / 文档改写默认开终端 Claude Code 走小米。
+> - **复杂阶段**（1D / 1F / 1G）：**Opus 4.7（桌面）**，**建议新开 worktree**，分支用 `feat/phase<编号>-<短名>` 或 `claude-official/phase<编号>-<短名>` 任一，**不在主 worktree `/Users/conan/Desktop/nibi` 直接改代码**（主 worktree 只用于 merge / 同步）。
 > - **当前下一步（Phase 1F）**：Opus 4.7 + 新 worktree + 分支 `feat/phase1f-pipeline-sse`（或同义 `claude-official/phase1f-pipeline-sse`）。
 > - **不再做的事**：不再立即 `git push` 占座（用户已确认单 agent 串行）。
-> - **模型升级触发**（即使简单阶段也要升 Opus）：跨文件 ≥ 5 / schema 迁移 + 老数据兼容 / 加密鉴权 API key / AI 自己说"不太确定哪个方案对"。
-> - **模型降级触发**：单文件 < 50 行 / CSS 微调 / 文档改写 / 模板代码 / pytest happy path → 切 Haiku。
+> - **决策速查**：复杂/SSE/状态机/加密 → Opus；中等多文件 CRUD → Sonnet；git/测试/文档/模板 → **小米 2.5 Pro（免费）**；单行 typo → Haiku 或小米。
 
 > ⚠️ **重要**：`plan.md` 描述的是 Phase 0 / 1A 阶段（任务系统初建），但**实际代码已远超那里**——已实现 providers、pipeline、transcript、RAG、workspaces、settings 多页面等。当前分支名（如 `feat/settings-phase2-m0`）和 `README.md` 里的「Phase-2 重构」才是真实状态。
 >
@@ -222,15 +221,47 @@ python3 tests/e2e_qa.py
 
 ---
 
-## 模型升级触发条件
+## 模型选择策略（四档决策树）
 
-如果你（AI）感觉以下情况出现，主动建议用户升级到更强的模型：
+用户同时使用 **桌面 Claude Code**（按额度计费的 Opus / Sonnet / Haiku）和 **终端 Claude Code 接小米 2.5 Pro**（免费，可大量用）。按以下顺序判断，命中即停：
 
-- 跨模块影响超过 5 个文件
-- 涉及数据库 schema 变更 + 老数据兼容
-- 出现"我不太确定哪个方案对"的犹豫
+### 档 1 — Opus 4.7（桌面，付费）：复杂阶段 + 升级触发
+任一命中即用：
+- Phase 1D / 1F / 1G（跨后端+前端+状态机的复杂阶段）
+- 跨文件改动 ≥ 5
+- schema 迁移 + 老数据兼容
+- 加密 / 鉴权 / API key
+- SSE / WebSocket / 状态机一致性
+- 三轨时间轴 / RAG 检索逻辑设计
+- AI 自己说"不太确定哪个方案对"
 
-**反过来——如果当前任务很简单（几行 CRUD、UI 微调），主动建议降级到 Haiku 省 token**。
+### 档 2 — Sonnet 4.6（桌面，付费）：中等复杂多文件
+- 多文件 CRUD（3–5 个文件）
+- 组件级前端开发（新建 React 组件 + 接 API）
+- 需要严谨业务理解但不烧脑的任务
+- Phase 1B / 1C / 1E 的前端部分
+
+### 档 3 — 小米 2.5 Pro（终端，⭐免费优先）：简单任务默认
+**这一档是日常默认**。能用就用，不要因为"小米可能不够强"而升级到 Sonnet 浪费付费额度。
+- git 操作（add / commit / merge / branch / push / 清理 worktree）
+- 跑终端命令验证（pytest happy path、pnpm build、curl 测接口、启动 dev server）
+- 文档改写（README / docs/*.md / 注释润色 / CLAUDE.md 维护）
+- 模板代码（pytest happy path、CRUD 路由骨架、Pydantic schema）
+- CSS token 翻译、Tailwind 配置调整
+- 重复性改写（i18n key 抽取、批量 import 修改）
+- 单文件简单查询 / 解释代码
+- 查文档（fastapi / vite / tailwind 用法）
+
+小米的工具能力：Bash / Read / Write / Edit / Grep / Glob 全套都能用，可独立完成 git 提交、跑测试、改文件。
+
+**小米不擅长 → 升档 1 Opus**：跨 5+ 文件架构、复杂状态机推理、加密鉴权细节、RAG / SSE 一致性。
+
+### 档 4 — Haiku 4.5（桌面，付费）：极简兜底
+- 单行修改 / typo
+- 短得不值得切到终端的任务（< 2 分钟）
+- 小米终端暂时不可用时
+
+> 当小米可用且任务在小米能力范围内时，**优先小米**而非 Haiku（小米免费 + 能力上限更高）。
 
 ---
 

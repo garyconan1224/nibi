@@ -66,19 +66,19 @@
 
 **所有 Phase 编号以本表为准**。详细目标 / 必读 / 改动 / 完成标准见总规划 §7 对应小节。
 
-| Phase | 名称 | 估时 | 分支 | Worktree | 模型 | 状态（2026-05-16） |
+| Phase | 名称 | 估时 | 分支 | Worktree | 模型（⭐ = 免费） | 状态（2026-05-16） |
 |---|---|---|---|---|---|---|
-| 0 | 设计令牌 + AppShell | 2h | main | 否 | Sonnet | ✅ |
-| 1A | 任务列表 API 补字段 | 1h | main | 否 | Sonnet | ✅ |
-| 1B | 任务列表前端 | 3h | main | 否 | Sonnet | ✅ |
+| 0 | 设计令牌 + AppShell | 2h | main | 否 | ⭐小米 2.5 Pro / Sonnet | ✅ |
+| 1A | 任务列表 API 补字段 | 1h | main | 否 | ⭐小米 2.5 Pro / Sonnet | ✅ |
+| 1B | 任务列表前端 | 3h | main | 否 | Sonnet / ⭐小米（骨架） | ✅ |
 | 1C | 设置 → 模型管理 | 2h | main | 否 | Sonnet | ✅ |
 | 1D | 任务详情骨架 + 输入层 | 3h | claude-official/phase1d-* | 是 | Opus | ✅ |
 | 1E | 前置配置面板 | 2h | claude-official/phase1e-* | 是 | Sonnet+Opus | ✅（已合并） |
 | **1F** | **Pipeline + SSE 进度条** | **3h** | **`claude-official/phase1f-pipeline-sse`** | **是（必须新开）** | **Opus 4.7** | **🟡 下一步** |
 | 1G | 视频结果页 + 三轨时间轴 | 5h | claude-official/phase1g-video-result | 是 | Opus | ⏳ |
-| 1H | 图片结果页 | 2h | main | 否 | Sonnet/Haiku | ⏳ |
-| 1I | 工作包 zip 导出 | 2h | main | 否 | Sonnet | ⏳ |
-| 1J | 老代码清理 + Phase 1 收口 | 1h | main | 否 | Haiku | ⏳ 收尾后 tag `v1.0.0-mvp` |
+| 1H | 图片结果页 | 2h | main | 否 | ⭐小米 2.5 Pro / Sonnet | ⏳ |
+| 1I | 工作包 zip 导出 | 2h | main | 否 | ⭐小米 2.5 Pro / Sonnet | ⏳ |
+| 1J | 老代码清理 + Phase 1 收口 | 1h | main | 否 | ⭐小米 2.5 Pro / Haiku | ⏳ 收尾后 tag `v1.0.0-mvp` |
 
 **强制顺序**：1F 必须在 1G 之前完成（1G 的三轨进度依赖 1F 的 SSE）。其余顺序按编号执行。
 
@@ -116,12 +116,37 @@
 
 ---
 
-## 6. 升级 / 降级触发（模型选择）
+## 6. 模型选择策略（四档决策树）
 
-继承总规划 §8：
+用户同时使用 **桌面 Claude Code**（按额度计费的 Opus / Sonnet / Haiku）和 **终端 Claude Code 接小米 2.5 Pro**（免费可大量用）。按顺序判断，命中即停：
 
-- **升 Opus 4.7**：跨文件 ≥ 5 / schema 迁移 + 老数据兼容 / 加密鉴权 API key / AI 自己说"不太确定哪个方案对"。
-- **降 Haiku 或小米 2.5 Pro**：单文件 < 50 行小改 / CSS 微调 / 文档与 README 改写 / 模板代码 / 单测 happy path。
+### 档 1 — Opus 4.7（桌面，付费）：复杂阶段 + 升级触发
+- Phase 1D / 1F / 1G
+- 跨文件 ≥ 5 / schema 迁移 + 老数据兼容 / 加密鉴权 / SSE / 状态机一致性 / 三轨时间轴 / RAG 检索逻辑
+- AI 自己说"不太确定"
+
+### 档 2 — Sonnet 4.6（桌面，付费）：中等复杂多文件
+- 多文件 CRUD（3–5 个文件）/ 组件级前端 / Phase 1B / 1C / 1E 前端
+
+### 档 3 — 小米 2.5 Pro（终端，⭐免费优先）：简单任务默认
+日常默认开终端走小米。能用就用，**不要因为"小米可能不够强"就升 Sonnet 浪费付费额度**。
+- git 全套（add / commit / merge / branch / 清理 worktree）
+- 跑测试 / pnpm build / curl 测接口 / 启动 dev server
+- 文档改写（README / docs/*.md / CLAUDE.md 维护）
+- 模板代码 / pytest happy path / CRUD 路由骨架 / Pydantic schema
+- CSS token 翻译 / Tailwind 配置 / i18n key 抽取
+- 单文件查询 / 解释代码 / 查文档
+
+工具能力：Bash / Read / Write / Edit / Grep / Glob 全套可用。
+**小米不擅长 → 升 Opus**：跨 5+ 文件架构、状态机推理、加密鉴权、RAG / SSE 一致性。
+
+### 档 4 — Haiku 4.5（桌面，付费）：极简兜底
+- 单行修改 / typo / < 2 分钟琐事
+- 小米终端不可用时
+
+> 小米可用且任务在能力内时，**优先小米**而非 Haiku（小米免费且能力上限更高）。
+
+详细使用边界见总规划 §8 工具分工表。
 
 ---
 
