@@ -6,7 +6,7 @@ This is a non-destructive inventory only. Do not delete, prune, or rewrite any w
 
 Primary workspace at inventory time:
 
-- `/Users/conan/Desktop/nibi` -> `bd972eb`, branch `codex/qa-handoff-worktree-sync`, clean, based on current `main`.
+- `/Users/conan/Desktop/nibi` -> `bd972eb`, branch `codex/qa-handoff-worktree-sync`, clean. This was the inventory baseline before the handoff-sync documentation commit was merged.
 
 ## Likely Safe Cleanup Candidates
 
