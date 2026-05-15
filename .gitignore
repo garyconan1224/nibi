@@ -12,6 +12,8 @@ data/videos/
 data/json_data/
 data/cookies/
 data/workspaces/
+data/*.db
+*.sqlite*
 projects/
 runtime.log
 *.log

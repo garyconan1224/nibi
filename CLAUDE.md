@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # 多媒体内容分析系统 — AI 协作规则
 
 > 这是项目级规则，会和 `~/.claude/CLAUDE.md` 全局规则一起生效。
@@ -9,9 +13,102 @@
 ## 项目背景
 
 - **后端**：Python 3.11 + FastAPI + SQLAlchemy + SQLite
-- **前端**：React 18 + TypeScript + Vite + Tailwind CSS
+- **前端**：React 19 + TypeScript + Vite 6 + Tailwind 4
 - **使用对象**：本地优先的桌面创作者工具（非 SaaS）
 - **用户特征**：编程新手，需要每一步都解释清楚在做什么
+
+---
+
+## 当前主线与接力边界
+
+- 当前主线是 **FastAPI 后端 + React/Vite 前端**。
+- `app.py`、`pages/`、`src/vidmirror/ui/` 属于 Streamlit legacy compatibility path；除非用户明确要求维护旧入口，否则不要往这里加新产品功能。
+- 新会话开始时先读 `AGENTS.md`、`docs/AI_HANDOFF.md`、`docs/OUTSTANDING_TASKS.md`，再判断任务边界。
+- 本次仓库卫生之后的下一步只能进入**产品选择**：先让用户选下一条产品主线，不要直接写功能。
+
+---
+
+## 常用命令
+
+### 一键启动（推荐日常用）
+```bash
+./start.sh
+```
+脚本会自动检测/安装 brew、Python 3.10+、ffmpeg、Node、pnpm，创建 `.venv`，装依赖，清端口，并行起后端 + 前端，日志写到 `.local/backend.log` 与 `.local/frontend.log`。
+
+### 单独启动（调试时用）
+```bash
+# 后端（默认 8000，改端口看 .env 里的 BACKEND_PORT）
+uvicorn backend.app.main:app --reload --port 8000
+
+# 前端（默认 5173，改端口看 .env 里的 VITE_PORT）
+cd frontend && pnpm dev
+```
+
+### 测试 / 检查
+```bash
+# 后端测试（CI 用同样命令）
+pytest tests/backend -q
+# 单文件 / 单用例
+pytest tests/backend/test_xxx.py -q
+pytest tests/backend/test_xxx.py::test_foo -q
+
+# 前端
+cd frontend && pnpm lint        # ESLint
+cd frontend && pnpm test        # vitest
+cd frontend && pnpm build       # tsc -b && vite build
+
+# 启动前自检（端口、依赖、.env）
+python3 scripts/preflight_check.py
+
+# 端到端验收
+python3 tests/e2e_qa.py
+```
+
+> 注：根目录暂无 `tests/backend/` 目录树（CI 跑的就是这条命令，本地若缺应先确认是否在某个 worktree/分支里）。新增后端测试时遵循「每个端点 1 个 happy path + 1 个错误路径」。
+
+---
+
+## 高层架构
+
+### 后端（`backend/app/`）
+- 入口 `backend/app/main.py`：模块顶层就 `load_dotenv` 根目录 `.env`（保证 router 模块导入时也能读到环境变量），挂 9 个 router：
+  - `/providers`（providers.py，模型供应商配置）
+  - `/pipeline`（pipeline.py，任务中心；含 SSE `…/events` 和 `…/ws`）
+  - `/transcript`（transcript.py，字幕/转写）
+  - `/rag`（rag.py，向量检索问答）
+  - `/workspaces`（workspaces.py，工作区/项目）
+  - `/admin`（admin.py）
+  - `/api`（notes.py，bilinote 兼容接口）
+  - 无前缀：`download_config.py`、`transcriber_config.py`
+- `lifespan` 钩子在启动时把 `.env` 里的 `SILICONFLOW_API_KEY` 自动 seed 成一个 ProviderProfile（写进 `shared/settings_store`）。
+- CORS 白名单通过 `_build_cors_origins()` 动态生成，优先级：`CORS_ALLOW_ORIGINS` > `VITE_PORT` 推导 > 5173 兜底。
+- 任务执行：`backend/app/services/task_runner.py` 是基于 `ThreadPoolExecutor` 的后台执行器，task 记录写 `task_store`；同 project + 同 URL 的下载任务做幂等去重；状态变化通过 SSE / WebSocket 推给前端。
+
+### 前后端共享层（`shared/`）
+- 这是 **FastAPI 后端 + React 前端 + Streamlit 旧前端 + 命令行脚本共用的代码**。改 `shared/` 里的东西会同时影响多个入口，先评估影响面。
+- 关键模块：`settings_store.py`（providers/global settings 持久化）、`api_key_resolver.py`（多源 API Key 优先级）、`knowledge_base.py`（RAG 索引）、`video_analyzer.py`（视频分析编排）、`video_download_ytdlp.py`（yt-dlp 封装）、`storyboard_generator.py`、`web_enrich.py`。
+
+### 前端（`frontend/src/`）
+- 路由：`router.tsx` 用 React Router v7 Data Router，**所有页面级组件都走 `React.lazy` 代码分割**（动手加新页面时记得也包一层 `withSuspense`）。
+- 状态：zustand，`store/` 下有 6 个 store：`configStore` / `modelStore` / `projectStore` / `providerStore` / `settingsShellStore` / `taskStore`。
+- 服务层：`services/client.ts` 封装 axios；`services/events.ts` 处理 SSE；其它对应后端各 router。
+- Vite 代理：`/api` 与 `/pipeline` 都被代理到后端（看 `vite.config.ts`），所以前端代码里写相对路径就行，不用拼 base URL。
+- 构建：`vite.config.ts` 用 rolldown `codeSplitting.groups` 手动拆 vendor chunk（react / radix / markmap / markdown 等），改依赖时如果引入了大包，考虑加进对应 group。
+- i18n：`locales/i18n.ts` + `i18next-parser.config.js`，文案改动后跑 `i18next-parser` 抽 key。
+
+### 运行时数据（`data/`，默认不应新增入库）
+- `cookies/`（B 站 cookies）、`videos/`（下载产物）、`json_data/`（分析结果）、`projects/` 和 `workspaces/`（工作区数据）。
+- 不要把这里的新文件 commit 进 git，也不要假设它在新机器上存在。已有 tracked 工作区 JSON 如需清理，应单独确认范围。
+
+### 端口与环境变量（关键约定）
+- 单一来源 `.env`，前后端都读它：`BACKEND_PORT`（默认 8000）、`VITE_PORT`（默认 5173）。
+- 前端编译时通过 `VITE_BACKEND_BASE_URL` 知道后端地址（`start.sh` 启前端前会注入）。
+- README、`.env.example` 和 `start.sh` 应保持同一默认端口；如本机 `.env` 覆盖端口，**以 `.env` 实际值为准**。
+
+### 双前端并存（legacy 兼容期）
+- `frontend/`（React，推荐 / 默认入口）
+- `app.py` + `pages/`（Streamlit，legacy 入口，**新功能不要往这边加**）
 
 ---
 
@@ -27,11 +124,18 @@
 
 ## 计划与边界
 
-1. **每次新会话第一件事是读 `plan.md`**，确认当前 Phase 和子任务编号。
-2. **一个会话只做 plan.md 里的一个子任务**，做完就停。
-3. 子任务完成后**主动提醒用户**：「子任务 X.Y 完成，建议 git commit 后开新会话做下一个」。
+> ⚠️ **重要**：`plan.md` 描述的是 Phase 0 / 1A 阶段（任务系统初建），但**实际代码已远超那里**——已实现 providers、pipeline、transcript、RAG、workspaces、settings 多页面等。当前分支名（如 `feat/settings-phase2-m0`）和 `README.md` 里的「Phase-2 重构」才是真实状态。
+>
+> 因此：
+> - **当 `plan.md` 与现实代码冲突时，以代码为准**，并告诉用户 plan.md 需要更新。
+> - 不要按 plan.md 里"建任务系统骨架"那种早期任务去写新代码——很可能已经存在了。
+> - 用户给的子任务编号（比如 settings-phase2-m0）是当前真实计划的来源，优先听用户的。
+
+1. 新会话开始时**同时扫一眼 `plan.md` 和当前 git 分支名**，判断当前真实进度，再问用户这次会话的目标。
+2. **一个会话只做一个明确的子任务**，做完就停。
+3. 子任务完成后**主动提醒用户**：「子任务 X 完成，建议 git commit 后开新会话做下一个」。
 4. **不要主动跨子任务工作**，即使你觉得"顺手就改了"——这破坏了用户的 git 颗粒度。
-5. **不要主动写 plan.md 里没列的功能**。如果觉得需要，先问。
+5. **不要主动写用户没要求的功能**。如果觉得需要，先问。
 
 ---
 
