@@ -4,7 +4,7 @@ Last updated: 2026-05-15
 
 ## Current Scope
 
-This handoff is for repository hygiene and AI collaboration setup only. It intentionally does not introduce business functionality.
+This handoff is for the current FastAPI + React/Vite mainline after Phase 1D local file upload and the multi-agent collision rules were merged.
 
 Primary workspace: `/Users/conan/Desktop/nibi`
 
@@ -12,31 +12,38 @@ Active product line: **FastAPI backend + React/Vite frontend**. Streamlit remain
 
 ## Completed In This Pass
 
-- Removed tracked runtime artifacts from the git index with `git rm --cached` only:
-  - `data/cookies/www.bilibili.com_cookies.txt`
-  - `vidmirror.zip`
-- Confirmed `data/nibi.db` is not currently tracked and was not present in the workspace during this pass.
-- Updated `.gitignore` so future cookies, local databases, sqlite files, and zip archives stay out of git.
-- Added the collaboration foundation files:
-  - `AGENTS.md`
-  - `docs/AI_HANDOFF.md`
-  - `docs/OUTSTANDING_TASKS.md`
-- Updated `README.md` and `CLAUDE.md` to make the active line explicit: FastAPI + React/Vite first, Streamlit legacy.
+- Merged Phase 1D local file upload into `main`:
+  - `79a1356 feat(phase1d): add workspace local file upload`
+  - `0e6bf53 Merge branch 'codex/phase1d-workspace-upload' into main`
+- Merged multi-agent collaboration rules into `main`:
+  - `a891eb1 docs(collab): 多 agent 防撞规则与职责边界`
+  - `bd972eb Merge branch 'claude/upbeat-bohr-11329b' into main`
+- Pushed the verified feature baseline to GitHub. The last feature/collaboration baseline before this handoff sync was `bd972eb`.
+- Verified the merged mainline from Codex:
+  - `.venv/bin/pytest tests/backend/test_workspaces_api.py -q` -> `8 passed`
+  - `cd frontend && pnpm build` -> passed
+  - frontend Vitest files run individually -> `8 passed`
+- Added `docs/WORKTREE_INVENTORY.md` as a non-destructive inventory of old Codex/Claude worktrees.
 
 ## Do Next
 
-Next session must enter **product selection only**. Do not write feature code in the same step.
+Next implementation session should start a single Claude build task for **Phase 1E network link input**, unless the user changes direction.
 
-Recommended product-selection questions:
+Recommended Phase 1E boundary:
 
-1. Which user journey is the next primary product lane: project/workspace setup, media ingestion, analysis review, or script/storyboard output?
-2. What is the smallest user-visible success state for that lane?
-3. Which artifact should be considered the MVP output: analysis report, storyboard, script draft, or workspace state?
-4. What should happen to Streamlit during this phase: keep frozen, hide from docs, or schedule removal?
+1. Let users add a network media URL to a workspace from the React workspace detail page.
+2. Persist the link as a workspace material/item through the FastAPI workspace API.
+3. Show clear loading, success, empty, and error states in the existing UI.
+4. Add or update the narrowest useful backend tests and run frontend build checks.
+5. Do not start Phase 1F pre-configuration panel work in the same session.
 
 ## Guardrails For The Next Agent
 
-- Do not implement product features before the user chooses the product direction.
+- Follow the multi-agent rules in `CLAUDE.md` and `AGENTS.md`.
+- Claude official / Claude Xiaomi are build agents. Codex is for checks, tests, branch comparison, and next-step advice.
+- Before editing, run `git fetch --all --prune`, `git status --short --branch`, `git worktree list`, `git branch -a`, and `git log --oneline HEAD..main`.
+- Start Phase 1E on a new Claude build branch such as `claude-official/phase1e-network-link-input`.
+- If a same-topic worktree or branch exists, stop and ask the user before implementing.
 - Do not commit runtime data, local cookies, sqlite databases, zip files, logs, `.env`, or downloaded media.
 - Do not delete local real files when cleaning git history unless the user explicitly asks for deletion.
-- If another cleanup pass is requested, prefer `git rm --cached` for tracked local artifacts.
+- Do not clean old worktrees inside the Phase 1E commit. Use `docs/WORKTREE_INVENTORY.md` for a separate cleanup decision.

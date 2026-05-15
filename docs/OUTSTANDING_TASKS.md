@@ -1,29 +1,39 @@
 # Outstanding Tasks
 
-This file tracks coordination work that should happen before the next implementation pass. It is intentionally product-facing and does not ask the next agent to start coding immediately.
+This file tracks coordination and product work that should happen before the next implementation pass.
 
-## P0 - Product Selection Only
+## P0 - Current Mainline State
 
-- Choose the next primary product lane:
-  - project/workspace setup
-  - media ingestion
-  - analysis review
-  - script/storyboard output
-- Define the smallest user-visible success state for the chosen lane.
-- Choose the MVP artifact for that lane: report, storyboard, script draft, workspace state, or another explicit output.
-- Decide how visible Streamlit should remain during this phase: frozen legacy entry, hidden from user-facing docs, or scheduled for removal.
+- The verified feature/collaboration baseline before this handoff sync is `bd972eb`.
+- Phase 1D local file upload is merged.
+- Multi-agent collision rules are merged into `CLAUDE.md` and `AGENTS.md`.
+- Codex QA after merge:
+  - backend workspace API tests passed: `8 passed`
+  - frontend build passed
+  - frontend Vitest files passed individually: `8 passed`
 
-## P0 - Repository Hygiene Follow-Up
+## P0 - Next Build Task
 
-- Commit the hygiene changes as their own small commit if the user approves.
-- After the commit, re-check that cookies, sqlite databases, local db files, zip archives, logs, and downloaded media do not appear in `git status`.
-- Keep `data/workspaces/*.json` under review separately. They are currently outside this pass because the requested scope was cookies, local databases, and zip archives.
+- Recommended next task: **Phase 1E network link input**.
+- Build owner should be Claude official or Claude Xiaomi, not Codex.
+- Suggested branch: `claude-official/phase1e-network-link-input`.
+- Keep the session scoped to network link input only. Do not include Phase 1F pre-configuration panel work.
+- Codex should review/test the completed branch before it is merged.
 
-## P1 - After Product Selection
+## P0 - Worktree Cleanup Follow-Up
 
-- Convert the selected product lane into a short implementation plan.
-- Confirm the plan with the user before editing business logic.
-- Then implement one narrow slice per session, with verification attached to that slice.
+- Review `docs/WORKTREE_INVENTORY.md` before deleting any old worktree.
+- Do not remove dirty worktrees without first inspecting, stashing, or confirming the local changes.
+- Do not mix worktree cleanup with Phase 1E feature work.
+
+## P1 - After Phase 1E
+
+- Run Codex QA on the Phase 1E branch:
+  - relevant backend tests
+  - frontend build
+  - narrow UI smoke check if a dev server is available
+- Merge only after the user confirms the reviewed branch.
+- Then choose between Phase 1F pre-configuration panel and worktree cleanup.
 
 ## Deferred Technical Debt
 
