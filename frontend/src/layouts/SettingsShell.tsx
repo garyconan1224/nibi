@@ -162,7 +162,7 @@ export function SettingsShell({
     [tabs, t],
   )
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden">
+    <div className="flex h-full w-full flex-col overflow-hidden">
       <header className="flex h-16 items-center justify-between border-b border-border bg-background px-6">
         <Link
           to="/"

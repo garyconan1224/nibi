@@ -56,7 +56,7 @@ export function WorkbenchShell({
   const health = useBackendHealth()
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden">
+    <div className="flex h-full w-full flex-col overflow-hidden">
       <header className="flex h-16 shrink-0 items-center justify-between gap-4 border-b border-border bg-background px-6">
         <div className="flex min-w-0 items-center gap-3">
           <span className="inline-flex size-8 items-center justify-center rounded-md bg-violet-100 text-violet-600">

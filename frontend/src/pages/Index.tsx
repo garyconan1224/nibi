@@ -1,13 +1,13 @@
 import { Outlet } from 'react-router-dom'
 import { Toaster } from 'sonner'
+import { AppShell } from '@/layouts/AppShell'
 
-const Index = () => {
-  return (
-    <>
-      <Outlet />
-      <Toaster position="top-right" richColors />
-    </>
-  )
-}
+const Index = () => (
+  <AppShell>
+    <Outlet />
+    <Toaster position="top-right" richColors />
+  </AppShell>
+)
+
 export default Index
 

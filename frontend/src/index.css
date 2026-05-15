@@ -1,6 +1,18 @@
 @import 'tailwindcss';
 
 @custom-variant dark (&:is(.dark *));
+
+/* VidMirror design tokens */
+:root {
+  --vm-accent:       #FF4D7E;
+  --vm-accent-2:     #B84CFF;
+  --vm-accent-3:     #3C77FB;
+  --vm-accent-warm:  #FFB84C;
+  --vm-accent-green: #22D39A;
+  --vm-sans: 'Inter', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  --vm-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  --vm-display: 'Instrument Serif', 'Source Han Serif SC', 'Noto Serif SC', Georgia, serif;
+}
 html, body, #root {
   height: 100%;
   overflow: hidden;
