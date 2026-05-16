@@ -12,6 +12,7 @@ import {
   FileAudio,
   FileText,
   PlayCircle,
+  Eye,
   Settings2,
   Upload,
   X,
@@ -392,6 +393,16 @@ export default function WorkspaceDetail() {
                       item={it}
                       onConfigure={() => handleConfigureItem(it)}
                       onRemove={() => handleRemoveItem(it.item_id)}
+                      onViewResult={() => {
+                        const map: Record<string, string> = {
+                          video: 'result',
+                          audio: 'audio_result',
+                          image: 'image_result',
+                          text: 'text_result',
+                        }
+                        const suffix = map[it.type] ?? 'result'
+                        navigate(`/workspaces/${workspace.workspace_id}/items/${it.item_id}/${suffix}`)
+                      }}
                     />
                   ))}
                 </div>
@@ -722,10 +733,12 @@ function ItemRow({
   item,
   onConfigure,
   onRemove,
+  onViewResult,
 }: {
   item: WorkspaceItem
   onConfigure: () => void
   onRemove: () => void
+  onViewResult: () => void
 }) {
   const Icon = TYPE_ICON_MAP[item.type]
   const taskCount = item.related_task_ids.length
@@ -757,6 +770,17 @@ function ItemRow({
               ? '完成'
               : '失败'}
       </Badge>
+      {item.status === 'done' && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onViewResult}
+          className="shrink-0"
+        >
+          <Eye className="mr-1 h-3.5 w-3.5" />
+          查看结果
+        </Button>
+      )}
       <Button
         size="sm"
         variant={canStart ? 'default' : 'outline'}
