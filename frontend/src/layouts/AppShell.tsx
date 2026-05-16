@@ -6,6 +6,7 @@ import {
   Settings,
   Search,
   Sparkles,
+  Star,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -20,6 +21,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'home', path: '/home', icon: Home, label: '工作台' },
   { id: 'workspaces', path: '/workspaces', icon: Library, label: '工作区' },
+  { id: 'favorites', path: '/favorites', icon: Star, label: '收藏夹' },
 ]
 
 const BOTTOM_ITEMS: NavItem[] = [
