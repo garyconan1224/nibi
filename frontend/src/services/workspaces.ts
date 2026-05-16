@@ -266,6 +266,61 @@ export async function getAudioItemResult(
   return res.data
 }
 
+// ── Phase 2C.2: 文本结果页 + 提示词版本栈 ──────────────────
+
+export interface PromptVersion {
+  version: number
+  content: string
+  created_at: string
+}
+
+export interface TextResult {
+  source: string
+  title: string
+  content: string
+  summary: string
+  char_count: number
+  source_type: string
+  source_url: string
+  meta: Record<string, unknown>
+  prompt_versions: PromptVersion[]
+}
+
+/** GET /workspaces/{id}/items/{itemId}/text_result — 文本结果页聚合数据 */
+export async function getTextItemResult(
+  workspaceId: string,
+  itemId: string,
+): Promise<TextResult> {
+  const res = await http.get<TextResult>(
+    `${BASE}/${workspaceId}/items/${itemId}/text_result`,
+  )
+  return res.data
+}
+
+/** POST /workspaces/{id}/items/{itemId}/prompts/versions — 追加提示词版本 */
+export async function addPromptVersion(
+  workspaceId: string,
+  itemId: string,
+  content: string,
+): Promise<PromptVersion> {
+  const res = await http.post<PromptVersion>(
+    `${BASE}/${workspaceId}/items/${itemId}/prompts/versions`,
+    { content },
+  )
+  return res.data
+}
+
+/** GET /workspaces/{id}/items/{itemId}/prompts/versions — 列出提示词版本 */
+export async function listPromptVersions(
+  workspaceId: string,
+  itemId: string,
+): Promise<PromptVersion[]> {
+  const res = await http.get<PromptVersion[]>(
+    `${BASE}/${workspaceId}/items/${itemId}/prompts/versions`,
+  )
+  return res.data
+}
+
 /** GET /workspaces/{id}/items/{itemId}/export — 下载复刻工作包 zip */
 export async function downloadExport(workspaceId: string, itemId: string): Promise<void> {
   const res = await http.get(`${BASE}/${workspaceId}/items/${itemId}/export`, {

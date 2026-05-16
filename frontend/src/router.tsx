@@ -30,6 +30,7 @@ const WorkspaceDetail = lazy(() => import('@/pages/WorkspacePage/WorkspaceDetail
 const VideoResultPage = lazy(() => import('@/pages/result/VideoResultPage'))
 const ImageResultPage = lazy(() => import('@/pages/result/ImageResultPage'))
 const AudioResultPage = lazy(() => import('@/pages/result/AudioResultPage'))
+const TextResultPage = lazy(() => import('@/pages/result/TextResultPage'))
 const FavoritesPage = lazy(() => import('@/pages/FavoritesPage/FavoritesPage'))
 
 // 懒加载 fallback：保持极简，避免把额外依赖拉进主 chunk
@@ -65,6 +66,10 @@ export const router = createBrowserRouter([
       {
         path: 'workspaces/:workspaceId/items/:itemId/audio_result',
         element: withSuspense(<AudioResultPage />),
+      },
+      {
+        path: 'workspaces/:workspaceId/items/:itemId/text_result',
+        element: withSuspense(<TextResultPage />),
       },
       {
         path: 'settings',
