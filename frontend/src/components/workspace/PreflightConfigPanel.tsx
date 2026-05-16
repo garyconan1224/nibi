@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-import { useProviderStore } from '@/store/providerStore'
+import { useProviderStore, type Model } from '@/store/providerStore'
 import type {
   ItemType,
   PreflightSaveRequest,
@@ -88,11 +88,20 @@ export default function PreflightConfigPanel({
   const [visionProviderId, setVisionProviderId] = useState('')
   const [textProviderId, setTextProviderId] = useState('')
   const [videoProviderId, setVideoProviderId] = useState('')
+  const [visionModelId, setVisionModelId] = useState('')
+  const [textModelId, setTextModelId] = useState('')
+  const [videoModelId, setVideoModelId] = useState('')
 
   // ── 3. 任务勾选 state（与 item.type 强相关） ─────
   const [tasks, setTasks] = useState<Record<string, boolean>>({})
 
-  const { providers, loading: providersLoading, fetchProviders } = useProviderStore()
+  const {
+    providers,
+    loading: providersLoading,
+    fetchProviders,
+    providerModels,
+    modelsLoading,
+  } = useProviderStore()
 
   // 首次打开拉一次 providers
   useEffect(() => {
@@ -111,12 +120,26 @@ export default function PreflightConfigPanel({
     setGlossary((bg.glossary ?? []).join(', '))
     setPurpose(bg.purpose ?? '')
 
-    setVisionProviderId(item.preflight.models?.vision ?? '')
-    setTextProviderId(item.preflight.models?.text ?? '')
-    setVideoProviderId(item.preflight.models?.video ?? '')
+    // models 里存的是模型 ID，回填时反查它属于哪家 provider
+    const findProviderByModel = (modelId: string): string => {
+      if (!modelId) return ''
+      for (const [pid, list] of Object.entries(providerModels)) {
+        if (list?.some((m) => m.id === modelId)) return pid
+      }
+      return ''
+    }
+    const vId = item.preflight.models?.vision ?? ''
+    const tId = item.preflight.models?.text ?? ''
+    const vidId = item.preflight.models?.video ?? ''
+    setVisionModelId(vId)
+    setTextModelId(tId)
+    setVideoModelId(vidId)
+    setVisionProviderId(findProviderByModel(vId))
+    setTextProviderId(findProviderByModel(tId))
+    setVideoProviderId(findProviderByModel(vidId))
 
     setTasks((item.preflight.tasks as Record<string, boolean>) ?? {})
-  }, [open, item])
+  }, [open, item, providerModels])
 
   // 默认勾选项（仅在用户未配置过时使用，避免覆盖已保存值）
   const taskOptions = useMemo(() => getTaskOptionsByType(item.type), [item.type])
@@ -148,9 +171,9 @@ export default function PreflightConfigPanel({
         purpose: purpose.trim(),
       },
       models: {
-        ...(visionProviderId && { vision: visionProviderId }),
-        ...(textProviderId && { text: textProviderId }),
-        ...(videoProviderId && { video: videoProviderId }),
+        ...(visionModelId && { vision: visionModelId }),
+        ...(textModelId && { text: textModelId }),
+        ...(videoModelId && { video: videoModelId }),
       },
       tasks: { ...tasks },
     }
@@ -259,23 +282,44 @@ export default function PreflightConfigPanel({
             </div>
           ) : (
             <div className="space-y-3">
-              <ProviderPicker
+              <ModelPicker
                 label="视觉大模型（截帧分析 / 图片分析）"
-                value={visionProviderId}
-                onChange={setVisionProviderId}
                 providers={visionProviders}
+                providerValue={visionProviderId}
+                modelValue={visionModelId}
+                onProviderChange={(pid) => {
+                  setVisionProviderId(pid)
+                  setVisionModelId('')
+                }}
+                onModelChange={setVisionModelId}
+                providerModels={providerModels}
+                modelsLoading={modelsLoading}
               />
-              <ProviderPicker
+              <ModelPicker
                 label="文本大模型（总结 / 归纳 / 对话）"
-                value={textProviderId}
-                onChange={setTextProviderId}
                 providers={textProviders}
+                providerValue={textProviderId}
+                modelValue={textModelId}
+                onProviderChange={(pid) => {
+                  setTextProviderId(pid)
+                  setTextModelId('')
+                }}
+                onModelChange={setTextModelId}
+                providerModels={providerModels}
+                modelsLoading={modelsLoading}
               />
-              <ProviderPicker
+              <ModelPicker
                 label="视频大模型（仅勾选「视频模型直接分析」时启用）"
-                value={videoProviderId}
-                onChange={setVideoProviderId}
                 providers={videoProviders}
+                providerValue={videoProviderId}
+                modelValue={videoModelId}
+                onProviderChange={(pid) => {
+                  setVideoProviderId(pid)
+                  setVideoModelId('')
+                }}
+                onModelChange={setVideoModelId}
+                providerModels={providerModels}
+                modelsLoading={modelsLoading}
               />
             </div>
           )}
@@ -338,40 +382,77 @@ export default function PreflightConfigPanel({
   )
 }
 
-// ── 子组件：provider 下拉 ─────────────────────────────
+// ── 子组件：provider + model 两级下拉 ─────────────────
 
-function ProviderPicker({
+function ModelPicker({
   label,
-  value,
-  onChange,
   providers,
+  providerValue,
+  modelValue,
+  onProviderChange,
+  onModelChange,
+  providerModels,
+  modelsLoading,
 }: {
   label: string
-  value: string
-  onChange: (id: string) => void
   providers: { id: string; name: string }[]
+  providerValue: string
+  modelValue: string
+  onProviderChange: (id: string) => void
+  onModelChange: (id: string) => void
+  providerModels: Record<string, Model[]>
+  modelsLoading: Record<string, boolean>
 }) {
+  const models = providerValue ? providerModels[providerValue] ?? [] : []
+  const isLoading = providerValue ? !!modelsLoading[providerValue] : false
+  const modelDisabled = !providerValue || isLoading || models.length === 0
+
+  let modelPlaceholder = '请先选供应商'
+  if (providerValue) {
+    if (isLoading) modelPlaceholder = '加载模型中…'
+    else if (models.length === 0) modelPlaceholder = '该供应商无可用模型'
+    else modelPlaceholder = '选择模型'
+  }
+
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger>
-          <SelectValue placeholder="选择 provider" />
-        </SelectTrigger>
-        <SelectContent>
-          {providers.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-muted-foreground">
-              没有具备此能力的 provider
-            </div>
-          ) : (
-            providers.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name}
+      <div className="grid grid-cols-2 gap-2">
+        <Select value={providerValue} onValueChange={onProviderChange}>
+          <SelectTrigger>
+            <SelectValue placeholder="选择供应商" />
+          </SelectTrigger>
+          <SelectContent>
+            {providers.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-muted-foreground">
+                没有具备此能力的 provider
+              </div>
+            ) : (
+              providers.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))
+            )}
+          </SelectContent>
+        </Select>
+        <Select
+          value={modelValue}
+          onValueChange={onModelChange}
+          disabled={modelDisabled}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder={modelPlaceholder} />
+          </SelectTrigger>
+          <SelectContent>
+            {models.map((m) => (
+              <SelectItem key={m.id} value={m.id}>
+                {m.name || m.id}
               </SelectItem>
-            ))
-          )}
-        </SelectContent>
-      </Select>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   )
 }
