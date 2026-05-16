@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Check, Copy, Pause, Play, Settings2, Star } from 'lucide-react'
+import { ArrowLeft, Check, Copy, Download, Pause, Play, Settings2, Star } from 'lucide-react'
 
 import {
   type VideoResult,
   type VideoResultFrame,
+  downloadExport,
   getItemResult,
 } from '@/services/workspaces'
 import {
@@ -248,6 +249,15 @@ export default function VideoResultPage() {
     })
   }, [frame, activeFrame, workspaceId, itemId])
 
+  const handleExport = useCallback(async () => {
+    try {
+      await downloadExport(workspaceId, itemId)
+      toast.success('工作包已下载')
+    } catch (err) {
+      toast.error('导出失败：' + (err instanceof Error ? err.message : '未知'))
+    }
+  }, [workspaceId, itemId])
+
   const openPicker = useCallback(() => {
     if (!formatsCfg) return
     setPickerSelection(
@@ -417,6 +427,14 @@ export default function VideoResultPage() {
               DEMO
             </span>
           )}
+          <button
+            className="btn-ghost"
+            onClick={handleExport}
+            title="导出复刻工作包 (.zip)"
+            style={{ height: 28, padding: '0 10px', fontSize: 12, flexShrink: 0 }}
+          >
+            <Download size={13} /> 导出
+          </button>
         </div>
 
         {/* 播放器 */}

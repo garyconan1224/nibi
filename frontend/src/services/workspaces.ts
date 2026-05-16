@@ -235,3 +235,25 @@ export async function getImageResult(
   )
   return res.data
 }
+
+/** GET /workspaces/{id}/items/{itemId}/export — 下载复刻工作包 zip */
+export async function downloadExport(workspaceId: string, itemId: string): Promise<void> {
+  const res = await http.get(`${BASE}/${workspaceId}/items/${itemId}/export`, {
+    responseType: 'blob',
+  })
+  // 从 Content-Disposition 提取文件名
+  const disposition = res.headers['content-disposition'] as string | undefined
+  let filename = '复刻工作包.zip'
+  if (disposition) {
+    const match = disposition.match(/filename\*=(?:UTF-8''|")?([^";]+)/i)
+    if (match) filename = decodeURIComponent(match[1])
+  }
+  const url = URL.createObjectURL(res.data as Blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}

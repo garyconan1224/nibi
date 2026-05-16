@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Check, Copy, Settings2, Star } from 'lucide-react'
+import { ArrowLeft, Check, Copy, Download, Settings2, Star } from 'lucide-react'
 
 import {
   type ImageResult,
+  downloadExport,
   getImageResult,
 } from '@/services/workspaces'
 import {
@@ -127,6 +128,15 @@ export default function ImageResultPage() {
       return next
     })
   }, [])
+
+  const handleExport = useCallback(async () => {
+    try {
+      await downloadExport(workspaceId, itemId)
+      toast.success('工作包已下载')
+    } catch (err) {
+      toast.error('导出失败：' + (err instanceof Error ? err.message : '未知'))
+    }
+  }, [workspaceId, itemId])
 
   const openPicker = useCallback(() => {
     if (!formatsCfg) return
@@ -262,6 +272,14 @@ export default function ImageResultPage() {
               DEMO
             </span>
           )}
+          <button
+            className="btn-ghost"
+            onClick={handleExport}
+            title="导出复刻工作包 (.zip)"
+            style={{ height: 28, padding: '0 10px', fontSize: 12, flexShrink: 0 }}
+          >
+            <Download size={13} /> 导出
+          </button>
         </div>
 
         {/* 原图区域 */}
