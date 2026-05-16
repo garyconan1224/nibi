@@ -38,7 +38,7 @@ def build_demo_audio_result(item_id: str, item_name: str = "") -> Dict[str, Any]
         "source": "demo_fixture",
         "audio": {
             "item_id": item_id,
-            "title": item_name or "大疆 Pocket 4 首发体验（音频）",
+            "title": item_name if item_name else "未命名音频",
             "url": "",  # 真实管线接入后填本地 mp3/m4a 路径 / 远端 URL
             "duration_sec": DEMO_TOTAL_SEC,
             "duration_str": "06:42",

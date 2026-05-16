@@ -804,6 +804,13 @@ def get_audio_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
                 "duration_str": "",
             },
         )
+        payload.setdefault(
+            "tracks_meta",
+            {
+                "total_sec": results.get("tracks_meta", {}).get("total_sec", 0),
+                "transcript_count": len(results.get("transcript", [])),
+            },
+        )
         return payload
 
     return build_demo_audio_result(item.item_id, item.name)
