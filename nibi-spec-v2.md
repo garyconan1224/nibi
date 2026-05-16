@@ -78,9 +78,14 @@
 | **1G** | **视频结果页 + 三轨时间轴** | **5h** | **feat/phase1g-video-result** | **是（必须新开）** | **Opus 4.7** | **🟡 下一步** |
 | 1H | 图片结果页 | 2h | main | 否 | ⭐小米 2.5 Pro / Sonnet | ⏳ |
 | 1I | 工作包 zip 导出 | 2h | main | 否 | ⭐小米 2.5 Pro / Sonnet | ⏳ |
-| 1J | 老代码清理 + Phase 1 收口 | 1h | main | 否 | ⭐小米 2.5 Pro / Haiku | ⏳ 收尾后 tag `v1.0.0-mvp` |
+| 1J | 老代码清理 + Phase 1 收口 | 1h | main | 否 | ⭐小米 2.5 Pro / Haiku | ✅ 收尾后 tag `v1.0.0-mvp` |
+| **2A** | LLM 对话侧栏（workspace-aware）+ 收藏夹管理页 | 4–5h | `feat/phase2a-llm-favorites` | 是 | Opus 4.7 | ⏳ |
+| **2B** | 音频结果页 | 2–3h | main | 否 | Sonnet 4.6 | ⏳ |
+| **2C.1** | 文本输入层（PDF/DOCX/网页正文） | 3h | `feat/phase2c1-text-input` | 是 | Opus 4.7 | ⏳ |
+| **2C.2** | 文本结果页 + 提示词版本栈 | 3h | `feat/phase2c2-text-prompt-version` | 是 | Sonnet 4.6 + Opus 兜底 | ⏳ |
+| **2D** | SQLite 切换评估（仅评估，不一定迁移） | 1h | main | 否 | ⭐小米 2.5 Pro / Sonnet | ⏳ Phase 2 收尾后 tag `v1.1.0` |
 
-**强制顺序**：1F 必须在 1G 之前完成（1G 的三轨进度依赖 1F 的 SSE）。其余顺序按编号执行。
+**强制顺序**：1F 必须在 1G 之前完成（1G 的三轨进度依赖 1F 的 SSE）。**Phase 2 强制顺序**：2A → 2B / 2C（2B 与 2C 之间无依赖，可任选先后）→ 2D。其余顺序按编号执行。
 
 **分支命名**：复杂阶段开 `feat/<编号>-<短名>` 或 `claude-official/<task>` 都可，由用户选；不再要求立即 push 占座（单 agent 串行不需要）。
 
@@ -162,6 +167,9 @@
 | 进度条 SSE 在反代下断开 | Phase 1F 加 30s 心跳 + 自动重连 |
 | 三轨时间轴 1G 卡住 | 1G 单独开分支 + 预留 5h + 用 Opus |
 | API key 明文 | 开源前必跑 Phase 4 加密；README 加显眼警告 |
+| 2C.1 新增 PDF/DOCX/网页解析依赖未确认 | 开工前必须 ask 用户确认包选型（推荐 `pypdf` + `python-docx` + `readability-lxml`，避免 `unstructured` 重依赖） |
+| 2C.2 提示词版本栈改 workspace schema | 老工作区兼容策略：`prompt_versions` 默认空数组；不写迁移脚本，但落地前需用户确认 |
+| 2A chat_history 写位置选错加速 SQLite 临界点 | 推荐存 `data/chats/<workspace_id>.jsonl` 解耦，不进 workspace JSON |
 
 ---
 
