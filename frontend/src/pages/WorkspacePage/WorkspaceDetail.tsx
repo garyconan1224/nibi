@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import axios from 'axios'
+import { ChatSidebar } from '@/components/workspace/ChatSidebar'
 import {
   ArrowLeft,
   Plus,
@@ -703,6 +704,7 @@ export default function WorkspaceDetail() {
           submitting={preflightSubmitting}
         />
       )}
+      <ChatSidebar workspaceId={workspace.workspace_id} />
     </div>
   )
 }
