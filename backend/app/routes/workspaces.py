@@ -18,6 +18,7 @@ from __future__ import annotations
   DELETE /workspaces/{ws_id}/favorites/{id}    取消收藏
 """
 
+import json
 import re
 import shutil
 import uuid
@@ -122,6 +123,12 @@ class PreflightSaveRequest(BaseModel):
         default_factory=dict,
         description="勾选项及子参数；结构按 item.type 区分",
     )
+
+
+class PromptVersionRequest(BaseModel):
+    """提示词版本新增请求体。"""
+
+    content: str = Field(min_length=1, description="提示词内容")
 
 
 # ── 内部小工具 ────────────────────────────────────────────
@@ -819,3 +826,103 @@ def get_audio_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
         return payload
 
     return build_demo_audio_result(item.item_id, item.name)
+
+
+# ── 文本结果页（Phase 2C.2）───────────────────────────────────
+
+
+def _read_text_result_from_disk(task_id: str, project_id: str) -> Optional[Dict[str, Any]]:
+    """从磁盘读取 text 任务产物（data/projects/<pid>/text/<task_id>.json）。"""
+    json_path = DATA_DIR / "projects" / project_id / "text" / f"{task_id}.json"
+    if not json_path.is_file():
+        return None
+    try:
+        return json.loads(json_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+@router.get("/{workspace_id}/items/{item_id}/text_result")
+def get_text_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
+    """文本结果页聚合数据（Phase 2C.2）。
+
+    查找顺序：
+      1. item.results（task_runner 已回写）
+      2. item.related_task_ids → task_store → 磁盘 JSON 文件
+    同时附带 prompt_versions 供前端展示提示词版本栈。
+    """
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+
+    if item.type != ItemType.TEXT.value:
+        raise HTTPException(
+            status_code=400,
+            detail=f"item type {item.type!r} has no text result (only 'text' supported)",
+        )
+
+    # 优先从 item.results 读取
+    results = item.results or {}
+    has_real = isinstance(results, dict) and results.get("content") and results.get("title")
+    if has_real:
+        payload = dict(results)
+        payload.setdefault("source", "item_results")
+        payload["prompt_versions"] = [
+            pv.to_dict() for pv in rec.prompt_versions.get(item_id) or []
+        ]
+        return payload
+
+    # 回退：从 task_store + 磁盘文件读取
+    project_id = rec.project_id.strip() or "default_project"
+    for task_id in reversed(item.related_task_ids):
+        task = _pipeline_runner.store.get(task_id)
+        if task is None:
+            continue
+        task_result = task.result or {}
+        # 优先用 task.result 里的数据
+        if task_result.get("content") and task_result.get("title"):
+            payload = dict(task_result)
+            payload.setdefault("source", "task_result")
+            payload["prompt_versions"] = [
+                pv.to_dict() for pv in rec.prompt_versions.get(item_id) or []
+            ]
+            return payload
+        # 再尝试磁盘 JSON
+        disk_data = _read_text_result_from_disk(task_id, project_id)
+        if disk_data and disk_data.get("content"):
+            disk_data.setdefault("source", "disk_json")
+            disk_data["prompt_versions"] = [
+                pv.to_dict() for pv in rec.prompt_versions.get(item_id) or []
+            ]
+            return disk_data
+
+    raise HTTPException(
+        status_code=404,
+        detail="text result not ready: no completed text task found for this item",
+    )
+
+
+# ── 提示词版本栈（Phase 2C.2）────────────────────────────
+
+
+@router.post("/{workspace_id}/items/{item_id}/prompts/versions")
+def add_prompt_version(
+    workspace_id: str, item_id: str, req: PromptVersionRequest
+) -> Dict[str, Any]:
+    """为指定素材追加一个提示词版本。"""
+    try:
+        pv = _store.add_prompt_version(workspace_id, item_id, req.content)
+    except KeyError as err:
+        raise HTTPException(status_code=404, detail=str(err)) from err
+    return pv.to_dict()
+
+
+@router.get("/{workspace_id}/items/{item_id}/prompts/versions")
+def list_prompt_versions(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
+    """列出指定素材的所有提示词版本。"""
+    try:
+        versions = _store.list_prompt_versions(workspace_id, item_id)
+    except KeyError as err:
+        raise HTTPException(status_code=404, detail=str(err)) from err
+    return [pv.to_dict() for pv in versions]
