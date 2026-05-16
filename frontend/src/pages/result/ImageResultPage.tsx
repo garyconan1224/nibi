@@ -62,7 +62,7 @@ export default function ImageResultPage() {
     return () => { cancelled = true }
   }, [])
 
-  // 拉图片结果数据
+  // 拉图片结果 + 提示词版本（合并为单个 effect 避免重复 cleanup）
   useEffect(() => {
     let cancelled = false
     getImageResult(workspaceId, itemId)
@@ -74,12 +74,6 @@ export default function ImageResultPage() {
         const message = err instanceof Error ? err.message : '加载图片结果失败'
         setFetchState({ kind: 'error', message })
       })
-    return () => { cancelled = true }
-  }, [workspaceId, itemId])
-
-  // 拉提示词版本
-  useEffect(() => {
-    let cancelled = false
     listPromptVersions(workspaceId, itemId)
       .then((data) => {
         if (!cancelled) setPromptVersions(data)

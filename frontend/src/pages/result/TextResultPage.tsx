@@ -4,7 +4,6 @@ import { toast } from 'sonner'
 import { ArrowLeft, Star } from 'lucide-react'
 
 import {
-  type PromptVersion,
   type TextResult,
   addPromptVersion,
   getTextItemResult,
@@ -23,7 +22,6 @@ export default function TextResultPage() {
     | { kind: 'error'; message: string }
   const [fetchState, setFetchState] = useState<FetchState>({ kind: 'loading' })
   const [favored, setFavored] = useState(false)
-  const [promptVersions, setPromptVersions] = useState<PromptVersion[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -40,15 +38,17 @@ export default function TextResultPage() {
   }, [workspaceId, itemId])
 
   const result = fetchState.kind === 'ready' ? fetchState.data : null
-
-  // 初始化 promptVersions
-  useEffect(() => {
-    if (result?.prompt_versions) setPromptVersions(result.prompt_versions)
-  }, [result])
+  const promptVersions = result?.prompt_versions ?? []
 
   const handleAddVersion = useCallback(async (content: string) => {
     const pv = await addPromptVersion(workspaceId, itemId, content)
-    setPromptVersions((prev) => [...prev, pv])
+    setFetchState((prev) => {
+      if (prev.kind !== 'ready') return prev
+      return {
+        kind: 'ready',
+        data: { ...prev.data, prompt_versions: [...prev.data.prompt_versions, pv] },
+      }
+    })
     toast.success(`已保存 v${pv.version}`)
   }, [workspaceId, itemId])
 
