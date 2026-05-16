@@ -69,7 +69,7 @@ def main() -> int:
         for r in reminders:
             print(f"- {r}")
     print("Preflight check passed.")
-    print("Note: 本地开发请使用 uvicorn + streamlit（见 README）。")
+    print("Note: 本地开发请使用 ./start.sh 启动后端 + Vite 前端（见 README）。")
     return 0
 
 

@@ -158,7 +158,7 @@ elif [[ "$PROJECT/requirements.txt" -nt "$STAMP" ]]; then
     NEEDS_INSTALL=1
 else
     # 快速验证核心模块
-    for _mod in streamlit fastapi uvicorn pydantic httpx psutil; do
+    for _mod in fastapi uvicorn pydantic httpx psutil; do
         if ! "$PY" -c "import $_mod" &>/dev/null; then
             warn "模块缺失: $_mod"
             NEEDS_INSTALL=1; break

@@ -4,8 +4,7 @@
 # 安装：pip install -r requirements.txt
 # 系统依赖：ffmpeg（视频转码，需单独安装：brew install ffmpeg）
 
-# ── Streamlit 多页面应用 ──────────────────────────────────────
-streamlit>=1.32.0
+# ── 后端依赖 ─────────────────────────────────────────────────
 python-dotenv>=1.0.0
 fastapi>=0.115.0
 uvicorn>=0.30.0
