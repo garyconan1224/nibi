@@ -21,6 +21,7 @@ load_dotenv(_ROOT_DIR / ".env", override=False)
 from backend.app.routes.admin import router as admin_router
 from backend.app.routes.download_config import router as download_config_router
 from backend.app.routes.pipeline import router as pipeline_router
+from backend.app.routes.prompt_formats import router as prompt_formats_router
 from backend.app.routes.providers import router as providers_router
 from backend.app.routes.rag import router as rag_router
 from backend.app.routes.transcriber_config import router as transcriber_config_router
@@ -110,6 +111,7 @@ app.include_router(pipeline_router)
 app.include_router(transcript_router)
 app.include_router(transcriber_config_router)
 app.include_router(download_config_router)
+app.include_router(prompt_formats_router)
 app.include_router(rag_router)
 app.include_router(notes_router)
 app.include_router(workspaces_router)

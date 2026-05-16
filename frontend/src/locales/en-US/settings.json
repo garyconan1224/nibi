@@ -32,6 +32,7 @@
       "network": "Network",
       "download": "Download",
       "transcriber": "Transcriber",
+      "promptFormats": "Prompt Formats",
       "screenshot": "Screenshot",
       "monitor": "Monitor",
       "about": "About"
@@ -220,6 +221,7 @@
       "network": "Network",
       "download": "Download",
       "transcriber": "Transcriber",
+      "promptFormats": "Prompt Formats",
       "screenshot": "Screenshot",
       "about": "About"
     },

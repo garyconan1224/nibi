@@ -1,35 +1,38 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Check, Copy, Pause, Play, Star } from 'lucide-react'
+import { ArrowLeft, Check, Copy, Pause, Play, Settings2, Star } from 'lucide-react'
 
 import {
   type VideoResult,
   type VideoResultFrame,
   getItemResult,
 } from '@/services/workspaces'
+import {
+  type PromptFormat,
+  type PromptFormatsConfig,
+  getPromptFormatsConfig,
+  isJsonFormat,
+  renderJsonForFrame,
+  renderTemplate,
+  savePromptFormatsConfig,
+} from '@/services/promptFormats'
 import { TripleTrack } from './TripleTrack'
 import { nearestFrameIdx } from './helpers'
 
 import './tokens.css'
 
-type PromptStyle = 'mj' | 'sd' | 'json'
+const ACTIVE_LIMIT = 3
 
-function buildPromptText(frame: VideoResultFrame, style: PromptStyle): string {
-  if (style === 'mj') return frame.prompt_mj
-  if (style === 'sd') return `${frame.prompt_sd.positive}\n\nNeg: ${frame.prompt_sd.negative}`
-  return JSON.stringify(
-    {
-      timestamp: frame.ts,
-      title: frame.title,
-      prompt_mj: frame.prompt_mj,
-      prompt_sd: frame.prompt_sd,
-      prompt_video: frame.prompt_video,
-      tags: frame.tags,
-    },
-    null,
-    2,
-  )
+interface TabDescriptor {
+  key: string
+  label: string
+  format: PromptFormat
+}
+
+function buildPromptText(frame: VideoResultFrame, format: PromptFormat): string {
+  if (isJsonFormat(format)) return renderJsonForFrame(frame)
+  return renderTemplate(format.template, frame)
 }
 
 function formatSec(sec: number): string {
@@ -52,11 +55,31 @@ export default function VideoResultPage() {
 
   const [currentSec, setCurrentSec] = useState(0)
   const [playing, setPlaying] = useState(false)
-  const [promptStyle, setPromptStyle] = useState<PromptStyle>('mj')
+  const [promptStyle, setPromptStyle] = useState<string>('')
   const [copied, setCopied] = useState(false)
   const [favored, setFavored] = useState<Record<number, boolean>>({})
 
+  // 提示词格式配置（异步加载；失败时 tabs 退化为内置 fallback）
+  const [formatsCfg, setFormatsCfg] = useState<PromptFormatsConfig | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerSelection, setPickerSelection] = useState<string[]>([])
+
   const videoRef = useRef<HTMLVideoElement>(null)
+
+  // 拉提示词格式配置；失败容忍（result 页仍可看，只是 tabs 用 fallback）
+  useEffect(() => {
+    let cancelled = false
+    getPromptFormatsConfig()
+      .then((data) => {
+        if (!cancelled) setFormatsCfg(data)
+      })
+      .catch(() => {
+        // 静默：UI 用 fallback
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -86,10 +109,51 @@ export default function VideoResultPage() {
   }, [frames, currentSec])
 
   const frame: VideoResultFrame | null = frames[activeFrame] ?? null
-  const promptText = useMemo(
-    () => (frame ? buildPromptText(frame, promptStyle) : ''),
-    [frame, promptStyle],
-  )
+
+  // 构造 tabs：active_image_ids 对应 format + JSON 永远附加在末尾
+  const tabs = useMemo<TabDescriptor[]>(() => {
+    const formats = formatsCfg?.formats ?? []
+    const imageFormats = formats.filter((f) => f.category === 'image')
+    if (!imageFormats.length) {
+      // fallback：未拉到配置时给两个最小 tabs，避免页面空白
+      return []
+    }
+    const idMap = new Map(imageFormats.map((f) => [f.id, f]))
+    const active = formatsCfg?.active_image_ids ?? []
+    const picked: PromptFormat[] = []
+    for (const id of active) {
+      const fmt = idMap.get(id)
+      if (fmt && !isJsonFormat(fmt) && !picked.find((p) => p.id === fmt.id)) {
+        picked.push(fmt)
+      }
+    }
+    // 不足 ACTIVE_LIMIT 时补齐（非 JSON 优先按 formats 顺序）
+    if (picked.length < ACTIVE_LIMIT) {
+      for (const fmt of imageFormats) {
+        if (picked.length >= ACTIVE_LIMIT) break
+        if (isJsonFormat(fmt)) continue
+        if (!picked.find((p) => p.id === fmt.id)) picked.push(fmt)
+      }
+    }
+    const jsonFmt = imageFormats.find((f) => isJsonFormat(f))
+    const built: TabDescriptor[] = picked.slice(0, ACTIVE_LIMIT).map((f) => ({
+      key: f.id,
+      label: f.name,
+      format: f,
+    }))
+    if (jsonFmt) {
+      built.push({ key: jsonFmt.id, label: jsonFmt.name, format: jsonFmt })
+    }
+    return built
+  }, [formatsCfg])
+
+  // promptStyle 没匹配上时由 activeTab fallback 选第一个 tab；
+  // 不在 effect 里 setState，避免级联渲染。
+  const activeTab = tabs.find((t) => t.key === promptStyle) ?? tabs[0]
+  const promptText = useMemo(() => {
+    if (!frame || !activeTab) return ''
+    return buildPromptText(frame, activeTab.format)
+  }, [frame, activeTab])
 
   // 视频 timeupdate → currentSec → 自动找最近帧
   useEffect(() => {
@@ -184,6 +248,43 @@ export default function VideoResultPage() {
     })
   }, [frame, activeFrame, workspaceId, itemId])
 
+  const openPicker = useCallback(() => {
+    if (!formatsCfg) return
+    setPickerSelection(
+      tabs.filter((t) => !isJsonFormat(t.format)).map((t) => t.key),
+    )
+    setPickerOpen(true)
+  }, [formatsCfg, tabs])
+
+  const togglePickerId = useCallback((id: string) => {
+    setPickerSelection((cur) => {
+      if (cur.includes(id)) return cur.filter((x) => x !== id)
+      if (cur.length >= ACTIVE_LIMIT) {
+        toast.error(`最多选 ${ACTIVE_LIMIT} 个`)
+        return cur
+      }
+      return [...cur, id]
+    })
+  }, [])
+
+  const savePicker = useCallback(async () => {
+    if (!formatsCfg) return
+    if (pickerSelection.length !== ACTIVE_LIMIT) {
+      toast.error(`请选满 ${ACTIVE_LIMIT} 个`)
+      return
+    }
+    try {
+      const saved = await savePromptFormatsConfig({
+        active_image_ids: pickerSelection,
+      })
+      setFormatsCfg(saved)
+      setPickerOpen(false)
+      toast.success('已更新提示词格式 tabs')
+    } catch (err) {
+      toast.error('保存失败：' + (err instanceof Error ? err.message : '未知'))
+    }
+  }, [formatsCfg, pickerSelection])
+
   const jumpFrame = useCallback(
     (delta: number) => {
       if (!frames.length) return
@@ -218,17 +319,14 @@ export default function VideoResultPage() {
         handleCopy()
       } else if (e.key === 'f' || e.key === 'F') {
         handleFavorite()
-      } else if (e.key === '1') {
-        setPromptStyle('mj')
-      } else if (e.key === '2') {
-        setPromptStyle('sd')
-      } else if (e.key === '3') {
-        setPromptStyle('json')
+      } else if (e.key >= '1' && e.key <= '9') {
+        const idx = parseInt(e.key, 10) - 1
+        if (idx < tabs.length) setPromptStyle(tabs[idx].key)
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [togglePlay, jumpFrame, seekTo, currentSec, setRate, handleCopy, handleFavorite])
+  }, [togglePlay, jumpFrame, seekTo, currentSec, setRate, handleCopy, handleFavorite, tabs])
 
   if (fetchState.kind === 'loading') {
     return (
@@ -532,10 +630,43 @@ export default function VideoResultPage() {
           }}
         >
           <span className="eyebrow" style={{ flex: 1 }}>提示词格式</span>
-          {(['mj', 'sd', 'json'] as PromptStyle[]).map((s) => (
+          <button
+            onClick={openPicker}
+            title="选择 3 个图片类格式作为 tabs（JSON 自动附加）"
+            style={{
+              height: 26,
+              padding: '0 8px',
+              borderRadius: 6,
+              fontSize: 10,
+              fontFamily: 'var(--mono)',
+              border: '1px solid var(--line)',
+              background: 'transparent',
+              color: 'var(--ink-3)',
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <Settings2 size={11} /> 选择
+          </button>
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            padding: '6px 12px 8px',
+            borderBottom: '1px solid var(--line)',
+            flexShrink: 0,
+            background: 'var(--bg-sunken)',
+            overflowX: 'auto',
+          }}
+        >
+          {tabs.map((t) => (
             <button
-              key={s}
-              onClick={() => setPromptStyle(s)}
+              key={t.key}
+              onClick={() => setPromptStyle(t.key)}
               style={{
                 height: 26,
                 padding: '0 10px',
@@ -545,13 +676,20 @@ export default function VideoResultPage() {
                 fontFamily: 'var(--mono)',
                 border: 'none',
                 cursor: 'pointer',
-                background: promptStyle === s ? 'var(--ink)' : 'transparent',
-                color: promptStyle === s ? 'var(--bg)' : 'var(--ink-3)',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+                background: promptStyle === t.key ? 'var(--ink)' : 'transparent',
+                color: promptStyle === t.key ? 'var(--bg)' : 'var(--ink-3)',
               }}
             >
-              {s.toUpperCase()}
+              {t.label}
             </button>
           ))}
+          {!tabs.length && (
+            <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>
+              （提示词格式未加载）
+            </span>
+          )}
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
@@ -653,6 +791,127 @@ export default function VideoResultPage() {
               </button>
             </div>
           </div>
+        </div>
+      </div>
+
+      {pickerOpen && formatsCfg && (
+        <FormatPicker
+          allFormats={formatsCfg.formats.filter(
+            (f) => f.category === 'image' && !isJsonFormat(f),
+          )}
+          selection={pickerSelection}
+          onToggle={togglePickerId}
+          onCancel={() => setPickerOpen(false)}
+          onSave={savePicker}
+        />
+      )}
+    </div>
+  )
+}
+
+interface FormatPickerProps {
+  allFormats: PromptFormat[]
+  selection: string[]
+  onToggle: (id: string) => void
+  onCancel: () => void
+  onSave: () => void
+}
+
+function FormatPicker({ allFormats, selection, onToggle, onCancel, onSave }: FormatPickerProps) {
+  return (
+    <div
+      onClick={onCancel}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.4)',
+        zIndex: 50,
+        display: 'grid',
+        placeItems: 'center',
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--bg-elev)',
+          border: '1px solid var(--line)',
+          borderRadius: 14,
+          padding: 18,
+          width: 420,
+          maxHeight: '80vh',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>选择 3 个图片类格式</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
+            JSON 永远附加在末尾，不在此处枚举。已选 {selection.length} / 3。
+          </div>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {allFormats.map((f) => {
+            const checked = selection.includes(f.id)
+            const index = checked ? selection.indexOf(f.id) + 1 : null
+            return (
+              <label
+                key={f.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  border: `1px solid ${checked ? 'var(--accent)' : 'var(--line)'}`,
+                  cursor: 'pointer',
+                  background: checked ? 'rgba(255,77,126,0.08)' : 'transparent',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => onToggle(f.id)}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>
+                    {f.name}
+                    {index !== null && (
+                      <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--accent)' }}>
+                        #{index}
+                      </span>
+                    )}
+                  </div>
+                  {f.description && (
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+                      {f.description}
+                    </div>
+                  )}
+                </div>
+              </label>
+            )
+          })}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button className="btn-ghost" style={{ padding: '6px 12px' }} onClick={onCancel}>
+            取消
+          </button>
+          <button
+            onClick={onSave}
+            disabled={selection.length !== 3}
+            style={{
+              padding: '6px 14px',
+              borderRadius: 8,
+              border: 'none',
+              cursor: selection.length === 3 ? 'pointer' : 'not-allowed',
+              background: selection.length === 3 ? 'var(--ink)' : 'var(--bg-sunken)',
+              color: selection.length === 3 ? 'var(--bg)' : 'var(--ink-4)',
+              fontWeight: 600,
+              fontSize: 13,
+            }}
+          >
+            保存
+          </button>
         </div>
       </div>
     </div>

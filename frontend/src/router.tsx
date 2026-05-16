@@ -20,6 +20,7 @@ const DownloadSettingsPage = lazy(
   () => import('@/pages/SettingPage/DownloadSettingsPage'),
 )
 const TranscriberPage = lazy(() => import('@/pages/SettingPage/TranscriberPage'))
+const PromptFormatPage = lazy(() => import('@/pages/SettingPage/PromptFormatPage'))
 const ScreenshotPage = lazy(() => import('@/pages/SettingPage/ScreenshotPage'))
 const DeployMonitorPage = lazy(() => import('@/pages/SettingPage/DeployMonitorPage'))
 const AboutPage = lazy(() => import('@/pages/SettingPage/AboutPage'))
@@ -63,6 +64,7 @@ export const router = createBrowserRouter([
           { path: 'network', element: withSuspense(<NetworkSettingsPage />) },
           { path: 'download', element: withSuspense(<DownloadSettingsPage />) },
           { path: 'transcriber', element: withSuspense(<TranscriberPage />) },
+          { path: 'prompt-formats', element: withSuspense(<PromptFormatPage />) },
           { path: 'screenshot', element: withSuspense(<ScreenshotPage />) },
           { path: 'monitor', element: withSuspense(<DeployMonitorPage />) },
           { path: 'about', element: withSuspense(<AboutPage />) },
