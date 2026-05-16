@@ -80,6 +80,11 @@ _EXTENSION_TYPE_MAP: Dict[str, str] = {
     ".srt": ItemType.TEXT.value,
     ".vtt": ItemType.TEXT.value,
     ".json": ItemType.TEXT.value,
+    # Phase 2C.1：文本输入层支持的额外扩展名
+    ".pdf": ItemType.TEXT.value,
+    ".docx": ItemType.TEXT.value,
+    ".html": ItemType.TEXT.value,
+    ".htm": ItemType.TEXT.value,
 }
 
 

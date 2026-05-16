@@ -20,6 +20,10 @@ class TaskStatus(str, Enum):
     FRAMES = "FRAMES"          # 截帧（画面准备）
     ASR = "ASR"                # 转写（Whisper）
     VLM = "VLM"                # 视觉分析（逐帧提示词）
+    # Phase 2C.1：文本输入层阶段（v1.1 §11 文本链）
+    FETCH = "FETCH"            # 拉取（URL 下载 / 文件就绪）
+    PARSE = "PARSE"            # 解析（PDF/DOCX/HTML → 原始文本）
+    EXTRACT = "EXTRACT"        # 抽取（标题 + 正文规范化）
     SUM = "SUM"                # 总结（LLM 生成总结）
     STORE = "STORE"            # 入库（写入任务数据库）
     SUCCESS = "SUCCESS"

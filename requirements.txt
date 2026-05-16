@@ -42,6 +42,15 @@ ctranslate2>=4.0.0
 # psutil 用于读取 CPU / 内存 / 磁盘使用率，驱动 /admin/system/stats
 psutil>=5.9.0
 
+# ── 文本输入层（Phase 2C.1：PDF / DOCX / 网页正文）─────────────
+# pypdf：纯 Python PDF 文本抽取（无 OCR；扫描件留给 Phase 3）
+# python-docx：Word .docx 解析
+# readability-lxml：Mozilla Readability 的 Python 移植，抽取网页正文
+pypdf>=4.0.0
+python-docx>=1.1.0
+readability-lxml>=0.8.1
+lxml>=5.0.0
+
 # ── 测试 ──────────────────────────────────────────────────────
 pytest>=8.0.0
 

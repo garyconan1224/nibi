@@ -57,11 +57,17 @@ def get_project_runtime_dir(project_id: str) -> Path:
     return get_project_root(project_id) / "runtime"
 
 
+def get_project_text_dir(project_id: str) -> Path:
+    """文本输入层产物目录（Phase 2C.1）：每个 text 任务落一份 .md + .json。"""
+    return get_project_root(project_id) / "text"
+
+
 def ensure_project_dirs(project_id: str) -> None:
     for d in (
         get_project_videos_dir(project_id),
         get_project_json_dir(project_id),
         get_project_runtime_dir(project_id),
+        get_project_text_dir(project_id),
     ):
         d.mkdir(parents=True, exist_ok=True)
 

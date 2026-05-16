@@ -2,15 +2,21 @@ from __future__ import annotations
 
 """Task handlers for pipeline task center."""
 
+import json
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from backend.app.models.tasks import TaskRecord, TaskStatus
 from backend.app.services.task_runner import TaskRunner
-from shared.config import get_project_json_dir, get_project_videos_dir
+from shared.config import (
+    get_project_json_dir,
+    get_project_text_dir,
+    get_project_videos_dir,
+)
 from shared.settings_store import load_settings
 from shared.storyboard_generator import run_storyboard_generation
+from shared.text_loader import TextDocument, TextLoaderError, load_auto
 from shared.video_analyzer import (
     find_videos,
     get_output_dir,
@@ -514,9 +520,178 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     }
 
 
+def _summarize_text(
+    *,
+    content: str,
+    title: str,
+    settings,
+    payload: Dict[str, Any],
+    log: Any,
+) -> str:
+    """对正文做一轮 LLM 摘要。失败时返回空串（不抛异常，由调用方决定是否阻断）。"""
+    if not content.strip():
+        return ""
+    api_key = (
+        str(payload.get("api_key") or "").strip()
+        or (settings.openai_api_key or "").strip()
+    )
+    if not api_key:
+        log("⚠️  未提供 api_key，跳过 LLM 摘要")
+        return ""
+
+    try:
+        registry = create_default_registry()
+        profile = registry.resolve_default_profile(settings, "chat")
+        provider = registry.build(profile)
+        model = (
+            str(payload.get("text_model") or "").strip()
+            or profile.default_models.get("chat")
+            or (settings.text_model or "").strip()
+        )
+        if not model:
+            log("⚠️  未配置 text_model，跳过 LLM 摘要")
+            return ""
+
+        # 控制传入 LLM 的正文长度，避免 token 超限（粗略字符截断，留给 Phase 3 上 chunk）
+        max_chars = int(payload.get("summary_max_input_chars") or 16000)
+        body = content[:max_chars]
+        truncated = len(content) > max_chars
+
+        sys_prompt = (
+            "你是一名严谨的中文文档摘要助手。请基于给定正文，输出 Markdown 格式的摘要，"
+            "结构为：1) 一句话摘要；2) 3–6 条要点（项目符号）；3) 关键术语（若有，最多 5 个）。"
+            "不要编造文中没有的事实。"
+        )
+        user_prompt = (
+            f"# 文档标题\n{title or '(无标题)'}\n\n"
+            f"# 正文（{'已截断' if truncated else '完整'}）\n{body}"
+        )
+
+        return provider.chat(
+            ChatRequest(
+                model=model,
+                messages=[
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=float(payload.get("temperature") or 0.3),
+                max_tokens=int(payload.get("summary_max_tokens") or 1024),
+            )
+        )
+    except Exception as err:  # noqa: BLE001
+        log(f"⚠️  LLM 摘要失败：{err}")
+        return ""
+
+
+def handle_text_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
+    """文本输入层任务（Phase 2C.1）。
+
+    payload 字段：
+      - source_type: "pdf" | "docx" | "url"（可省略，依赖 source 自动推断）
+      - source: 必填，URL 或本地文件路径
+      - api_key / text_model / temperature / summary_max_tokens / summary_max_input_chars：可选
+
+    状态机：FETCH → PARSE → EXTRACT → SUM → STORE → SUCCESS
+    产物：data/projects/<pid>/text/<task_id>.md + .json
+    """
+    payload = record.payload
+    task_id = record.task_id
+
+    source = str(payload.get("source") or "").strip()
+    if not source:
+        raise ValueError("text task 需要 payload.source（URL 或文件路径）")
+    source_type = str(payload.get("source_type") or "").strip().lower() or None
+
+    log = lambda msg: runner.append_log(task_id, msg)  # noqa: E731
+    log(f"📄 text_task 配置 | source_type={source_type or 'auto'} | source={source[:80]}")
+
+    # ── 1. FETCH ────────────────────────────────────────────
+    runner.store.update(task_id, status=TaskStatus.FETCH.value)
+    runner.set_progress(task_id, 0.05, "拉取素材...")
+
+    # ── 2. PARSE + EXTRACT（loader 内部一次完成；分两个进度点对外展示）─
+    runner.store.update(task_id, status=TaskStatus.PARSE.value)
+    runner.set_progress(task_id, 0.30, "解析文档...")
+    try:
+        doc: TextDocument = load_auto(source, source_type)
+    except TextLoaderError as err:
+        raise RuntimeError(str(err)) from err
+
+    runner.store.update(task_id, status=TaskStatus.EXTRACT.value)
+    runner.set_progress(task_id, 0.55, f"正文提取完成（{doc.char_count} 字符）")
+    log(f"📄 正文抽取 | title={doc.title!r} chars={doc.char_count} type={doc.source_type}")
+    if doc.char_count == 0:
+        log("⚠️  抽取到的正文为空，跳过摘要（PDF 可能为扫描件）")
+
+    _persist_intermediate(runner, task_id, {
+        "title": doc.title,
+        "content": doc.content,
+        "char_count": doc.char_count,
+        "source_type": doc.source_type,
+        "source": doc.source,
+        "meta": doc.meta,
+    })
+
+    # ── 3. SUM ──────────────────────────────────────────────
+    runner.store.update(task_id, status=TaskStatus.SUM.value)
+    runner.set_progress(task_id, 0.70, "生成 LLM 摘要...")
+    settings = load_settings()
+    summary = _summarize_text(
+        content=doc.content,
+        title=doc.title,
+        settings=settings,
+        payload=payload,
+        log=log,
+    )
+
+    # ── 4. STORE ────────────────────────────────────────────
+    runner.store.update(task_id, status=TaskStatus.STORE.value)
+    runner.set_progress(task_id, 0.90, "归档文本产物...")
+    text_dir = get_project_text_dir(record.project_id)
+    text_dir.mkdir(parents=True, exist_ok=True)
+    md_path = text_dir / f"{task_id}.md"
+    json_path = text_dir / f"{task_id}.json"
+
+    md_body = (
+        f"# {doc.title}\n\n"
+        f"> 来源：{doc.source} ｜ 类型：{doc.source_type} ｜ 字符数：{doc.char_count}\n\n"
+        f"## 摘要\n\n{summary.strip() if summary else '_（未生成摘要）_'}\n\n"
+        f"---\n\n## 正文\n\n{doc.content}\n"
+    )
+    md_path.write_text(md_body, encoding="utf-8")
+    json_path.write_text(
+        json.dumps(
+            {
+                "task_id": task_id,
+                "project_id": record.project_id,
+                **doc.to_dict(),
+                "summary": summary,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    runner.set_progress(task_id, 1.0, "文本任务完成")
+
+    return {
+        "title": doc.title,
+        "content": doc.content,
+        "summary": summary,
+        "char_count": doc.char_count,
+        "source_type": doc.source_type,
+        "source": doc.source,
+        "meta": doc.meta,
+        "markdown_path": str(md_path.resolve()),
+        "json_path": str(json_path.resolve()),
+    }
+
+
 def register_pipeline_handlers(runner: TaskRunner) -> None:
     runner.register("download",  handle_download_task)
     runner.register("analyze",   handle_analyze_task)
     runner.register("create",    handle_create_task)
     runner.register("storyboard", handle_storyboard_task)
     runner.register("note",      handle_note_task)
+    runner.register("text",      handle_text_task)
