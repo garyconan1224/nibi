@@ -124,6 +124,12 @@ class PreflightSaveRequest(BaseModel):
     )
 
 
+class PromptVersionRequest(BaseModel):
+    """提示词版本新增请求体。"""
+
+    content: str = Field(min_length=1, description="提示词内容")
+
+
 # ── 内部小工具 ────────────────────────────────────────────
 
 
@@ -819,3 +825,28 @@ def get_audio_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
         return payload
 
     return build_demo_audio_result(item.item_id, item.name)
+
+
+# ── 提示词版本栈（Phase 2C.2）────────────────────────────
+
+
+@router.post("/{workspace_id}/items/{item_id}/prompts/versions")
+def add_prompt_version(
+    workspace_id: str, item_id: str, req: PromptVersionRequest
+) -> Dict[str, Any]:
+    """为指定素材追加一个提示词版本。"""
+    try:
+        pv = _store.add_prompt_version(workspace_id, item_id, req.content)
+    except KeyError as err:
+        raise HTTPException(status_code=404, detail=str(err)) from err
+    return pv.to_dict()
+
+
+@router.get("/{workspace_id}/items/{item_id}/prompts/versions")
+def list_prompt_versions(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
+    """列出指定素材的所有提示词版本。"""
+    try:
+        versions = _store.list_prompt_versions(workspace_id, item_id)
+    except KeyError as err:
+        raise HTTPException(status_code=404, detail=str(err)) from err
+    return [pv.to_dict() for pv in versions]
