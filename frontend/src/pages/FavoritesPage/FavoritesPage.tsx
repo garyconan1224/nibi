@@ -48,7 +48,13 @@ function collectFavorites(workspaces: WorkspaceRecord[]): FavoriteEntry[] {
 
 function resultRouteFor(entry: FavoriteEntry): string {
   const { workspace, item } = entry
-  const suffix = item.type === 'image' ? 'image_result' : 'result'
+  const map: Record<string, string> = {
+    video: 'result',
+    audio: 'audio_result',
+    image: 'image_result',
+    text: 'text_result',
+  }
+  const suffix = map[item.type] ?? 'result'
   return `/workspaces/${workspace.workspace_id}/items/${item.item_id}/${suffix}`
 }
 
