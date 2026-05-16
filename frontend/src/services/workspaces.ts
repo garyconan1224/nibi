@@ -236,6 +236,36 @@ export async function getImageResult(
   return res.data
 }
 
+// ── Phase 2B: 音频结果页聚合 ──────────────────────────────
+
+export interface AudioResult {
+  source: 'demo_fixture' | 'item_results'
+  audio: {
+    item_id: string
+    title: string
+    url: string
+    duration_sec: number
+    duration_str: string
+  }
+  transcript: VideoResultTranscriptLine[]
+  summary: string
+  tracks_meta: {
+    total_sec: number
+    transcript_count: number
+  }
+}
+
+/** GET /workspaces/{id}/items/{itemId}/audio_result — 音频结果页聚合数据 */
+export async function getAudioItemResult(
+  workspaceId: string,
+  itemId: string,
+): Promise<AudioResult> {
+  const res = await http.get<AudioResult>(
+    `${BASE}/${workspaceId}/items/${itemId}/audio_result`,
+  )
+  return res.data
+}
+
 /** GET /workspaces/{id}/items/{itemId}/export — 下载复刻工作包 zip */
 export async function downloadExport(workspaceId: string, itemId: string): Promise<void> {
   const res = await http.get(`${BASE}/${workspaceId}/items/${itemId}/export`, {
