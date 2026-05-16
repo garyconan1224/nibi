@@ -39,6 +39,7 @@ from backend.app.models.workspace import (
     WorkspaceRecord,
     WorkspaceStatus,
 )
+from backend.app.services.audio_result_demo import build_demo_audio_result
 from backend.app.services.video_result_demo import build_demo_video_result
 from backend.app.services.workspace_store import WorkspaceStore
 from shared.config import DATA_DIR
@@ -765,3 +766,44 @@ def get_image_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
         return payload
 
     return _build_demo_image_result(item.item_id, item.name)
+
+
+# ── 音频结果页（Phase 2B） ────────────────────────────────────
+
+
+@router.get("/{workspace_id}/items/{item_id}/audio_result")
+def get_audio_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
+    """音频结果页聚合数据（Phase 2B）。
+
+    优先返回 item.results 里的真数据；当 results 尚未填充时，
+    退化到 demo fixture，保证前端音频播放器 + transcript 列表可跑通。
+    """
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+
+    if item.type != ItemType.AUDIO.value:
+        raise HTTPException(
+            status_code=400,
+            detail=f"item type {item.type!r} has no audio result (only 'audio' supported)",
+        )
+
+    results = item.results or {}
+    has_real = isinstance(results, dict) and results.get("transcript")
+    if has_real:
+        payload = dict(results)
+        payload.setdefault("source", "item_results")
+        payload.setdefault(
+            "audio",
+            {
+                "item_id": item.item_id,
+                "title": item.name,
+                "url": item.source_value if item.source == "url" else "",
+                "duration_sec": results.get("tracks_meta", {}).get("total_sec", 0),
+                "duration_str": "",
+            },
+        )
+        return payload
+
+    return build_demo_audio_result(item.item_id, item.name)
