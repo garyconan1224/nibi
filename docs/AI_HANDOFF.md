@@ -1,6 +1,79 @@
 # AI Handoff
 
-Last updated: 2026-05-16
+Last updated: 2026-05-17
+
+---
+
+## Phase 2B 开工交接（2026-05-17，最新）
+
+> 这一段是给下一个会话开 **Phase 2B（音频结果页）** 时直接抄的笔记。
+> 2A 已合入 main（merge `c41121f`），分支 `feat/phase2a-llm-favorites` 可以留着不删，也可以等用户决定后清理。
+> 现状全部来自直接读代码，非猜测。
+
+### 2B 范围（spec v2 §3 决议）
+
+- 标题：音频结果页
+- 估时：2–3h
+- 分支建议：直接在 main 做（spec 标「否」需要 worktree）
+- 推荐模型：Sonnet 4.6（或小米 2.5 Pro 优先）—— 中等多文件 CRUD，复杂度低于 2A
+- 强制顺序：必须在 2A 之后；与 2C 之间无依赖，2B / 2C 任选先后；2D 在 2B/2C 完成后
+
+### 现状扫码结果
+
+#### 后端
+
+- `/workspaces/{id}/items/{id}/result` 在 [backend/app/routes/workspaces.py:648](../backend/app/routes/workspaces.py#L648) — 只对 `item.type == 'video'` 工作，其它类型 400。
+- `/workspaces/{id}/items/{id}/image_result` 在 [:734](../backend/app/routes/workspaces.py#L734) — Phase 1H 加的，独立端点。
+- **缺 `/audio_result`**。2B 要按 `image_result` 的模式新加一个：
+  - 优先返回 `item.results`（管线已填充时）；
+  - 否则返回 `build_demo_audio_result(item_id, name)` —— 需要新写 demo fixture（参考 `_build_demo_image_result` / `video_result_demo.build_demo_video_result`）。
+- **数据形状建议**（复用现有 `VideoResultTranscriptLine`，去掉视频帧）：
+  ```python
+  {
+    "source": "demo_fixture" | "item_results",
+    "audio": {"item_id", "title", "url", "duration_sec", "duration_str"},
+    "transcript": [{"t_sec", "t_str", "text"}, ...],
+    "summary": "...",   # 可选：LLM 摘要
+    "tracks_meta": {"total_sec", "transcript_count"},
+  }
+  ```
+- 没有专门的 audio pipeline handler；音频走的是 `analyze` / `transcribe`，结果落 `item.results`。Phase 2B 暂不动管线，只做结果页读取。
+
+#### 前端
+
+- router：[frontend/src/router.tsx:55-62](../frontend/src/router.tsx#L55) 已有 `result`（视频）+ `image_result`（图片）路由。缺 **`audio_result`** 路由。
+- 现有页面参考：[VideoResultPage.tsx](../frontend/src/pages/result/VideoResultPage.tsx) 937 行（含三轨）；音频页应是 VideoResultPage 的精简版（去掉 frames / TripleTrack，保留 `<audio>` 播放器 + transcript 列表 + 摘要 + 提示词/导出 tabs）。
+- 类型在 [frontend/src/services/workspaces.ts:159](../frontend/src/services/workspaces.ts#L159) — 复用 `VideoResultTranscriptLine`，新增 `AudioResult` interface + `getAudioItemResult()` 客户端方法。
+
+#### 2A 留下的坑（要在 2B 顺手修）
+
+我在 [FavoritesPage.tsx:resultRouteFor](../frontend/src/pages/FavoritesPage/FavoritesPage.tsx) 把 audio 类型映射到了 `/result`，但目前 `/result` 端点会对 audio 返回 400。**2B 路由接入后要把 audio 改到 `/audio_result`**：
+```ts
+function resultRouteFor(entry) {
+  const map = { video: 'result', image: 'image_result', audio: 'audio_result', text: 'text_result' }
+  return `/workspaces/${ws}/items/${item.item_id}/${map[item.type]}`
+}
+```
+
+#### WorkspaceDetail 入口
+
+- ItemRow 当前 [WorkspaceDetail.tsx:719](../frontend/src/pages/WorkspacePage/WorkspaceDetail.tsx#L719) **没有「查看结果」按钮**，进 result 页目前只能从收藏夹或手动拼 URL。可考虑在 2B 顺手加一个：item.status === 'done' 时显示一个「查看结果」按钮，按 type 跳对应路由。是否做由用户决定，不是 2B 强制项。
+
+### 2B 拆分建议（4–5 个 commit）
+
+| 顺序 | 子任务 | commit 信息建议 |
+|---|---|---|
+| 2B.1 | 后端 `audio_result` demo fixture + 端点 + 测试 | `feat(phase2b): 2B.1 新增 audio_result 端点（含 demo fixture）` |
+| 2B.2 | 前端 `AudioResult` 类型 + service 方法 | `feat(phase2b): 2B.2 前端 audio_result 客户端` |
+| 2B.3 | AudioResultPage 组件（音频播放器 + transcript） | `feat(phase2b): 2B.3 音频结果页 UI` |
+| 2B.4 | 路由接入 + FavoritesPage 跳转修正 | `feat(phase2b): 2B.4 接入 /audio_result 路由并修正收藏夹跳转` |
+| 2B.5（可选） | ItemRow「查看结果」按钮 + 端到端冒烟 | `feat(phase2b): 2B.5 工作区入口与冒烟` |
+
+### 风险提示
+
+- `item.type` 是字符串 `'audio'`（见 [models/workspace.py:88](../backend/app/models/workspace.py#L88) ItemType 枚举），写后端校验时直接比对字符串。
+- 音频文件路径与视频共用 `data/videos/`（一些通过 ffmpeg 抽出的音轨也存这里），url 字段可能是 `file://` 或 `/api/files/...` 形式，需要看 1D 上传后 `source_value` 长什么样再决定 `<audio src>` 怎么写。
+- 不要新增 audio-specific 的 pipeline 处理逻辑（spec 范围外）。
 
 ---
 
