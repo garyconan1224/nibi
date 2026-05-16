@@ -687,3 +687,81 @@ def get_item_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
         return payload
 
     return build_demo_video_result(item.item_id, item.name)
+
+
+# ── Phase 1H: 图片结果页接口 ───────────────────────────────
+
+
+def _build_demo_image_result(item_id: str, item_name: str) -> Dict[str, Any]:
+    """图片结果页 demo fixture（Phase 1H）。
+
+    当 item.results 尚未填充时返回固定示例，保证前端左图右信息 + 提示词 tabs 可跑通。
+    数据对齐 v1.1 §7.4 图片结果页布局。
+    """
+    return {
+        "source": "demo_fixture",
+        "image": {
+            "item_id": item_id,
+            "title": item_name,
+            "image_url": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200",
+        },
+        "description": "壮丽的山脉倒映在平静的湖面上，前景是翠绿的草地，天空呈现金色日落。画面构图采用三分法，前景草地、中景湖泊、远景山脉层次分明。",
+        "ocr_text": "",
+        "exif": {
+            "time": "2024-08-15 18:32:05",
+            "location": "瑞士·因特拉肯",
+        },
+        "prompts": {
+            "mj": "majestic mountain reflection on calm lake, green meadow foreground, golden hour sunset, Swiss Alps, photorealistic, landscape photography, --ar 3:2 --style raw --v 6",
+            "sd": {
+                "positive": "majestic mountain reflection, calm lake, green meadow, golden hour, Swiss Alps, landscape photography, ultra detailed, 8k, masterpiece",
+                "negative": "blurry, low quality, oversaturated, watermark, text",
+            },
+            "json": "",
+        },
+        "tags": {
+            "subject": ["山脉", "湖泊", "草地"],
+            "scene": ["瑞士", "因特拉肯", "阿尔卑斯"],
+            "style": ["风光摄影", "写实"],
+            "lighting": ["金色时刻", "逆光"],
+            "color": ["金色", "翠绿", "深蓝"],
+            "composition": ["三分法", "对称倒影"],
+            "lens": ["广角", "f/8"],
+        },
+    }
+
+
+@router.get("/{workspace_id}/items/{item_id}/image_result")
+def get_image_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
+    """图片结果页聚合数据（v1.1 §7.4）。
+
+    优先返回 item.results 里的真数据；当 results 尚未填充时，
+    退化到 demo fixture，保证前端左图右信息 + 提示词 tabs 可跑通。
+    """
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+
+    if item.type != ItemType.IMAGE.value:
+        raise HTTPException(
+            status_code=400,
+            detail=f"item type {item.type!r} has no image result (only 'image' supported in Phase 1H)",
+        )
+
+    results = item.results or {}
+    has_real = isinstance(results, dict) and results.get("description") and results.get("prompts")
+    if has_real:
+        payload = dict(results)
+        payload.setdefault("source", "item_results")
+        payload.setdefault(
+            "image",
+            {
+                "item_id": item.item_id,
+                "title": item.name,
+                "image_url": item.source_value if item.source == "url" else "",
+            },
+        )
+        return payload
+
+    return _build_demo_image_result(item.item_id, item.name)

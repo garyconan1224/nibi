@@ -4,7 +4,7 @@
 // 占位符约定见 shared/prompt_format_defaults.py 顶部注释。
 
 import { http } from './client'
-import type { VideoResultFrame } from './workspaces'
+import type { ImageResult, VideoResultFrame } from './workspaces'
 
 export type PromptFormatCategory = 'image' | 'video'
 
@@ -98,4 +98,40 @@ export function renderJsonForFrame(frame: VideoResultFrame): string {
 /** 判断一个 format 是否走 JSON 特殊渲染分支。 */
 export function isJsonFormat(fmt: PromptFormat): boolean {
   return fmt.template.trim() === '' && fmt.name.toLowerCase().includes('json')
+}
+
+// ── Phase 1H: 图片结果页模板渲染 ──────────────────────────
+
+/** 把 ImageResult 适配为 renderTemplate 可用的 VideoResultFrame 接口。 */
+export function imageToFrameAdapter(img: ImageResult): VideoResultFrame {
+  return {
+    idx: 0,
+    ts: '',
+    sec: 0,
+    shot_type: '',
+    title: img.image.title,
+    subtitle: '',
+    description: img.description,
+    prompt_mj: img.prompts.mj,
+    prompt_sd: img.prompts.sd,
+    prompt_video: '',
+    tags: img.tags,
+  }
+}
+
+/** JSON 格式特殊渲染：dump 图片结果为可读 JSON 文本。 */
+export function renderJsonForImage(img: ImageResult): string {
+  return JSON.stringify(
+    {
+      title: img.image.title,
+      description: img.description,
+      ocr_text: img.ocr_text || undefined,
+      exif: img.exif,
+      tags: img.tags,
+      prompt_mj: img.prompts.mj,
+      prompt_sd: img.prompts.sd,
+    },
+    null,
+    2,
+  )
 }

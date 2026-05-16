@@ -204,3 +204,34 @@ export async function getItemResult(
   )
   return res.data
 }
+
+// ── Phase 1H: 图片结果页聚合 ──────────────────────────────
+
+export interface ImageResult {
+  source: 'demo_fixture' | 'item_results'
+  image: {
+    item_id: string
+    title: string
+    image_url: string
+  }
+  description: string
+  ocr_text: string
+  exif: { time: string; location: string }
+  prompts: {
+    mj: string
+    sd: { positive: string; negative: string }
+    json: string
+  }
+  tags: Record<string, string[]>
+}
+
+/** GET /workspaces/{id}/items/{itemId}/image_result — 图片结果页聚合数据 */
+export async function getImageResult(
+  workspaceId: string,
+  itemId: string,
+): Promise<ImageResult> {
+  const res = await http.get<ImageResult>(
+    `${BASE}/${workspaceId}/items/${itemId}/image_result`,
+  )
+  return res.data
+}
