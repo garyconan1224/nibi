@@ -59,6 +59,11 @@
 - **Streamlit**：Phase 1A 已从入口移除；Phase 1J 一次性删源文件。
 - **暗色模式**：token 准备好但 Phase 1 不全量调通。
 - **i18n**：暂只做中文，en 文件留空。
+- **Phase 2 决议**（2026-05-16）：
+  - **2A chat_history 存储**：独立 `data/chats/<workspace_id>.jsonl`，**不进** workspace JSON（避免加速 SQLite 临界点）。
+  - **2A LLM 流式响应**：Phase 2A 就上 SSE 流式，复用 1F 的 SSE 基础设施；估时由 4–5h 上调至 **5–6h**。
+  - **2C.1 文本解析依赖**：`pypdf` + `python-docx` + `readability-lxml`（三件套，轻量），不引 `unstructured`。
+  - **Phase 2 收尾 tag**：`v1.1.0`（SemVer）；后续 Phase 3 = `v1.2.0`，Phase 4 加密等破坏性变更 = `v2.0.0`。
 
 ---
 
@@ -79,7 +84,7 @@
 | 1H | 图片结果页 | 2h | main | 否 | ⭐小米 2.5 Pro / Sonnet | ⏳ |
 | 1I | 工作包 zip 导出 | 2h | main | 否 | ⭐小米 2.5 Pro / Sonnet | ⏳ |
 | 1J | 老代码清理 + Phase 1 收口 | 1h | main | 否 | ⭐小米 2.5 Pro / Haiku | ✅ 收尾后 tag `v1.0.0-mvp` |
-| **2A** | LLM 对话侧栏（workspace-aware）+ 收藏夹管理页 | 4–5h | `feat/phase2a-llm-favorites` | 是 | Opus 4.7 | ⏳ |
+| **2A** | LLM 对话侧栏（workspace-aware，流式）+ 收藏夹管理页 | 5–6h | `feat/phase2a-llm-favorites` | 是 | Opus 4.7 | ⏳ |
 | **2B** | 音频结果页 | 2–3h | main | 否 | Sonnet 4.6 | ⏳ |
 | **2C.1** | 文本输入层（PDF/DOCX/网页正文） | 3h | `feat/phase2c1-text-input` | 是 | Opus 4.7 | ⏳ |
 | **2C.2** | 文本结果页 + 提示词版本栈 | 3h | `feat/phase2c2-text-prompt-version` | 是 | Sonnet 4.6 + Opus 兜底 | ⏳ |
