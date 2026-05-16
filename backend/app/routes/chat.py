@@ -17,13 +17,12 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse
 
+from backend.app.routes.workspaces import _store as _workspaces
 from backend.app.services.chat_runner import ChatRunner
-from backend.app.services.workspace_store import WorkspaceStore
 from shared.chat_store import get_default_store as get_chat_store
 
 router = APIRouter(prefix="/workspaces", tags=["chat"])
 
-_workspaces = WorkspaceStore()
 _runner = ChatRunner()
 _chat_store = get_chat_store()
 

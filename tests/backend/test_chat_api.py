@@ -34,6 +34,9 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     runner = ChatRunner(store=chat_store, llm_caller=fake_llm, chunk_size=4, chunk_delay_s=0.0)
 
     monkeypatch.setattr(chat_module, "_workspaces", ws_store)
+    # chat 路由通过模块导入复用 workspaces 路由的 _store；测试里两边都换成隔离实例
+    from backend.app.routes import workspaces as ws_module
+    monkeypatch.setattr(ws_module, "_store", ws_store)
     monkeypatch.setattr(chat_module, "_runner", runner)
     monkeypatch.setattr(chat_module, "_chat_store", chat_store)
 

@@ -4,6 +4,49 @@ Last updated: 2026-05-16
 
 ---
 
+## Phase 2A 收口纪要（2026-05-16）
+
+> Phase 2A 全部完成，分支 `feat/phase2a-llm-favorites`，6 个 commit 已落（2A.1 → 2A.6）。
+
+### 已交付
+
+| 子任务 | 内容 | 关键文件 |
+|---|---|---|
+| 2A.1 | jsonl 聊天持久化 | [shared/chat_store.py](../shared/chat_store.py) · [tests/backend/test_chat_store.py](../tests/backend/test_chat_store.py) |
+| 2A.2 | 两段式 SSE 聊天接口 | [backend/app/routes/chat.py](../backend/app/routes/chat.py) · [backend/app/services/chat_runner.py](../backend/app/services/chat_runner.py) · [tests/backend/test_chat_api.py](../tests/backend/test_chat_api.py) |
+| 2A.3 | 前端 ChatSidebar | [frontend/src/components/workspace/ChatSidebar.tsx](../frontend/src/components/workspace/ChatSidebar.tsx) · [frontend/src/services/chat.ts](../frontend/src/services/chat.ts) |
+| 2A.4 | 收藏夹页面（5 tab） | [frontend/src/pages/FavoritesPage/FavoritesPage.tsx](../frontend/src/pages/FavoritesPage/FavoritesPage.tsx) |
+| 2A.5 | 路由 + 侧栏入口 | [frontend/src/router.tsx](../frontend/src/router.tsx) · [frontend/src/layouts/AppShell.tsx](../frontend/src/layouts/AppShell.tsx) |
+| 2A.6 | 冒烟 + 文档 | 本节 |
+
+### 接口速查
+
+- `POST /workspaces/{id}/chat` body `{prompt, chat_id?, model?}` → `{turn_id, chat_id, status}`
+- `GET /workspaces/{id}/chat/events?turn_id=...` SSE：事件 `delta` / `done` / `error`，30s `: heartbeat`
+- `GET /workspaces/{id}/chat/messages?chat_id=...` 历史
+- `GET /workspaces/{id}/chat/list` 按 chat_id 汇总
+- 收藏夹路由：`/favorites`，无新增后端接口（复用 `WorkspaceItem.type` + `WorkspaceRecord.favorites`）
+
+### 设计要点 / 已踩坑
+
+1. **chat_runner 当前是「假流式」**：底层 `sf_client.chat_completion` 非流式；拿到完整文本后按 24 字符切片，每片 40ms 间隔模拟 token。UX 已经成型，后续要换真实流式只需替换 `_default_llm_caller`。
+2. **chat router 必须复用 workspaces 的 `_store` 实例**（已在 2A.6 修复）：`WorkspaceStore` 在 `__init__` 加载磁盘到内存，独立两个实例会出现一边 create 后另一边 get 不到的 bug。
+3. **ChatSidebar 是浮动 drawer**：通过 fixed 定位，不和 WorkspaceDetail 原 layout 冲突；卸载时 `EventSource.close()` 已处理。
+4. **`data/chats/`** 已加入 `.gitignore`。
+
+### 验证状态（自动跑过的）
+
+- `pytest tests/backend -q` → **61 passed**
+- `cd frontend && pnpm build` → 0 error
+- curl 冒烟：`/health` 200 / 空 prompt 422 / 不存在 ws 404 / 空 messages 返回 `[]` 全部正确
+
+### 留给用户的 UI 验证（建议手测）
+
+- 打开 `/workspaces/<id>`，点右下浮动按钮 → ChatSidebar 弹出，发一条消息看到逐段流式输出、新会话按钮能清空。
+- 打开 `/favorites`，切 5 个 tab，看计数与卡片是否一致；点卡片应跳到对应 result 页。
+
+---
+
 ## Phase 2A 开工交接（2026-05-16，最新）
 
 > 这一段是给下一个会话开 **Phase 2A（LLM 聊天 + 收藏夹页面）** 时直接抄的笔记。
