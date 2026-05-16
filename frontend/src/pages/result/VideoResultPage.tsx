@@ -4,11 +4,15 @@ import { toast } from 'sonner'
 import { ArrowLeft, Check, Copy, Download, Pause, Play, Settings2, Star } from 'lucide-react'
 
 import {
+  type PromptVersion,
   type VideoResult,
   type VideoResultFrame,
+  addPromptVersion,
   downloadExport,
   getItemResult,
+  listPromptVersions,
 } from '@/services/workspaces'
+import { PromptVersionStack } from '@/components/result/PromptVersionStack'
 import {
   type PromptFormat,
   type PromptFormatsConfig,
@@ -64,6 +68,7 @@ export default function VideoResultPage() {
   const [formatsCfg, setFormatsCfg] = useState<PromptFormatsConfig | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerSelection, setPickerSelection] = useState<string[]>([])
+  const [promptVersions, setPromptVersions] = useState<PromptVersion[]>([])
 
   const videoRef = useRef<HTMLVideoElement>(null)
 
@@ -96,6 +101,17 @@ export default function VideoResultPage() {
     return () => {
       cancelled = true
     }
+  }, [workspaceId, itemId])
+
+  // 拉提示词版本
+  useEffect(() => {
+    let cancelled = false
+    listPromptVersions(workspaceId, itemId)
+      .then((data) => {
+        if (!cancelled) setPromptVersions(data)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
   }, [workspaceId, itemId])
 
   const result = fetchState.kind === 'ready' ? fetchState.data : null
@@ -256,6 +272,12 @@ export default function VideoResultPage() {
     } catch (err) {
       toast.error('导出失败：' + (err instanceof Error ? err.message : '未知'))
     }
+  }, [workspaceId, itemId])
+
+  const handleAddPromptVersion = useCallback(async (content: string) => {
+    const pv = await addPromptVersion(workspaceId, itemId, content)
+    setPromptVersions((prev) => [...prev, pv])
+    toast.success(`已保存 v${pv.version}`)
   }, [workspaceId, itemId])
 
   const openPicker = useCallback(() => {
@@ -726,6 +748,14 @@ export default function VideoResultPage() {
             }}
           >
             {promptText}
+          </div>
+
+          {/* 提示词版本栈 */}
+          <div style={{ marginTop: 14 }}>
+            <PromptVersionStack
+              versions={promptVersions}
+              onAddVersion={handleAddPromptVersion}
+            />
           </div>
         </div>
 

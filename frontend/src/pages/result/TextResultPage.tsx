@@ -4,9 +4,12 @@ import { toast } from 'sonner'
 import { ArrowLeft, Star } from 'lucide-react'
 
 import {
+  type PromptVersion,
   type TextResult,
+  addPromptVersion,
   getTextItemResult,
 } from '@/services/workspaces'
+import { PromptVersionStack } from '@/components/result/PromptVersionStack'
 
 import './tokens.css'
 
@@ -20,6 +23,7 @@ export default function TextResultPage() {
     | { kind: 'error'; message: string }
   const [fetchState, setFetchState] = useState<FetchState>({ kind: 'loading' })
   const [favored, setFavored] = useState(false)
+  const [promptVersions, setPromptVersions] = useState<PromptVersion[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -36,6 +40,17 @@ export default function TextResultPage() {
   }, [workspaceId, itemId])
 
   const result = fetchState.kind === 'ready' ? fetchState.data : null
+
+  // 初始化 promptVersions
+  useEffect(() => {
+    if (result?.prompt_versions) setPromptVersions(result.prompt_versions)
+  }, [result])
+
+  const handleAddVersion = useCallback(async (content: string) => {
+    const pv = await addPromptVersion(workspaceId, itemId, content)
+    setPromptVersions((prev) => [...prev, pv])
+    toast.success(`已保存 v${pv.version}`)
+  }, [workspaceId, itemId])
 
   const handleFavorite = useCallback(() => {
     setFavored((prev) => {
@@ -166,33 +181,10 @@ export default function TextResultPage() {
           </div>
 
           {/* 提示词版本栈 */}
-          <div>
-            <div className="eyebrow" style={{ marginBottom: 6 }}>提示词版本</div>
-            {result.prompt_versions.length === 0 ? (
-              <span className="mono" style={{ fontSize: 12, color: 'var(--ink-4)' }}>暂无提示词版本</span>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {result.prompt_versions.map((pv) => (
-                  <div
-                    key={pv.version}
-                    style={{
-                      padding: '6px 10px',
-                      borderRadius: 6,
-                      background: 'var(--bg-sunken)',
-                      fontSize: 12,
-                      lineHeight: 1.6,
-                      color: 'var(--ink-2)',
-                    }}
-                  >
-                    <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)', marginRight: 6 }}>
-                      v{pv.version}
-                    </span>
-                    {pv.content}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <PromptVersionStack
+            versions={promptVersions}
+            onAddVersion={handleAddVersion}
+          />
         </div>
 
         {/* 底部操作 */}

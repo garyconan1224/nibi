@@ -5,9 +5,13 @@ import { ArrowLeft, Check, Copy, Download, Settings2, Star } from 'lucide-react'
 
 import {
   type ImageResult,
+  type PromptVersion,
+  addPromptVersion,
   downloadExport,
   getImageResult,
+  listPromptVersions,
 } from '@/services/workspaces'
+import { PromptVersionStack } from '@/components/result/PromptVersionStack'
 import {
   type PromptFormat,
   type PromptFormatsConfig,
@@ -45,6 +49,7 @@ export default function ImageResultPage() {
   const [formatsCfg, setFormatsCfg] = useState<PromptFormatsConfig | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerSelection, setPickerSelection] = useState<string[]>([])
+  const [promptVersions, setPromptVersions] = useState<PromptVersion[]>([])
 
   // 拉提示词格式配置
   useEffect(() => {
@@ -69,6 +74,17 @@ export default function ImageResultPage() {
         const message = err instanceof Error ? err.message : '加载图片结果失败'
         setFetchState({ kind: 'error', message })
       })
+    return () => { cancelled = true }
+  }, [workspaceId, itemId])
+
+  // 拉提示词版本
+  useEffect(() => {
+    let cancelled = false
+    listPromptVersions(workspaceId, itemId)
+      .then((data) => {
+        if (!cancelled) setPromptVersions(data)
+      })
+      .catch(() => {})
     return () => { cancelled = true }
   }, [workspaceId, itemId])
 
@@ -136,6 +152,12 @@ export default function ImageResultPage() {
     } catch (err) {
       toast.error('导出失败：' + (err instanceof Error ? err.message : '未知'))
     }
+  }, [workspaceId, itemId])
+
+  const handleAddPromptVersion = useCallback(async (content: string) => {
+    const pv = await addPromptVersion(workspaceId, itemId, content)
+    setPromptVersions((prev) => [...prev, pv])
+    toast.success(`已保存 v${pv.version}`)
   }, [workspaceId, itemId])
 
   const openPicker = useCallback(() => {
@@ -470,6 +492,14 @@ export default function ImageResultPage() {
               </div>
             </div>
           )}
+
+          {/* 提示词版本栈 */}
+          <div style={{ marginTop: 14 }}>
+            <PromptVersionStack
+              versions={promptVersions}
+              onAddVersion={handleAddPromptVersion}
+            />
+          </div>
         </div>
 
         {/* 底部操作按钮 */}
