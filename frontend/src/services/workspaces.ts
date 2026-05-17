@@ -244,11 +244,12 @@ export interface AudioResult {
   audio: {
     item_id: string
     title: string
+    filename?: string
     url: string
     duration_sec: number
     duration_str: string
   }
-  transcript: VideoResultTranscriptLine[]
+  transcript: VideoResultTranscriptLine[] | string
   summary: string
   tracks_meta: {
     total_sec: number
