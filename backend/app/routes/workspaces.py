@@ -773,8 +773,11 @@ def get_item_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
             detail=f"item type {item.type!r} has no video result (only 'video' supported in Phase 1G)",
         )
 
-    if _video_result_has_real_data(item.results):
-        payload = dict(item.results)
+    # X.1 bridge: check task results overlay so video_result sees real data
+    v_overlay = _sync_item_with_tasks(item)
+    v_results = dict(v_overlay.get("results", {})) if v_overlay and v_overlay.get("results") else dict(item.results or {})
+    if _video_result_has_real_data(v_results):
+        payload = v_results
         payload.setdefault("source", "item_results")
         payload.setdefault(
             "video",
@@ -859,7 +862,9 @@ def get_image_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
             detail=f"item type {item.type!r} has no image result (only 'image' supported in Phase 1H)",
         )
 
-    results = item.results or {}
+    # X.1 bridge: merge task results overlay so image_result sees real data
+    overlay = _sync_item_with_tasks(item)
+    results = dict(overlay.get("results", {})) if overlay and overlay.get("results") else dict(item.results or {})
     has_real = isinstance(results, dict) and results.get("description") and results.get("prompts")
     if has_real:
         payload = dict(results)
