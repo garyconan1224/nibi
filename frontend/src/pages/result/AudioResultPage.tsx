@@ -44,7 +44,14 @@ export default function AudioResultPage() {
   }, [workspaceId, itemId])
 
   const result = fetchState.kind === 'ready' ? fetchState.data : null
-  const transcript = useMemo(() => result?.transcript ?? [], [result])
+  const transcript = useMemo(() => {
+    const raw = result?.transcript
+    if (Array.isArray(raw)) return raw
+    if (typeof raw === 'string' && raw.length > 0) {
+      return [{ t_sec: 0, t_str: '00:00', text: raw }]
+    }
+    return []
+  }, [result])
 
   // 音频 timeupdate 回调
   const handleTimeUpdate = useCallback(() => {
@@ -176,7 +183,7 @@ export default function AudioResultPage() {
               whiteSpace: 'nowrap',
             }}
           >
-            {result.audio.title}
+            {result.audio?.title || result.audio?.filename || '音频'}
           </span>
           <span className="kw mono" style={{ fontSize: 10, flexShrink: 0 }}>AUDIO</span>
           {result.source === 'demo_fixture' && (
@@ -238,14 +245,14 @@ export default function AudioResultPage() {
             </button>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 200 }}>
               <span className="mono" style={{ fontSize: 12, color: 'var(--ink-2)' }}>
-                {formatSec(currentSec)} / {result.audio.duration_str || formatSec(result.audio.duration_sec)}
+                {formatSec(currentSec)} / {result.audio?.duration_str || formatSec(result.audio?.duration_sec ?? 0)}
               </span>
             </div>
           </div>
           {/* 原生 audio 元素（隐藏，由自定义按钮控制） */}
           <audio
             ref={audioRef}
-            src={result.audio.url || undefined}
+            src={result.audio?.url || (typeof result.source === 'string' ? result.source : undefined) || undefined}
             onTimeUpdate={handleTimeUpdate}
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
@@ -309,8 +316,8 @@ export default function AudioResultPage() {
           <div style={{ marginBottom: 14 }}>
             <div className="eyebrow" style={{ marginBottom: 6 }}>元信息</div>
             <div style={{ fontSize: 12, lineHeight: 1.8, color: 'var(--ink-2)' }}>
-              <div>时长：{result.audio.duration_str || formatSec(result.audio.duration_sec)}</div>
-              <div>转写行数：{result.tracks_meta.transcript_count}</div>
+              <div>时长：{result.audio?.duration_str || formatSec(result.audio?.duration_sec ?? 0)}</div>
+              <div>转写行数：{result.tracks_meta?.transcript_count ?? transcript.length}</div>
             </div>
           </div>
         </div>
