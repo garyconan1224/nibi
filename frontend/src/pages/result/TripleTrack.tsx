@@ -117,22 +117,35 @@ export function TripleTrack({
                   transition: 'border-color 140ms, transform 140ms',
                 }}
               >
-                <div
-                  style={{
-                    width: '100%',
-                    aspectRatio: '16/9',
-                    background: `linear-gradient(135deg, ${
-                      TRACK_COLORS[i % TRACK_COLORS.length]
-                    }33, ${TRACK_COLORS[(i + 2) % TRACK_COLORS.length]}66)`,
-                    display: 'grid',
-                    placeItems: 'center',
-                    color: 'rgba(255,255,255,0.85)',
-                    fontFamily: 'var(--mono)',
-                    fontSize: 11,
-                  }}
-                >
-                  {f.ts}
-                </div>
+                {f.image_path ? (
+                  <img
+                    src={f.image_path}
+                    alt={f.title || f.ts}
+                    style={{
+                      width: '100%',
+                      aspectRatio: '16/9',
+                      objectFit: 'cover',
+                      display: 'block',
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: '100%',
+                      aspectRatio: '16/9',
+                      background: `linear-gradient(135deg, ${
+                        TRACK_COLORS[i % TRACK_COLORS.length]
+                      }33, ${TRACK_COLORS[(i + 2) % TRACK_COLORS.length]}66)`,
+                      display: 'grid',
+                      placeItems: 'center',
+                      color: 'rgba(255,255,255,0.85)',
+                      fontFamily: 'var(--mono)',
+                      fontSize: 11,
+                    }}
+                  >
+                    {f.ts}
+                  </div>
+                )}
                 <div className="mono" style={{ fontSize: 9, color: 'var(--ink-4)', padding: '3px 5px 0' }}>
                   {f.ts}
                 </div>
