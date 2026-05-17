@@ -2,15 +2,11 @@ import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 
 import zhCommon from './zh-CN/common.json'
-import zhHome from './zh-CN/home.json'
 import zhSettings from './zh-CN/settings.json'
 import zhProviders from './zh-CN/providers.json'
-import zhHomePage from './zh-CN/homePage.json'
 import enCommon from './en-US/common.json'
-import enHome from './en-US/home.json'
 import enSettings from './en-US/settings.json'
 import enProviders from './en-US/providers.json'
-import enHomePage from './en-US/homePage.json'
 
 export const SUPPORTED_LANGS = [
   { code: 'zh-CN', label: '简体中文' },
@@ -33,12 +29,12 @@ const resolveInitialLang = (): LangCode => {
 
 void i18n.use(initReactI18next).init({
   resources: {
-    'zh-CN': { common: zhCommon, home: zhHome, settings: zhSettings, providers: zhProviders, homePage: zhHomePage },
-    'en-US': { common: enCommon, home: enHome, settings: enSettings, providers: enProviders, homePage: enHomePage },
+    'zh-CN': { common: zhCommon, settings: zhSettings, providers: zhProviders },
+    'en-US': { common: enCommon, settings: enSettings, providers: enProviders },
   },
   lng: resolveInitialLang(),
   fallbackLng: 'en-US',
-  ns: ['common', 'home', 'settings', 'providers', 'homePage'],
+  ns: ['common', 'settings', 'providers'],
   defaultNS: 'common',
   interpolation: { escapeValue: false },
   returnNull: false,
