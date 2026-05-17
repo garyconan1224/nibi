@@ -12,6 +12,7 @@ from typing import Any, Dict
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 # 项目根目录（backend/app/main.py → backend/app → backend → root）
 _ROOT_DIR: Path = Path(__file__).resolve().parent.parent.parent
@@ -97,6 +98,9 @@ def _build_cors_origins() -> list[str]:
 
 
 app = FastAPI(title="VidMirror API", version=_APP_VERSION, lifespan=lifespan)
+
+# 静态文件挂载：/static → data/ 目录（关键帧图片、项目资源等）
+app.mount("/static", StaticFiles(directory=str(_ROOT_DIR / "data")), name="static")
 
 # 允许前端开发服务器跨域访问；origin 列表由根 .env 中 VITE_PORT/CORS_ALLOW_ORIGINS 决定
 # 浏览器把 localhost 和 127.0.0.1 视为不同源，自动展开两种变体

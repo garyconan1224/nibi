@@ -28,6 +28,9 @@ from urllib.parse import urlparse
 
 from backend.app.models.tasks import TERMINAL_STATUS_VALUES, TaskStatus
 
+# 项目根目录（backend/app/routes/workspaces.py → routes → app → backend → root）
+_ROOT_DIR: Path = Path(__file__).resolve().parent.parent.parent.parent
+
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
@@ -805,13 +808,45 @@ def _materialize_video_results_from_analyze(
     except Exception:
         return results
     raw_frames = visual.get("frames") or []
+
+    # 从 json 文件名推导 basename（去掉 _视觉数据.json 后缀）
+    json_stem = _Path(target_path).stem.replace("_视觉数据", "")
+    # 在多个可能的位置查找 frames 目录
+    parent_dir = _Path(target_path).parent
+    data_root = _ROOT_DIR / "data"
+    frames_dir = None
+    for candidate_dir in [
+        parent_dir / "frames",                          # 同级 frames/
+        parent_dir / f"{json_stem}_分析报告" / "frames",  # videos/{name}_分析报告/frames/
+        parent_dir.parent / "videos" / f"{json_stem}_分析报告" / "frames",  # json_data → videos/
+    ]:
+        if candidate_dir.is_dir():
+            frames_dir = candidate_dir
+            break
+
     frames = []
     for idx, fr in enumerate(raw_frames):
+        # 优先用 JSON 里自带的路径，否则按命名规则拼
+        img_path = fr.get("frame_image_path") or fr.get("image_path") or ""
+        if not img_path and frames_dir:
+            # 命名规则：{basename}_{HH}_{MM}_{SS}.jpg（idx 秒数转时分秒）
+            h = idx // 3600
+            m = (idx % 3600) // 60
+            s = idx % 60
+            fname = f"{json_stem}_{h:02d}_{m:02d}_{s:02d}.jpg"
+            candidate = (frames_dir / fname).resolve()
+            if candidate.exists():
+                # 转为 URL 路径：/static/projects/{pid}/...
+                try:
+                    img_path = "/static/" + str(candidate.relative_to(data_root)).replace("\\", "/")
+                except ValueError:
+                    img_path = ""
         frames.append({
             "frame_index": idx,
             "timestamp": fr.get("timestamp", ""),
             "description": fr.get("description_zh") or fr.get("description") or "",
-            "frame_image_path": fr.get("frame_image_path") or fr.get("image_path") or "",
+            "frame_image_path": img_path,
+            "image_path": img_path,
         })
     return {
         **results,

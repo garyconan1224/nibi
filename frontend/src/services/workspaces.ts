@@ -168,6 +168,7 @@ export interface VideoResultFrame {
   prompt_sd: { positive: string; negative: string }
   prompt_video: string
   tags: Record<string, string[]>
+  image_path?: string
 }
 
 export interface VideoResultTranscriptLine {
