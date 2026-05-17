@@ -755,6 +755,53 @@ def _video_result_has_real_data(results: Dict[str, Any]) -> bool:
     return bool(frames) and isinstance(frames, list) and isinstance(transcript, list)
 
 
+def _materialize_video_results_from_analyze(results: Dict[str, Any]) -> Dict[str, Any]:
+    """把 analyze task 产出的 json_outputs 文件转成 frames+transcript 结构。
+
+    analyze 任务 result 形如：
+        {"json_outputs": ["/path/to/xxx_视觉数据.json", ...]}
+    json 文件里有 frames[{timestamp, description_zh, ...}] 和 global_visual_summary。
+    把第一份 json_outputs 展开成视频结果页可用的格式。
+    """
+    if not isinstance(results, dict):
+        return results
+    if results.get("frames"):
+        return results  # 已是目标格式
+    json_outputs = results.get("json_outputs") or []
+    if not json_outputs:
+        return results
+    import json as _json
+    from pathlib import Path as _Path
+    target_path = None
+    for p in json_outputs:
+        if _Path(p).exists():
+            target_path = p
+            break
+    if not target_path:
+        return results
+    try:
+        with open(target_path, "r", encoding="utf-8") as f:
+            visual = _json.load(f)
+    except Exception:
+        return results
+    raw_frames = visual.get("frames") or []
+    frames = []
+    for idx, fr in enumerate(raw_frames):
+        frames.append({
+            "frame_index": idx,
+            "timestamp": fr.get("timestamp", ""),
+            "description": fr.get("description_zh") or fr.get("description") or "",
+            "frame_image_path": fr.get("frame_image_path") or fr.get("image_path") or "",
+        })
+    return {
+        **results,
+        "frames": frames,
+        "transcript": results.get("transcript") or [],
+        "summary": visual.get("global_visual_summary", ""),
+        "video_title": visual.get("video_title", ""),
+    }
+
+
 @router.get("/{workspace_id}/items/{item_id}/result")
 def get_item_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
     """视频结果页聚合数据（v1.1 §5.3 三轨时间轴所需）。
@@ -776,6 +823,7 @@ def get_item_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
     # X.1 bridge: check task results overlay so video_result sees real data
     v_overlay = _sync_item_with_tasks(item)
     v_results = dict(v_overlay.get("results", {})) if v_overlay and v_overlay.get("results") else dict(item.results or {})
+    v_results = _materialize_video_results_from_analyze(v_results)
     if _video_result_has_real_data(v_results):
         payload = v_results
         payload.setdefault("source", "item_results")
