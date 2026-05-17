@@ -47,11 +47,49 @@ from shared.config import DATA_DIR
 
 # 复用 pipeline 路由的 runner / store 单例，避免重复初始化任务引擎
 from backend.app.routes.pipeline import _runner as _pipeline_runner
+from backend.app.models.tasks import TaskRecord
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
 # 进程级单例 store（与 pipeline 路由的 _store 同模式）
 _store = WorkspaceStore()
+
+
+def _on_download_success(completed_task: TaskRecord, runner) -> None:  # type: ignore[type-arg]
+    """X.5 任务链：download 成功后自动 enqueue analyze，并把 analyze task_id 写回 item。
+
+    逻辑：
+    1. 从 download 产物拿 save_path（视频本地路径）
+    2. enqueue 一个 analyze task，payload 带 video_basenames
+    3. 扫描所有 workspace items，找引用了此 download task_id 的 item
+    4. 追加 analyze task_id 到 item.related_task_ids（持久化）
+    """
+    save_path = str(completed_task.result.get("save_path") or "").strip()
+    if not save_path:
+        return  # download 没有产出文件（可能被取消），不起 analyze
+
+    video_basename = Path(save_path).name
+    project_id = completed_task.project_id
+
+    try:
+        analyze_task = runner.create_task(project_id, "analyze", {
+            "video_basenames": [video_basename],
+        })
+    except Exception:
+        return  # analyze enqueue 失败不影响 download 本身
+
+    # 把 analyze task_id 写入引用了此 download task 的所有 workspace items
+    for ws in _store.list_all():
+        for item in ws.items:
+            if completed_task.task_id in item.related_task_ids:
+                new_ids = list(item.related_task_ids) + [analyze_task.task_id]
+                try:
+                    _store.update_item(ws.workspace_id, item.item_id, related_task_ids=new_ids)
+                except Exception:
+                    pass  # 写失败不阻断（X.1 桥仍能通过 download task 显示最终状态）
+
+
+_pipeline_runner.register_success_callback("download", _on_download_success)
 
 WORKSPACE_UPLOAD_ROOT: Path = DATA_DIR / "workspaces"
 MAX_UPLOAD_BYTES = 500 * 1024 * 1024

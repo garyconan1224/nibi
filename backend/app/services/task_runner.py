@@ -5,12 +5,13 @@ from __future__ import annotations
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from backend.app.models.tasks import TERMINAL_STATUS_VALUES, TaskRecord, TaskStatus
 from backend.app.services.task_store import TaskStore
 
 TaskHandler = Callable[[TaskRecord, "TaskRunner"], Dict[str, Any]]
+SuccessCallback = Callable[[TaskRecord, "TaskRunner"], None]
 
 
 class TaskRunner:
@@ -18,11 +19,17 @@ class TaskRunner:
         self.store = store
         self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="vps-task")
         self._handlers: Dict[str, TaskHandler] = {}
+        self._success_callbacks: Dict[str, List[SuccessCallback]] = {}
         self._lock = threading.Lock()
 
     def register(self, task_type: str, handler: TaskHandler) -> None:
         with self._lock:
             self._handlers[task_type] = handler
+
+    def register_success_callback(self, task_type: str, callback: SuccessCallback) -> None:
+        """注册 task_type 成功后的回调（可注册多个，按顺序调用）。"""
+        with self._lock:
+            self._success_callbacks.setdefault(task_type, []).append(callback)
 
     def _has_active_duplicate(self, project_id: str, task_type: str, payload: Dict[str, Any]) -> Optional[str]:
         """检查是否已有同 project + 同 URL 的 running/queued 下载任务。返回 task_id 或 None。"""
@@ -85,6 +92,14 @@ class TaskRunner:
                 return
             self.store.update(task_id, status=TaskStatus.SUCCESS.value, progress=1.0, result=result, error="")
             self.store.append_log(task_id, "Task succeeded")
+            # 触发成功回调（例如：download→analyze 任务链）
+            with self._lock:
+                callbacks = list(self._success_callbacks.get(record.task_type, []))
+            for cb in callbacks:
+                try:
+                    cb(record, self)
+                except Exception as cb_err:  # noqa: BLE001
+                    self.store.append_log(task_id, f"Success callback error: {cb_err}", level="error")
         except Exception as err:  # noqa: BLE001
             self.store.update(task_id, status=TaskStatus.FAILED.value, error=str(err))
             self.store.append_log(task_id, f"Task failed: {err}", level="error")
