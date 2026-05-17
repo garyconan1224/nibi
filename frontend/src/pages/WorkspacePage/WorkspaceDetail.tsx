@@ -57,6 +57,7 @@ import PreflightConfigPanel from '@/components/workspace/PreflightConfigPanel'
 import {
   addWorkspaceItem,
   deleteWorkspace,
+  downloadExport,
   getWorkspace,
   removeWorkspaceItem,
   savePreflight,
@@ -120,6 +121,24 @@ export default function WorkspaceDetail() {
   // 前置配置面板状态——保存当前正在配置的 item 引用
   const [preflightItem, setPreflightItem] = useState<WorkspaceItem | null>(null)
   const [preflightSubmitting, setPreflightSubmitting] = useState(false)
+  const [exporting, setExporting] = useState(false)
+
+  // 找到第一个已完成的 video/image item 用于导出
+  const exportableItem = workspace?.items.find(
+    (it) => (it.type === 'video' || it.type === 'image') && it.status === 'done',
+  )
+
+  const handleExport = useCallback(async () => {
+    if (!workspace || !exportableItem) return
+    setExporting(true)
+    try {
+      await downloadExport(workspace.workspace_id, exportableItem.item_id)
+    } catch {
+      // downloadExport 内部已处理下载，这里只兜底
+    } finally {
+      setExporting(false)
+    }
+  }, [workspace, exportableItem])
 
   const refresh = useCallback(async () => {
     if (!id) return
@@ -445,8 +464,14 @@ export default function WorkspaceDetail() {
               <CardTitle className="text-base">导出工作包</CardTitle>
             </CardHeader>
             <CardContent>
-              <Button variant="outline" size="sm" disabled className="w-full">
-                即将上线
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!exportableItem || exporting}
+                className="w-full"
+                onClick={handleExport}
+              >
+                {exporting ? '导出中…' : exportableItem ? '导出 ZIP' : '先完成一个视频/图片分析任务'}
               </Button>
             </CardContent>
           </Card>
