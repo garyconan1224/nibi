@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-from backend.app.models.tasks import TERMINAL_STATUS_VALUES
+from backend.app.models.tasks import TERMINAL_STATUS_VALUES, TaskStatus
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
@@ -307,12 +307,57 @@ def _items_count_by_type(rec: WorkspaceRecord) -> Dict[str, int]:
     return counts
 
 
+def _sync_item_with_tasks(item: WorkspaceItem) -> Optional[Dict[str, Any]]:
+    """Phase X.1 状态桥（拉模式）：根据 related_task_ids 推导 item 当前应有的状态/产物。
+
+    - status：最新一条 task 决定。SUCCESS→done / FAILED|CANCELLED→failed / 其它非终结→processing
+    - results：最新一条 SUCCESS 任务的 result，作为 overlay 返回（item.results 已有则不覆盖）
+    只读 task_store；返回 None 表示无需 overlay。**不修改** item 本身，避免污染 store 缓存。
+    """
+    if not item.related_task_ids:
+        return None
+
+    latest: Optional[Any] = None
+    latest_success: Optional[Any] = None
+    for tid in item.related_task_ids:
+        task = _pipeline_runner.store.get(tid)
+        if task is None:
+            continue
+        if latest is None or task.updated_at > latest.updated_at:
+            latest = task
+        if task.status == TaskStatus.SUCCESS.value and (
+            latest_success is None or task.updated_at > latest_success.updated_at
+        ):
+            latest_success = task
+
+    if latest is None:
+        return None
+
+    overlay: Dict[str, Any] = {}
+    if latest.status == TaskStatus.SUCCESS.value:
+        overlay["status"] = ItemStatus.DONE.value
+    elif latest.status in (TaskStatus.FAILED.value, TaskStatus.CANCELLED.value):
+        overlay["status"] = ItemStatus.FAILED.value
+    else:
+        overlay["status"] = ItemStatus.PROCESSING.value
+
+    if latest_success is not None and latest_success.result and not item.results:
+        overlay["results"] = dict(latest_success.result)
+
+    return overlay
+
+
 def _enrich_workspace(rec: WorkspaceRecord) -> Dict[str, Any]:
     """把 WorkspaceRecord.to_dict() 合并上 Phase 1A 派生字段后返回。
 
     派生字段在路由层计算，不写回 WorkspaceStore。
     """
     d = rec.to_dict()
+    items_out = d.get("items") or []
+    for item_obj, item_dict in zip(rec.items, items_out):
+        overlay = _sync_item_with_tasks(item_obj)
+        if overlay:
+            item_dict.update(overlay)
     d["current_step"] = _current_step(rec)
     d["items_count_by_type"] = _items_count_by_type(rec)
     d["cover_thumbnail"] = _cover_thumbnail(rec)

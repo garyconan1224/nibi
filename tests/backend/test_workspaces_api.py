@@ -289,3 +289,96 @@ def test_get_item_result_item_not_found(client: TestClient) -> None:
     ws_id = client.post("/workspaces", json={"name": "1G 404"}).json()["workspace_id"]
     resp = client.get(f"/workspaces/{ws_id}/items/nonexistent/result")
     assert resp.status_code == 404
+
+
+# ── Phase X.1 状态桥（拉模式）────────────────────────────────────────
+
+
+def _make_task(status: str, result: dict | None = None, updated_at: str = "2026-05-17T00:00:00+00:00"):
+    t = MagicMock()
+    t.status = status
+    t.result = result or {}
+    t.updated_at = updated_at
+    return t
+
+
+def test_sync_item_with_tasks_success_maps_to_done(tmp_path: Path) -> None:
+    """SUCCESS 任务 → item.status=done，且 result 挂回 item.results。"""
+    isolated_store = WorkspaceStore(root=tmp_path / "workspaces")
+    mock_runner = MagicMock()
+    tasks = {
+        "t1": _make_task("DOWNLOAD", updated_at="2026-05-17T00:00:00+00:00"),
+        "t2": _make_task("SUCCESS", result={"title": "x", "content": "y"},
+                          updated_at="2026-05-17T01:00:00+00:00"),
+    }
+    mock_runner.store.get.side_effect = lambda tid: tasks.get(tid)
+
+    app = FastAPI()
+    with (
+        patch.object(ws_module, "_store", isolated_store),
+        patch.object(ws_module, "_pipeline_runner", mock_runner),
+    ):
+        app.include_router(ws_module.router)
+        with TestClient(app) as c:
+            ws = c.post("/workspaces", json={"name": "bridge"}).json()
+            ws_id = ws["workspace_id"]
+            it = c.post(f"/workspaces/{ws_id}/items", json={
+                "type": "text", "source": "url",
+                "source_value": "https://example.com/a",
+            }).json()
+            item_id = it["items"][0]["item_id"]
+            # 手动塞 related_task_ids（绕过 /start，避免依赖真实 pipeline）
+            rec = isolated_store.get(ws_id)
+            rec.items[0].related_task_ids = ["t1", "t2"]
+
+            body = c.get(f"/workspaces/{ws_id}").json()
+            it_out = body["items"][0]
+            assert it_out["status"] == "done"
+            assert it_out["results"] == {"title": "x", "content": "y"}
+            # 没污染 store
+            assert isolated_store.get(ws_id).items[0].status == "pending"
+            assert isolated_store.get(ws_id).items[0].results == {}
+
+
+def test_sync_item_with_tasks_running_maps_to_processing(tmp_path: Path) -> None:
+    """非终结 task → item.status=processing。"""
+    isolated_store = WorkspaceStore(root=tmp_path / "workspaces")
+    mock_runner = MagicMock()
+    mock_runner.store.get.return_value = _make_task("ASR")
+
+    app = FastAPI()
+    with (
+        patch.object(ws_module, "_store", isolated_store),
+        patch.object(ws_module, "_pipeline_runner", mock_runner),
+    ):
+        app.include_router(ws_module.router)
+        with TestClient(app) as c:
+            ws_id = c.post("/workspaces", json={"name": "p"}).json()["workspace_id"]
+            it = c.post(f"/workspaces/{ws_id}/items", json={
+                "type": "text", "source": "url", "source_value": "https://example.com/b",
+            }).json()
+            isolated_store.get(ws_id).items[0].related_task_ids = ["t1"]
+            body = c.get(f"/workspaces/{ws_id}").json()
+            assert body["items"][0]["status"] == "processing"
+
+
+def test_sync_item_with_tasks_failed_maps_to_failed(tmp_path: Path) -> None:
+    """FAILED/CANCELLED → item.status=failed。"""
+    isolated_store = WorkspaceStore(root=tmp_path / "workspaces")
+    mock_runner = MagicMock()
+    mock_runner.store.get.return_value = _make_task("FAILED")
+
+    app = FastAPI()
+    with (
+        patch.object(ws_module, "_store", isolated_store),
+        patch.object(ws_module, "_pipeline_runner", mock_runner),
+    ):
+        app.include_router(ws_module.router)
+        with TestClient(app) as c:
+            ws_id = c.post("/workspaces", json={"name": "f"}).json()["workspace_id"]
+            c.post(f"/workspaces/{ws_id}/items", json={
+                "type": "text", "source": "url", "source_value": "https://example.com/c",
+            })
+            isolated_store.get(ws_id).items[0].related_task_ids = ["t1"]
+            body = c.get(f"/workspaces/{ws_id}").json()
+            assert body["items"][0]["status"] == "failed"
