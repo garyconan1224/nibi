@@ -574,12 +574,19 @@ def _bridge_to_pipeline_payload(
     audio / image / text 分支需对应的 pipeline handler，后续阶段实现，
     目前抛 501 让前端展示「即将上线」提示。
     """
-    if item.type != ItemType.VIDEO.value:
+    if item.type == ItemType.TEXT.value:
+        payload: Dict[str, Any] = {
+            "source": item.source_value,
+            "source_type": item.source,  # "url" or "local"
+        }
+        return "text", payload
+
+    if item.type not in (ItemType.VIDEO.value,):
         raise HTTPException(
             status_code=501,
             detail=(
                 f"暂不支持触发 {item.type} 分支的分析"
-                "（待实现 audio/image/text pipeline handler）"
+                "（待实现 audio/image pipeline handler）"
             ),
         )
 
