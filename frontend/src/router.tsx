@@ -3,9 +3,6 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import Index from '@/pages/Index'
 
 // 按路由做代码分割：每个页面组件通过动态 import 拆成独立 chunk
-const HomePage = lazy(() =>
-  import('@/pages/HomePage/Home').then((m) => ({ default: m.HomePage })),
-)
 const SettingPage = lazy(() => import('@/pages/SettingPage/index'))
 const ProvidersManagementPage = lazy(
   () => import('@/pages/SettingPage/ProvidersManagementPage'),
@@ -50,8 +47,7 @@ export const router = createBrowserRouter([
     path: '/',
     element: <Index />,
     children: [
-      { index: true, element: <Navigate to="/home" replace /> },
-      { path: 'home', element: withSuspense(<HomePage />) },
+      { index: true, element: <Navigate to="/workspaces" replace /> },
       { path: 'workspaces', element: withSuspense(<WorkspaceList />) },
       { path: 'favorites', element: withSuspense(<FavoritesPage />) },
       { path: 'workspaces/:id', element: withSuspense(<WorkspaceDetail />) },
