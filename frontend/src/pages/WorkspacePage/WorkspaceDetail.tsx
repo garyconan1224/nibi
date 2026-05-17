@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import axios from 'axios'
+import { subscribeSse } from '@/services/events'
 import { ChatSidebar } from '@/components/workspace/ChatSidebar'
 import {
   ArrowLeft,
@@ -120,7 +121,7 @@ export default function WorkspaceDetail() {
   const [preflightItem, setPreflightItem] = useState<WorkspaceItem | null>(null)
   const [preflightSubmitting, setPreflightSubmitting] = useState(false)
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     if (!id) return
     setLoading(true)
     setError(null)
@@ -132,7 +133,7 @@ export default function WorkspaceDetail() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
 
   useEffect(() => {
     refresh()
@@ -391,6 +392,7 @@ export default function WorkspaceDetail() {
                     <ItemRow
                       key={it.item_id}
                       item={it}
+                      onTaskDone={refresh}
                       onConfigure={() => handleConfigureItem(it)}
                       onRemove={() => handleRemoveItem(it.item_id)}
                       onViewResult={() => {
@@ -729,13 +731,17 @@ const TYPE_ICON_MAP: Record<ItemType, typeof FileVideo> = {
   text: FileText,
 }
 
+const TERMINAL = new Set(['SUCCESS', 'FAILED', 'CANCELLED'])
+
 function ItemRow({
   item,
+  onTaskDone,
   onConfigure,
   onRemove,
   onViewResult,
 }: {
   item: WorkspaceItem
+  onTaskDone: () => void
   onConfigure: () => void
   onRemove: () => void
   onViewResult: () => void
@@ -744,6 +750,43 @@ function ItemRow({
   const taskCount = item.related_task_ids.length
   // pending = 还没配过/没起任务；processing = 已经触发；done/failed = 终态
   const canStart = item.status === 'pending'
+
+  // ── SSE 进度订阅（X.3）──────────────────────────────────
+  const [progressMsg, setProgressMsg] = useState<string | null>(null)
+  const [progressPct, setProgressPct] = useState<number | null>(null)
+  const onTaskDoneRef = useRef(onTaskDone)
+  useEffect(() => { onTaskDoneRef.current = onTaskDone }, [onTaskDone])
+
+  useEffect(() => {
+    if (item.status !== 'processing' || item.related_task_ids.length === 0) {
+      setProgressMsg(null)
+      setProgressPct(null)
+      return
+    }
+    const taskId = item.related_task_ids[item.related_task_ids.length - 1]
+    const sub = subscribeSse<{ type: string; entry?: { message: string }; task?: { status: string; progress: number } }>(
+      `/pipeline/tasks/${taskId}/events`,
+      {
+        onMessage: (data) => {
+          if (data.type === 'log' && data.entry?.message) {
+            setProgressMsg(data.entry.message)
+          } else if (data.type === 'task' && data.task) {
+            if (data.task.progress != null) setProgressPct(data.task.progress)
+            if (TERMINAL.has(data.task.status)) {
+              sub.close()
+              setProgressMsg(null)
+              setProgressPct(null)
+              onTaskDoneRef.current()
+            }
+          }
+        },
+      },
+    )
+    return () => sub.close()
+  // item.status / related_task_ids 变化时重新订阅（item_id 唯一确定稳定 ref）
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.item_id, item.status, item.related_task_ids.length])
+
   return (
     <div className="group flex items-center gap-3 rounded-md border p-3 transition-colors hover:bg-muted/50">
       <div
@@ -761,15 +804,22 @@ function ItemRow({
           )}
         </div>
       </div>
-      <Badge variant="secondary" className="shrink-0">
-        {item.status === 'pending'
-          ? '待处理'
-          : item.status === 'processing'
-            ? '处理中'
-            : item.status === 'done'
-              ? '完成'
-              : '失败'}
-      </Badge>
+      <div className="flex shrink-0 flex-col items-end gap-0.5">
+        <Badge variant="secondary">
+          {item.status === 'pending'
+            ? '待处理'
+            : item.status === 'processing'
+              ? '处理中'
+              : item.status === 'done'
+                ? '完成'
+                : '失败'}
+        </Badge>
+        {item.status === 'processing' && progressMsg && (
+          <span className="max-w-[14rem] truncate text-right text-[10px] text-muted-foreground">
+            {progressPct != null ? `${Math.round(progressPct * 100)}% · ` : ''}{progressMsg}
+          </span>
+        )}
+      </div>
       {item.status === 'done' && (
         <Button
           size="sm"
