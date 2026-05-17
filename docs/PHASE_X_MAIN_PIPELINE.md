@@ -22,9 +22,9 @@
 
 | 类型 | 触发 `/start` | pipeline handler | 状态回写 item | 产物回写 item.results | 结果页有真数据 |
 |------|--------------|-----------------|--------------|---------------------|--------------|
-| TEXT | ✅ | ✅ text_task | ✅ X.1 桥 | ✅ X.1 桥 | ✅ X.2 验收通过 |
-| IMAGE | ✅ X.4 | ✅ image_task | ✅ X.1 桥 | ✅ X.1 桥 | 🟡 待 e2e 验收 |
-| VIDEO | ✅ download | ✅ download→analyze X.5 | ✅ X.1 桥 | ✅ X.1 桥 | 🟡 待 e2e 验收 |
+| TEXT | ✅ | ✅ text_task | ✅ X.1 桥 | ✅ X.1 桥 | ✅ X.2/X.7 验收通过 |
+| IMAGE | ✅ X.4 | ✅ image_task | ✅ X.1 桥 | ✅ X.1 桥 | ✅ X.7 验收通过 |
+| VIDEO | ✅ download | ✅ download→analyze X.5 | ✅ X.1 桥 | ✅ X.1 桥 | ✅ X.7 验收通过 |
 | AUDIO | ❌ 501 | ❌ | ❌ | ❌ | ❌（demo 兜底，暂缓） |
 
 > AUDIO 这一栏暂缓，等 1F 之后再说。本 plan 只覆盖 TEXT / IMAGE / VIDEO。
