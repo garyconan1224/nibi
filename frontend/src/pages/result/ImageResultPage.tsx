@@ -477,12 +477,12 @@ export default function ImageResultPage() {
           </div>
 
           {/* EXIF 信息 */}
-          {(result.exif.time || result.exif.location) && (
+          {(result.exif?.time || result.exif?.location) && (
             <div style={{ marginBottom: 14 }}>
               <div className="eyebrow" style={{ marginBottom: 6 }}>EXIF 信息</div>
               <div style={{ fontSize: 12, lineHeight: 1.8, color: 'var(--ink-2)' }}>
-                {result.exif.time && <div>拍摄时间：{result.exif.time}</div>}
-                {result.exif.location && <div>拍摄地点：{result.exif.location}</div>}
+                {result.exif?.time && <div>拍摄时间：{result.exif.time}</div>}
+                {result.exif?.location && <div>拍摄地点：{result.exif.location}</div>}
               </div>
             </div>
           )}
