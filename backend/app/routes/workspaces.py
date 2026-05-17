@@ -626,12 +626,19 @@ def _bridge_to_pipeline_payload(
         }
         return "text", payload
 
+    if item.type == ItemType.IMAGE.value:
+        payload = {
+            "source": item.source_value,
+            "source_type": item.source,  # "url" or "local"
+        }
+        return "image", payload
+
     if item.type not in (ItemType.VIDEO.value,):
         raise HTTPException(
             status_code=501,
             detail=(
                 f"暂不支持触发 {item.type} 分支的分析"
-                "（待实现 audio/image pipeline handler）"
+                "（待实现 audio pipeline handler）"
             ),
         )
 

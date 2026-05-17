@@ -2,8 +2,10 @@ from __future__ import annotations
 
 """Task handlers for pipeline task center."""
 
+import base64
 import json
 import time
+import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -688,6 +690,165 @@ def handle_text_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     }
 
 
+def handle_image_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
+    """图片分析任务（Phase X.4）。
+
+    payload 字段：
+      - source: 必填，HTTP(S) URL 或本地文件路径
+      - source_type: "url" | "local"（可省略，依赖 source 自动判断）
+      - vision_model / text_model / api_key：可选，从 settings 兜底
+
+    状态机：FETCH → VLM → STORE → SUCCESS
+    产物：data/projects/<pid>/image/<task_id>.json
+    """
+    payload = record.payload
+    task_id = record.task_id
+    log = lambda msg: runner.append_log(task_id, msg)  # noqa: E731
+
+    source = str(payload.get("source") or "").strip()
+    if not source:
+        raise ValueError("image task 需要 payload.source（URL 或文件路径）")
+    source_type = str(payload.get("source_type") or "").strip().lower() or (
+        "url" if source.startswith(("http://", "https://")) else "local"
+    )
+
+    log(f"🖼 image_task | source_type={source_type} | source={source[:80]}")
+
+    # ── 1. FETCH ────────────────────────────────────────────
+    runner.store.update(task_id, status=TaskStatus.FETCH.value)
+    runner.set_progress(task_id, 0.05, "拉取图片...")
+
+    if source_type == "url":
+        req = urllib.request.Request(source, headers={"User-Agent": "Mozilla/5.0"})
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                image_bytes = resp.read()
+        except Exception as err:
+            raise RuntimeError(f"图片下载失败：{err}") from err
+    else:
+        local = Path(source)
+        if not local.is_file():
+            raise RuntimeError(f"本地图片不存在：{source}")
+        image_bytes = local.read_bytes()
+
+    # 通过文件头简单判断格式
+    if image_bytes[:4] == b"\x89PNG":
+        mime = "image/png"
+    elif image_bytes[:2] == b"\xff\xd8":
+        mime = "image/jpeg"
+    elif image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP":
+        mime = "image/webp"
+    else:
+        mime = "image/jpeg"  # 兜底
+
+    img_b64 = base64.b64encode(image_bytes).decode()
+    log(f"📦 图片已加载，{len(image_bytes)//1024} KB，mime={mime}")
+
+    # ── 2. VLM ──────────────────────────────────────────────
+    runner.store.update(task_id, status=TaskStatus.VLM.value)
+    runner.set_progress(task_id, 0.35, "视觉模型分析中...")
+
+    settings = load_settings()
+    api_key = (
+        str(payload.get("api_key") or "").strip()
+        or (settings.openai_api_key or "").strip()
+    )
+    if not api_key:
+        log("⚠️  未提供 api_key，跳过视觉分析")
+        description = ""
+        prompts: Dict[str, Any] = {"mj": "", "sd": {"positive": "", "negative": ""}, "json": ""}
+        tags: Dict[str, List[str]] = {}
+        ocr_text = ""
+    else:
+        registry = create_default_registry()
+        profile = registry.resolve_default_profile(settings, "vision")
+        provider = registry.build(profile)
+        vision_model = (
+            str(payload.get("vision_model") or "").strip()
+            or profile.default_models.get("vision")
+            or (settings.vision_model or "").strip()
+        )
+        if not vision_model:
+            log("⚠️  未配置 vision_model，跳过视觉分析")
+            description = ""
+            prompts = {"mj": "", "sd": {"positive": "", "negative": ""}, "json": ""}
+            tags = {}
+            ocr_text = ""
+        else:
+            log(f"🔍 调用 vision model={vision_model}")
+            analysis_prompt = (
+                "你是一名专业的图像分析助手。请分析这张图片并以纯 JSON 格式输出，不要有 markdown 代码块。\n"
+                "JSON 结构如下：\n"
+                '{"description": "中文详细描述（100-200字）",\n'
+                ' "ocr_text": "图中可见文字（无则空字符串）",\n'
+                ' "prompts": {\n'
+                '   "mj": "Midjourney 提示词（英文，50-80词）",\n'
+                '   "sd": {"positive": "Stable Diffusion 正向提示词（英文）", "negative": "负向提示词"},\n'
+                '   "json": "结构化场景描述（英文 JSON 字符串）"\n'
+                ' },\n'
+                ' "tags": {"subject": [], "scene": [], "style": [], "lighting": [], "color": [], "composition": []}}'
+            )
+            try:
+                raw = provider.chat(
+                    ChatRequest(
+                        model=vision_model,
+                        messages=[{
+                            "role": "user",
+                            "content": [
+                                {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{img_b64}"}},
+                                {"type": "text", "text": analysis_prompt},
+                            ],
+                        }],
+                        temperature=0.3,
+                        max_tokens=1200,
+                    )
+                )
+                import re as _re
+                m = _re.search(r"\{[\s\S]*\}", raw)
+                parsed: Dict[str, Any] = json.loads(m.group()) if m else {}
+            except Exception as err:
+                log(f"⚠️  视觉分析失败：{err}")
+                parsed = {}
+
+            description = str(parsed.get("description") or "")
+            ocr_text = str(parsed.get("ocr_text") or "")
+            prompts = parsed.get("prompts") or {"mj": "", "sd": {"positive": "", "negative": ""}, "json": ""}
+            tags = parsed.get("tags") or {}
+
+    log(f"📊 分析完成 | description={description[:40]}...")
+
+    # ── 3. STORE ────────────────────────────────────────────
+    runner.store.update(task_id, status=TaskStatus.STORE.value)
+    runner.set_progress(task_id, 0.90, "归档图片产物...")
+
+    image_dir = Path(settings.data_dir) / "projects" / record.project_id / "image" \
+        if hasattr(settings, "data_dir") and settings.data_dir \
+        else Path(__file__).resolve().parents[4] / "data" / "projects" / record.project_id / "image"
+
+    # 保险兜底：通过 config 拿 project root
+    from shared.config import get_project_root
+    image_dir = get_project_root(record.project_id) / "image"
+    image_dir.mkdir(parents=True, exist_ok=True)
+
+    result: Dict[str, Any] = {
+        "task_id": task_id,
+        "project_id": record.project_id,
+        "source": source,
+        "source_type": source_type,
+        "description": description,
+        "ocr_text": ocr_text,
+        "prompts": prompts,
+        "tags": tags,
+    }
+    json_path = image_dir / f"{task_id}.json"
+    json_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    runner.set_progress(task_id, 1.0, "图片任务完成")
+    log(f"✅ 产物已归档：{json_path}")
+
+    return {**result, "json_path": str(json_path.resolve())}
+
+
 def register_pipeline_handlers(runner: TaskRunner) -> None:
     runner.register("download",  handle_download_task)
     runner.register("analyze",   handle_analyze_task)
@@ -695,3 +856,4 @@ def register_pipeline_handlers(runner: TaskRunner) -> None:
     runner.register("storyboard", handle_storyboard_task)
     runner.register("note",      handle_note_task)
     runner.register("text",      handle_text_task)
+    runner.register("image",     handle_image_task)
