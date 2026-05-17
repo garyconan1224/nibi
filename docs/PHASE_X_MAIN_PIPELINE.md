@@ -86,6 +86,13 @@ items:
 **模型**：**小米 2.5 Pro（终端，免费优先）** —— 跑 curl + playwright 截图就够
 **commit 信息**：`test(phasex): X.2 TEXT 主干 e2e 验收通过`
 
+> **completed: 2026-05-17 by 小米 2.5 Pro + Opus 4.7 收尾**
+> - curl /text_result 返回真 Wikipedia 数据（title="Xinjiang - Wikipedia"，content 非空）
+> - 工作空间页 chip 显示「完成」（X.1 桥生效）
+> - 文本结果页可见原文 + 中文摘要
+> - 截图：`.local/phasex2-screenshots/0{1,2}-*.png`
+> - 顺手修了 phase 2C.2 遗留依赖缺失：`react-diff-viewer-continued` 需 `pnpm install`
+
 ---
 
 ### **X.3** · SSE 进度接入工作空间详情页
