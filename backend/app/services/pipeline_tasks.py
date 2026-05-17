@@ -849,6 +849,170 @@ def handle_image_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     return {**result, "json_path": str(json_path.resolve())}
 
 
+def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
+    """音频分析任务（Phase X.A）。
+
+    payload 字段：
+      - source: 必填，HTTP(S) URL 或本地文件路径
+      - source_type: "url" | "local"（可省略，依 source 前缀自动判断）
+      - audio_model: 可选，默认 FunAudioLLM/SenseVoiceSmall
+
+    状态机：FETCH → TRANSCRIBE → SUMMARIZE → STORE → SUCCESS
+    产物：data/projects/<pid>/audio/<task_id>.json
+    """
+    import mimetypes
+
+    payload = record.payload
+    task_id = record.task_id
+    log = lambda msg: runner.append_log(task_id, msg)  # noqa: E731
+
+    source = str(payload.get("source") or "").strip()
+    if not source:
+        raise ValueError("audio task 需要 payload.source（URL 或文件路径）")
+    source_type = str(payload.get("source_type") or "").strip().lower() or (
+        "url" if source.startswith(("http://", "https://")) else "local"
+    )
+
+    log(f"🎵 audio_task | source_type={source_type} | source={source[:80]}")
+
+    # ── 1. FETCH ────────────────────────────────────────────
+    runner.store.update(task_id, status=TaskStatus.FETCH.value)
+    runner.set_progress(task_id, 0.05, "拉取音频文件...")
+
+    if source_type == "url":
+        req = urllib.request.Request(source, headers={"User-Agent": "Mozilla/5.0"})
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                audio_bytes = resp.read()
+                content_type = resp.headers.get("Content-Type", "")
+        except Exception as err:
+            raise RuntimeError(f"音频下载失败：{err}") from err
+        # 从 URL 推断文件名
+        url_path = source.split("?")[0]
+        audio_filename = url_path.split("/")[-1] or "audio.mp3"
+    else:
+        local = Path(source)
+        if not local.is_file():
+            raise RuntimeError(f"本地音频不存在：{source}")
+        audio_bytes = local.read_bytes()
+        audio_filename = local.name
+        content_type = ""
+
+    # 推断 MIME
+    guessed, _ = mimetypes.guess_type(audio_filename)
+    audio_mime = guessed or content_type.split(";")[0].strip() or "audio/mpeg"
+    log(f"📦 音频已加载，{len(audio_bytes)//1024} KB，mime={audio_mime}，filename={audio_filename}")
+
+    # ── 2. TRANSCRIBE ────────────────────────────────────────
+    runner.store.update(task_id, status=TaskStatus.VLM.value)  # 借用 VLM 状态表示「模型推理中」
+    runner.set_progress(task_id, 0.30, "语音转文字中...")
+
+    settings = load_settings()
+    api_key = str(payload.get("api_key") or "").strip() or (getattr(settings, "openai_api_key", "") or "").strip()
+    base_url = str(payload.get("base_url") or "").strip() or (getattr(settings, "openai_base_url", "") or "https://api.siliconflow.cn/v1").strip()
+    audio_model = str(payload.get("audio_model") or "").strip() or "FunAudioLLM/SenseVoiceSmall"
+
+    transcript_text = ""
+    transcript_segments: List[Dict[str, Any]] = []
+
+    if not api_key:
+        log("⚠️  未提供 api_key，跳过转写")
+    else:
+        # 用 multipart/form-data POST 到 /audio/transcriptions（OpenAI 兼容）
+        log(f"🔊 调用 audio model={audio_model}")
+        boundary = "----PythonFormBoundary"
+        body_parts = []
+        body_parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\n{audio_model}\r\n".encode())
+        body_parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"response_format\"\r\n\r\njson\r\n".encode())
+        body_parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{audio_filename}\"\r\nContent-Type: {audio_mime}\r\n\r\n".encode())
+        body_parts.append(audio_bytes)
+        body_parts.append(f"\r\n--{boundary}--\r\n".encode())
+        body = b"".join(body_parts)
+
+        transcribe_url = base_url.rstrip("/") + "/audio/transcriptions"
+        transcribe_req = urllib.request.Request(
+            transcribe_url,
+            data=body,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(transcribe_req, timeout=120) as resp:
+                resp_data = json.loads(resp.read())
+            transcript_text = resp_data.get("text") or ""
+            transcript_segments = resp_data.get("segments") or []
+            log(f"✅ 转写完成，{len(transcript_text)} 字符")
+        except Exception as err:
+            log(f"⚠️  转写失败：{err}")
+            transcript_text = ""
+
+    # ── 3. SUMMARIZE ─────────────────────────────────────────
+    runner.set_progress(task_id, 0.70, "生成摘要中...")
+    summary = ""
+
+    if transcript_text and api_key:
+        log("📝 调用 chat model 生成摘要...")
+        registry = create_default_registry()
+        profile = registry.resolve_default_profile(settings, "chat")
+        provider = registry.build(profile)
+        chat_model = (
+            str(payload.get("text_model") or "").strip()
+            or getattr(profile.default_models, "chat", None)
+            or (getattr(settings, "text_model", "") or "").strip()
+        )
+        if chat_model:
+            try:
+                summary = provider.chat(
+                    ChatRequest(
+                        model=chat_model,
+                        messages=[{
+                            "role": "user",
+                            "content": (
+                                f"请将以下音频转写内容总结为 100-200 字的中文摘要：\n\n{transcript_text[:3000]}"
+                            ),
+                        }],
+                        temperature=0.3,
+                        max_tokens=400,
+                    )
+                )
+                log(f"📋 摘要生成完成，{len(summary)} 字符")
+            except Exception as err:
+                log(f"⚠️  摘要生成失败：{err}")
+
+    # ── 4. STORE ─────────────────────────────────────────────
+    runner.store.update(task_id, status=TaskStatus.STORE.value)
+    runner.set_progress(task_id, 0.90, "归档音频产物...")
+
+    from shared.config import get_project_root
+    audio_dir = get_project_root(record.project_id) / "audio"
+    audio_dir.mkdir(parents=True, exist_ok=True)
+
+    result: Dict[str, Any] = {
+        "task_id": task_id,
+        "project_id": record.project_id,
+        "source": source,
+        "source_type": source_type,
+        "transcript": transcript_text,
+        "transcript_segments": transcript_segments,
+        "summary": summary,
+        "audio": {
+            "filename": audio_filename,
+            "mime": audio_mime,
+            "size_bytes": len(audio_bytes),
+        },
+    }
+    json_path = audio_dir / f"{task_id}.json"
+    json_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    runner.set_progress(task_id, 1.0, "音频任务完成")
+    log(f"✅ 产物已归档：{json_path}")
+
+    return {**result, "json_path": str(json_path.resolve())}
+
+
 def register_pipeline_handlers(runner: TaskRunner) -> None:
     runner.register("download",  handle_download_task)
     runner.register("analyze",   handle_analyze_task)
@@ -857,3 +1021,4 @@ def register_pipeline_handlers(runner: TaskRunner) -> None:
     runner.register("note",      handle_note_task)
     runner.register("text",      handle_text_task)
     runner.register("image",     handle_image_task)
+    runner.register("audio",     handle_audio_task)

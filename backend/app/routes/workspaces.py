@@ -671,13 +671,17 @@ def _bridge_to_pipeline_payload(
         }
         return "image", payload
 
+    if item.type == ItemType.AUDIO.value:
+        payload = {
+            "source": item.source_value,
+            "source_type": item.source,  # "url" or "local"
+        }
+        return "audio", payload
+
     if item.type not in (ItemType.VIDEO.value,):
         raise HTTPException(
             status_code=501,
-            detail=(
-                f"暂不支持触发 {item.type} 分支的分析"
-                "（待实现 audio pipeline handler）"
-            ),
+            detail=f"暂不支持触发 {item.type} 分支的分析",
         )
 
     if item.source == "url":
@@ -977,7 +981,9 @@ def get_audio_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
             detail=f"item type {item.type!r} has no audio result (only 'audio' supported)",
         )
 
-    results = item.results or {}
+    # X.1 bridge: overlay task results so audio_result sees real data
+    a_overlay = _sync_item_with_tasks(item)
+    results = dict(a_overlay.get("results", {})) if a_overlay and a_overlay.get("results") else dict(item.results or {})
     has_real = isinstance(results, dict) and results.get("transcript")
     if has_real:
         payload = dict(results)
