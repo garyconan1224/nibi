@@ -755,13 +755,19 @@ def _video_result_has_real_data(results: Dict[str, Any]) -> bool:
     return bool(frames) and isinstance(frames, list) and isinstance(transcript, list)
 
 
-def _materialize_video_results_from_analyze(results: Dict[str, Any]) -> Dict[str, Any]:
+def _materialize_video_results_from_analyze(
+    results: Dict[str, Any],
+    preferred_basenames: Optional[List[str]] = None,
+) -> Dict[str, Any]:
     """把 analyze task 产出的 json_outputs 文件转成 frames+transcript 结构。
 
     analyze 任务 result 形如：
         {"json_outputs": ["/path/to/xxx_视觉数据.json", ...]}
     json 文件里有 frames[{timestamp, description_zh, ...}] 和 global_visual_summary。
-    把第一份 json_outputs 展开成视频结果页可用的格式。
+
+    当 preferred_basenames 给出（来自 analyze task.payload.video_basenames）时，
+    优先选 path 名里包含其中任一 basename 词干的文件；防止 analyze 批处理
+    project 下多视频时 result 含多份 json_outputs，端点拿错文件。
     """
     if not isinstance(results, dict):
         return results
@@ -772,8 +778,18 @@ def _materialize_video_results_from_analyze(results: Dict[str, Any]) -> Dict[str
         return results
     import json as _json
     from pathlib import Path as _Path
+
+    candidates = list(json_outputs)
+    if preferred_basenames:
+        def _norm(s: str) -> str:
+            return s.replace("-", "_").replace(".", "_")
+        stems = [_norm(_Path(b).stem) for b in preferred_basenames if b]
+        matched = [p for p in candidates if any(stem and stem in _norm(p) for stem in stems)]
+        if matched:
+            candidates = matched
+
     target_path = None
-    for p in json_outputs:
+    for p in candidates:
         if _Path(p).exists():
             target_path = p
             break
@@ -823,7 +839,17 @@ def get_item_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
     # X.1 bridge: check task results overlay so video_result sees real data
     v_overlay = _sync_item_with_tasks(item)
     v_results = dict(v_overlay.get("results", {})) if v_overlay and v_overlay.get("results") else dict(item.results or {})
-    v_results = _materialize_video_results_from_analyze(v_results)
+
+    # 找最近一条 SUCCESS analyze task，用它的 payload.video_basenames 给 _materialize 提示
+    preferred_basenames: List[str] = []
+    for tid in reversed(item.related_task_ids):
+        task = _pipeline_runner.store.get(tid)
+        if task is None or task.task_type != "analyze" or task.status != TaskStatus.SUCCESS.value:
+            continue
+        preferred_basenames = list(task.payload.get("video_basenames") or [])
+        if preferred_basenames:
+            break
+    v_results = _materialize_video_results_from_analyze(v_results, preferred_basenames=preferred_basenames)
     if _video_result_has_real_data(v_results):
         payload = v_results
         payload.setdefault("source", "item_results")
