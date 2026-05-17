@@ -1,7 +1,6 @@
 import { type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  Home,
   Library,
   Settings,
   Search,
@@ -19,7 +18,6 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'home', path: '/home', icon: Home, label: '工作台' },
   { id: 'workspaces', path: '/workspaces', icon: Library, label: '工作区' },
   { id: 'favorites', path: '/favorites', icon: Star, label: '收藏夹' },
 ]
@@ -81,9 +79,9 @@ export function AppShell({ children }: AppShellProps) {
         {/* Logo slot */}
         <button
           className="mb-2 flex size-8 items-center justify-center rounded-md bg-violet-100 text-violet-600 transition-colors hover:bg-violet-200 dark:bg-violet-900/30 dark:text-violet-400 dark:hover:bg-violet-900/50"
-          onClick={() => navigate('/home')}
+          onClick={() => navigate('/workspaces')}
           title="VidMirror"
-          aria-label="返回工作台"
+          aria-label="返回工作区"
         >
           <Sparkles size={15} />
         </button>
