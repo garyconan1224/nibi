@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import base64
 import json
+from collections.abc import Iterator
 from typing import Any, Callable, Optional, Sequence
 
 import requests
@@ -167,6 +168,55 @@ def chat_completion(
     if not isinstance(content, str):
         raise SiliconFlowError(f"异常 message 结构: {msg}")
     return content
+
+
+def chat_completion_stream(
+    api_key: str,
+    model: str,
+    messages: list[dict[str, Any]],
+    temperature: float = 0.7,
+    max_tokens: int = 8192,
+) -> Iterator[str]:
+    """OpenAI 兼容流式 /v1/chat/completions（stream=True），逐块 yield 文本片段。
+
+    每次 yield 的是单条 delta.content 字符串；调用方无需关心 SSE 格式。
+    API 返回 [DONE] 或流结束时自动停止迭代。
+    """
+    url = f"{get_openai_compat_base_url().rstrip('/')}/chat/completions"
+    payload = {
+        "model": model,
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "stream": True,
+    }
+    headers = _headers(api_key)
+    with requests.post(url, headers=headers, json=payload, stream=True, timeout=300) as resp:
+        if resp.status_code in (429, 503, 504):
+            raise SiliconFlowTransientError(f"HTTP {resp.status_code}: {resp.text[:500]}")
+        if resp.status_code >= 400:
+            try:
+                detail = resp.json()
+            except Exception:
+                detail = resp.text
+            raise SiliconFlowError(f"HTTP {resp.status_code}: {detail}")
+        for raw_line in resp.iter_lines():
+            if not raw_line:
+                continue
+            line = raw_line.decode("utf-8") if isinstance(raw_line, bytes) else raw_line
+            if not line.startswith("data: "):
+                continue
+            payload_str = line[6:]
+            if payload_str.strip() == "[DONE]":
+                break
+            try:
+                chunk = json.loads(payload_str)
+            except json.JSONDecodeError:
+                continue
+            delta = (chunk.get("choices") or [{}])[0].get("delta") or {}
+            text = delta.get("content")
+            if text:
+                yield text
 
 
 def build_vision_user_content(
