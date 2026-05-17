@@ -142,15 +142,16 @@ export default function PreflightConfigPanel({
   }, [open, item, providerModels])
 
   // 默认勾选项（仅在用户未配置过时使用，避免覆盖已保存值）
+  // 直接读 item.preflight.tasks 而非 tasks state，避免与上方回填 effect 的 race condition
   const taskOptions = useMemo(() => getTaskOptionsByType(item.type), [item.type])
   useEffect(() => {
     if (!open) return
-    if (Object.keys(tasks).length > 0) return
+    const saved = (item.preflight?.tasks as Record<string, boolean>) ?? {}
+    if (Object.keys(saved).length > 0) return
     const defaults: Record<string, boolean> = {}
     for (const opt of taskOptions) defaults[opt.id] = opt.defaultChecked
     setTasks(defaults)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, item.type])
+  }, [open, item.type, item.preflight?.tasks, taskOptions])
 
   const enabledProviders = providers.filter((p) => p.enabled && p.has_api_key)
   const visionProviders = enabledProviders.filter((p) =>
