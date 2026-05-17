@@ -143,7 +143,19 @@ python3 tests/e2e_qa.py
 >
 > 总规划与本规则里凡是写「zip 内」「zip/components/...」「zip/styles.css」「v1.1 §X」的，统一对应到 `vidmirror-handoff/project/` 下对应文件。
 >
-> **新会话启动必读顺序**：① `nibi-spec-v2.md` → ② `AGENTS.md` → ③ `docs/AI_HANDOFF.md` → ④ `docs/OUTSTANDING_TASKS.md` → ⑤ **`docs/PHASE_X_MAIN_PIPELINE.md`（当前主线：TEXT/IMAGE/VIDEO 主干竖切打通）**。其他文件按需读。
+> **新会话启动必读顺序**：① **`docs/PROJECT_EXECUTION_PLAN.md`（总索引 + 打勾清单，最权威）** → ② `nibi-spec-v2.md` → ③ `AGENTS.md` → ④ `docs/AI_HANDOFF.md` → ⑤ `docs/OUTSTANDING_TASKS.md` → ⑥ **`docs/PHASE_X_MAIN_PIPELINE.md`（当前主线：TEXT/IMAGE/VIDEO 主干竖切打通）**。其他文件按需读。
+>
+> 📋 **项目执行计划维护流程（任何 AI 工具开新会话都要遵守）**：
+> 1. 读完 `docs/PROJECT_EXECUTION_PLAN.md`，找第一个未打勾（`- [ ]`）的子任务
+> 2. 打开对应 `docs/plans/<file>.md` 详细计划：
+>    - 若 `status: pending` 且操作步骤段是 `TODO: 进入此阶段时再展开` → **停下问用户「要先展开这个 phase 的具体执行计划吗？」**，**不要自作主张展开**
+>    - 若 `status: ready` 或 `in_progress` 且已有操作步骤 → 按里面的步骤执行
+> 3. 每完成一个子任务，**同时**更新三处：
+>    - ① `docs/PROJECT_EXECUTION_PLAN.md` 把对应方框从 `- [ ]` 改成 `- [x]`
+>    - ② 该 phase md 的 frontmatter：`status: done` + 填 `commits` / `completed_date` / `actual_hours`
+>    - ③ `docs/COMPLETED_WORK.md` 追加一段（按文件顶部"记录模板"格式）
+> 4. **不要跳着做**：当前 phase 所有子任务全部打勾后，再进下一个 phase。如果用户明确要求跳，照办，但要在 COMPLETED_WORK.md 注明"跳过原因"
+> 5. **本流程与"启动强制对账"配合**：先 git log 对账 → 再读 PROJECT_EXECUTION_PLAN → 找未打勾项
 >
 > ⚠️ **启动强制对账（铁律，违反过一次就出过事故）**：读完 5 件套后，**必须立刻跑 `git log --oneline -20`**，把 `AI_HANDOFF.md` / `OUTSTANDING_TASKS.md` 里写的「下一步 Phase X」与 git 实际合并状态对照一次。规则：
 > - 若 git 显示某 phase 已有 `feat(phaseXX)` commit 合入 main，而文档仍把它列为「下一步 / 待办」——**先停下来更新这两份文档，再向用户确认真正的下一步**，绝不能直接按文档动手。
