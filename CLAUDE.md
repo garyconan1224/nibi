@@ -144,6 +144,11 @@ python3 tests/e2e_qa.py
 > 总规划与本规则里凡是写「zip 内」「zip/components/...」「zip/styles.css」「v1.1 §X」的，统一对应到 `vidmirror-handoff/project/` 下对应文件。
 >
 > **新会话启动必读顺序**：① `nibi-spec-v2.md` → ② `AGENTS.md` → ③ `docs/AI_HANDOFF.md` → ④ `docs/OUTSTANDING_TASKS.md` → ⑤ **`docs/PHASE_X_MAIN_PIPELINE.md`（当前主线：TEXT/IMAGE/VIDEO 主干竖切打通）**。其他文件按需读。
+>
+> ⚠️ **启动强制对账（铁律，违反过一次就出过事故）**：读完 5 件套后，**必须立刻跑 `git log --oneline -20`**，把 `AI_HANDOFF.md` / `OUTSTANDING_TASKS.md` 里写的「下一步 Phase X」与 git 实际合并状态对照一次。规则：
+> - 若 git 显示某 phase 已有 `feat(phaseXX)` commit 合入 main，而文档仍把它列为「下一步 / 待办」——**先停下来更新这两份文档，再向用户确认真正的下一步**，绝不能直接按文档动手。
+> - 若 git log 与文档一致，再开工。
+> - 这条规则的存在原因：2026-05-17 曾发生 AI 让用户重做已合并的 Phase 2C.1 的事故，根因就是 AI_HANDOFF / OUTSTANDING_TASKS 是手工快照、滞后于 git。**spec 表里的 phase 顺序不是事实来源，git log 才是。**
 
 > 🚀 **Phase 启动速查**（开工前对照 `nibi-spec-v2.md` §3 表确认，模型详细规则见下文「模型选择策略」章）：
 > - **简单阶段**（Phase 0 / 1A / 1B / 1C / 1H / 1I / 1J）：**小米 2.5 Pro（终端，⭐免费优先）** / Sonnet / Haiku，**不开 worktree**，直接在 main 上做。日常 git / 跑测试 / 文档改写默认开终端 Claude Code 走小米。
