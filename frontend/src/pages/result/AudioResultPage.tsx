@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { toast } from 'sonner'
 import { ArrowLeft, Download, Pause, Play, Star } from 'lucide-react'
 
@@ -303,12 +305,34 @@ export default function AudioResultPage() {
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
-          {/* 摘要 */}
+          {/* 摘要（markdown 渲染） */}
           {result.summary && (
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--ink-2)' }}>
+            <div style={{ marginBottom: 14, fontSize: 13, lineHeight: 1.7, color: 'var(--ink-2)' }}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm as any]}
+                components={{
+                  h1: ({ children }) => <h1 style={{ fontSize: 18, fontWeight: 700, margin: '12px 0 8px' }}>{children}</h1>,
+                  h2: ({ children }) => <h2 style={{ fontSize: 15, fontWeight: 600, margin: '10px 0 6px' }}>{children}</h2>,
+                  h3: ({ children }) => <h3 style={{ fontSize: 14, fontWeight: 600, margin: '8px 0 4px' }}>{children}</h3>,
+                  p: ({ children }) => <p style={{ margin: '0 0 8px' }}>{children}</p>,
+                  ul: ({ children }) => <ul style={{ margin: '0 0 8px', paddingLeft: 20 }}>{children}</ul>,
+                  ol: ({ children }) => <ol style={{ margin: '0 0 8px', paddingLeft: 20 }}>{children}</ol>,
+                  li: ({ children }) => <li style={{ lineHeight: 1.6 }}>{children}</li>,
+                  blockquote: ({ children }) => (
+                    <blockquote style={{ borderLeft: '3px solid var(--accent-warm)', paddingLeft: 12, margin: '8px 0', color: 'var(--ink-3)' }}>
+                      {children}
+                    </blockquote>
+                  ),
+                  code: ({ children, className }) => {
+                    const isBlock = className?.includes('language-')
+                    return isBlock
+                      ? <pre style={{ background: 'var(--bg-sunken)', padding: 10, borderRadius: 6, overflow: 'auto', fontSize: 12, margin: '8px 0' }}><code>{children}</code></pre>
+                      : <code style={{ background: 'var(--bg-sunken)', padding: '1px 4px', borderRadius: 3, fontSize: 12 }}>{children}</code>
+                  },
+                }}
+              >
                 {result.summary}
-              </div>
+              </ReactMarkdown>
             </div>
           )}
 
