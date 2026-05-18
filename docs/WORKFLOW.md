@@ -96,9 +96,9 @@
 > - **不 push**：按 CLAUDE.md §「Push 策略」，commit 留在 local main，等 [D] 开源准备阶段统一推
 
 待办：
-- [ ] 9. 重写 [`docs/PROJECT_EXECUTION_PLAN.md`](PROJECT_EXECUTION_PLAN.md)：抛弃旧 Phase 3D-3E 路线，替换为 N1~N11 路线（路线初稿见 `docs/nibi-spec-merged.md` 附录 C.2）
-- [ ] 10. 重写 [`docs/AI_HANDOFF.md`](AI_HANDOFF.md)：清除 Phase 2B 旧入口，改 N1 开工交接（参考本文档 §4 模板）
-- [ ] 11. 旧 `docs/plans/phase-3d~phase-10.md` 共 10 份，全部 frontmatter 加 `status: archived` + 顶部注明"被合并 spec 取代"
+- [x] 9. 重写 [`docs/PROJECT_EXECUTION_PLAN.md`](PROJECT_EXECUTION_PLAN.md)：抛弃旧 Phase 3D-3E 路线，替换为 N1~N11 路线（路线初稿见 `docs/nibi-spec-merged.md` 附录 C.2）
+- [x] 10. 重写 [`docs/AI_HANDOFF.md`](AI_HANDOFF.md)：清除 Phase 2B 旧入口，改 N1 开工交接（参考本文档 §4 模板）
+- [x] 11. 旧 `docs/plans/phase-3d~phase-10.md` 共 9 份，全部 frontmatter 加 `status: archived` + 顶部注明"被合并 spec 取代"
 
 > ~~12. push 52 commits 到 origin~~ **取消**：按新 push 策略，暂缓所有 push 到 [D] 开源准备阶段。当前 local main 已包含 docs/spec-merged 全部内容（57 commits ahead of origin），本地状态完整。
 
