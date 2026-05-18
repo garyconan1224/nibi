@@ -88,12 +88,19 @@
 - [x] 7. 更新 `CLAUDE.md` 优先级段落
 - [x] 8. 更新 `AGENTS.md` 同步
 
-**还差**（在 local main 上做，下一会话开干）：
-- [ ] 9. 重写 [`docs/PROJECT_EXECUTION_PLAN.md`](PROJECT_EXECUTION_PLAN.md)：抛弃旧 Phase 3D-3E 路线，替换为 N1~N11 路线
-- [ ] 10. 重写 [`docs/AI_HANDOFF.md`](AI_HANDOFF.md)：清除 Phase 2B 旧入口，改 N1 开工交接
-- [ ] 11. 旧 `docs/plans/phase-3d~phase-10.md` 共 10 份，全部 frontmatter 加 `status: archived`
+**还差**（下一会话开干）：
 
-> ~~~12. push 52 commits 到 origin~~~ **取消**：按新 push 策略（CLAUDE.md §「Push 策略」），暂缓所有 push 到 [D] 开源准备阶段。当前 local main 已合入 docs/spec-merged 全部内容（57 commits ahead of origin），本地状态完整。
+> 🛠️ **下一会话开工参数**（任何 AI 工具看这里即可，不用问）：
+> - **模型**：⭐ **小米 2.5 Pro（终端，免费）** —— 纯文档改写，符合 CLAUDE.md §「模型选择策略」档 3
+> - **分支**：**直接在 main 上做**，不开 worktree —— 纯文档不算"改代码"，CLAUDE.md §「Git 行为」第 4 条仅约束代码改动
+> - **不 push**：按 CLAUDE.md §「Push 策略」，commit 留在 local main，等 [D] 开源准备阶段统一推
+
+待办：
+- [ ] 9. 重写 [`docs/PROJECT_EXECUTION_PLAN.md`](PROJECT_EXECUTION_PLAN.md)：抛弃旧 Phase 3D-3E 路线，替换为 N1~N11 路线（路线初稿见 `docs/nibi-spec-merged.md` 附录 C.2）
+- [ ] 10. 重写 [`docs/AI_HANDOFF.md`](AI_HANDOFF.md)：清除 Phase 2B 旧入口，改 N1 开工交接（参考本文档 §4 模板）
+- [ ] 11. 旧 `docs/plans/phase-3d~phase-10.md` 共 10 份，全部 frontmatter 加 `status: archived` + 顶部注明"被合并 spec 取代"
+
+> ~~12. push 52 commits 到 origin~~ **取消**：按新 push 策略，暂缓所有 push 到 [D] 开源准备阶段。当前 local main 已包含 docs/spec-merged 全部内容（57 commits ahead of origin），本地状态完整。
 
 ---
 
