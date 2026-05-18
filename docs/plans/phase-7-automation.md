@@ -1,13 +1,15 @@
 ---
 phase: 7
 title: 自动化（批处理 / 计划任务 / 文件夹监听）
-status: pending
+status: archived
 estimate_hours: 5
 model: Sonnet 4.6
 branch: feat/phase7-automation
 worktree: 是
 depends_on: [6]
 ---
+
+> ⚠️ **已归档**：本计划已被 `docs/nibi-spec-merged.md` 取代，不再参与执行。保留作历史参考。
 
 ## 范围概述
 

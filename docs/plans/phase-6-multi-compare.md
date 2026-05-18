@@ -1,13 +1,15 @@
 ---
 phase: 6
 title: 多源对比（多图对比 / 多文对比 / 跨任务检索进阶）
-status: pending
+status: archived
 estimate_hours: 6
 model: Opus 4.7
 branch: feat/phase6-multi-compare
 worktree: 是
 depends_on: [5]
 ---
+
+> ⚠️ **已归档**：本计划已被 `docs/nibi-spec-merged.md` 取代，不再参与执行。保留作历史参考。
 
 ## 范围概述
 

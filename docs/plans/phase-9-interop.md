@@ -1,13 +1,15 @@
 ---
 phase: 9
 title: 导入导出 / 互操作（Obsidian / Notion / 跨设备同步）
-status: pending
+status: archived
 estimate_hours: 5
 model: Sonnet 4.6
 branch: feat/phase9-interop
 worktree: 是
 depends_on: [8]
 ---
+
+> ⚠️ **已归档**：本计划已被 `docs/nibi-spec-merged.md` 取代，不再参与执行。保留作历史参考。
 
 ## 范围概述
 

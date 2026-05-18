@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: 安全 + 开源准备（破坏性变更）
-status: pending
+status: archived
 estimate_hours: 8
 model: Opus 4.7（加密改造）+ 小米（文档/扫描）
 branch: feat/phase4-security
@@ -9,6 +9,8 @@ worktree: 是
 depends_on: [3E]
 opensource_threshold: true   # 这一阶段完成 = 开源时刻
 ---
+
+> ⚠️ **已归档**：本计划已被 `docs/nibi-spec-merged.md` 取代，不再参与执行。保留作历史参考。
 
 ## 范围概述
 

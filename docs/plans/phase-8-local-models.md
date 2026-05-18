@@ -1,13 +1,15 @@
 ---
 phase: 8
 title: 本地模型 / 私有化（Ollama / LM Studio / 完全离线）
-status: pending
+status: archived
 estimate_hours: 6
 model: Opus 4.7（涉及多供应商架构）
 branch: feat/phase8-local-models
 worktree: 是
 depends_on: [7]
 ---
+
+> ⚠️ **已归档**：本计划已被 `docs/nibi-spec-merged.md` 取代，不再参与执行。保留作历史参考。
 
 ## 范围概述
 

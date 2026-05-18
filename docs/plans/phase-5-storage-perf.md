@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: 存储 / 性能升级
-status: pending
+status: archived
 estimate_hours: 6
 model: Opus 4.7（若涉及 SQLite 迁移）
 branch: feat/phase5-storage
@@ -9,6 +9,8 @@ worktree: 是
 depends_on: [4]
 trigger_condition: 见 docs/PHASE_2D_SQLITE_EVALUATION.md §6 复审条件
 ---
+
+> ⚠️ **已归档**：本计划已被 `docs/nibi-spec-merged.md` 取代，不再参与执行。保留作历史参考。
 
 ## 范围概述
 

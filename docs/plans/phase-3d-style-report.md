@@ -1,13 +1,15 @@
 ---
 phase: 3D
 title: 风格报告 / 对比原作
-status: pending
+status: archived
 estimate_hours: 4
 model: Sonnet 4.6 + Opus 兜底
 branch: feat/phase3d-style-report
 worktree: 待开
 depends_on: [3C]
 ---
+
+> ⚠️ **已归档**：本计划已被 `docs/nibi-spec-merged.md` 取代，不再参与执行。保留作历史参考。
 
 ## 范围概述
 

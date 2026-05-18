@@ -1,13 +1,15 @@
 ---
 phase: 10
 title: 插件 / 扩展性（自定义分析模板 / 用户脚本 / 命令面板）
-status: pending
+status: archived
 estimate_hours: 8
 model: Opus 4.7
 branch: feat/phase10-extensibility
 worktree: 是
 depends_on: [9]
 ---
+
+> ⚠️ **已归档**：本计划已被 `docs/nibi-spec-merged.md` 取代，不再参与执行。保留作历史参考。
 
 ## 范围概述
 
