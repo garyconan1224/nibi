@@ -45,6 +45,7 @@ from backend.app.models.workspace import (
 )
 from backend.app.services.audio_result_demo import build_demo_audio_result
 from backend.app.services.video_result_demo import build_demo_video_result
+from backend.app.services.workspace_search_service import search_one_workspace
 from backend.app.services.workspace_store import WorkspaceStore
 from shared.config import DATA_DIR
 
@@ -1143,3 +1144,27 @@ def list_prompt_versions(workspace_id: str, item_id: str) -> List[Dict[str, Any]
     except KeyError as err:
         raise HTTPException(status_code=404, detail=str(err)) from err
     return [pv.to_dict() for pv in versions]
+
+
+# ── Phase 3B.2：单工作空间语义检索 ─────────────────────────
+
+
+class WorkspaceSearchRequest(BaseModel):
+    query: str = Field(..., min_length=1)
+    top_k: int = Field(default=5, ge=1, le=20)
+
+
+@router.post("/{workspace_id}/search")
+def workspace_search(workspace_id: str, req: WorkspaceSearchRequest) -> Dict[str, Any]:
+    """在单个工作空间内做 RAG 检索，返回 {answer, sources[]}。"""
+    try:
+        return search_one_workspace(
+            workspace_id=workspace_id,
+            query=req.query,
+            top_k=req.top_k,
+            store=_store,
+        )
+    except KeyError as err:
+        raise HTTPException(status_code=404, detail=str(err)) from err
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=str(err)) from err
