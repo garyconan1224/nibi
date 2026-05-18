@@ -516,10 +516,31 @@ def update_workspace(workspace_id: str, req: WorkspaceUpdateRequest) -> Dict[str
     return rec.to_dict()
 
 
-@router.delete("/{workspace_id}")
-def delete_workspace(workspace_id: str) -> Dict[str, Any]:
-    if _store.get(workspace_id) is None:
-        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+def _cleanup_workspace_chat(workspace_id: str) -> None:
+    """删除该 workspace 的聊天 jsonl。"""
+    from shared.chat_store import CHATS_DIR
+
+    safe = workspace_id.replace("/", "_").replace("\\", "_").strip()
+    if not safe:
+        return
+    fp = (CHATS_DIR / f"{safe}.jsonl").resolve()
+    try:
+        fp.relative_to(CHATS_DIR.resolve())
+    except ValueError:
+        return
+    if fp.exists():
+        try:
+            fp.unlink()
+        except OSError:
+            pass
+
+
+def _permanently_delete_workspace(workspace_id: str) -> None:
+    """物理删除 workspace：JSON 记录 + 上传目录 + 聊天文件。
+
+    不递归扫描全局共享目录（data/videos / data/json_data）——那些目录按 item 维度
+    组织且可能与其它 workspace 共享，由 item 级删除路径独立处理。
+    """
     ok = _store.delete(workspace_id)
     if not ok:
         raise HTTPException(
@@ -530,6 +551,69 @@ def delete_workspace(workspace_id: str) -> Dict[str, Any]:
             ),
         )
     _cleanup_workspace_uploads(workspace_id)
+    _cleanup_workspace_chat(workspace_id)
+
+
+# 注意：路径 /trash 必须在 /{workspace_id} 之前注册，否则会被 path param 吞掉
+@router.delete("/trash")
+def empty_trash() -> Dict[str, Any]:
+    """清空垃圾桶：物理删除所有 trashed=True 的 workspace 及关联文件。"""
+    trashed = _store.list_all(trashed_only=True)
+    deleted: List[str] = []
+    for rec in trashed:
+        try:
+            _permanently_delete_workspace(rec.workspace_id)
+            deleted.append(rec.workspace_id)
+        except HTTPException:
+            # 单条失败不阻塞其它，前端可重试
+            continue
+    return {"deleted": deleted, "count": len(deleted)}
+
+
+@router.delete("/{workspace_id}")
+def delete_workspace(workspace_id: str) -> Dict[str, Any]:
+    """软删除：标记 trashed=True，不删 JSON 记录与素材文件。
+
+    通过 POST /workspaces/{id}/restore 恢复；
+    通过 DELETE /workspaces/{id}/permanent 彻底删除。
+    """
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    if rec.trashed:
+        # 已经在垃圾桶里，幂等返回
+        return {"trashed": True, "workspace_id": workspace_id, "already": True}
+    _store.update(workspace_id, trashed=True)
+    return {"trashed": True, "workspace_id": workspace_id}
+
+
+@router.post("/{workspace_id}/restore")
+def restore_workspace(workspace_id: str) -> Dict[str, Any]:
+    """从垃圾桶恢复：trashed=False，原 status 保留。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    if not rec.trashed:
+        return {"restored": True, "workspace_id": workspace_id, "already": True}
+    _store.update(workspace_id, trashed=False)
+    return {"restored": True, "workspace_id": workspace_id}
+
+
+@router.delete("/{workspace_id}/permanent")
+def permanently_delete_workspace(workspace_id: str) -> Dict[str, Any]:
+    """彻底删除：物理删除 JSON 记录 + 上传目录 + 聊天文件。
+
+    必须先经过软删除（trashed=True）才能彻底删除——避免误操作。
+    """
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    if not rec.trashed:
+        raise HTTPException(
+            status_code=400,
+            detail="workspace must be trashed before permanent deletion",
+        )
+    _permanently_delete_workspace(workspace_id)
     return {"deleted": True, "workspace_id": workspace_id}
 
 
