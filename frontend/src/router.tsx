@@ -21,6 +21,7 @@ const PromptFormatPage = lazy(() => import('@/pages/SettingPage/PromptFormatPage
 const ScreenshotPage = lazy(() => import('@/pages/SettingPage/ScreenshotPage'))
 const DeployMonitorPage = lazy(() => import('@/pages/SettingPage/DeployMonitorPage'))
 const AboutPage = lazy(() => import('@/pages/SettingPage/AboutPage'))
+const TrashPage = lazy(() => import('@/pages/SettingPage/TrashPage'))
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
 const WorkspaceList = lazy(() => import('@/pages/WorkspacePage/WorkspaceList'))
 const WorkspaceDetail = lazy(() => import('@/pages/WorkspacePage/WorkspaceDetail'))
@@ -82,6 +83,7 @@ export const router = createBrowserRouter([
           { path: 'prompt-formats', element: withSuspense(<PromptFormatPage />) },
           { path: 'screenshot', element: withSuspense(<ScreenshotPage />) },
           { path: 'monitor', element: withSuspense(<DeployMonitorPage />) },
+          { path: 'trash', element: withSuspense(<TrashPage />) },
           { path: 'about', element: withSuspense(<AboutPage />) },
           { path: '*', element: withSuspense(<NotFoundPage />) },
         ],

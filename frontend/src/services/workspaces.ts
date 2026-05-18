@@ -55,9 +55,25 @@ export async function updateWorkspace(
   return res.data
 }
 
-/** DELETE /workspaces/{id} — 删除 */
+/** DELETE /workspaces/{id} — 软删除（标记 trashed=True） */
 export async function deleteWorkspace(workspaceId: string): Promise<void> {
   await http.delete(`${BASE}/${workspaceId}`)
+}
+
+/** POST /workspaces/{id}/restore — 从垃圾桶恢复 */
+export async function restoreWorkspace(workspaceId: string): Promise<void> {
+  await http.post(`${BASE}/${workspaceId}/restore`)
+}
+
+/** DELETE /workspaces/{id}/permanent — 彻底删除（必须先软删） */
+export async function permanentlyDeleteWorkspace(workspaceId: string): Promise<void> {
+  await http.delete(`${BASE}/${workspaceId}/permanent`)
+}
+
+/** DELETE /workspaces/trash — 清空垃圾桶 */
+export async function emptyWorkspaceTrash(): Promise<{ deleted: string[]; count: number }> {
+  const res = await http.delete<{ deleted: string[]; count: number }>(`${BASE}/trash`)
+  return res.data
 }
 
 /** POST /workspaces/{id}/items — 添加素材 */
