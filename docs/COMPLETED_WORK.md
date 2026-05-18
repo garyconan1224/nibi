@@ -4,7 +4,7 @@
 >
 > **维护规则**：每完成一个子任务，在本文件**追加**一段（不删旧记录），格式见下方"记录模板"。
 >
-> Last updated: 2026-05-18
+> Last updated: 2026-05-18 (Phase 3B 完成)
 
 ---
 
@@ -38,6 +38,44 @@
 ---
 
 # 历史记录（倒序，最新在上）
+
+---
+
+## Phase 3B – 知识库 UI（跨工作空间 RAG 检索）
+
+**完成日期**：2026-05-18
+**模型 / 工具**：Opus 4.7（桌面 Claude Code）
+**分支**：`feat/phase3b-knowledge-search`（待 merge 到 main）
+**Commit**：`c606ba4` / `24089ed` / `adf5fb3` / `92b25a6` / `8388c71`（共 5 个）
+
+### 影响范围
+- 后端：新增 2 个 service（`workspace_knowledge.py` / `workspace_search_service.py`）+ 1 个 router（`search.py`）；扩 `workspaces.py` 加 `/search` 子路由；`main.py` 注册新 router
+- 前端：新增 `services/search.ts` + `pages/SearchPage/SearchPage.tsx` + `pages/WorkspacePage/WorkspaceSearchBar.tsx`；改 `router.tsx`、`layouts/AppShell.tsx`、`pages/WorkspacePage/WorkspaceDetail.tsx`
+- 测试：`tests/backend/test_workspace_knowledge.py` / `test_workspaces_search.py` / `test_global_search.py`，共 7 个新用例
+- 缓存目录：`data/.local/embeddings/<workspace_id>.{faiss,meta.json}`
+
+### 关键改动
+- **数据桥（3B.1）**：把每个 `WorkspaceItem.results` 序列化为临时 JSON 文件，复用 `shared/knowledge_base.load_folder_as_knowledge(only_paths=...)` 喂给 FAISS，不改核心算法
+- **缓存层（3B.1）**：以 items 内容 sha256 hash 作为缓存键；命中则反序列化 `VideoChunk` + `faiss.read_index`；不命中重建并写盘；`invalidate_workspace_index()` 用于 item 增删时主动失效
+- **单空间检索（3B.2）**：`POST /workspaces/{wid}/search`，复用 `retrieve_with_sources` + `rag_qa_service` 的 LLM 调用模式
+- **跨空间检索（3B.3）**：`POST /search`，`ThreadPoolExecutor(max_workers=4)` 并发各 workspace 取候选 → 合并入池 → `rerank_documents` 二次精排取 top_k（量纲统一）→ 综合回答；reranker 失败降级按原 score 排
+- **前端检索页（3B.4）**：`/search` 路由 + 范围下拉（全部 / 单工作空间）+ ReactMarkdown 答案区 + 源卡片（含 score / 类型 badge / jump_url）；AppShell 侧栏 🔍 图标接到此页
+- **内嵌检索条（3B.5）**：`WorkspaceDetail` 左主区顶部挂 `WorkspaceSearchBar`（窄版），结果内联可折叠
+- **SearchSource 字段约定**（plan §Q4）：`workspace_id` / `workspace_name` / `item_id` / `item_type` / `item_title` / `chunk_excerpt` (≤200 字) / `score` / `jump_url`
+
+### 为什么这么做
+- **不改 `shared/knowledge_base.py` 核心**：里面 511 行算法是 Streamlit 旧入口 + RAG 旧接口共用的，改动影响面太大；现有 `only_paths` 参数已够用
+- **临时 JSON 文件方案**：避免给 knowledge_base 增加「从 dict 列表加载」入口，绕开数据结构演化风险；缓存命中后不再需要这些临时文件
+- **items_hash 缓存策略**：相比按 `updated_at` 失效更稳——用户手改 results 也能触发重建；空间换时间，hash 计算成本 ≪ embedding API 调用
+- **rerank 跨空间合并 vs score 归一化**：reranker 二次精排比 min-max 规范化更可靠（不同空间向量分布差异大，min-max 容易失真）
+- **前端不传 api_key**：后端 fallback 到 `settings.openai_api_key`，前端不沾敏感字段（plan §Q3）
+
+### 留给后续的影响
+- **缓存失效未自动接入 item CRUD**：目前 `invalidate_workspace_index` 仅暴露 API，未在 `workspaces.py` 的 add_item / remove_item / update_item 钩子里调用。下次 item 变更时 hash 自然失效会触发重建，但有一次 stale window。如果未来希望立刻生效，需要在 add/remove/update item 后调一次（注意 add_prompt_version 不影响 results 不用调）
+- **embeddings 占位字段**：`LongKnowledge.embeddings` 在缓存命中时填 `np.zeros((ntotal, dim))`——目前下游只用 `index` 做 ANN 搜索 + `chunks` 文本不会读这个数组，安全；如果将来改用 `embeddings` 字段，需要持久化真实向量
+- **未做并发限流**：跨空间检索一次 API 调用 = workspace 数 × embedding 调用，3+ 个空间触发 SiliconFlow 限流时需要降并发或加退避
+- **i18n**：3B 全程用硬编码中文文案（与现有 AppShell / WorkspaceList 风格一致），未抽 i18n key；后续若做英文版需要补 locale
+- **测试覆盖**：所有外部 API（create_embeddings / rerank_documents / LLM）都 mock；真实端到端验证需要跑 `./start.sh` + 至少 2 个含 results 的 workspace
 
 ---
 

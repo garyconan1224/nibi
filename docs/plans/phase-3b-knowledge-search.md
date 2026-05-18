@@ -1,13 +1,21 @@
 ---
 phase: 3B
 title: 知识库 UI（跨工作空间 RAG 检索）
-status: in_progress
+status: done
 estimate_hours: 5
+actual_hours: ~2.5
 model: Opus 4.7
 branch: feat/phase3b-knowledge-search
 worktree: 否（直接在主目录 /Users/conan/Desktop/nibi 的 feat/phase3b-knowledge-search 分支上做）
 depends_on: [3A]
 subtasks: [3B.1, 3B.2, 3B.3, 3B.4, 3B.5]
+commits:
+  - c606ba4 feat(phase3b): 3B.1 workspace 知识库数据桥 + FAISS 缓存层
+  - 24089ed feat(phase3b): 3B.2 单工作空间检索端点 + 测试
+  - adf5fb3 feat(phase3b): 3B.3 跨工作空间检索端点 + reranker 合并
+  - 92b25a6 feat(phase3b): 3B.4 前端搜索页 + 侧栏入口接入
+  - 8388c71 feat(phase3b): 3B.5 WorkspaceDetail 内嵌搜索条
+completed_date: 2026-05-18
 ---
 
 ## 工作环境
