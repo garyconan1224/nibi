@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import threading
 import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -94,6 +95,49 @@ def _on_download_success(completed_task: TaskRecord, runner) -> None:  # type: i
 
 
 _pipeline_runner.register_success_callback("download", _on_download_success)
+
+
+# ── Phase 3C.4：分析任务 SUCCESS 后自动打标 ──────────────────────
+
+
+def _autotag_items_for_task(task: TaskRecord, runner) -> None:  # type: ignore[type-arg]
+    """对引用 task.task_id 的所有 workspace items 调 LLM 自动打标（同步逻辑）。
+
+    跳过已经有 tags 的 item，避免重复消耗 LLM 配额；任何异常都不阻塞主流程。
+    """
+    # 延迟 import 避免与 settings/provider 链路的初始化顺序冲突
+    from backend.app.services.tag_generator import generate_tags  # noqa: PLC0415
+
+    for ws in _store.list_all():
+        for item in ws.items:
+            if task.task_id not in item.related_task_ids:
+                continue
+            if item.tags:
+                continue
+            try:
+                tags = generate_tags(item, ws, task_store=runner.store)
+            except Exception:
+                tags = {}
+            if not tags:
+                continue
+            try:
+                _store.update_item(ws.workspace_id, item.item_id, tags=tags)
+            except Exception:
+                pass
+
+
+def _on_analysis_success_autotag(completed_task: TaskRecord, runner) -> None:  # type: ignore[type-arg]
+    """task SUCCESS 后异步触发自动打标（不阻塞 task worker 线程）。"""
+    threading.Thread(
+        target=_autotag_items_for_task,
+        args=(completed_task, runner),
+        daemon=True,
+        name=f"autotag-{completed_task.task_id}",
+    ).start()
+
+
+for _tt in ("analyze", "text", "audio", "image"):
+    _pipeline_runner.register_success_callback(_tt, _on_analysis_success_autotag)
 
 WORKSPACE_UPLOAD_ROOT: Path = DATA_DIR / "workspaces"
 MAX_UPLOAD_BYTES = 500 * 1024 * 1024
