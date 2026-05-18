@@ -79,6 +79,16 @@ git branch --show-current
 > 我只能做检查，不会继续写功能。
 > 请你决定：A（先处理未提交改动）/ B（让我对比 diff 并报告）。
 
+## Push Policy (2026-05-18)
+
+**All `git push origin` operations are deferred** until phase [D] open-source preparation. See `CLAUDE.md` § "Push Policy" for details.
+
+- ❌ Do not push to origin on your own (no `git push origin main`, no PR creation, no triggering CI)
+- ✅ Keep all commits on local main / local feature branches
+- ✅ Merge feature branches into local main directly (no PR flow)
+- ✅ local main intentionally diverges from origin/main—this is expected state until [D] phase
+- ✅ Exception: ask the user explicitly if you think a push is needed
+
 ## Quality And Risk
 
 - Avoid speculative abstractions, optionality, and future-proofing that were not requested.

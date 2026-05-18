@@ -169,10 +169,33 @@ python3 tests/e2e_qa.py
    <type>(<phase>): <子任务编号> <一句话描述>
    ```
    - type 选一个：`feat` | `fix` | `refactor` | `docs` | `test` | `chore`
-   - 例：`feat(phase1a): 1A.3 添加 POST /tasks 创建任务接口`
+   - 例：`feat(phase-n1): N1.3 添加 trashed 状态字段`
 3. **修上一次 commit 的小问题用 `git commit --amend`**，不要新建一个 fixup commit。
-4. **永远不在 main 分支直接改代码**。新 Phase 开始时先 `git checkout -b feature/phase-1a`。
+4. **永远不在 main 分支直接改代码**。新 Phase 开始时先 `git checkout -b feat/phase-n1`。
 5. **Phase 完成时只提醒打 tag，不自动打 tag**。让用户自己决定何时打。
+
+### ⚠️ Push 策略（2026-05-18 调整）
+
+**暂缓所有 `git push origin` 操作**，等做到 **[D] 开源准备阶段** 才开始统一推送：
+
+- ❌ 不要主动 `git push origin main`
+- ❌ 不要主动 `git push origin <feature-branch>` 提交 PR
+- ❌ 不要为修 CI 而 push 触发 GitHub Actions
+- ✅ 所有 commit 都留在 local main 或本地 feature 分支
+- ✅ feature 分支完成后**本地 merge 进 local main**（不走 PR）
+- ✅ local main 会越来越领先 origin/main，**这是预期状态**
+- ✅ 到 [D] 阶段统一做一次完整 push + 仓库整理
+
+**原因**：开源前 origin 状态不需要保持同步，本地 commit 历史是真相源；过早暴露半成品仓库 / 跑 CI 都是浪费。
+
+**例外**（必须先问用户授权）：
+- 用户明确说"现在推一次"
+- 临时需要从其他机器拉代码做协作（罕见，问清楚再做）
+
+**已存在的远端分支处理**：
+- `docs/spec-merged` 分支已 push（含 PR #1）—— 不再追加 push，PR 留着或关闭由用户决定
+- 不主动 `git push --delete` 清理远端分支
+- 后续若再被迫 push（如手机端备份），先问用户
 
 ---
 

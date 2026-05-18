@@ -133,10 +133,19 @@ git log --oneline -5
 
 ## 7. Git 与分支规则（沿用 CLAUDE.md）
 
-- 不在 main 直接改代码（docs/spec-merged 等 feature 分支 → PR → merge）
+- 不在 main 直接改代码（feature 分支 → 本地 merge → 不走 PR）
 - 一个子任务一个 commit
 - 不主动 push --force / git reset --hard
 - 完成阶段才打 tag（仅 v1.0.0-mvp 等里程碑）
+
+### ⚠️ Push 暂缓（2026-05-18 起）
+
+**所有 `git push origin` 操作暂缓**，直到 [D] 开源准备阶段才统一推送。详见 `CLAUDE.md` §「Push 策略」。
+
+- 所有 commit 留在 local main / 本地 feature 分支
+- feature 分支完成后**本地 merge 进 local main**（不走 PR、不 push 到 GitHub）
+- local main 会越来越领先 origin/main，这是预期状态
+- 已存在的远端 PR #1（docs/spec-merged 分支）放着，由用户决定关闭或留着
 
 ---
 
