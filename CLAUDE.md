@@ -124,26 +124,24 @@ python3 tests/e2e_qa.py
 
 ## 计划与边界
 
-> 📌 **唯一标准（Single Source of Truth）**：`/Users/conan/Desktop/nibi/nibi-spec-v2.md`
-> 这份文件（"Nibi / VidMirror 主规范 v2，合并版"）以 v1.1 设计契约为骨架、叠加总规划 v1 路线图，是 Phase 0 → 1J 的权威仲裁层。所有 Phase 编号、决议、模型分工、验收标准都以它为准。
+> 📌 **唯一标准（Single Source of Truth）**：`docs/nibi-spec-merged.md`
+> 这是 2026-05-18 合并 v2 + v3 + 设计稿 + 现有代码 + 用户最新决议产出的 8 模块统一规范，是当前所有产品决议的最终仲裁。**Phase 推进、设计落地、AI 协作决策都以本文件为准**。
 >
 > **优先级（冲突仲裁，自上而下）**：
-> 1. `nibi-spec-v2.md`（唯一标准）
-> 2. `vidmirror-handoff/project/system_design_v1.1.md`（v1.1 设计契约真相源）
-> 3. `vidmirror-handoff/project/VidMirror.html` + `project/styles.css` + `project/components/*`（视觉骨架）
-> 4. `users-conan-claude-plans-nibi-vidmirror-modular-kurzweil.md`（总规划 v1：Phase 路线 / 模型分工 / 风险表）
-> 5. `docs/OUTSTANDING_TASKS.md`、`docs/AI_HANDOFF.md`（运行时进度快照）
-> 6. `plan.md` + `system_design_for_claude_design_v1.md`（**已 deprecated**，仅作历史，不维护不改）
+> 1. `docs/nibi-spec-merged.md`（**唯一标准**，产品需求级粒度）
+> 2. `docs/PROJECT_EXECUTION_PLAN.md`（工程执行计划——Phase 打勾 + 当前在哪步）
+> 3. `docs/design/`（**设计稿源文件**——19 个 jsx 组件 / VidMirror.html / styles.css / system_design_v1.1.md）
+> 4. 当前代码（与 spec 偏差时优先反映到 spec 或新建差异 phase）
+> 5. ~~`nibi-spec-v2.md`、`docs/archive/system_design_v3_final.md`、`plan.md`、`system_design_for_claude_design_v1.md`~~ ⚠️ **已 DEPRECATED**，仅历史归档，不参与仲裁
 >
-> **VidMirror handoff 原型路径（重要）**：zip 已解压到 `/Users/conan/Desktop/nibi/vidmirror-handoff/`，真正的项目目录是 `vidmirror-handoff/project/`，里面有：
-> - `project/VidMirror.html`（837 行主原型）
-> - `project/components/`（shell / topbar / sidebar / 12 个详情组件 JSX）
-> - `project/styles.css` + `project/styles-preflight.css`
-> - `project/system_design_v1.1.md`（v1.1 真本，比项目根 v1 更新）
+> **设计稿路径**：`docs/design/`（19 个 jsx 组件 / VidMirror.html / styles.css / system_design_v1.1.md）。旧 `vidmirror-handoff/` 路径已废弃。
 >
-> 总规划与本规则里凡是写「zip 内」「zip/components/...」「zip/styles.css」「v1.1 §X」的，统一对应到 `vidmirror-handoff/project/` 下对应文件。
->
-> **新会话启动必读顺序**：① **`docs/PROJECT_EXECUTION_PLAN.md`（总索引 + 打勾清单，最权威）** → ② `nibi-spec-v2.md` → ③ `AGENTS.md` → ④ `docs/AI_HANDOFF.md` → ⑤ `docs/OUTSTANDING_TASKS.md` → ⑥ **`docs/PHASE_X_MAIN_PIPELINE.md`（当前主线：TEXT/IMAGE/VIDEO 主干竖切打通）**。其他文件按需读。
+> **新会话启动必读顺序**：
+> ① [`docs/WORKFLOW.md`](docs/WORKFLOW.md)（总流程图 + 当前阶段，**第一份要读的**）
+> ② [`docs/nibi-spec-merged.md`](docs/nibi-spec-merged.md)（产品需求 8 模块）
+> ③ [`docs/PROJECT_EXECUTION_PLAN.md`](docs/PROJECT_EXECUTION_PLAN.md)（找未打勾子任务）
+> ④ [`AGENTS.md`](AGENTS.md)
+> ⑤ [`docs/AI_HANDOFF.md`](docs/AI_HANDOFF.md)（上次会话留下的开工笔记）
 >
 > 📋 **项目执行计划维护流程（任何 AI 工具开新会话都要遵守）**：
 > 1. 读完 `docs/PROJECT_EXECUTION_PLAN.md`，找第一个未打勾（`- [ ]`）的子任务
@@ -157,26 +155,24 @@ python3 tests/e2e_qa.py
 > 4. **不要跳着做**：当前 phase 所有子任务全部打勾后，再进下一个 phase。如果用户明确要求跳，照办，但要在 COMPLETED_WORK.md 注明"跳过原因"
 > 5. **本流程与"启动强制对账"配合**：先 git log 对账 → 再读 PROJECT_EXECUTION_PLAN → 找未打勾项
 >
-> ⚠️ **启动强制对账（铁律，违反过一次就出过事故）**：读完 5 件套后，**必须立刻跑 `git log --oneline -20`**，把 `AI_HANDOFF.md` / `OUTSTANDING_TASKS.md` 里写的「下一步 Phase X」与 git 实际合并状态对照一次。规则：
-> - 若 git 显示某 phase 已有 `feat(phaseXX)` commit 合入 main，而文档仍把它列为「下一步 / 待办」——**先停下来更新这两份文档，再向用户确认真正的下一步**，绝不能直接按文档动手。
+> ⚠️ **启动强制对账（铁律，违反过一次就出过事故）**：读完启动必读 5 件套后，**必须立刻跑 `git log --oneline -20`**，把 `AI_HANDOFF.md` / `OUTSTANDING_TASKS.md` 里写的「下一步 Phase X」与 git 实际合并状态对照一次。规则：
+> - 若 git 显示某 phase 已有 commit 合入 main，而文档仍把它列为「下一步 / 待办」——**先停下来更新这两份文档，再向用户确认真正的下一步**，绝不能直接按文档动手。
 > - 若 git log 与文档一致，再开工。
-> - 这条规则的存在原因：2026-05-17 曾发生 AI 让用户重做已合并的 Phase 2C.1 的事故，根因就是 AI_HANDOFF / OUTSTANDING_TASKS 是手工快照、滞后于 git。**spec 表里的 phase 顺序不是事实来源，git log 才是。**
+> - 这条规则的存在原因：2026-05-17 曾发生 AI 让用户重做已合并的 Phase 2C.1 的事故，根因就是 AI_HANDOFF / OUTSTANDING_TASKS 是手工快照、滞后于 git。**phase 文档不是事实来源，git log 才是。**
 
-> 🚀 **Phase 启动速查**（开工前对照 `nibi-spec-v2.md` §3 表确认，模型详细规则见下文「模型选择策略」章）：
-> - **简单阶段**（Phase 0 / 1A / 1B / 1C / 1H / 1I / 1J）：**小米 2.5 Pro（终端，⭐免费优先）** / Sonnet / Haiku，**不开 worktree**，直接在 main 上做。日常 git / 跑测试 / 文档改写默认开终端 Claude Code 走小米。
-> - **复杂阶段**（1D / 1F / 1G）：**Opus 4.7（桌面）**，**建议新开 worktree**，分支用 `feat/phase<编号>-<短名>` 或 `claude-official/phase<编号>-<短名>` 任一，**不在主 worktree `/Users/conan/Desktop/nibi` 直接改代码**（主 worktree 只用于 merge / 同步）。
-> - **当前下一步（Phase 1F）**：Opus 4.7 + 新 worktree + 分支 `feat/phase1f-pipeline-sse`（或同义 `claude-official/phase1f-pipeline-sse`）。
-> - **不再做的事**：不再立即 `git push` 占座（用户已确认单 agent 串行）。
-> - **决策速查**：复杂/SSE/状态机/加密 → Opus；中等多文件 CRUD → Sonnet；git/测试/文档/模板 → **小米 2.5 Pro（免费）**；单行 typo → Haiku 或小米。
+> 🚀 **Phase 启动速查**（开工前对照 `nibi-spec-merged.md` 附录 C 的 N1~N11 路线 + 「模型选择策略」章）：
+> - **当前阶段：[A] 现状同步**（参见 `docs/WORKFLOW.md` §4），收尾事项：重写 PROJECT_EXECUTION_PLAN / 重写 AI_HANDOFF / 归档旧 plans / push 52 commits 到 origin
+> - **下一阶段：[B] N1~N11 落地差异**——按 spec 附录 C 路线，依次推进
+> - **再下一阶段：[C] AI 导演**——N1~N11 完成之后才启动
+> - **简单阶段**（N1 / N2 / N3 / N11 等纯前后端 CRUD）：⭐ 小米 2.5 Pro（终端，免费）/ Sonnet 4.6，不开 worktree
+> - **复杂阶段**（N5 Preflight 抽屉子参数细化 / N6 任务级 LLM 对话 + RAG / N7 视频镜头分析）：Opus 4.7 + 新 worktree（`feat/phase<N>-<短名>` 分支）
+> - **决策速查**：复杂/SSE/状态机/加密 → Opus；中等多文件 CRUD → Sonnet；git/测试/文档/模板 → 小米；单行 typo → Haiku / 小米
 
-> ⚠️ **重要**：`plan.md` 描述的是 Phase 0 / 1A 阶段（任务系统初建），但**实际代码已远超那里**——已实现 providers、pipeline、transcript、RAG、workspaces、settings 多页面等。当前分支名（如 `feat/settings-phase2-m0`）和 `README.md` 里的「Phase-2 重构」才是真实状态。
->
-> 因此：
-> - **当 `plan.md` 与现实代码冲突时，以代码为准**，并告诉用户 plan.md 需要更新。
-> - 不要按 plan.md 里"建任务系统骨架"那种早期任务去写新代码——很可能已经存在了。
-> - 用户给的子任务编号（比如 settings-phase2-m0）是当前真实计划的来源，优先听用户的。
+> ⚠️ **重要**：本文档与历史 `plan.md` / `nibi-spec-v2.md` 已不再一致——以本文档为准。
+> - 当历史文件与现实代码冲突时，**以代码 + 合并 spec + WORKFLOW.md 为准**。
+> - 旧 phase 编号（1A~3E / 4~10）已**完成或归档**，新工作走 N1~N11 路线。
 
-1. 新会话开始时**同时扫一眼 `plan.md` 和当前 git 分支名**，判断当前真实进度，再问用户这次会话的目标。
+1. 新会话开始时**先扫 `git status --short --branch` + `git log --oneline -5`** 确认现状，再读 `WORKFLOW.md` → `nibi-spec-merged.md` → `PROJECT_EXECUTION_PLAN.md`。
 2. **一个会话只做一个明确的子任务**，做完就停。
 3. 子任务完成后**主动提醒用户**：「子任务 X 完成，建议 git commit 后开新会话做下一个」。
 4. **不要主动跨子任务工作**，即使你觉得"顺手就改了"——这破坏了用户的 git 颗粒度。
@@ -192,10 +188,33 @@ python3 tests/e2e_qa.py
    <type>(<phase>): <子任务编号> <一句话描述>
    ```
    - type 选一个：`feat` | `fix` | `refactor` | `docs` | `test` | `chore`
-   - 例：`feat(phase1a): 1A.3 添加 POST /tasks 创建任务接口`
+   - 例：`feat(phase-n1): N1.3 添加 trashed 状态字段`
 3. **修上一次 commit 的小问题用 `git commit --amend`**，不要新建一个 fixup commit。
-4. **永远不在 main 分支直接改代码**。新 Phase 开始时先 `git checkout -b feature/phase-1a`。
+4. **永远不在 main 分支直接改代码**。新 Phase 开始时先 `git checkout -b feat/phase-n1`。
 5. **Phase 完成时只提醒打 tag，不自动打 tag**。让用户自己决定何时打。
+
+### ⚠️ Push 策略（2026-05-18 调整）
+
+**暂缓所有 `git push origin` 操作**，等做到 **[D] 开源准备阶段** 才开始统一推送：
+
+- ❌ 不要主动 `git push origin main`
+- ❌ 不要主动 `git push origin <feature-branch>` 提交 PR
+- ❌ 不要为修 CI 而 push 触发 GitHub Actions
+- ✅ 所有 commit 都留在 local main 或本地 feature 分支
+- ✅ feature 分支完成后**本地 merge 进 local main**（不走 PR）
+- ✅ local main 会越来越领先 origin/main，**这是预期状态**
+- ✅ 到 [D] 阶段统一做一次完整 push + 仓库整理
+
+**原因**：开源前 origin 状态不需要保持同步，本地 commit 历史是真相源；过早暴露半成品仓库 / 跑 CI 都是浪费。
+
+**例外**（必须先问用户授权）：
+- 用户明确说"现在推一次"
+- 临时需要从其他机器拉代码做协作（罕见，问清楚再做）
+
+**已存在的远端分支处理**：
+- `docs/spec-merged` 分支已 push（含 PR #1）—— 不再追加 push，PR 留着或关闭由用户决定
+- 不主动 `git push --delete` 清理远端分支
+- 后续若再被迫 push（如手机端备份），先问用户
 
 ---
 

@@ -1,5 +1,7 @@
 # Nibi / VidMirror 主规范 v2（合并版，唯一标准）
 
+> ⚠️ **DEPRECATED 2026-05-18** — 本文件已被 [`docs/nibi-spec-merged.md`](docs/nibi-spec-merged.md) 取代。新 spec 融合了 v2 + v3 + 设计稿 + 现有代码 + 用户最新决议（8 个模块）。本文件**仅作历史归档**，不再维护，不参与冲突仲裁。
+
 > 生成日期：2026-05-16
 > 角色：本仓库**唯一的真相源（Single Source of Truth）**。所有 Phase 推进、设计落地、AI 协作决策都以本文件为最终仲裁。
 > 基底：以 `vidmirror-handoff/project/system_design_v1.1.md`（设计契约）为骨架，叠加 `users-conan-claude-plans-nibi-vidmirror-modular-kurzweil.md`（实施路线 / 模型分工 / 风险清单）。

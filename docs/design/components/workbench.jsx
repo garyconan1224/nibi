@@ -44,6 +44,37 @@ const Workbench = ({ onStart }) => {
   const [maxFrames, setMaxFrames] = React.useState(128);
   const [mixedOpen, setMixedOpen] = React.useState(false);
   const [mixedSel, setMixedSel] = React.useState({video:true, audio:true, article:false});
+  const [preflightOpen, setPreflightOpen] = React.useState(false);
+  const [projectSel, setProjectSel] = React.useState([]); // workspace ids — empty = unassigned
+  const [projectOpen, setProjectOpen] = React.useState(false);
+  const [projectQuery, setProjectQuery] = React.useState('');
+  // 项目 = 工作空间 (SEARCH_WORKSPACES). Color is derived deterministically by index.
+  const WS_COLORS = ['#22c55e','#f59e0b','#a855f7','#0ea5e9','#ef4444','#ec4899','#14b8a6','#eab308'];
+  const [wsExtra, setWsExtra] = React.useState([]); // newly-created in-session
+  const baseWs = (window.VM_DATA && window.VM_DATA.SEARCH_WORKSPACES) || [];
+  const projects = React.useMemo(() => (
+    [...baseWs, ...wsExtra].map((w, i) => ({
+      id: w.id, name: w.name, count: w.items, color: w.color || WS_COLORS[i % WS_COLORS.length],
+      active: w.active,
+    }))
+  ), [baseWs, wsExtra]);
+  const projectsById = React.useMemo(() => Object.fromEntries(projects.map(p=>[p.id,p])), [projects]);
+  const filteredProjects = React.useMemo(() => {
+    const q = projectQuery.trim().toLowerCase();
+    if (!q) return projects;
+    return projects.filter(p => p.name.toLowerCase().includes(q));
+  }, [projects, projectQuery]);
+  const toggleProject = (id) => setProjectSel(s => s.includes(id) ? s.filter(x=>x!==id) : [...s, id]);
+  const removeProject = (id) => setProjectSel(s => s.filter(x=>x!==id));
+  const popRef = React.useRef(null);
+  React.useEffect(() => {
+    if (!projectOpen) return;
+    const onClick = (e) => {
+      if (popRef.current && !popRef.current.contains(e.target)) setProjectOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [projectOpen]);
 
   const toggle = (i) => setSteps(ss => ss.map((v,j) => j===i ? !v : v));
   const detected = detectPlatform(url);
@@ -56,7 +87,7 @@ const Workbench = ({ onStart }) => {
 
   const handleRun = () => {
     if (isMixed) { setMixedOpen(true); return; }
-    onStart({ url, model, asr, steps });
+    setPreflightOpen(true);
   };
 
   return (
@@ -99,6 +130,80 @@ const Workbench = ({ onStart }) => {
               </div>
             )}
             <button className="btn btn-ghost" title="上传本地文件"><IcUpload size={16}/>上传</button>
+          </div>
+
+          {/* Workspace assignment row (optional · multi-select — 工作空间) */}
+          <div className="composer-projects">
+            <span className="pp-label">归入工作空间</span>
+            {projectSel.length === 0 && (
+              <span className="pp-none">不归入 · 可选</span>
+            )}
+            {projectSel.map(id => {
+              const p = projectsById[id]; if (!p) return null;
+              return (
+                <span key={id} className="pp-chip">
+                  <span className="pp-dot" style={{background:p.color}}/>
+                  {p.name}
+                  <button className="pp-x" onClick={()=>removeProject(id)} title="移除"><IcX size={11}/></button>
+                </span>
+              );
+            })}
+            <button className="pp-add" onClick={()=>setProjectOpen(o=>!o)}>
+              <IcLayers size={11}/>{projectSel.length ? '继续添加' : '选择工作空间'}
+            </button>
+            <span style={{marginLeft:'auto', fontSize:10, color:'var(--ink-4)', fontFamily:'var(--mono)'}}
+              title="一个内容可同时归入多个工作空间">
+              可多选 · 一个内容可归入多个空间
+            </span>
+
+            {projectOpen && (
+              <div className="pp-popover" ref={popRef}>
+                <div className="pp-search">
+                  <IcSearch size={14}/>
+                  <input autoFocus placeholder="搜索工作空间..."
+                    value={projectQuery} onChange={e=>setProjectQuery(e.target.value)}/>
+                  {projectSel.length>0 && (
+                    <button className="btn btn-ghost" onClick={()=>setProjectSel([])}
+                      style={{height:24, padding:'0 8px', fontSize:11}}>清空</button>
+                  )}
+                </div>
+                <div className="pp-list">
+                  {filteredProjects.length === 0 && (
+                    <div style={{padding:'18px 12px', textAlign:'center', fontSize:12, color:'var(--ink-4)', fontFamily:'var(--mono)'}}>
+                      无匹配工作空间
+                    </div>
+                  )}
+                  {filteredProjects.map(p => {
+                    const on = projectSel.includes(p.id);
+                    return (
+                      <div key={p.id} className="pp-row" data-on={on}
+                           onClick={()=>toggleProject(p.id)}>
+                        <span className="pp-check"><IcCheck size={11} strokeWidth={3}/></span>
+                        <span className="pp-dot" style={{width:8, height:8, borderRadius:99, background:p.color}}/>
+                        <div style={{minWidth:0}}>
+                          <div className="pp-name">{p.name}{p.active && <span style={{marginLeft:6, fontSize:9, color:'var(--accent-green, var(--ink-3))', fontFamily:'var(--mono)', letterSpacing:'0.06em'}}>• 当前</span>}</div>
+                        </div>
+                        <span className="pp-count">{p.count} 项</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="pp-foot">
+                  <button className="pp-new"
+                    onClick={()=>{
+                      const name = projectQuery.trim() || '新工作空间';
+                      const id = 'ws-'+Date.now().toString(36);
+                      const color = WS_COLORS[(baseWs.length + wsExtra.length) % WS_COLORS.length];
+                      setWsExtra(prev => [...prev, { id, name, items: 0, color }]);
+                      setProjectSel(s => [...s, id]);
+                      setProjectQuery('');
+                    }}>
+                    <IcPlus size={11}/>新建工作空间{projectQuery ? ` “${projectQuery}”` : ''}
+                  </button>
+                  <button className="pp-done" onClick={()=>setProjectOpen(false)}>完成</button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Download quality row (only for video) */}
@@ -241,6 +346,16 @@ const Workbench = ({ onStart }) => {
           </button>
         </div>
       </div>
+
+      {/* ─── Preflight drawer (PRD §4) ─── */}
+      <Preflight
+        open={preflightOpen}
+        onClose={() => setPreflightOpen(false)}
+        onStart={(cfg) => { setPreflightOpen(false); onStart({ url, ...cfg }); }}
+        sourceUrl={url}
+        sourcePlatform={platform?.name}
+        defaultKind="video"
+      />
 
       {/* ─── Recent tasks ─── */}
       <section className="examples">

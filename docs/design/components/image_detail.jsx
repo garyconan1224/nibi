@@ -118,6 +118,11 @@ const ImageDetail = ({ material, onBack }) => {
           </button>
         </div>
 
+        {/* Phase 3C — 7 维度标签 */}
+        <div className="it-host" style={{ padding:'12px 20px 0', flexShrink:0, background:'var(--bg-elev)' }}>
+          <ItemTagsPanel itemId={material?.id || 'm3'} compact/>
+        </div>
+
         {/* Main image display */}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
                       padding: 24, overflow: 'hidden' }}>

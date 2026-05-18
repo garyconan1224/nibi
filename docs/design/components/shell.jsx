@@ -4,7 +4,6 @@ const Sidebar = ({ route, setRoute }) => {
   const items = [
     { id:'home',       ic: IcHome,    label:'工作台' },
     { id:'taskboard',  ic: IcLayers,  label:'任务中心' },
-    { id:'queue',      ic: IcList,    label:'队列',    dot: true },
     { id:'process',    ic: IcSpark,   label:'处理中' , dot: true },
     { id:'results',    ic: IcClap,    label:'结果' },
     { id:'storyboard', ic: IcFilm,    label:'分镜' },
@@ -25,7 +24,9 @@ const Sidebar = ({ route, setRoute }) => {
         </button>
       ))}
       <div className="sb-sep"/>
-      <button className="sb-btn" title="搜索"><IcSearch size={20}/></button>
+      <button className="sb-btn" title="跨工作空间检索" data-active={route==='search'} onClick={() => setRoute('search')}>
+        <IcSearch size={20}/>
+      </button>
       <div className="sb-spacer"/>
       <button className="sb-btn" title="设置" data-active={route==='settings'} onClick={() => setRoute('settings')}>
         <IcSettings size={20}/>
@@ -45,12 +46,12 @@ const Topbar = ({ route, onOpenTasks, theme, setTheme, onToggleTweaks, tasksCoun
     library:      ['资料库',   'Library'],
     director:     ['AI 导演',  'Director'],
     settings:     ['设置',     'Settings'],
-    queue:        ['队列',     'Queue'],
     video_detail: ['视频详情', 'Video Detail'],
     image_detail: ['图片详情', 'Image Detail'],
     audio_detail: ['音频详情', 'Audio Detail'],
     text_detail:  ['文字详情', 'Text Detail'],
     overview:     ['12 屏概览', 'Screen Overview'],
+    search:       ['跨工作空间检索', 'Knowledge Search'],
   }[route] || ['工作台', 'Workbench'];
 
   return (
@@ -81,38 +82,73 @@ const Topbar = ({ route, onOpenTasks, theme, setTheme, onToggleTweaks, tasksCoun
 };
 
 // ─── Tasks drawer ───
-const TasksDrawer = ({ open, onClose, tasks, activeId, onPick }) => (
-  <>
-    <div className="drawer-backdrop" data-open={open} onClick={onClose}/>
-    <aside className="drawer" data-open={open}>
-      <div className="d-head">
-        <h3>任务中心</h3>
-        <button className="btn btn-ghost" onClick={onClose}><IcX size={16}/></button>
-      </div>
-      <div className="d-body">
-        {tasks.map(t => {
-          const f = VM_DATA.FRAMES[t.thumb % VM_DATA.FRAMES.length];
-          return (
-            <div key={t.id} className="d-task" data-active={t.id===activeId} onClick={() => onPick(t)}>
-              <div className="dt-thumb">
-                <img src={`assets/frame_${f.ts.replace(/:/g,'_')}.svg`}/>
-              </div>
-              <div className="dt-body">
-                <div className="dt-title">{t.title}</div>
-                <div className="dt-meta">
-                  <span>{t.src}</span>
-                  <span style={{opacity:0.4}}>·</span>
-                  <span>{t.type}</span>
+const TasksDrawer = ({ open, onClose, tasks, activeId, onPick }) => {
+  const [filter, setFilter] = React.useState(() => (window.ITF_load ? window.ITF_load() : null));
+  React.useEffect(() => { if (filter && window.ITF_save) window.ITF_save(filter); }, [filter]);
+  // first render guard if item_tags.jsx hasn't loaded yet
+  if (!filter && window.ITF_EMPTY) { /* lazy init */ }
+  const effFilter = filter || (window.ITF_EMPTY ? window.ITF_EMPTY() : null);
+
+  const matchOf = (t) => {
+    if (!window.wsMatchesFilter || !effFilter) return true;
+    return window.wsMatchesFilter(VM_DATA.TASK_TAGS?.[t.id], effFilter);
+  };
+  const visible = tasks.filter(matchOf);
+  const total = tasks.length;
+  const matches = visible.length;
+
+  return (
+    <>
+      <div className="drawer-backdrop" data-open={open} onClick={onClose}/>
+      <aside className="drawer" data-open={open}>
+        <div className="d-head">
+          <h3>任务中心</h3>
+          <button className="btn btn-ghost" onClick={onClose}><IcX size={16}/></button>
+        </div>
+
+        {/* Phase 3C · workspace tag filter */}
+        {window.WorkspaceTagFilter && (
+          <div className="d-filter">
+            <WorkspaceTagFilter value={effFilter} onChange={setFilter}
+              matches={matches} total={total}/>
+          </div>
+        )}
+
+        <div className="d-body">
+          {visible.map(t => {
+            const f = VM_DATA.FRAMES[t.thumb % VM_DATA.FRAMES.length];
+            return (
+              <div key={t.id} className="d-task" data-active={t.id===activeId} onClick={() => onPick(t)}>
+                <div className="dt-thumb">
+                  <img src={`assets/frame_${f.ts.replace(/:/g,'_')}.svg`}/>
                 </div>
+                <div className="dt-body">
+                  <div className="dt-title">{t.title}</div>
+                  <div className="dt-meta">
+                    <span>{t.src}</span>
+                    <span style={{opacity:0.4}}>·</span>
+                    <span>{t.type}</span>
+                  </div>
+                  {window.TaskTagPreview && <TaskTagPreview taskId={t.id} filter={effFilter}/>}
+                </div>
+                <div className="dt-state" data-s={t.state}>{t.state}</div>
               </div>
-              <div className="dt-state" data-s={t.state}>{t.state}</div>
+            );
+          })}
+          {visible.length === 0 && (
+            <div className="d-empty">
+              <div className="d-empty-h">没有匹配的工作空间</div>
+              <div className="d-empty-s">当前筛选下,所有工作空间都被排除。</div>
+              <button className="btn" onClick={() => setFilter(window.ITF_EMPTY())}>
+                <IcX size={13}/> 清除筛选
+              </button>
             </div>
-          );
-        })}
-      </div>
-    </aside>
-  </>
-);
+          )}
+        </div>
+      </aside>
+    </>
+  );
+};
 
 // ─── Tweaks panel ───
 const Tweaks = ({ open, onClose, theme, setTheme, density, setDensity, accent, setAccent, layout, setLayout, lang, setLang }) => {

@@ -194,7 +194,12 @@ const TextDetail = ({ material, onBack }) => {
           <span style={{ fontWeight: 600, fontSize: 13, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {material?.title || TEXT_DATA.title}
           </span>
-          <span className="kw mono" style={{ fontSize: 10 }}>TEXT · {TEXT_DATA.wordCount} 字</span>
+          <span className="kw mono" style={{ fontSize: 10, flexShrink: 0 }}>TEXT · {TEXT_DATA.wordCount} 字</span>
+        </div>
+
+        {/* Phase 3C — 7 维度标签 */}
+        <div className="it-host" style={{ padding:'12px 22px 0', flexShrink:0, background:'var(--bg-elev)' }}>
+          <ItemTagsPanel itemId={material?.id || 'm7'} compact/>
         </div>
 
         {/* Source meta */}

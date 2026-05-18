@@ -31,16 +31,20 @@ const SECTIONS = [
         render: () => <Taskboard onAddMaterial={() => {}} onOpenMaterial={() => {}} />,
       },
       {
-        id: 's03', num:'03', title:'处理队列 · Queue',
-        sub:'进度列表 + 系统占用 + 滑块',
-        tone:'purple',
-        render: () => <QueuePanel onOpenMaterial={() => {}} />,
-      },
-      {
         id: 's04', num:'04', title:'处理中 · Processing',
         sub:'分步动画 + 日志 + 预览帧',
         tone:'purple',
         render: () => <Processing progress={0.55} onDone={() => {}} onCancel={() => {}} />,
+      },
+      {
+        id: 's13', num:'13', title:'前置配置 · Preflight',
+        sub:'背景 / 模型 / 任务勾选 · §4',
+        tone:'amber',
+        render: () => (
+          <div style={{height:'100%', background:'var(--bg-sunken)', position:'relative', overflow:'hidden'}}>
+            <Preflight open={true} onClose={() => {}} onStart={() => {}} sourceUrl="bilibili.com/BV1abc" sourcePlatform="Bilibili"/>
+          </div>
+        ),
       },
     ],
   },
@@ -99,10 +103,10 @@ const SECTIONS = [
         render: () => <Settings />,
       },
       {
-        id: 's12', num:'12', title:'AI 导演 · Director (stub)',
-        sub:'复刻 / 风格 / 对比 · 扩展入口',
+        id: 's12', num:'12', title:'AI 导演 · Director',
+        sub:'复刻工坊 · 收藏 / 版本 / 对比 / 风格 DNA',
         tone:'purple',
-        render: () => <DirectorStub />,
+        render: () => <Director/>,
       },
     ],
   },
@@ -296,7 +300,7 @@ const OverviewCanvas = ({ setRoute }) => {
 
   /* Navigate to actual route on expand */
   const routeMap = {
-    s01: 'home', s02: 'taskboard', s03: 'queue', s04: 'process',
+    s01: 'home', s02: 'taskboard', s04: 'process', s13: 'home',
     s05: 'results', s06: 'taskboard', s07: 'taskboard', s08: 'taskboard',
     s09: 'taskboard', s10: 'storyboard', s11: 'settings', s12: 'director',
   };
