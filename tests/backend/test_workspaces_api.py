@@ -140,7 +140,12 @@ def test_upload_item_persists_file_and_registers_item(
     assert stored.is_file()
     assert stored.read_bytes() == payload
 
+    # N1.3 之后 DELETE 是软删除，文件保留；需 permanent 才会清理上传目录
     resp = client.delete(f"/workspaces/{ws_id}")
+    assert resp.status_code == 200
+    assert stored.exists(), "soft delete should not remove uploaded files"
+
+    resp = client.delete(f"/workspaces/{ws_id}/permanent")
     assert resp.status_code == 200
     assert not stored.exists()
 

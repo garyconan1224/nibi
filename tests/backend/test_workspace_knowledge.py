@@ -14,7 +14,7 @@ from shared import knowledge_base as kb
 
 def _seed_workspace(store_root: Path) -> tuple[WorkspaceStore, str]:
     store = WorkspaceStore(root=store_root)
-    rec = WorkspaceRecord(workspace_id="ws_test", name="测试空间", project_id="")
+    rec = WorkspaceRecord(workspace_id="ws_test", name="测试空间")
     rec.items = [
         WorkspaceItem(
             item_id="it_001",
