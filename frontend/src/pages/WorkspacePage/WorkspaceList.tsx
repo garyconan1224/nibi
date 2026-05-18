@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Trash2, FolderOpen } from 'lucide-react'
+
+import { TagFilterBar } from '@/components/workspace/TagFilterBar'
+import { useTagFilter } from './useTagFilter'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -65,6 +68,18 @@ export default function WorkspaceList() {
   // 删除确认状态
   const [deleteTarget, setDeleteTarget] = useState<WorkspaceRecord | null>(null)
   const [deleting, setDeleting] = useState(false)
+
+  // Phase 3C.5：tag 筛选（与 URL search params 双向同步）
+  const { filter, setFilter, filterItems, hasActiveFilter } = useTagFilter()
+
+  // 工作空间显示规则：若有 tag 筛选，仅展示「至少一个 item 命中筛选」的 workspace；
+  // 同时把每个 ws 的 items 过滤一次给 WorkspaceCard 做计数
+  const filteredItems = useMemo(() => {
+    if (!hasActiveFilter) return items
+    return items
+      .map(ws => ({ ...ws, items: filterItems(ws.items) }))
+      .filter(ws => ws.items.length > 0)
+  }, [items, hasActiveFilter, filterItems])
 
   const refresh = async () => {
     setLoading(true)
@@ -137,6 +152,11 @@ export default function WorkspaceList() {
         </div>
       )}
 
+      {/* Phase 3C.5：tag 筛选栏 */}
+      {!loading && items.length > 0 && (
+        <TagFilterBar value={filter} onChange={setFilter} />
+      )}
+
       {/* 主体：列表 / 加载 / 空态 */}
       {loading ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -156,9 +176,20 @@ export default function WorkspaceList() {
             </Button>
           }
         />
+      ) : filteredItems.length === 0 ? (
+        <EmptyState
+          illustration={<FolderOpen className="size-6" />}
+          title="没有匹配的工作空间"
+          description="当前筛选条件下没有素材命中。试着清除一些维度或调整自定义关键词。"
+          action={
+            <Button variant="outline" onClick={() => setFilter({ dimensions: {}, customQuery: '' })}>
+              清除筛选
+            </Button>
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {items.map((ws) => (
+          {filteredItems.map((ws) => (
             <WorkspaceCard
               key={ws.workspace_id}
               workspace={ws}

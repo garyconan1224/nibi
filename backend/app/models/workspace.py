@@ -117,6 +117,7 @@ class WorkspaceItem:
     preflight: PreflightConfig = field(default_factory=PreflightConfig)
     results: Dict[str, Any] = field(default_factory=dict)
     related_task_ids: List[str] = field(default_factory=list)
+    tags: Dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=_now_iso)
     updated_at: str = field(default_factory=_now_iso)
 
@@ -137,6 +138,7 @@ class WorkspaceItem:
             preflight=PreflightConfig.from_dict(data.get("preflight") or {}),
             results=dict(data.get("results") or {}),
             related_task_ids=list(data.get("related_task_ids") or []),
+            tags=dict(data.get("tags") or {}),
             created_at=str(data.get("created_at") or _now_iso()),
             updated_at=str(data.get("updated_at") or _now_iso()),
         )

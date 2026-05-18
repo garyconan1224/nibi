@@ -239,3 +239,36 @@ def get_backend_base_url() -> str:
 # ── 分镜脚本分隔符 ────────────────────────────────────────────
 
 PLAN_MARKERS: tuple[str, str, str] = ("<<<PLAN_A>>>", "<<<PLAN_B>>>", "<<<PLAN_C>>>")
+
+# ── 标签库 7 维度（Phase 3C）─────────────────────────────────
+
+TAG_DIMENSIONS: dict[str, dict] = {
+    "content_type": {
+        "label": "内容类型",
+        "choices": ["教程", "访谈", "解说", "纪实", "Vlog", "新闻", "评测", "其它"],
+    },
+    "subject_domain": {
+        "label": "主题领域",
+        "choices": ["科技", "人文", "财经", "教育", "娱乐", "生活", "体育", "其它"],
+    },
+    "difficulty": {
+        "label": "难度等级",
+        "choices": ["入门", "进阶", "专家"],
+    },
+    "duration_band": {
+        "label": "时长档位",
+        "choices": ["短", "中", "长"],  # 短<5min / 中5-30min / 长>30min
+    },
+    "information_density": {
+        "label": "信息密度",
+        "choices": ["高", "中", "低"],
+    },
+    "emotion_tone": {
+        "label": "情绪基调",
+        "choices": ["中性", "激励", "批判", "幽默", "严肃", "悲情"],
+    },
+    "custom_tags": {
+        "label": "自定义标签",
+        "choices": None,  # 自由文本数组
+    },
+}

@@ -24,6 +24,7 @@ import {
 } from '@/services/promptFormats'
 import { TripleTrack } from './TripleTrack'
 import { nearestFrameIdx } from './helpers'
+import { ItemTagsPanel } from '@/components/workspace/ItemTagsPanel'
 
 import './tokens.css'
 
@@ -450,6 +451,11 @@ export default function VideoResultPage() {
           >
             <Download size={13} /> 导出
           </button>
+        </div>
+
+        {/* 标签展示 */}
+        <div style={{ padding: '10px 20px 0', flexShrink: 0 }}>
+          <ItemTagsPanel workspaceId={workspaceId} itemId={itemId} />
         </div>
 
         {/* 播放器 */}
