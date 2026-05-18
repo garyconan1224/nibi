@@ -58,21 +58,32 @@
 - 用户在使用中发现 spec 描述跟实际需要不符时（先改 spec → 再改设计稿 → 再写代码）
 - 进入 AI 导演阶段时（复刻功能 UI 细节当前不够）
 
-### 各 phase 工作内容速查
+### 各 phase 工作内容速查（含开工参数）
 
-| Phase | 性质 | 是否需要先改设计 |
-|---|---|---|
-| **[A] 现状同步** | 文档梳理 | ❌ 纯文档 |
-| **N1 任务系统差异** | 代码 | ❌（spec 已细化） |
-| **N2 导航精简** | 代码 + 微调设计稿 | ⚠️ 仅删除 design/ 里被砍掉的组件引用 |
-| **N3 设置页重组** | 代码 | ❌ |
-| **N4 添加素材模态** | 代码 | ❌（design/ 已有 4 步合一模态） |
-| **N5 Preflight 抽屉** | 代码 | ❌ |
-| **N6 任务级 LLM 对话** | 代码 + **要补设计** | ⚠️ design/ 的 task_chat.jsx 没有"上下文素材多选 chip"——这部分要补设计稿或在 spec 里写清楚交互 |
-| **N7-N10 四大分支补齐** | 代码 | ❌（详情页设计稿已实现） |
-| **N11 UI 清理** | 代码 | ❌ |
-| **[C] AI 导演** | **大量先改设计** + 代码 | ✅ 整体延后，需要补完整的 director 模块设计 |
-| **[D] 开源** | 代码 + 文档 | ❌ |
+> **规则来源**：CLAUDE.md §「模型选择策略」+ §「Git 行为」第 4 条 + §「Push 策略」。
+> Push 全部暂缓到 [D] 阶段，下表不再重复标注。
+
+| Phase | 性质 | 设计先改？ | **模型** | **分支** |
+|---|---|---|---|---|
+| **[A] 现状同步** | 纯文档 | ❌ | 小米 2.5 Pro / Sonnet | main 直接做 |
+| **N1 任务系统差异** | 代码 + schema 迁移 | ❌ | ⭐ **Opus 4.7** | **新 worktree** `feat/phase-n1-task-system` |
+| **N2 导航精简** | 代码 + 微调设计 | ⚠️ 删 design/ 被砍组件 | Sonnet 4.6 / 小米 | `feat/phase-n2-nav-cleanup` |
+| **N3 设置页重组** | 代码（多文件 CRUD） | ❌ | Sonnet 4.6 | `feat/phase-n3-settings` |
+| **N4 添加素材模态** | 代码 | ❌（design 已有） | Sonnet 4.6 | `feat/phase-n4-add-material` |
+| **N5 Preflight 抽屉** | 代码 + 子参数细化 | ❌ | ⭐ **Opus 4.7**（跨多素材类型） | **新 worktree** `feat/phase-n5-preflight` |
+| **N6 任务级 LLM 对话** | 代码 + RAG + **要补设计** | ⚠️ task_chat.jsx 缺多选 chip | ⭐ **Opus 4.7**（RAG / 上下文） | **新 worktree** `feat/phase-n6-task-chat` |
+| **N7 视频分支补齐** | 代码（PySceneDetect + 3 路径） | ❌ | ⭐ **Opus 4.7** | **新 worktree** `feat/phase-n7-video` |
+| **N8 音频分支补齐** | 代码（VAD + pyannote） | ❌ | ⭐ **Opus 4.7** | **新 worktree** `feat/phase-n8-audio` |
+| **N9 图片分支补齐** | 代码（PaddleOCR + 多图对比） | ❌ | Sonnet 4.6 | `feat/phase-n9-image` |
+| **N10 文字分支补齐** | 代码（marker/docling + 多文对比） | ❌ | Sonnet 4.6 | `feat/phase-n10-text` |
+| **N11 UI 清理** | 代码（隐藏砍掉的入口） | ❌ | 小米 2.5 Pro | main 直接做 |
+| **[C] AI 导演** | **大量先改设计** + 代码 | ✅ 补完整 director 设计 | Opus 4.7 全程 | 多个 worktree（按子模块） |
+| **[D] 开源** | 代码 + 文档 | ❌ | Sonnet / 小米 | main + 各 feature 分支 |
+
+**决策规则速查**（复杂度判定）：
+- 跨 5+ 文件 / schema 迁移 / 加密 / SSE / 状态机 / RAG → **Opus + worktree**
+- 3-5 文件 CRUD / 前端组件 → **Sonnet + 单分支**
+- 纯文档 / git / 测试 → **小米 + main 直接做**
 
 ---
 

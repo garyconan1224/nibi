@@ -27,8 +27,9 @@ Last updated: 2026-05-18（现状同步完成，进入 N1~N11 路线）
 - 标题：任务系统差异
 - 估时：4-6h
 - 优先级：P0
-- 推荐模型：Sonnet 4.6（多文件 CRUD）或 Opus 4.7（若涉及 schema 迁移）
-- 分支：待定（建议 `feat/phase-n1-task-system`，进入时确认）
+- **模型**：⭐ **Opus 4.7（桌面）** —— 跨后端模型 + routes + 前端 + **schema 迁移**（删 `project_id` 是破坏性），符合 CLAUDE.md「复杂阶段」定义
+- **分支**：**新开 worktree** + 分支 `feat/phase-n1-task-system`，**不在主 worktree** `/Users/conan/Desktop/nibi` **直接改代码**（主 worktree 仅用于 merge）
+- **不 push**：按 CLAUDE.md §「Push 策略」，commit 留本地，等 [D] 阶段统一推
 
 ### 具体差异项
 

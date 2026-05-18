@@ -81,7 +81,10 @@
 - 软删除垃圾桶（前端 + 后端）
 - 删 project_id 冗余字段
 
-> 📍 **模型选择**：N1 涉及后端状态机 + 前端 CRUD + 可能的 schema 迁移，建议 **Sonnet 4.6** 或 **Opus 4.7**（若需要迁移脚本）。详见 `CLAUDE.md` §「模型选择策略」。
+> 📍 **N1 开工参数（决议版）**：
+> - **模型**：⭐ **Opus 4.7（桌面）** —— schema 迁移 + 跨后端/前端，符合 CLAUDE.md「复杂阶段」
+> - **分支**：**新开 worktree** + `feat/phase-n1-task-system`，**不在主 worktree 直接改代码**
+> - **不 push**：commit 留本地，等 [D] 阶段统一推
 
 ---
 
