@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from backend.app.routes.pipeline import _runner as _pipeline_runner
 from backend.app.services.workspace_search_service import search_across_workspaces
 
 router = APIRouter(tags=["search"])
@@ -31,6 +32,7 @@ def global_search(req: GlobalSearchRequest) -> Dict[str, Any]:
             query=req.query,
             top_k=req.top_k,
             workspace_ids=req.workspace_ids,
+            task_store=_pipeline_runner.store,
         )
     except KeyError as err:
         raise HTTPException(status_code=404, detail=str(err)) from err

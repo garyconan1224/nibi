@@ -58,15 +58,40 @@ def _items_hash(rec: WorkspaceRecord) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def _item_has_data(it: WorkspaceItem) -> bool:
-    return bool(it.results)
+def _resolve_item_results(it: WorkspaceItem, task_store: Any = None) -> Dict[str, Any]:
+    """返回 item 的最佳分析产物 dict。
+
+    优先用 item.results；为空时从 task_store 找最新 SUCCESS 任务的 result。
+    task_store 可以是任何实现了 .get(task_id) -> Optional[TaskRecord] 的对象。
+    """
+    if it.results:
+        return dict(it.results)
+    if task_store is None or not it.related_task_ids:
+        return {}
+    latest_success: Any = None
+    for tid in it.related_task_ids:
+        task = task_store.get(tid)
+        if task is None:
+            continue
+        if str(getattr(task, "status", "")).upper() == "SUCCESS" and getattr(task, "result", None):
+            if latest_success is None or task.updated_at > latest_success.updated_at:
+                latest_success = task
+    return dict(latest_success.result) if latest_success else {}
+
+
+def _item_has_data(it: WorkspaceItem, task_store: Any = None) -> bool:
+    return bool(_resolve_item_results(it, task_store))
 
 
 def collect_workspace_json_paths(
-    workspace_id: str, dest: Path, store: Optional[WorkspaceStore] = None
+    workspace_id: str,
+    dest: Path,
+    store: Optional[WorkspaceStore] = None,
+    task_store: Any = None,
 ) -> Tuple[List[Path], SourceMap, WorkspaceRecord]:
     """把每个 item 的分析产物序列化为 JSON 文件写到 dest 目录。
 
+    task_store 用于补全 item.results 为空但任务已完成的 items（拉模式同 _sync_item_with_tasks）。
     返回 (paths, source_map, workspace_record)。source_map 以绝对路径字符串为 key，
     含 workspace + item 元数据，后续检索结果回填用。
     """
@@ -79,7 +104,8 @@ def collect_workspace_json_paths(
     paths: List[Path] = []
     source_map: SourceMap = {}
     for it in rec.items:
-        if not _item_has_data(it):
+        results = _resolve_item_results(it, task_store)
+        if not results:
             continue
         title = it.name or it.source_value or it.item_id
         obj: Dict[str, Any] = {
@@ -87,7 +113,7 @@ def collect_workspace_json_paths(
             "item_type": it.type,
             "video_title": title,
             "title": title,
-            **(it.results or {}),
+            **results,
         }
         p = (dest / f"{it.item_id}.json").resolve()
         p.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -164,11 +190,13 @@ def build_or_load_workspace_index(
     api_key: str,
     embedding_model: str = EMBEDDING_MODEL,
     store: Optional[WorkspaceStore] = None,
+    task_store: Any = None,
 ) -> Tuple[KnowledgeState, SourceMap]:
     """Lazy 加载/重建 workspace 知识库。
 
     - 命中缓存（items_hash 一致）→ 反序列化 FAISS + chunks
     - 未命中 → 把 items 序列化为 JSON 临时目录 → load_folder_as_knowledge → 写缓存
+    - task_store 用于补全 item.results 为空但任务已完成的 items
     """
     if not api_key or not api_key.strip():
         raise ValueError("api_key required to build workspace index")
@@ -178,7 +206,12 @@ def build_or_load_workspace_index(
     if rec is None:
         raise KeyError(f"workspace not found: {workspace_id}")
 
-    items_with_data = [it for it in rec.items if _item_has_data(it)]
+    # 若未传 task_store，懒加载一个（从磁盘读，保证数据是最新的）
+    if task_store is None:
+        from backend.app.services.task_store import TaskStore  # noqa: PLC0415
+        task_store = TaskStore()
+
+    items_with_data = [it for it in rec.items if _item_has_data(it, task_store)]
     if not items_with_data:
         raise ValueError(f"workspace {workspace_id} has no items with analysis results")
 
@@ -189,7 +222,9 @@ def build_or_load_workspace_index(
 
     with tempfile.TemporaryDirectory(prefix=f"wsidx_{workspace_id}_") as td:
         tdp = Path(td)
-        paths, source_map, _ = collect_workspace_json_paths(workspace_id, tdp, store=store)
+        paths, source_map, _ = collect_workspace_json_paths(
+            workspace_id, tdp, store=store, task_store=task_store
+        )
         if not paths:
             raise ValueError(f"workspace {workspace_id} produced no JSON for indexing")
         knowledge = load_folder_as_knowledge(

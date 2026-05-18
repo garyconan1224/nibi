@@ -133,6 +133,7 @@ def search_one_workspace(
     top_k: int = 5,
     api_key: Optional[str] = None,
     store: Optional[WorkspaceStore] = None,
+    task_store: Any = None,
 ) -> Dict[str, Any]:
     """单 workspace 检索。返回 {answer, sources[]}。"""
     if not query or not query.strip():
@@ -145,7 +146,7 @@ def search_one_workspace(
         raise KeyError(f"workspace not found: {workspace_id}")
 
     knowledge, source_map = build_or_load_workspace_index(
-        workspace_id, eff_key, store=store
+        workspace_id, eff_key, store=store, task_store=task_store
     )
 
     sources_out: List[Dict[str, Any]] = []
@@ -177,6 +178,7 @@ def _retrieve_one(
     api_key: str,
     per_ws_top_k: int,
     store: WorkspaceStore,
+    task_store: Any = None,
 ) -> Tuple[List[Dict[str, Any]], List[VideoChunk], SourceMap, str, str]:
     """跨空间检索单 worker：返回 (raw_sources, chunks_for_rerank, source_map, ws_id, ws_name)。"""
     rec = store.get(workspace_id)
@@ -184,7 +186,7 @@ def _retrieve_one(
         return [], [], {}, workspace_id, ""
     try:
         knowledge, source_map = build_or_load_workspace_index(
-            workspace_id, api_key, store=store
+            workspace_id, api_key, store=store, task_store=task_store
         )
     except ValueError:
         return [], [], {}, workspace_id, rec.name
@@ -216,6 +218,7 @@ def search_across_workspaces(
     workspace_ids: Optional[List[str]] = None,
     api_key: Optional[str] = None,
     store: Optional[WorkspaceStore] = None,
+    task_store: Any = None,
 ) -> Dict[str, Any]:
     """跨工作空间检索。workspace_ids 为空 → 全部。"""
     if not query or not query.strip():
@@ -247,6 +250,7 @@ def search_across_workspaces(
                 api_key=eff_key,
                 per_ws_top_k=per_ws_top_k,
                 store=store,
+                task_store=task_store,
             )
             for wid in target_ids
         ]

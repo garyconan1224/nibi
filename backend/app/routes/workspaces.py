@@ -1163,6 +1163,7 @@ def workspace_search(workspace_id: str, req: WorkspaceSearchRequest) -> Dict[str
             query=req.query,
             top_k=req.top_k,
             store=_store,
+            task_store=_pipeline_runner.store,
         )
     except KeyError as err:
         raise HTTPException(status_code=404, detail=str(err)) from err
