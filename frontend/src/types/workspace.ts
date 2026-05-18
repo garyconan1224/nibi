@@ -16,6 +16,28 @@ export interface PreflightConfig {
 }
 
 /** 工作空间内单个素材 */
+/** Phase 3C: 系统标签维度（与后端 shared/config.py::TAG_DIMENSIONS 同步） */
+export type SystemTagDimension =
+  | 'content_type'
+  | 'subject_domain'
+  | 'difficulty'
+  | 'duration_band'
+  | 'information_density'
+  | 'emotion_tone'
+
+/** Phase 3C: WorkspaceItem.tags 形状（6 个系统维度 + custom_tags + 元数据） */
+export interface ItemTags {
+  content_type?: string
+  subject_domain?: string
+  difficulty?: string
+  duration_band?: string
+  information_density?: string
+  emotion_tone?: string
+  custom_tags?: string[]
+  _generated_at?: string
+  _generated_model?: string
+}
+
 export interface WorkspaceItem {
   item_id: string
   type: ItemType
@@ -26,6 +48,7 @@ export interface WorkspaceItem {
   preflight: PreflightConfig
   results: Record<string, unknown>
   related_task_ids: string[]
+  tags: ItemTags
   created_at: string
   updated_at: string
 }
