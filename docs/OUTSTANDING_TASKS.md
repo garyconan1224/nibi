@@ -1,35 +1,38 @@
 # Outstanding Tasks
 
-> ⚠️ 本文件是「下一步该做什么」的快照。**写入前必须先 `git log --oneline -20` 对账**，避免把已完成阶段当作待办（曾经发生过：AI 让用户重做已合并的 2C.1）。
+> ⚠️ 本文件是「下一步该做什么」的快照。**写入前必须先 `git log --oneline -20` 对账**，避免把已完成阶段当作待办。
 
-Last updated: 2026-05-17（Phase 2C.2 合并之后）
+Last updated: 2026-05-18（现状同步完成，进入 N1~N11 路线）
 
 ---
 
 ## P0 — 当前 main 基线
 
-- 最新合并：`7e08e74`（2C.2 review 修复）。
-- Phase 2A / 2B / 2C.1 / 2C.2 全部合并入 main，详见 `docs/AI_HANDOFF.md` 顶部对账表。
+- 最新合并：docs/spec-merged 分支全部内容已入 main（local main 领先 origin 59 commits）。
+- Phase 0~3C 全部完成，现状同步 [A] 已完成。
+- 详细进度见 `docs/PROJECT_EXECUTION_PLAN.md`。
 
-## P0 — 下一步建议任务
+## P0 — 下一步
 
-**Phase 2D｜SQLite 切换评估**（详见 `docs/AI_HANDOFF.md` 的 2D 开工交接段）。
+**N1 任务系统差异**（详见 `docs/AI_HANDOFF.md` 的 N1 开工交接段）。
 
-- 估时：1h
-- 分支：直接在 main 上做（不开 worktree）
-- 推荐模型：⭐小米 2.5 Pro（终端，免费优先）或 Sonnet 4.6
-- 产物：`docs/PHASE_2D_SQLITE_EVALUATION.md`（评估报告）
-- commit 模板：`docs(phase2d): 2D SQLite 切换评估报告`
+- 估时：4-6h
+- 优先级：P0
+- 推荐模型：Sonnet 4.6 或 Opus 4.7（若涉及 schema 迁移）
+- 分支：待定（进入时确认）
+- 具体范围：trashed/analyzed 状态 / 软删除垃圾桶 / 删 project_id
 
-## P1 — 2D 之后
+## P0 — N1 之后
 
-- 等用户回看 2D 评估结论再决定下一程：
-  - 触发临界点 → 启动 SQLite 迁移子阶段（需新拆 2E.x，先回 spec v2 §3 表补行）。
-  - 未触发 → 进入 Phase 3 主线（参考 `nibi-spec-v2.md` §3）。
+按 `docs/PROJECT_EXECUTION_PLAN.md` 的 N1~N11 路线依次推进：
+- N2 侧边栏精简（2-3h）
+- N3 设置页重组（6-8h）
+- N4 添加素材模态（4-5h）
+- ...
 
 ## 长期遗留技术债
 
 - Streamlit 旧入口冻结，除非用户明确要求维护。
 - 持续把文档对齐到 FastAPI + React/Vite 主线。
-- `docs/PHASE_X_MAIN_PIPELINE.md` 里第 184 行记录的「任务存储路径漂移」问题 — 长期注意只从 `/Users/conan/Desktop/nibi` 主目录起服务，不在 worktree 内 `./start.sh`。
-- 旧 worktree（如 `phase2c2-text-prompt-version`）合并后清理需用户授权，参考 `docs/WORKTREE_INVENTORY.md`。
+- `docs/PHASE_X_MAIN_PIPELINE.md` 里记录的「任务存储路径漂移」问题 — 长期注意只从 `/Users/conan/Desktop/nibi` 主目录起服务，不在 worktree 内 `./start.sh`。
+- Push 策略：所有 push 暂缓到 [D] 开源准备阶段。
