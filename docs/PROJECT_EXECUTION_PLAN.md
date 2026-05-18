@@ -11,87 +11,77 @@
 ## 使用方法（每个新会话开始时跑一遍）
 
 1. 读本文件，找到第一个未打勾的子任务
-2. 打开它对应的 `docs/plans/<file>.md` 详细计划
-3. 如果该文件 `status: pending` 且操作步骤段写着 `TODO: 进入此阶段时再展开`，停下问用户「要先展开 phase X 的具体执行计划吗？」
-4. 如果该文件已经展开操作步骤（`status: ready` 或 `in_progress`），按里面的步骤执行
-5. 每完成一个子任务，在本文件勾上对应方框，并按"流程"更新 `docs/COMPLETED_WORK.md`
+2. 如果是 N1~N11 阶段，读 `docs/nibi-spec-merged.md` 对应模块理解产品需求
+3. 如果该子任务有对应的 `docs/plans/<file>.md` 详细计划：
+   - 若 `status: pending` 且操作步骤段是 `TODO` → 停下问用户「要先展开这个 phase 的具体执行计划吗？」
+   - 若 `status: ready` 或 `in_progress` 且已有操作步骤 → 按里面的步骤执行
+4. 每完成一个子任务，在本文件勾上对应方框，并按"流程"更新 `docs/COMPLETED_WORK.md`
 
 ---
 
 ## 进度总览（打勾 = 已合并入 main）
 
-### Phase 0 — 设计令牌 + AppShell
-- [x] 全部完成（详见 [phase-0.md](plans/phase-0.md)）
+### 已完成阶段（Phase 0 ~ 3C）
 
-### Phase 1 — MVP 主干（v1.0.0-mvp）
-- [x] 1A 任务列表 API 补字段
-- [x] 1B 任务列表前端
-- [x] 1C 设置 → 模型管理
-- [x] 1D 任务详情骨架 + 输入层
-- [x] 1E 前置配置面板
-- [x] 1F Pipeline + SSE 进度条
-- [x] 1G 视频结果页 + 三轨时间轴
-- [x] 1H 图片结果页
-- [x] 1I 工作包 zip 导出
-- [x] 1J 老代码清理 + Phase 1 收口
-- [x] Phase X 主干竖切（TEXT/IMAGE/VIDEO/AUDIO）
+> 以下阶段已全部完成并合并入 main。详细记录见 [`docs/COMPLETED_WORK.md`](COMPLETED_WORK.md)。
 
-### Phase 2 — 内容能力扩展
-- [x] 2A LLM 对话侧栏 + 收藏夹
-- [x] 2B 音频结果页
-- [x] 2C.1 文本输入层（PDF/DOCX/网页）
-- [x] 2C.2 文本结果页 + 提示词版本栈
-- [x] 2D SQLite 切换评估（结论：暂不切，见 [PHASE_2D_SQLITE_EVALUATION.md](PHASE_2D_SQLITE_EVALUATION.md)）
+- [x] **Phase 0** — 设计令牌 + AppShell
+- [x] **Phase 1** — MVP 主干（v1.0.0-mvp）
+  - [x] 1A 任务列表 API 补字段
+  - [x] 1B 任务列表前端
+  - [x] 1C 设置 → 模型管理
+  - [x] 1D 任务详情骨架 + 输入层
+  - [x] 1E 前置配置面板
+  - [x] 1F Pipeline + SSE 进度条
+  - [x] 1G 视频结果页 + 三轨时间轴
+  - [x] 1H 图片结果页
+  - [x] 1I 工作包 zip 导出
+  - [x] 1J 老代码清理 + Phase 1 收口
+  - [x] Phase X 主干竖切（TEXT/IMAGE/VIDEO/AUDIO）
+- [x] **Phase 2** — 内容能力扩展
+  - [x] 2A LLM 对话侧栏 + 收藏夹
+  - [x] 2B 音频结果页
+  - [x] 2C.1 文本输入层（PDF/DOCX/网页）
+  - [x] 2C.2 文本结果页 + 提示词版本栈
+  - [x] 2D SQLite 切换评估（结论：暂不切）
+- [x] **Phase 3A~3C** — 知识库 + 工作空间整顿
+  - [x] 3A 视频工作台清理
+  - [x] 3B 知识库 UI（跨工作空间 RAG 检索）
+  - [x] 3C 标签库 7 维度
 
-### Phase 3 — 知识库 + 工作空间整顿
-- [x] **3A** 视频工作台清理 — [phase-3a-video-workbench-cleanup.md](plans/phase-3a-video-workbench-cleanup.md) ✅
-- [x] **3B** 知识库 UI（跨工作空间 RAG 检索）— [phase-3b-knowledge-search.md](plans/phase-3b-knowledge-search.md) ✅
-  - [x] 3B.1 workspace 知识库数据桥 + FAISS 缓存层
-  - [x] 3B.2 单工作空间检索端点
-  - [x] 3B.3 跨工作空间检索端点 + reranker 合并
-  - [x] 3B.4 前端搜索页 + 侧栏入口
-  - [x] 3B.5 WorkspaceDetail 内嵌搜索条
-- [x] **3C** 标签库 7 维度 — [phase-3c-tag-library.md](plans/phase-3c-tag-library.md) ✅
-  - [x] 3C.1 WorkspaceItem.tags 字段 + 7 维度 config
-  - [x] 3C.2 LLM 自动打标 service + 测试
-  - [x] 3C.3 tags CRUD + 重新生成端点 + 测试
-  - [x] 3C.4 分析任务 SUCCESS 后自动打标钩子
-  - [x] 3C.5 WorkspaceList 顶部 tag chip 筛选栏 + URL 同步
-  - [x] 3C.6 item 结果页 tags 展示 + 重新生成
-- [ ] **3D** 风格报告 / 对比原作 — [phase-3d-style-report.md](plans/phase-3d-style-report.md) ⏸
-- [ ] **3E** 暗色模式全调通 — [phase-3e-dark-mode.md](plans/phase-3e-dark-mode.md) ⏸
+### N1~N11「合并 spec 落地差异」（当前主线）
 
-> 📍 **3C 完成后 = Claude Design 介入做完整 UI 翻新的最佳时机**（信息架构定型）
+> 来源：`docs/nibi-spec-merged.md` 附录 C.2。每个 Phase 的具体子任务在进入时再展开（pending → ready → done）。
 
-### Phase 4 — 安全 + 开源准备（破坏性，v2.0.0）
-- [ ] 详见 [phase-4-security-opensource.md](plans/phase-4-security-opensource.md) ⏸
+- [ ] **N1** 任务系统差异：trashed/analyzed 状态 / 软删除垃圾桶 / 删 project_id — `4-6h` P0
+- [ ] **N2** 侧边栏从 8 砍到 4 + Taskboard 子标签 5→4（隐藏「导出」入口）— `2-3h` P0
+- [ ] **N3** 设置页重组 9→7（合并分析默认偏好 / 模型与渠道 / 新增任务垃圾桶）— `6-8h` P0
+- [ ] **N4** 添加素材模态升级（4 步合一 + 自动识别类型 + 智能默认勾选 + 背景信息折叠）— `4-5h` P1
+- [ ] **N5** Preflight 抽屉细化（按素材类型展开所有子参数）— `4-6h` P1
+- [ ] **N6** 任务级 LLM 对话上下文素材多选 chip + RAG 兜底 — `6-8h` P1
+- [ ] **N7** 视频分支补全：PySceneDetect AI 镜头分析 / 总结路径 1 & 3 / 视频运镜延后 — `8-10h` P2
+- [ ] **N8** 音频分支补全：VAD 双路 / pyannote 说话人 / 音乐分析 — `8-10h` P2
+- [ ] **N9** 图片分支补全：PaddleOCR / 4 联想方向 / 多图对比 — `6-8h` P2
+- [ ] **N10** 文字分支补全：marker/docling PDF / 改写翻译并排对照 / 多文对比 — `6-8h` P2
+- [ ] **N11** 砍掉的 UI 清理（仅入口隐藏，代码留备份）— `1-2h` P3
 
-### Phase 5 — 存储 / 性能升级
-- [ ] 详见 [phase-5-storage-perf.md](plans/phase-5-storage-perf.md) ⏸
+### 延后阶段（N1~N11 完成后）
 
-### Phase 6 — 多源对比
-- [ ] 详见 [phase-6-multi-compare.md](plans/phase-6-multi-compare.md) ⏸
-
-### Phase 7 — 自动化
-- [ ] 详见 [phase-7-automation.md](plans/phase-7-automation.md) ⏸
-
-### Phase 8 — 本地模型 / 私有化
-- [ ] 详见 [phase-8-local-models.md](plans/phase-8-local-models.md) ⏸
-
-### Phase 9 — 导入导出 / 互操作
-- [ ] 详见 [phase-9-interop.md](plans/phase-9-interop.md) ⏸
-
-### Phase 10 — 插件 / 扩展性
-- [ ] 详见 [phase-10-extensibility.md](plans/phase-10-extensibility.md) ⏸
+- [ ] **[C] AI 导演模块** — 复刻功能（收藏帧 + 提示词版本 UI / A/B 对比 / 风格 DNA 报告 / 生成模型 API 接入）。需先补完整设计稿。
+- [ ] **[D] 安全 + 开源准备** — v1.0.0 发布。含加密改造 / CI / push 策略解除 / 仓库整理。
 
 ---
 
 ## 当前下一步
 
-**Phase 3D 风格报告 / 对比原作**（3C 已完成并 merge 到 main，commit `2fd8fd3`）。
-3D 计划见 [docs/plans/phase-3d-style-report.md](plans/phase-3d-style-report.md)，处于 pending 状态，操作步骤待用户进入此 phase 时再展开。
+**N1 任务系统差异**（P0，估时 4-6h）。
 
-> 💡 **信息架构已定型**：3C 完成后 = Claude Design 介入做完整 UI 翻新的最佳时机。如要先做 UI 翻新而不是继续 3D/3E，跟用户对齐后调整计划。
+具体范围见 `docs/nibi-spec-merged.md` 附录 C.2 的 N1 行：
+- trashed / analyzed 状态字段
+- 软删除垃圾桶（前端 + 后端）
+- 删 project_id 冗余字段
+
+> 📍 **模型选择**：N1 涉及后端状态机 + 前端 CRUD + 可能的 schema 迁移，建议 **Sonnet 4.6** 或 **Opus 4.7**（若需要迁移脚本）。详见 `CLAUDE.md` §「模型选择策略」。
 
 ---
 
@@ -99,4 +89,8 @@
 
 用户决定：**不按 SemVer 节奏自动打 tag**。Tag 等到「功能都差不多」时统一打，**那时就是开源时刻**。在那之前每个 Phase 完成只 commit，不 tag。
 
-开源门槛清单见 [phase-4-security-opensource.md](plans/phase-4-security-opensource.md) 顶部 frontmatter。
+---
+
+## 归档说明
+
+旧 Phase 3D~10 计划（`docs/plans/phase-3d-style-report.md` ~ `phase-10-extensibility.md`）已被合并 spec 取代，frontmatter 已标 `status: archived`。这些文件保留作历史参考，不再参与执行。
