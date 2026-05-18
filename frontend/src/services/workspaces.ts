@@ -18,10 +18,17 @@ import type {
 
 const BASE = '/workspaces'
 
-/** GET /workspaces — 列表，可按 project_id 过滤 */
-export async function listWorkspaces(projectId?: string): Promise<WorkspaceRecord[]> {
-  const params = projectId ? { project_id: projectId } : undefined
-  const res = await http.get<WorkspaceRecord[]>(BASE, { params })
+/** GET /workspaces — 列表（默认排除 trashed） */
+export async function listWorkspaces(opts?: {
+  trashedOnly?: boolean
+  includeTrashed?: boolean
+}): Promise<WorkspaceRecord[]> {
+  const params: Record<string, boolean> = {}
+  if (opts?.trashedOnly) params.trashed_only = true
+  if (opts?.includeTrashed) params.include_trashed = true
+  const res = await http.get<WorkspaceRecord[]>(BASE, {
+    params: Object.keys(params).length ? params : undefined,
+  })
   return res.data
 }
 

@@ -3,7 +3,7 @@
 export type ItemType = 'video' | 'audio' | 'image' | 'text'
 export type ItemSource = 'url' | 'local'
 export type ItemStatus = 'pending' | 'processing' | 'done' | 'failed'
-export type WorkspaceStatus = 'active' | 'processing' | 'completed' | 'archived'
+export type WorkspaceStatus = 'active' | 'processing' | 'analyzed' | 'archived'
 
 /** 前置配置（设计文档第 4 章）。 */
 export interface PreflightConfig {
@@ -66,8 +66,8 @@ export interface WorkspaceBackground {
 export interface WorkspaceRecord {
   workspace_id: string
   name: string
-  project_id: string
   status: WorkspaceStatus
+  trashed: boolean
   background: WorkspaceBackground
   items: WorkspaceItem[]
   favorites: string[]
@@ -78,7 +78,6 @@ export interface WorkspaceRecord {
 /** 创建工作空间请求体 */
 export interface WorkspaceCreateRequest {
   name: string
-  project_id?: string
   background?: Partial<WorkspaceBackground>
 }
 
@@ -115,7 +114,7 @@ export interface StartItemResponse {
 export const WORKSPACE_STATUS_TEXT: Record<WorkspaceStatus, string> = {
   active: '进行中',
   processing: '处理中',
-  completed: '已完成',
+  analyzed: '已分析',
   archived: '已归档',
 }
 
