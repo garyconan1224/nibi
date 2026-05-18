@@ -88,13 +88,12 @@
 - [x] 7. 更新 `CLAUDE.md` 优先级段落
 - [x] 8. 更新 `AGENTS.md` 同步
 
-**还差**（merge PR #1 之后做）：
+**还差**（在 local main 上做，下一会话开干）：
 - [ ] 9. 重写 [`docs/PROJECT_EXECUTION_PLAN.md`](PROJECT_EXECUTION_PLAN.md)：抛弃旧 Phase 3D-3E 路线，替换为 N1~N11 路线
 - [ ] 10. 重写 [`docs/AI_HANDOFF.md`](AI_HANDOFF.md)：清除 Phase 2B 旧入口，改 N1 开工交接
 - [ ] 11. 旧 `docs/plans/phase-3d~phase-10.md` 共 10 份，全部 frontmatter 加 `status: archived`
-- [ ] 12. push 52 commits 到 origin（如未 push）
 
-> 注：第 9-12 项需要在 local main 分支做，因为 PROJECT_EXECUTION_PLAN.md 等运维文档在 local main 上而不在 docs/spec-merged 分支上。
+> ~~~12. push 52 commits 到 origin~~~ **取消**：按新 push 策略（CLAUDE.md §「Push 策略」），暂缓所有 push 到 [D] 开源准备阶段。当前 local main 已合入 docs/spec-merged 全部内容（57 commits ahead of origin），本地状态完整。
 
 ---
 
