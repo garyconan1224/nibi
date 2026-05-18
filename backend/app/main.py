@@ -26,6 +26,7 @@ from backend.app.routes.pipeline import router as pipeline_router
 from backend.app.routes.prompt_formats import router as prompt_formats_router
 from backend.app.routes.providers import router as providers_router
 from backend.app.routes.rag import router as rag_router
+from backend.app.routes.search import router as search_router
 from backend.app.routes.transcriber_config import router as transcriber_config_router
 from backend.app.routes.transcript import router as transcript_router
 from backend.app.routes.workspaces import router as workspaces_router
@@ -118,6 +119,7 @@ app.include_router(transcriber_config_router)
 app.include_router(download_config_router)
 app.include_router(prompt_formats_router)
 app.include_router(rag_router)
+app.include_router(search_router)
 app.include_router(workspaces_router)
 app.include_router(chat_router)
 app.include_router(export_router)

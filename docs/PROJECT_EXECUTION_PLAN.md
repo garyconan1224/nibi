@@ -45,12 +45,12 @@
 
 ### Phase 3 — 知识库 + 工作空间整顿
 - [x] **3A** 视频工作台清理 — [phase-3a-video-workbench-cleanup.md](plans/phase-3a-video-workbench-cleanup.md) ✅
-- [ ] **3B** 知识库 UI（跨工作空间 RAG 检索）— [phase-3b-knowledge-search.md](plans/phase-3b-knowledge-search.md) 🔄 worktree 已开
-  - [ ] 3B.1 workspace 知识库数据桥 + FAISS 缓存层
-  - [ ] 3B.2 单工作空间检索端点
-  - [ ] 3B.3 跨工作空间检索端点 + reranker 合并
-  - [ ] 3B.4 前端搜索页 + 侧栏入口
-  - [ ] 3B.5 WorkspaceDetail 内嵌搜索条
+- [x] **3B** 知识库 UI（跨工作空间 RAG 检索）— [phase-3b-knowledge-search.md](plans/phase-3b-knowledge-search.md) ✅
+  - [x] 3B.1 workspace 知识库数据桥 + FAISS 缓存层
+  - [x] 3B.2 单工作空间检索端点
+  - [x] 3B.3 跨工作空间检索端点 + reranker 合并
+  - [x] 3B.4 前端搜索页 + 侧栏入口
+  - [x] 3B.5 WorkspaceDetail 内嵌搜索条
 - [ ] **3C** 标签库 7 维度 — [phase-3c-tag-library.md](plans/phase-3c-tag-library.md) ⏸ 待开工时展开
 - [ ] **3D** 风格报告 / 对比原作 — [phase-3d-style-report.md](plans/phase-3d-style-report.md) ⏸
 - [ ] **3E** 暗色模式全调通 — [phase-3e-dark-mode.md](plans/phase-3e-dark-mode.md) ⏸
@@ -82,9 +82,8 @@
 
 ## 当前下一步
 
-**Phase 3B**，详细步骤见 [docs/plans/phase-3b-knowledge-search.md](plans/phase-3b-knowledge-search.md)。
-
-Worktree: `/Users/conan/Desktop/nibi-phase3b`，分支 `feat/phase3b-knowledge-search`，模型 Opus 4.7。
+**Phase 3C 标签库 7 维度**（3B 已完成，分支 `feat/phase3b-knowledge-search` 5 个 commit 待用户 merge 到 main）。
+3C 计划见 [docs/plans/phase-3c-tag-library.md](plans/phase-3c-tag-library.md)，处于 pending 状态，操作步骤待用户进入此 phase 时再展开。
 
 ---
 

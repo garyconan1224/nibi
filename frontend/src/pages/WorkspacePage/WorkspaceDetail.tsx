@@ -54,6 +54,7 @@ import {
 } from '@/components/ui/alert-dialog'
 
 import PreflightConfigPanel from '@/components/workspace/PreflightConfigPanel'
+import { WorkspaceSearchBar } from './WorkspaceSearchBar'
 import {
   addWorkspaceItem,
   deleteWorkspace,
@@ -391,6 +392,8 @@ export default function WorkspaceDetail() {
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         {/* 左：素材列表 */}
         <div className="space-y-4">
+          {/* Phase 3B.5：本工作空间内嵌检索 */}
+          <WorkspaceSearchBar workspaceId={workspace.workspace_id} />
           <Card>
             <CardHeader className="flex-row items-center justify-between space-y-0">
               <CardTitle className="text-lg">素材列表</CardTitle>
