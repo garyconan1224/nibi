@@ -5,18 +5,16 @@ status: in_progress
 estimate_hours: 5
 model: Opus 4.7
 branch: feat/phase3b-knowledge-search
-worktree: /Users/conan/Desktop/nibi-phase3b
+worktree: 否（直接在主目录 /Users/conan/Desktop/nibi 的 feat/phase3b-knowledge-search 分支上做）
 depends_on: [3A]
 subtasks: [3B.1, 3B.2, 3B.3, 3B.4, 3B.5]
 ---
 
 ## 工作环境
 
-- Worktree: `/Users/conan/Desktop/nibi-phase3b`（已开好）
+- 工作目录: `/Users/conan/Desktop/nibi`（主目录，已在 `feat/phase3b-knowledge-search` 分支）
 - 分支: `feat/phase3b-knowledge-search`（基于 main `948c115`）
-- `.env` 已从主目录复制（含 `SILICONFLOW_API_KEY`）
-- 第一次跑 `./start.sh` 会自动建 venv + 装依赖
-- **不要在主 worktree `/Users/conan/Desktop/nibi` 改代码**
+- `.env` 在主目录，无需额外操作
 
 ## 背景
 
