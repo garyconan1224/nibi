@@ -13,6 +13,7 @@ import {
 } from '@/services/workspaces'
 
 import './tokens.css'
+import { ItemTagsPanel } from '@/components/workspace/ItemTagsPanel'
 
 export default function AudioResultPage() {
   const { workspaceId = '', itemId = '' } = useParams<{ workspaceId: string; itemId: string }>()
@@ -212,6 +213,11 @@ export default function AudioResultPage() {
           >
             <Download size={13} /> 导出
           </button>
+        </div>
+
+        {/* 标签展示 */}
+        <div style={{ padding: '10px 20px 0', flexShrink: 0 }}>
+          <ItemTagsPanel workspaceId={workspaceId} itemId={itemId} />
         </div>
 
         {/* 音频播放器区域 */}

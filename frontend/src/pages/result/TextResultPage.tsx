@@ -11,6 +11,7 @@ import {
 import { PromptVersionStack } from '@/components/result/PromptVersionStack'
 
 import './tokens.css'
+import { ItemTagsPanel } from '@/components/workspace/ItemTagsPanel'
 
 export default function TextResultPage() {
   const { workspaceId = '', itemId = '' } = useParams<{ workspaceId: string; itemId: string }>()
@@ -129,6 +130,11 @@ export default function TextResultPage() {
             {result.title}
           </span>
           <span className="kw mono" style={{ fontSize: 10, flexShrink: 0 }}>TEXT</span>
+        </div>
+
+        {/* 标签展示 */}
+        <div style={{ padding: '10px 20px 0', flexShrink: 0 }}>
+          <ItemTagsPanel workspaceId={workspaceId} itemId={itemId} />
         </div>
 
         {/* 正文区域 */}
