@@ -915,7 +915,9 @@ yt-dlp 执行下载 + 实时进度
 
 ### 8.1 复刻专项（整体延后到「AI 导演」模块）
 
-> ⏳ **当前阶段不立即做。** 模块 1.6 已定：复刻功能未来抽出独立的「AI 导演」一级模块。本节只记录"未来要做什么"，方便后续接手时不遗漏。
+> ⏳ **启动时机**：完成所有「合并 spec 落地差异」项（N1~Nx）之后再启动。这些差异是产品主体能力的查漏补缺，要先把现有代码跟合并 spec 对齐，才有合理的基础迁入"复刻"高级能力。
+>
+> 模块 1.6 已定：复刻功能未来抽出独立的「AI 导演」一级模块。本节只记录"未来要做什么"，方便后续接手时不遗漏。
 
 **未来 AI 导演要做的子功能**：
 
@@ -932,16 +934,20 @@ yt-dlp 执行下载 + 实时进度
 - 默认**手动触发**（避免新手任务素材一多就消耗 token）
 - 设置页可开启"自动触发"开关，阈值默认 5 个素材，可调
 
-### 8.2 「导出工作包」功能——**砍掉**
+### 8.2 「导出工作包」功能——**代码保留 / UI 隐藏**
 
 经过场景分析判断，导出 zip 工作包**没有强应用场景**：
 - 本地归档 → Nibi 已是本地软件
 - 分享给朋友 → 朋友没装 Nibi 时 prompts.json 用不起来
 - 跨工具流转 → 素材详情页"一键复制"已够用
 
-**结论**：
-- **不做** Taskboard 的「导出」子标签
-- **不做** 整任务级别的 .zip 工作包
+**结论（修订版）**：
+- **现有代码保留**（Phase 1I 已实现的前后端 zip 导出逻辑不删，作为可重启功能）
+- **UI 入口隐藏**：
+  - Taskboard 不显示「导出」子标签
+  - 任务中心 / 顶部都没有"导出工作包"按钮
+  - 用户表面上看不到这个能力
+- **未来重启条件**：如收到用户反馈"我需要打包带走"，再恢复 UI 入口（成本极低）
 - **保留**：单素材级别的导出能力（每个素材详情页可下载字幕 .srt、文案 .md、提示词 .json、原文件等），已在模块 4-7 各自落 spec
 - 任务中心子标签调整为：素材 / 队列 / 标签库 / AI 对话（**4 个**，不再是 5 个；模块 1.8 同步更新）
 
@@ -1064,7 +1070,7 @@ yt-dlp 执行下载 + 实时进度
 
 | 砍掉项 | 原因 |
 |---|---|
-| 任务级 .zip 工作包导出 | 无强应用场景（模块 8.2） |
+| 任务级 .zip 工作包导出（UI 入口） | 无强应用场景（模块 8.2）。**代码保留备用**，仅隐藏入口 |
 | 侧边栏「工作台 / 处理中 / 结果 / 分镜 / 12 屏概览」5 个一级入口 | 与任务中心重复（模块 1.7） |
 | 侧边栏独立「搜索」入口 | 改走 topbar（模块 1.7） |
 | Taskboard 的「收藏夹 / 风格报告 / 对比 / 版本」4 个子标签 | 移到未来 AI 导演模块（模块 1.8） |
@@ -1082,3 +1088,44 @@ yt-dlp 执行下载 + 实时进度
 - 是否需要把现有 Phase 3C 之前的代码**保留 / 重构 / 推翻**
 
 **生效后**：`nibi-spec-v2.md` 与 `system_design_v3_final.md` 在文件顶部加 deprecated 声明，指向本文档。
+
+---
+
+## 附录 C：下一会话执行清单（"现状同步"）
+
+合并 spec 完成后，**真实工程状态与 spec 严重失配**。下一会话的唯一任务是把运维文档体系拉齐到合并 spec：
+
+### C.1 必做项（按顺序）
+
+| # | 任务 | 涉及文件 |
+|---|---|---|
+| 1 | **修改 CLAUDE.md** 优先级表 / 「项目执行计划维护流程」段落 | `CLAUDE.md` |
+| 2 | **重写 `docs/PROJECT_EXECUTION_PLAN.md`**：保留 Phase 1-3C 已完成记录，废弃 3D-3E 的"风格报告 / 暗色模式"路线，新增 **N1~Nx「合并 spec 落地差异」phase 路线** | `docs/PROJECT_EXECUTION_PLAN.md` |
+| 3 | **重写 `docs/AI_HANDOFF.md`**：清除 Phase 2B 旧入口，改成 N1 的开工交接 | `docs/AI_HANDOFF.md` |
+| 4 | **更新 `docs/OUTSTANDING_TASKS.md`** | 同上 |
+| 5 | **归档旧 phase plan**：`docs/plans/phase-3d~phase-10.md` 全部 frontmatter 加 `status: archived`，注明"被合并 spec 取代" | `docs/plans/*.md` |
+| 6 | **加 deprecated 标记**：`nibi-spec-v2.md` / `system_design_v3_final.md` / `plan.md` / `system_design_for_claude_design_v1.md` 顶部 | 4 个文件 |
+| 7 | **处理设计稿快照**：`vidmirror/` 目录 commit 到 `docs/design-source/`（作为历史），`design_reference/` 删除（重复），`vidmirror.zip` / `vidmirror-handoff.zip` 加 `.gitignore` | 多处 |
+| 8 | **删除 untracked 重复文件**：`system_design_for_claude_design_v1 (1).md`（与已 tracked 的 v1 重复） | 根目录 |
+| 9 | **同步 origin/main**：把 local main 上的 52 个未推送 commit 推到 origin（修复 CI + 让 GitHub 状态反映现实） | git push |
+
+### C.2 N1~Nx「合并 spec 落地差异」初步划分（供 C.1 第 2 步参考）
+
+参考 phase 模板（最终在 PROJECT_EXECUTION_PLAN 里展开）：
+
+| Phase | 范围 | 估时 | 优先级 |
+|---|---|---|---|
+| **N1** | 任务系统差异：trashed/analyzed 状态 / 软删除垃圾桶 / 删 project_id | 4-6h | P0 |
+| **N2** | 侧边栏从 8 砍到 4 + Taskboard 子标签 5→4（隐藏「导出」入口） | 2-3h | P0 |
+| **N3** | 设置页重组 9→7（合并 ScreenshotPage/TranscriberPage/PromptFormat → 分析默认偏好；ProvidersManagement+ModelManagement → 模型与渠道；新增任务垃圾桶） | 6-8h | P0 |
+| **N4** | 添加素材模态升级（4 步合一 + 自动识别类型 + 智能默认勾选 + 背景信息折叠） | 4-5h | P1 |
+| **N5** | Preflight 抽屉细化（按素材类型展开所有子参数） | 4-6h | P1 |
+| **N6** | 任务级 LLM 对话上下文素材多选 chip + RAG 兜底 | 6-8h | P1 |
+| **N7** | 视频分支补全：PySceneDetect AI 镜头分析 / 总结路径 1 & 3 / 视频运镜延后 | 8-10h | P2 |
+| **N8** | 音频分支补全：VAD 双路 / pyannote 说话人 / 音乐分析 | 8-10h | P2 |
+| **N9** | 图片分支补全：PaddleOCR / 4 联想方向 / 多图对比 | 6-8h | P2 |
+| **N10** | 文字分支补全：marker/docling PDF / 改写翻译并排对照 / 多文对比 | 6-8h | P2 |
+| **N11** | 砍掉的 UI 清理（仅入口隐藏，代码留备份） | 1-2h | P3 |
+| → **AI 导演** | N1~N11 完成之后再启动 | — | 延后 |
+
+具体子任务在进入对应 phase 时再展开（沿用 CLAUDE.md「项目执行计划维护流程」的 pending → ready → done 节奏）。
