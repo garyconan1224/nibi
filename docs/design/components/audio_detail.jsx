@@ -219,6 +219,11 @@ const AudioDetail = ({ material, onBack }) => {
         </button>
       </div>
 
+      {/* Phase 3C — 7 维度标签 */}
+      <div className="it-host" style={{ padding:'12px 24px 0', flexShrink:0, background:'var(--bg-elev)' }}>
+        <ItemTagsPanel itemId={material?.id || 'm4'} compact/>
+      </div>
+
       {/* ── Waveform player ── */}
       <div style={{ flexShrink: 0, padding: '14px 24px', borderBottom: '1px solid var(--line)',
                     background: 'var(--bg-elev)' }}>

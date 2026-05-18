@@ -17,9 +17,22 @@
 
 ## Collaboration Handoff
 
-- At the start of a new coding session, read `docs/AI_HANDOFF.md` and `docs/OUTSTANDING_TASKS.md` before choosing work.
-- The immediate next step after this hygiene pass is **product selection only**. Do not begin feature implementation until the user chooses the product direction.
-- Keep each turn scoped to one clear task. If a request starts to expand into product design plus implementation, separate the decision step from the coding step.
+**Required reading order at the start of every session** (single source of truth as of 2026-05-18):
+
+1. [`docs/WORKFLOW.md`](docs/WORKFLOW.md) — Master workflow, current phase, design-vs-code decisions per phase
+2. [`docs/nibi-spec-merged.md`](docs/nibi-spec-merged.md) — Product specification (8 modules, product-requirement granularity)
+3. [`docs/PROJECT_EXECUTION_PLAN.md`](docs/PROJECT_EXECUTION_PLAN.md) — Engineering plan (Phase checkboxes, current step)
+4. [`docs/design/`](docs/design/) — Design source files (19 jsx components, VidMirror.html, styles.css, v1.1 design contract)
+5. `docs/AI_HANDOFF.md` / `docs/OUTSTANDING_TASKS.md` — Session-level handoff notes (if present)
+
+**Deprecated, do not read for current decisions**:
+- `nibi-spec-v2.md` (replaced by `docs/nibi-spec-merged.md`)
+- `docs/archive/system_design_v3_final.md`
+- `plan.md`, `system_design_for_claude_design_v1.md`
+
+**Current phase**: [A] state sync (see WORKFLOW.md §4). Next: [B] N1~N11 spec-gap landing per `docs/nibi-spec-merged.md` Appendix C.
+
+Keep each turn scoped to one clear task. If a request starts to expand into product design plus implementation, separate the decision step from the coding step.
 
 ---
 
@@ -54,18 +67,17 @@
 ```bash
 git fetch --all --prune
 git status --short --branch
-git worktree list
-git branch -a
-git log --oneline HEAD..main
+git log --oneline -5
+git branch --show-current
 ```
 
-如果 `git worktree list` 显示存在 `claude-official/` 或 `claude-xiaomi/` 前缀的同主题 worktree，**立刻停下来告知用户**，不要继续。
+**单 agent 串行原则（2026-05-18 起）**：项目已不再多 agent 并发。如果 `git status` 显示工作区有未提交改动且不属于本次任务，或当前分支与预期不符，**立刻停下问用户**，不要继续。
 
 ### 发现冲突时的报告模板
 
-> 启动检查发现 [描述冲突，例如"claude-official/phase1e 已存在"]。
+> 启动检查发现 [描述冲突，例如"工作区有未提交改动疑似上次未 commit 完"]。
 > 我只能做检查，不会继续写功能。
-> 请你决定：A（以哪条分支为主线）/ B（让我运行测试并对比两份实现）。
+> 请你决定：A（先处理未提交改动）/ B（让我对比 diff 并报告）。
 
 ## Quality And Risk
 

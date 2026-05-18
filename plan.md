@@ -1,5 +1,7 @@
 # 多媒体内容分析系统 — AI 协作开发计划 v1
 
+> ⚠️ **DEPRECATED 2026-05-18** — 早期 Phase 0/1A 阶段计划，已被 [`docs/nibi-spec-merged.md`](docs/nibi-spec-merged.md) 附录 C 的 N1~N11 路线取代。仅作历史归档。
+
 > 配合 `system_design_for_claude_design_v1.md` 使用。
 > 本文件用于约束 AI 编程工具的工作边界。
 > 每开始一个新会话，AI 第一件事就是先读本文件确认当前在哪个阶段。

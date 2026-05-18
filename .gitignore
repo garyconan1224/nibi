@@ -32,3 +32,7 @@ frontend/.env.local
 *.pyc
 __pycache__/
 .claude/worktrees/
+
+# Design source archives (already extracted to docs/design/)
+*.zip
+.DS_Store

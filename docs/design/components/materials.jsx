@@ -266,76 +266,6 @@ const MatText = () => {
   );
 };
 
-/* ─── Parallel queue panel · global concurrency ─── */
-const QueuePanel = () => {
-  const detected = { cpu:16, ram:64, gpu:'RTX 4090 · 24GB' };
-  const recommend = 6;
-  const [cur, setCur] = React.useState(4);
-  const queue = [
-    { id:'q1', title:'大疆 Pocket 4 · 画面提示词', state:'running', pct:67, stage:'视觉分析' },
-    { id:'q2', title:'iPhone 17 Pro · 字幕转录',  state:'running', pct:42, stage:'Whisper' },
-    { id:'q3', title:'海边日落 · 9张 · 联想总结', state:'running', pct:88, stage:'LLM总结' },
-    { id:'q4', title:'背景乐参考 · 音乐分析',     state:'running', pct:22, stage:'特征提取' },
-    { id:'q5', title:'Sora 2 测评 · 分镜',       state:'queued',  pct:0,  stage:'等待中' },
-    { id:'q6', title:'运镜十招 · 画面提示词',     state:'queued',  pct:0,  stage:'等待中' },
-    { id:'q7', title:'徕卡 M11 · 视频总结',      state:'error',   pct:38, stage:'API 超限' },
-  ];
-  return (
-    <div className="qp-wrap">
-      <div className="tb-head-mini">
-        <div>
-          <div className="eyebrow">批量队列 · 本机性能检测</div>
-          <h2 className="display" style={{fontSize:28, margin:'4px 0 0'}}>并行队列 · Queue</h2>
-        </div>
-        <button className="btn"><IcDownload size={13}/>导出队列日志</button>
-      </div>
-
-      <div className="qp-sys">
-        <div className="qp-det">
-          <div className="eyebrow">本机检测</div>
-          <div style={{display:'flex', gap:18, marginTop:8, alignItems:'baseline'}}>
-            <span><span className="mono" style={{fontSize:11, color:'var(--ink-3)'}}>CPU</span> <b style={{fontSize:16}}>{detected.cpu}</b><span className="mono" style={{fontSize:11, color:'var(--ink-3)'}}> 核</span></span>
-            <span><span className="mono" style={{fontSize:11, color:'var(--ink-3)'}}>RAM</span> <b style={{fontSize:16}}>{detected.ram}</b><span className="mono" style={{fontSize:11, color:'var(--ink-3)'}}> GB</span></span>
-            <span><span className="mono" style={{fontSize:11, color:'var(--ink-3)'}}>GPU</span> <b style={{fontSize:14}}>{detected.gpu}</b></span>
-          </div>
-        </div>
-        <div className="qp-slider">
-          <div style={{display:'flex', justifyContent:'space-between', fontSize:12}}>
-            <span>并行上限 · 系统推荐 <b className="mono">{recommend}</b></span>
-            <span className="mono">{cur}</span>
-          </div>
-          <input type="range" min="1" max={recommend+2} value={cur} onChange={e=>setCur(+e.target.value)}
-            style={{width:'100%', marginTop:8, accentColor:'var(--accent)'}}/>
-          <div className="mono" style={{fontSize:10, color:'var(--ink-3)', marginTop:4, display:'flex', justifyContent:'space-between'}}>
-            <span>1</span><span style={{color:'var(--accent-green)'}}>↑ 推荐 {recommend}</span><span>{recommend+2}</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="qp-list">
-        {queue.map(q => (
-          <div key={q.id} className="qp-row" data-state={q.state}>
-            <div className="qp-dot" data-state={q.state}/>
-            <div className="qp-t">
-              <div style={{fontSize:13, fontWeight:600}}>{q.title}</div>
-              <div className="mono" style={{fontSize:11, color:'var(--ink-3)', marginTop:3}}>{q.stage}</div>
-            </div>
-            <div className="qp-bar"><span style={{width:`${q.pct}%`}}/></div>
-            <div className="mono qp-pct" style={{width:50, textAlign:'right'}}>
-              {q.state==='running'?`${q.pct}%` : q.state==='queued'?'—' : q.state==='error'?'失败':'完成'}
-            </div>
-            <div className="qp-acts">
-              {q.state==='error' && <button className="btn btn-ghost" style={{height:26, fontSize:11}}>重试</button>}
-              {q.state==='queued' && <button className="btn btn-ghost" style={{height:26, fontSize:11}}>上移</button>}
-              <button className="btn btn-ghost" style={{height:26, padding:'0 8px'}}><IcX size={12}/></button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
 /* ─── Material explorer (showcase all 4 types) ─── */
 const MatExplorer = () => {
   const [t, setT] = React.useState('video');
@@ -344,7 +274,6 @@ const MatExplorer = () => {
     { id:'audio', l:'音频', ic:IcMusic },
     { id:'image', l:'图片', ic:IcImage },
     { id:'text',  l:'文字', ic:IcDoc },
-    { id:'queue', l:'并行队列', ic:IcLayers },
   ];
   return (
     <div style={{padding:'28px 32px', maxWidth:1400, margin:'0 auto'}}>
@@ -366,10 +295,9 @@ const MatExplorer = () => {
         {t==='audio' && <MatAudio/>}
         {t==='image' && <MatImage/>}
         {t==='text'  && <MatText/>}
-        {t==='queue' && <QueuePanel/>}
       </div>
     </div>
   );
 };
 
-Object.assign(window, { MatVideo, MatAudio, MatImage, MatText, QueuePanel, MatExplorer });
+Object.assign(window, { MatVideo, MatAudio, MatImage, MatText, MatExplorer });

@@ -243,5 +243,232 @@
     purpose:'复刻参考',
   };
 
-  window.VM_DATA = { FRAMES, TRANSCRIPT, NOTES_MD, STORYBOARD, TASKS, EXAMPLES, MATERIALS, TAG_LIB, FAVORITES, PROMPT_VERSIONS, STYLE_REPORT, COMPARE, TASK_CONFIG };
+  // ─── Phase 3B: 跨工作空间知识库检索 (search demo) ───
+  const SEARCH_WORKSPACES = [
+    { id:'ws-current', name:'影视飓风 · Pocket 4 复刻', items:8,  active:true },
+    { id:'ws-iphone',  name:'iPhone 17 Pro · 上手系列', items:5 },
+    { id:'ws-sora',    name:'Sora 2 提示词工程',         items:12 },
+    { id:'ws-leijun',  name:'雷军演讲复盘集',             items:3 },
+    { id:'ws-tycho',   name:'Tycho 视觉日记 · 灵感板',    items:9 },
+    { id:'ws-leica',   name:'徕卡街拍语言',               items:4 },
+  ];
+
+  const SEARCH_RECENT = [
+    '产品开箱视频的前 5 秒都用了什么手法',
+    'D-Log M 在不同评测里的描述差异',
+    '海报里反复出现的橙色 RGB 值',
+    '哪些素材标了 cinematic + warm tones',
+  ];
+
+  const SEARCH_DEMO = {
+    query:'产品开箱视频的前 5 秒都用了什么手法?',
+    scope:'all',
+    duration:'2.31s',
+    candidates_recalled:23,
+    answer_blocks:[
+      { type:'p', text:'扫描了 **6 个工作空间** 共 41 个素材后, 前 5 秒钩子可归纳为 **三种结构化开场**——可以按题材任选其一。' },
+      { type:'h3', text:'1. 产品对比开场 (最常见)' },
+      { type:'p', text:'把同系列/竞品产品横向并排、纯色背景、辉光描边, 3 秒静帧 + 画外音建立"迭代叙事"。Pocket 4 评测的"四代同堂"是教科书级案例 [1], iPhone 17 Pro 在第 1 秒也用了同样手法 [2]。' },
+      { type:'h3', text:'2. 反向钩子' },
+      { type:'p', text:'用一句"我不想买/我很困惑/我翻车了"先制造认知矛盾, 后 25 秒做翻盘。Pocket 4 主持人 0:12 的"非常困惑" [3] 与雷军演讲开场的"我承认" [4] 都属于此类。' },
+      { type:'h3', text:'3. 大字幕硬切' },
+      { type:'p', text:'纯黑底 + 大字白色衬线字幕直接给出三个关键词 (1英寸 / D-Log M / ProRes), 2 秒解决问题, 适合抖音切片 [5]。' },
+      { type:'blockquote', text:'**复刻建议**: 优先使用方案 1, 它在 6 个工作空间里出现 11 次, 平均完播率最高。' },
+    ],
+    sources:[
+      {
+        idx:1, workspace_id:'ws-current', workspace_name:'影视飓风 · Pocket 4 复刻',
+        item_id:'m1', item_type:'video',
+        item_title:'三代封神, 那四代呢? 大疆 Pocket 4 首发体验',
+        chunk_excerpt:'00:00:00–00:00:04 开场: Pocket 1·2·3·4 四代横向并排, 黑底白辉光, 3 秒静态, 主持人画外音"从一代到四代, 这条线一直没断过"。直接用产品对比建立迭代叙事支点, 不解释参数。',
+        ts:'00:00:00', score:0.927, thumb:1,
+      },
+      {
+        idx:2, workspace_id:'ws-iphone', workspace_name:'iPhone 17 Pro · 上手系列',
+        item_id:'m12', item_type:'video',
+        item_title:'iPhone 17 Pro 上手: 换了胶水的相机',
+        chunk_excerpt:'00:00:01–00:00:05 镜头从 14 Pro 缓慢平移到 17 Pro, 同样的 deep purple 背景, 同样的角度——观众第一时间感受到"这是同一支镜头的延续"。',
+        ts:'00:00:01', score:0.891, thumb:2,
+      },
+      {
+        idx:3, workspace_id:'ws-current', workspace_name:'影视飓风 · Pocket 4 复刻',
+        item_id:'m1', item_type:'video',
+        item_title:'三代封神, 那四代呢? 大疆 Pocket 4 首发体验',
+        chunk_excerpt:'00:00:12 主持人半侧身入镜, 霓虹"H"背景, 直视镜头说"说实话, 第一次看到它的时候, 我是非常困惑的"——制造与观众预期相反的情绪锚点。',
+        ts:'00:00:12', score:0.864, thumb:2,
+      },
+      {
+        idx:4, workspace_id:'ws-leijun', workspace_name:'雷军演讲复盘集',
+        item_id:'m31', item_type:'audio',
+        item_title:'雷总 Xiaomi 15 Ultra 演讲完整复盘',
+        chunk_excerpt:'00:00:08 雷军开场: "我承认, 这一代我们做了一个很大胆的决定。"——把"承认"作为反向钩子, 后面引出 1 英寸大底相机的取舍叙事。',
+        ts:'00:00:08', score:0.812, thumb:3,
+      },
+      {
+        idx:5, workspace_id:'ws-sora', workspace_name:'Sora 2 提示词工程',
+        item_id:'m22', item_type:'video',
+        item_title:'Sora 2 测评 · 100 个提示词全部实测',
+        chunk_excerpt:'00:00:00 纯黑底, 三个白色衬线大字幕逐行硬切: "Photorealistic" / "10s clip" / "$0.4 each"。2 秒内把测评的范围 / 单价 / 质量交付完毕, 抖音流式切片版本删除主持人入镜直接进入素材展示。',
+        ts:'00:00:00', score:0.789, thumb:4,
+      },
+      {
+        idx:6, workspace_id:'ws-tycho', workspace_name:'Tycho 视觉日记 · 灵感板',
+        item_id:'m41', item_type:'image',
+        item_title:'橙色调封面参考图集 · 9 张',
+        chunk_excerpt:'PNG · 9 张拼图。共同特征: 主色 #E08E45 ± 8 (暖琥珀), 副色 #1B2840 (深青), 大留白, 衬线大字标题居中, 灵感来自 Tycho 2014《Awake》专辑封面体系。',
+        ts:'img_001', score:0.742, thumb:5,
+      },
+      {
+        idx:7, workspace_id:'ws-current', workspace_name:'影视飓风 · Pocket 4 复刻',
+        item_id:'m7', item_type:'text',
+        item_title:'三明治拍摄脚本参考',
+        chunk_excerpt:'脚本第 2 段: "开头 5 秒原则——观众的耐心已经掉到 3 秒。要么先抛矛盾, 要么先给画面密度。我们这里选后者: 4 个产品的横向滑轨镜头。"',
+        ts:'p2', score:0.708, thumb:6,
+      },
+      {
+        idx:8, workspace_id:'ws-leica', workspace_name:'徕卡街拍语言',
+        item_id:'m51', item_type:'video',
+        item_title:'徕卡 M11 两年用后感',
+        chunk_excerpt:'00:00:03 一句口播"两年前我说徕卡是玩具, 现在我收回这句话。"再次使用反向钩子, 直接挑明立场转变。',
+        ts:'00:00:03', score:0.691, thumb:7,
+      },
+    ],
+    suggested_followups:[
+      '复刻方案 1 时, 用什么参数能稳定生成"四代同堂"的并排构图?',
+      '反向钩子的口播前 2 秒画面通常配什么?',
+      '哪些工作空间里同时包含产品对比 + 反向钩子两种结构?',
+    ],
+  };
+
+  // 工作空间内的搜索结果 (筛 sources 到 workspace='ws-current')
+  const SEARCH_WORKSPACE_DEMO = {
+    query:'开场前 5 秒',
+    duration:'0.78s',
+    sources: SEARCH_DEMO.sources.filter(s => s.workspace_id === 'ws-current'),
+  };
+
+  // ─── Phase 3C: 7 维度标签库 (Tag dimensions + per-item tags + per-workspace aggregate) ───
+  // 6 个系统维度的候选值 + custom_tags 自由数组
+  const TAG_DIMENSIONS = {
+    content_type:        { label:'内容类型', short:'类型', tone:'pink',   options:['教程','访谈','解说','纪实','Vlog','新闻','评测','其它'] },
+    subject_domain:      { label:'主题领域', short:'领域', tone:'blue',   options:['科技','人文','财经','教育','娱乐','生活','体育','其它'] },
+    difficulty:          { label:'难度',     short:'难度', tone:'amber',  options:['入门','进阶','专家'] },
+    duration_band:       { label:'时长',     short:'时长', tone:'mono',   options:['短','中','长'] },
+    information_density: { label:'信息密度', short:'密度', tone:'purple', options:['高','中','低'] },
+    emotion_tone:        { label:'情绪基调', short:'情绪', tone:'green',  options:['中性','激励','批判','幽默','严肃','悲情'] },
+  };
+  const TAG_DIM_ORDER = ['content_type','subject_domain','difficulty','duration_band','information_density','emotion_tone'];
+
+  // 每个 item 一份完整 tags (供 4 个 result 详情页用)
+  const ITEM_TAGS = {
+    m1: { // 视频 · 大疆 Pocket 4 首发体验
+      content_type:'评测', subject_domain:'科技', difficulty:'进阶',
+      duration_band:'中', information_density:'高', emotion_tone:'激励',
+      custom_tags:['Pocket 4','数码开箱','大疆','D-Log M','三脚架对比'],
+      _generated_at:'2026-05-18T16:21:00Z', _generated_at_display:'3 分钟前',
+      _generated_model:'Qwen/Qwen2.5-72B-Instruct',
+    },
+    m2: { // 视频 · iPhone 17 Pro 上手
+      content_type:'评测', subject_domain:'科技', difficulty:'入门',
+      duration_band:'短', information_density:'中', emotion_tone:'幽默',
+      custom_tags:['iPhone 17 Pro','苹果','上手','摄像头'],
+      _generated_at:'2026-05-18T15:48:00Z', _generated_at_display:'36 分钟前',
+      _generated_model:'Qwen/Qwen2.5-72B-Instruct',
+    },
+    m3: { // 图片 · 海边日落
+      content_type:'纪实', subject_domain:'生活', difficulty:'入门',
+      duration_band:'短', information_density:'低', emotion_tone:'中性',
+      custom_tags:['golden hour','海滩','portrait','9张组图'],
+      _generated_at:'2026-05-18T11:02:00Z', _generated_at_display:'5 小时前',
+      _generated_model:'claude-sonnet-4',
+    },
+    m4: { // 音频 · Lo-Fi
+      content_type:'其它', subject_domain:'娱乐', difficulty:'入门',
+      duration_band:'短', information_density:'低', emotion_tone:'中性',
+      custom_tags:['lo-fi','city pop','92 BPM','Cmaj','背景乐'],
+      _generated_at:'2026-05-17T22:14:00Z', _generated_at_display:'昨天',
+      _generated_model:'claude-sonnet-4',
+    },
+    m5: { // 视频 · Sora 2 测评
+      content_type:'评测', subject_domain:'科技', difficulty:'专家',
+      duration_band:'长', information_density:'高', emotion_tone:'严肃',
+      custom_tags:['Sora 2','AI 视频','提示词','100次实测'],
+      _generated_at:'2026-05-18T09:35:00Z', _generated_at_display:'6 小时前',
+      _generated_model:'Qwen/Qwen2.5-72B-Instruct',
+    },
+    m6: { // 图片 · 霓虹街拍
+      content_type:'纪实', subject_domain:'娱乐', difficulty:'进阶',
+      duration_band:'短', information_density:'中', emotion_tone:'幽默',
+      custom_tags:['neon','赛博朋克','night','Pinterest','灵感板'],
+      _generated_at:'2026-05-16T20:00:00Z', _generated_at_display:'2 天前',
+      _generated_model:'claude-sonnet-4',
+    },
+    m7: { // 文字 · 三明治脚本
+      content_type:'其它', subject_domain:'生活', difficulty:'入门',
+      duration_band:'短', information_density:'中', emotion_tone:'激励',
+      custom_tags:['脚本','旁白','短视频','三明治','BPM 95'],
+      _generated_at:'2026-05-18T13:10:00Z', _generated_at_display:'3 小时前',
+      _generated_model:'claude-sonnet-4',
+    },
+    m8: null, // 影视飓风 · 运镜十招 — 处理中, 尚无标签 (用于演示空态)
+  };
+
+  // 每个 workspace (TASK) 聚合维度: 各维度可能取多值 (因为有多个 item)
+  // 筛选逻辑: 同维度多选 = OR, 跨维度 = AND, 自定义关键词 = contains
+  // workspace 通过条件 = 至少一个 item 命中所有激活维度
+  const TASK_TAGS = {
+    'a1': { // 大疆 Pocket 4 首发体验 (note)
+      content_type:['评测','解说'], subject_domain:['科技'],
+      difficulty:['进阶'], duration_band:['中'],
+      information_density:['高'], emotion_tone:['激励','严肃'],
+      custom_tags:['Pocket 4','数码开箱','大疆','D-Log M','ProRes'],
+      items_total: 3, items_with_tags: 3,
+    },
+    'a2': { // iPhone 17 Pro 上手 (analyze · queued)
+      content_type:['评测'], subject_domain:['科技'],
+      difficulty:['入门'], duration_band:['短'],
+      information_density:['中'], emotion_tone:['幽默'],
+      custom_tags:['iPhone 17 Pro','苹果','上手'],
+      items_total: 1, items_with_tags: 1,
+    },
+    'a3': { // Sora 2 测评
+      content_type:['评测','教程'], subject_domain:['科技'],
+      difficulty:['专家'], duration_band:['长','中'],
+      information_density:['高'], emotion_tone:['严肃','激励'],
+      custom_tags:['Sora 2','AI 视频','提示词','100次实测','OpenAI'],
+      items_total: 4, items_with_tags: 4,
+    },
+    'a4': { // 雷军演讲复盘
+      content_type:['解说','新闻'], subject_domain:['科技','财经'],
+      difficulty:['进阶'], duration_band:['长'],
+      information_density:['高'], emotion_tone:['激励'],
+      custom_tags:['雷军','小米','演讲复盘','Xiaomi 15 Ultra'],
+      items_total: 2, items_with_tags: 2,
+    },
+    'a5': { // 徕卡 M11 (error)
+      content_type:['评测','Vlog'], subject_domain:['人文','科技'],
+      difficulty:['进阶','入门'], duration_band:['中'],
+      information_density:['中'], emotion_tone:['幽默','中性'],
+      custom_tags:['徕卡','M11','街拍','两年用后'],
+      items_total: 1, items_with_tags: 1,
+    },
+    'a6': { // DJI Osmo Action 6
+      content_type:['评测'], subject_domain:['科技','体育'],
+      difficulty:['进阶'], duration_band:['中'],
+      information_density:['高'], emotion_tone:['激励'],
+      custom_tags:['Osmo Action 6','骑行','摩托','雪道','极限运动'],
+      items_total: 5, items_with_tags: 5,
+    },
+    'a7': { // Canon R5 II 开箱
+      content_type:['评测'], subject_domain:['科技'],
+      difficulty:['入门'], duration_band:['短'],
+      information_density:['中'], emotion_tone:['激励'],
+      custom_tags:['Canon','R5','开箱','EOS'],
+      items_total: 1, items_with_tags: 0,
+    },
+  };
+
+  window.VM_DATA = { FRAMES, TRANSCRIPT, NOTES_MD, STORYBOARD, TASKS, EXAMPLES, MATERIALS, TAG_LIB, FAVORITES, PROMPT_VERSIONS, STYLE_REPORT, COMPARE, TASK_CONFIG,
+    SEARCH_WORKSPACES, SEARCH_RECENT, SEARCH_DEMO, SEARCH_WORKSPACE_DEMO,
+    TAG_DIMENSIONS, TAG_DIM_ORDER, ITEM_TAGS, TASK_TAGS };
 })();

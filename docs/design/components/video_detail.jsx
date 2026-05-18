@@ -174,6 +174,11 @@ const VideoDetail = ({ material, onBack, onAddFavorite }) => {
           </button>
         </div>
 
+        {/* Phase 3C — 7 维度标签 */}
+        <div className="it-host" style={{ padding:'12px 20px 0', flexShrink:0 }}>
+          <ItemTagsPanel itemId={material?.id || 'm1'} compact/>
+        </div>
+
         {/* ── Video player ── */}
         <div style={{ padding:'14px 20px 10px', flexShrink:0 }}>
           <div onClick={() => setPlaying(p => !p)}

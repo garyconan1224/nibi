@@ -40,6 +40,7 @@ const Taskboard = ({ onAddMaterial, onOpenMaterial }) => {
   const cfg = VM_DATA.TASK_CONFIG || { name:'未命名任务', contentType:'—', people:'—', background:'—', terms:'—', purpose:'—' };
   const tabs = [
     { id:'materials', l:'素材', en:'Materials',    ic: IcLayers,  n: (VM_DATA.MATERIALS||[]).length },
+    { id:'queue',     l:'队列', en:'Queue',        ic: IcList,    n: (VM_DATA.MATERIALS||[]).filter(m=>m.state==='running'||m.state==='queued'||m.state==='error').length },
     { id:'tags',      l:'标签库', en:'Tag Library', ic: IcTag,     n: Object.values(VM_DATA.TAG_LIB||{}).flat().length },
     { id:'favs',      l:'收藏夹', en:'Favorites',   ic: IcStar,    n: (VM_DATA.FAVORITES||[]).length },
     { id:'style',     l:'风格报告', en:'Style Report', ic: IcSpark, n: null },
@@ -72,6 +73,9 @@ const Taskboard = ({ onAddMaterial, onOpenMaterial }) => {
         </div>
       </div>
 
+      {/* ─── Workspace knowledge search (Phase 3B inline) ─── */}
+      <WorkspaceSearchBar workspaceName={cfg.name}/>
+
       {/* ─── Sub-tabs ─── */}
       <div className="tb-tabs">
         {tabs.map(t => (
@@ -87,6 +91,7 @@ const Taskboard = ({ onAddMaterial, onOpenMaterial }) => {
       {/* ─── Content ─── */}
       <div className="tb-body">
         {tab==='materials' && <TBMaterials onAdd={onAddMaterial} onOpenMaterial={onOpenMaterial}/>}
+        {tab==='queue'     && <TBQueue/>}
         {tab==='tags'      && <TBTags/>}
         {tab==='favs'      && <TBFavorites/>}
         {tab==='style'     && <TBStyle/>}
@@ -495,6 +500,117 @@ const TBExport = () => {
           <button className="btn"><IcEdit size={13}/>修改路径</button>
           <button className="btn btn-primary"><IcDownload size={13}/>打包导出 ({totalSize.toFixed(1)} MB)</button>
         </div>
+      </div>
+    </>
+  );
+};
+
+/* ─── Queue · 并行队列管理 (重试 / 取消 / 调序 / 性能检测) ─── */
+const TBQueue = () => {
+  const detected = { cpu:16, ram:64, gpu:'RTX 4090 · 24GB' };
+  const recommend = 6;
+  const [cur, setCur] = React.useState(3);
+  // Build queue from MATERIALS that are still active
+  const seed = VM_DATA.MATERIALS.filter(m => m.state==='running' || m.state==='queued' || m.state==='error');
+  // Add a couple synthetic running rows in case data is thin
+  const extra = [
+    { id:'q-extra-1', title:'大疆 Pocket 4 · 画面提示词', state:'running', progress:67, stage:'视觉分析', source:'bilibili.com/BV1abc' },
+    { id:'q-extra-2', title:'iPhone 17 Pro · 字幕转录',   state:'running', progress:42, stage:'Whisper · zh', source:'youtube.com/xYz' },
+    { id:'q-extra-3', title:'徕卡 M11 · 视频总结',       state:'error',   progress:38, stage:'API 超限 · 限流 429', source:'youtube.com/abc' },
+  ];
+  const rows = [...seed.map(m => ({
+    id: m.id,
+    title: m.title,
+    state: m.state,
+    progress: m.progress ?? (m.state==='queued'?0:m.state==='error'?38:50),
+    stage: m.state==='running' ? '视觉分析 · stage 4/6'
+         : m.state==='queued'  ? '等待并行槽位'
+         : 'API 超限',
+    source: m.source,
+  })), ...extra];
+
+  const running = rows.filter(r=>r.state==='running').length;
+  const queued  = rows.filter(r=>r.state==='queued').length;
+  const errored = rows.filter(r=>r.state==='error').length;
+
+  const pctColor = (s) => s==='running'?'var(--ink)' : s==='queued'?'var(--ink-4)' : s==='error'?'var(--accent)' : 'var(--accent-green)';
+
+  return (
+    <>
+      <div className="tb-head-mini">
+        <div>
+          <div className="eyebrow">BATCH QUEUE · 并行执行 · 本机性能检测</div>
+          <h2 className="display" style={{fontSize:28, margin:'4px 0 0'}}>队列 · Queue</h2>
+        </div>
+        <div style={{display:'flex', gap:8}}>
+          <button className="btn"><IcDownload size={13}/>导出队列日志</button>
+          <button className="btn" disabled={!errored}><IcSpark size={13}/>全部重试 ({errored})</button>
+        </div>
+      </div>
+
+      {/* Summary chips */}
+      <div style={{display:'flex', gap:8, marginBottom:14, flexWrap:'wrap'}}>
+        <span className="kw" style={{background:'var(--bg-sunken)', fontSize:12, padding:'5px 11px'}}>
+          <span className="dot" style={{background:'var(--ink)', width:6, height:6, borderRadius:99, display:'inline-block', marginRight:6}}/>
+          运行中 <b style={{marginLeft:4, fontFamily:'var(--mono)'}}>{running}</b>
+        </span>
+        <span className="kw" style={{background:'var(--bg-sunken)', fontSize:12, padding:'5px 11px'}}>
+          <span className="dot" style={{background:'var(--ink-4)', width:6, height:6, borderRadius:99, display:'inline-block', marginRight:6}}/>
+          排队中 <b style={{marginLeft:4, fontFamily:'var(--mono)'}}>{queued}</b>
+        </span>
+        <span className="kw" style={{background:'var(--bg-sunken)', fontSize:12, padding:'5px 11px'}}>
+          <span className="dot" style={{background:'var(--accent)', width:6, height:6, borderRadius:99, display:'inline-block', marginRight:6}}/>
+          失败 <b style={{marginLeft:4, fontFamily:'var(--mono)'}}>{errored}</b>
+        </span>
+      </div>
+
+      {/* System detection + parallel slider */}
+      <div className="qp-sys">
+        <div className="qp-det">
+          <div className="eyebrow">本机检测</div>
+          <div style={{display:'flex', gap:18, marginTop:8, alignItems:'baseline'}}>
+            <span><span className="mono" style={{fontSize:11, color:'var(--ink-3)'}}>CPU</span> <b style={{fontSize:16}}>{detected.cpu}</b><span className="mono" style={{fontSize:11, color:'var(--ink-3)'}}> 核</span></span>
+            <span><span className="mono" style={{fontSize:11, color:'var(--ink-3)'}}>RAM</span> <b style={{fontSize:16}}>{detected.ram}</b><span className="mono" style={{fontSize:11, color:'var(--ink-3)'}}> GB</span></span>
+            <span><span className="mono" style={{fontSize:11, color:'var(--ink-3)'}}>GPU</span> <b style={{fontSize:14}}>{detected.gpu}</b></span>
+          </div>
+        </div>
+        <div className="qp-slider">
+          <div style={{display:'flex', justifyContent:'space-between', fontSize:12}}>
+            <span>并行数量上限 · 系统推荐 <b className="mono">{recommend}</b></span>
+            <span className="mono">{cur}</span>
+          </div>
+          <input type="range" min="1" max={recommend+2} value={cur} onChange={e=>setCur(+e.target.value)}
+            style={{width:'100%', marginTop:8, accentColor:'var(--accent)'}}/>
+          <div className="mono" style={{fontSize:10, color:'var(--ink-3)', marginTop:4, display:'flex', justifyContent:'space-between'}}>
+            <span>1</span><span style={{color:'var(--accent-green)'}}>↑ 推荐 {recommend}</span><span>{recommend+2}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Queue rows */}
+      <div className="qp-list" style={{marginTop:14}}>
+        {rows.map((q, i) => (
+          <div key={q.id} className="qp-row" data-state={q.state}>
+            <div className="qp-dot" data-state={q.state}/>
+            <div className="qp-t">
+              <div style={{fontSize:13, fontWeight:600, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{q.title}</div>
+              <div className="mono" style={{fontSize:11, color:'var(--ink-3)', marginTop:3}}>
+                {q.stage}{q.source ? ` · ${q.source}` : ''}
+              </div>
+            </div>
+            <div className="qp-bar"><span style={{width:`${q.progress}%`}}/></div>
+            <div className="mono qp-pct" style={{width:50, textAlign:'right', color: pctColor(q.state)}}>
+              {q.state==='running'?`${q.progress}%` : q.state==='queued'?'—' : q.state==='error'?'失败':'完成'}
+            </div>
+            <div className="qp-acts">
+              {q.state==='error' && <button className="btn btn-ghost" style={{height:26, fontSize:11}}><IcSpark size={12}/>重试</button>}
+              {q.state==='queued' && i>0 && <button className="btn btn-ghost" style={{height:26, fontSize:11}} title="上移优先级">↑</button>}
+              {q.state==='queued' && <button className="btn btn-ghost" style={{height:26, fontSize:11}} title="下移优先级">↓</button>}
+              {q.state==='running' && <button className="btn btn-ghost" style={{height:26, fontSize:11}} title="暂停">暂停</button>}
+              <button className="btn btn-ghost" style={{height:26, padding:'0 8px'}} title="取消"><IcX size={12}/></button>
+            </div>
+          </div>
+        ))}
       </div>
     </>
   );
