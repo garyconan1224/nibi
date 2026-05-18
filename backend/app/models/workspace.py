@@ -26,7 +26,7 @@ class WorkspaceStatus(str, Enum):
 
     ACTIVE = "active"
     PROCESSING = "processing"
-    COMPLETED = "completed"
+    ANALYZED = "analyzed"
     ARCHIVED = "archived"
 
 
@@ -179,8 +179,9 @@ class WorkspaceRecord:
 
     workspace_id: str
     name: str
-    project_id: str = ""  # 关联到现有 project；为空表示全局
+    project_id: str = ""  # 关联到现有 project；为空表示全局（N1.4 移除）
     status: str = WorkspaceStatus.ACTIVE.value
+    trashed: bool = False
     background: WorkspaceBackground = field(default_factory=WorkspaceBackground)
     items: List[WorkspaceItem] = field(default_factory=list)
     favorites: List[str] = field(default_factory=list)  # item_id 列表，复刻清单
@@ -194,6 +195,7 @@ class WorkspaceRecord:
             "name": self.name,
             "project_id": self.project_id,
             "status": self.status,
+            "trashed": self.trashed,
             "background": self.background.to_dict(),
             "items": [it.to_dict() for it in self.items],
             "favorites": list(self.favorites),
@@ -220,11 +222,16 @@ class WorkspaceRecord:
                     prompt_versions[str(k)] = [
                         PromptVersion.from_dict(pv) for pv in v if isinstance(pv, dict)
                     ]
+        raw_status = str(data.get("status") or WorkspaceStatus.ACTIVE.value)
+        # 老数据兼容：旧 "completed" 统一映射成 "analyzed"
+        if raw_status == "completed":
+            raw_status = WorkspaceStatus.ANALYZED.value
         return cls(
             workspace_id=str(data.get("workspace_id") or ""),
             name=str(data.get("name") or ""),
             project_id=str(data.get("project_id") or ""),
-            status=str(data.get("status") or WorkspaceStatus.ACTIVE.value),
+            status=raw_status,
+            trashed=bool(data.get("trashed") or False),
             background=WorkspaceBackground.from_dict(data.get("background") or {}),
             items=items,
             favorites=list(data.get("favorites") or []),
