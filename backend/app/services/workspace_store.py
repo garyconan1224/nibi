@@ -107,11 +107,28 @@ class WorkspaceStore:
         with self._lock:
             return self._records.get(workspace_id)
 
-    def list_all(self, project_id: Optional[str] = None) -> List[WorkspaceRecord]:
+    def list_all(
+        self,
+        project_id: Optional[str] = None,
+        *,
+        include_trashed: bool = False,
+        trashed_only: bool = False,
+    ) -> List[WorkspaceRecord]:
+        """列出工作空间。
+
+        默认仅返回非 trashed 的记录（主列表语义）。
+        trashed_only=True：仅返回 trashed 的记录（垃圾桶视图）。
+        include_trashed=True：返回全部（含 trashed），用于管理后台/调试。
+        trashed_only 优先于 include_trashed。
+        """
         with self._lock:
             recs = list(self._records.values())
         if project_id:
             recs = [r for r in recs if r.project_id == project_id]
+        if trashed_only:
+            recs = [r for r in recs if r.trashed]
+        elif not include_trashed:
+            recs = [r for r in recs if not r.trashed]
         # 按 updated_at 倒序，最近更新在前
         return sorted(recs, key=lambda r: r.updated_at, reverse=True)
 

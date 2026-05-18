@@ -469,9 +469,22 @@ def create_workspace(req: WorkspaceCreateRequest) -> Dict[str, Any]:
 
 
 @router.get("")
-def list_workspaces(project_id: Optional[str] = None) -> List[Dict[str, Any]]:
-    """列出所有工作空间，可按 project_id 过滤。"""
-    return [_enrich_workspace(r) for r in _store.list_all(project_id=project_id)]
+def list_workspaces(
+    project_id: Optional[str] = None,
+    trashed_only: bool = False,
+    include_trashed: bool = False,
+) -> List[Dict[str, Any]]:
+    """列出工作空间。
+
+    默认排除 trashed（软删除后的"垃圾桶"内容）。
+    trashed_only=true：仅返回垃圾桶；include_trashed=true：返回全部。
+    """
+    recs = _store.list_all(
+        project_id=project_id,
+        trashed_only=trashed_only,
+        include_trashed=include_trashed,
+    )
+    return [_enrich_workspace(r) for r in recs]
 
 
 @router.get("/{workspace_id}")
