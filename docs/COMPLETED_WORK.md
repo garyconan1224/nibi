@@ -4,7 +4,7 @@
 >
 > **维护规则**：每完成一个子任务，在本文件**追加**一段（不删旧记录），格式见下方"记录模板"。
 >
-> Last updated: 2026-05-18 (Phase 3B 完成)
+> Last updated: 2026-05-18 (Phase 3C 完成)
 
 ---
 
@@ -38,6 +38,79 @@
 ---
 
 # 历史记录（倒序，最新在上）
+
+---
+
+## Phase 3C – 标签库 7 维度（自动打标 + 手动校正 + 按标签筛选）
+
+**完成日期**：2026-05-18
+**模型 / 工具**：Opus 4.7（桌面）+ 小米 2.5 Pro（终端，免费）混合
+**分支**：`feat/phase3c-tag-library` → merge 到 main（`2fd8fd3`，--no-ff）
+**Commit**：`4a04c1d` / `606b9f7` / `d93d001` / `aea7f55` / `52222e5` / `c1f5b6d` / `5d9b3ba` / `2fd8fd3`（共 8 个，含 merge）
+**模型分工**：
+- 小米：3C.1（config + 字段）、3C.3（CRUD 端点）、3C.6（item 页 tags 面板）—— 模板性任务
+- Opus：3C.2（LLM prompt + 严格 JSON 解析）、3C.4（task 钩子 + 异步线程）、3C.5（chip 栏 + URL 双向同步）—— 设计含思考的任务
+
+### 影响范围
+- 后端 service：`tag_generator.py`（LLM 打标 + JSON 解析 + 校验）
+- 后端 model：`WorkspaceItem.tags: Dict[str, Any]` 字段（持久化进 workspace.json）
+- 后端 config：`shared/config.py::TAG_DIMENSIONS`（6 系统维度 + custom_tags 候选值表）
+- 后端 routes：`workspaces.py` 加 3 个 tags 端点 + `_autotag_items_for_task` 钩子
+- 前端 types：`SystemTagDimension` / `ItemTags`
+- 前端 constants：`tagDimensions.ts` 镜像后端 config（手工同步）
+- 前端 components：`TagFilterBar.tsx`（chip 多选）、`ItemTagsPanel.tsx`（展示 + 重新生成）
+- 前端 hooks：`useTagFilter.ts`（URL search params 双向同步 + 内存过滤）
+- 前端 pages：WorkspaceList 顶部挂筛选栏；4 个 result 页挂 ItemTagsPanel
+- 测试：4 个新测试文件，共 12 个新用例，全 backend 101 passed
+
+### 关键改动
+
+**Tag 数据形状（设计契约）**
+```python
+WorkspaceItem.tags = {
+    "content_type": "教程",           # 6 个系统维度，单选 enum
+    "subject_domain": "科技",
+    "difficulty": "入门",
+    "duration_band": "短",
+    "information_density": "高",
+    "emotion_tone": "中性",
+    "custom_tags": ["前端", "React"],  # 自由文本数组
+    "_generated_at": "ISO8601",       # 元数据
+    "_generated_model": "Qwen/..."
+}
+```
+
+**LLM 打标 service（3C.2）**：调当前默认 chat provider，prompt 严格要求返回 JSON；解析层支持 markdown 代码块包裹；校验层对系统维度做 `value in choices` 检查，非法值丢弃不抛；任何异常返回 `{}` + log warning（不阻塞主流程）。
+
+**自动打标钩子（3C.4）**：`register_success_callback("analyze"|"text"|"audio"|"image", ...)`，在 daemon Thread 里跑 `generate_tags`，避免阻塞 task worker。跳过已有 tags 的 item，避免重复消耗 LLM 配额。
+
+**URL 双向同步（3C.5）**：`?tags.content_type=教程,访谈&tags.difficulty=入门&tags.custom=React` 格式；`useSearchParams` + `replace: true` 不污染浏览器历史；同维度 OR / 跨维度 AND 语义；custom_tags 走 contains。
+
+**前端筛选（3C.5）**：筛选纯内存做，不走后端接口（性能足够，列表小）。筛选规则：保留至少一个 item 命中筛选的 workspace，工作空间卡片展示该空间下匹配的 items。
+
+### 为什么这么做
+
+- **7 维度选择**：plan 默认 6 个系统维度 + 1 个自由 custom_tags，平衡覆盖度与 LLM 推理稳定性。维度名 / 候选值放在 config，以后改值不改代码
+- **存 item.tags 字段而不是独立文件**：减少 IO 套路；tags 本身就是 item 的衍生属性，跟随 workspace.json 走最自然
+- **自动跳 + 手动补打**：自动跳保证「分析完即用」；手动按钮兜底失败场景（首次 LLM 调用可能因 prompt 工程问题失败）；不做后台批量是为了避免一次性触发限流
+- **筛选纯前端**：列表数据量小（< 100 workspaces），无需后端 query；URL 同步让筛选状态可分享 / 可刷新
+- **前端 hardcode 维度配置**：与 shared/config.py 同步两边的代价 < 加一个 GET /tags/config 端点 + 客户端缓存的复杂度
+- **chip + dropdown 用原生 div + 外部点击监听**：项目无 Popover 组件，加一个 radix-ui/popover 会引入新依赖；自己实现一个最小可用版 OK
+
+### 留给后续的影响
+
+- **配置同步双写风险**：`shared/config.py::TAG_DIMENSIONS` 和 `frontend/src/constants/tagDimensions.ts` 必须保持一致，加维度时记得改两处。未来想消除可加 GET /tags/config 端点
+- **未做手动编辑 UI**：当前 ItemTagsPanel 只展示 + 重新生成，没有给用户「点 badge 直接改值」的入口；后端 PUT /tags 端点已就绪，前端补 UI 即可
+- **prompt 工程稳定性**：当前 prompt 在 SiliconFlow 默认模型上测过 OK，换模型时可能需要重测；模型选择不在 settings 里独立配置，跟随 default chat profile
+- **未提供「跳过自动打标」开关**：如果用户不想每次分析都触发 LLM 调用，需要在 settings 里加开关 + 钩子里读 settings；目前是硬编码自动跳
+- **筛选语义**：跨维度 AND 可能让结果过少；当前空态有清除按钮兜底，UI 上够用。如果用户觉得 AND 太严，可改成 OR（一行代码改动）
+- **custom_tags 在 LLM 生成时数量限制为 10**：避免模型失控塞太多；如果觉得限制太死可调 `tag_generator._validate_and_normalize`
+
+### 验证
+
+- 后端：`pytest tests/backend -q` 101 passed（含 12 个新用例）
+- 前端：`pnpm tsc --noEmit` 通过
+- 端到端：未做（用户已确认搜索链路通过，3C 钩子需要触发新的分析才能验证，留给后续手动跑）
 
 ---
 

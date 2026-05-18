@@ -1,13 +1,24 @@
 ---
 phase: 3C
 title: 标签库 7 维度（自动打标 + 手动校正 + 按标签筛选）
-status: ready
+status: done
 estimate_hours: 4-5
-model: Opus 4.7
+actual_hours: ~3.5
+model: Opus 4.7 + 小米 2.5 Pro（混合）
 branch: feat/phase3c-tag-library
 worktree: 否（主目录直接做，与 3B 同模式）
 depends_on: [3B]
 subtasks: [3C.1, 3C.2, 3C.3, 3C.4, 3C.5, 3C.6]
+commits:
+  - 4a04c1d feat(phase3c): 3C.1 WorkspaceItem.tags 字段 + 7 维度 config（小米）
+  - 606b9f7 feat(phase3c): 3C.2 LLM 自动打标 service + 测试（Opus）
+  - d93d001 docs(phase3c): 展开 3C 详细执行计划（6 子任务 + 设计契约）
+  - aea7f55 feat(phase3c): 3C.3 tags CRUD + 重新生成端点 + 测试（小米）
+  - 52222e5 feat(phase3c): 3C.4 分析任务 SUCCESS 后自动打标钩子（Opus）
+  - c1f5b6d feat(phase3c): 3C.5 WorkspaceList 顶部 tag chip 筛选栏 + URL 同步（Opus）
+  - 5d9b3ba feat(phase3c): 3C.6 item 结果页 tags 展示 + 重新生成（小米）
+  - 2fd8fd3 Merge Phase 3C
+completed_date: 2026-05-18
 ---
 
 ## 范围概述

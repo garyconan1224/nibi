@@ -51,7 +51,13 @@
   - [x] 3B.3 跨工作空间检索端点 + reranker 合并
   - [x] 3B.4 前端搜索页 + 侧栏入口
   - [x] 3B.5 WorkspaceDetail 内嵌搜索条
-- [ ] **3C** 标签库 7 维度 — [phase-3c-tag-library.md](plans/phase-3c-tag-library.md) ⏸ 待开工时展开
+- [x] **3C** 标签库 7 维度 — [phase-3c-tag-library.md](plans/phase-3c-tag-library.md) ✅
+  - [x] 3C.1 WorkspaceItem.tags 字段 + 7 维度 config
+  - [x] 3C.2 LLM 自动打标 service + 测试
+  - [x] 3C.3 tags CRUD + 重新生成端点 + 测试
+  - [x] 3C.4 分析任务 SUCCESS 后自动打标钩子
+  - [x] 3C.5 WorkspaceList 顶部 tag chip 筛选栏 + URL 同步
+  - [x] 3C.6 item 结果页 tags 展示 + 重新生成
 - [ ] **3D** 风格报告 / 对比原作 — [phase-3d-style-report.md](plans/phase-3d-style-report.md) ⏸
 - [ ] **3E** 暗色模式全调通 — [phase-3e-dark-mode.md](plans/phase-3e-dark-mode.md) ⏸
 
@@ -82,8 +88,10 @@
 
 ## 当前下一步
 
-**Phase 3C 标签库 7 维度**（3B 已完成，分支 `feat/phase3b-knowledge-search` 5 个 commit 待用户 merge 到 main）。
-3C 计划见 [docs/plans/phase-3c-tag-library.md](plans/phase-3c-tag-library.md)，处于 pending 状态，操作步骤待用户进入此 phase 时再展开。
+**Phase 3D 风格报告 / 对比原作**（3C 已完成并 merge 到 main，commit `2fd8fd3`）。
+3D 计划见 [docs/plans/phase-3d-style-report.md](plans/phase-3d-style-report.md)，处于 pending 状态，操作步骤待用户进入此 phase 时再展开。
+
+> 💡 **信息架构已定型**：3C 完成后 = Claude Design 介入做完整 UI 翻新的最佳时机。如要先做 UI 翻新而不是继续 3D/3E，跟用户对齐后调整计划。
 
 ---
 
