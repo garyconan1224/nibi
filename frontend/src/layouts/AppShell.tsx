@@ -99,12 +99,12 @@ export function AppShell({ children }: AppShellProps) {
 
         <div className="my-1 h-px w-6 bg-border" />
 
-        {/* Search (non-routed placeholder) */}
+        {/* Search (Phase 3B：跨工作空间检索) */}
         <SidebarBtn
           icon={Search}
-          label="搜索（即将开放）"
-          active={false}
-          onClick={() => {}}
+          label="知识库检索"
+          active={isActive('/search')}
+          onClick={() => navigate('/search')}
         />
 
         {/* Spacer */}
