@@ -179,7 +179,6 @@ class WorkspaceRecord:
 
     workspace_id: str
     name: str
-    project_id: str = ""  # 关联到现有 project；为空表示全局（N1.4 移除）
     status: str = WorkspaceStatus.ACTIVE.value
     trashed: bool = False
     background: WorkspaceBackground = field(default_factory=WorkspaceBackground)
@@ -193,7 +192,6 @@ class WorkspaceRecord:
         return {
             "workspace_id": self.workspace_id,
             "name": self.name,
-            "project_id": self.project_id,
             "status": self.status,
             "trashed": self.trashed,
             "background": self.background.to_dict(),
@@ -226,10 +224,10 @@ class WorkspaceRecord:
         # 老数据兼容：旧 "completed" 统一映射成 "analyzed"
         if raw_status == "completed":
             raw_status = WorkspaceStatus.ANALYZED.value
+        # 老数据可能仍含 project_id 字段；from_dict 静默忽略
         return cls(
             workspace_id=str(data.get("workspace_id") or ""),
             name=str(data.get("name") or ""),
-            project_id=str(data.get("project_id") or ""),
             status=raw_status,
             trashed=bool(data.get("trashed") or False),
             background=WorkspaceBackground.from_dict(data.get("background") or {}),

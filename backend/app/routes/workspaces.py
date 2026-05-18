@@ -8,10 +8,13 @@ from __future__ import annotations
 
 接口清单（最小可用集，后续按设计文档增补）：
   POST   /workspaces                     创建工作空间
-  GET    /workspaces                     列表（可按 project_id 过滤）
+  GET    /workspaces                     列表（默认排除 trashed；trashed_only/include_trashed 可切换视图）
   GET    /workspaces/{ws_id}             详情
   PATCH  /workspaces/{ws_id}             更新名称 / 状态 / 背景信息
-  DELETE /workspaces/{ws_id}             删除
+  DELETE /workspaces/{ws_id}             软删除（标记 trashed=True）
+  POST   /workspaces/{ws_id}/restore     从垃圾桶恢复
+  DELETE /workspaces/{ws_id}/permanent   彻底删除（必须先软删）
+  DELETE /workspaces/trash               清空垃圾桶
   POST   /workspaces/{ws_id}/items       添加素材
   DELETE /workspaces/{ws_id}/items/{id}  移除素材
   POST   /workspaces/{ws_id}/favorites/{id}    收藏素材
@@ -180,13 +183,12 @@ _EXTENSION_TYPE_MAP: Dict[str, str] = {
 
 class WorkspaceCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120, description="工作空间名称")
-    project_id: str = Field(default="", description="可选：关联 project_id")
     background: Dict[str, Any] = Field(default_factory=dict)
 
 
 class WorkspaceUpdateRequest(BaseModel):
     name: Optional[str] = None
-    status: Optional[str] = Field(default=None, description="active|processing|completed|archived")
+    status: Optional[str] = Field(default=None, description="active|processing|analyzed|archived")
     background: Optional[Dict[str, Any]] = None
 
 
@@ -461,7 +463,6 @@ def create_workspace(req: WorkspaceCreateRequest) -> Dict[str, Any]:
     rec = WorkspaceRecord(
         workspace_id=str(uuid.uuid4()),
         name=req.name.strip(),
-        project_id=req.project_id.strip(),
         background=bg,
     )
     _store.create(rec)
@@ -470,7 +471,6 @@ def create_workspace(req: WorkspaceCreateRequest) -> Dict[str, Any]:
 
 @router.get("")
 def list_workspaces(
-    project_id: Optional[str] = None,
     trashed_only: bool = False,
     include_trashed: bool = False,
 ) -> List[Dict[str, Any]]:
@@ -480,7 +480,6 @@ def list_workspaces(
     trashed_only=true：仅返回垃圾桶；include_trashed=true：返回全部。
     """
     recs = _store.list_all(
-        project_id=project_id,
         trashed_only=trashed_only,
         include_trashed=include_trashed,
     )
@@ -865,8 +864,9 @@ def start_item_pipeline(workspace_id: str, item_id: str) -> Dict[str, Any]:
         raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
     item = _find_item(rec, item_id)
 
-    # workspace 没绑定 project 时退化到 default_project（与 notes 路由策略一致）
-    project_id = rec.project_id.strip() or "default_project"
+    # N1.4 移除 WorkspaceRecord.project_id 后，统一用 default_project 兜底。
+    # 磁盘布局（data/projects/<project_id>/...）作为 N1b 独立 phase 重构。
+    project_id = "default_project"
 
     task_type, payload = _bridge_to_pipeline_payload(item, rec)
 
@@ -1233,7 +1233,7 @@ def get_text_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
         return payload
 
     # 回退：从 task_store + 磁盘文件读取
-    project_id = rec.project_id.strip() or "default_project"
+    project_id = "default_project"
     for task_id in reversed(item.related_task_ids):
         task = _pipeline_runner.store.get(task_id)
         if task is None:

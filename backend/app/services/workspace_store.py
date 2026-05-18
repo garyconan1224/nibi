@@ -109,7 +109,6 @@ class WorkspaceStore:
 
     def list_all(
         self,
-        project_id: Optional[str] = None,
         *,
         include_trashed: bool = False,
         trashed_only: bool = False,
@@ -123,8 +122,6 @@ class WorkspaceStore:
         """
         with self._lock:
             recs = list(self._records.values())
-        if project_id:
-            recs = [r for r in recs if r.project_id == project_id]
         if trashed_only:
             recs = [r for r in recs if r.trashed]
         elif not include_trashed:
