@@ -20,7 +20,7 @@ Last updated: 2026-05-18（现状同步完成，进入 N1~N11 路线）
 
 ## N1 开工交接（下一步）
 
-> 来源：`docs/nibi-spec-merged.md` 附录 C.2 N1 行。
+> 来源：`docs/SPEC.md` 附录 C.2 N1 行。
 
 ### N1 范围
 
@@ -38,7 +38,7 @@ Last updated: 2026-05-18（现状同步完成，进入 N1~N11 路线）
 
 ### 开工前准备
 
-1. 读 `docs/nibi-spec-merged.md` 找 N1 相关模块描述
+1. 读 `docs/SPEC.md` 找 N1 相关模块描述
 2. 读现有 task 状态机代码（`backend/app/` 相关文件）
 3. 确认是否需要 schema 迁移（涉及数据库变更需先问用户）
 4. 拆子任务 → 写到 `docs/plans/phase-n1-task-system.md` → 问用户确认
@@ -53,6 +53,6 @@ Last updated: 2026-05-18（现状同步完成，进入 N1~N11 路线）
 
 ## 历史交接（已完成，仅备查）
 
-Phase 2D 评估报告见 `docs/PHASE_2D_SQLITE_EVALUATION.md`，结论：暂不切 SQLite，等 workspace.json > 5MB 时复审。
+Phase 2D 评估报告见 `docs/archive/phase-2d-sqlite-evaluation.md`，结论：暂不切 SQLite，等 workspace.json > 5MB 时复审。
 
 更早的交接记录（Phase 2B/2C 等）请翻 `git log -p docs/AI_HANDOFF.md` 查找。

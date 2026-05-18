@@ -20,17 +20,17 @@
 **Required reading order at the start of every session** (single source of truth as of 2026-05-18):
 
 1. [`docs/WORKFLOW.md`](docs/WORKFLOW.md) — Master workflow, current phase, design-vs-code decisions per phase
-2. [`docs/nibi-spec-merged.md`](docs/nibi-spec-merged.md) — Product specification (8 modules, product-requirement granularity)
-3. [`docs/PROJECT_EXECUTION_PLAN.md`](docs/PROJECT_EXECUTION_PLAN.md) — Engineering plan (Phase checkboxes, current step)
+2. [`docs/SPEC.md`](docs/SPEC.md) — Product specification (8 modules, product-requirement granularity)
+3. [`docs/EXECUTION_PLAN.md`](docs/EXECUTION_PLAN.md) — Engineering plan (Phase checkboxes, current step)
 4. [`docs/design/`](docs/design/) — Design source files (19 jsx components, VidMirror.html, styles.css, v1.1 design contract)
 5. `docs/AI_HANDOFF.md` / `docs/OUTSTANDING_TASKS.md` — Session-level handoff notes (if present)
 
 **Deprecated, do not read for current decisions**:
-- `nibi-spec-v2.md` (replaced by `docs/nibi-spec-merged.md`)
+- `docs/archive/spec-v2.md` (replaced by `docs/SPEC.md`)
 - `docs/archive/system_design_v3_final.md`
-- `plan.md`, `system_design_for_claude_design_v1.md`
+- `docs/archive/plan-v1.md`, `docs/archive/design-spec-v1.md`
 
-**Current phase**: [A] state sync (see WORKFLOW.md §4). Next: [B] N1~N11 spec-gap landing per `docs/nibi-spec-merged.md` Appendix C.
+**Current phase**: [A] state sync (see WORKFLOW.md §4). Next: [B] N1~N11 spec-gap landing per `docs/SPEC.md` Appendix C.
 
 Keep each turn scoped to one clear task. If a request starts to expand into product design plus implementation, separate the decision step from the coding step.
 

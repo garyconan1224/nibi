@@ -193,7 +193,7 @@ WorkspaceItem.tags = {
 **Commit**：`a946fa2`
 
 ### 影响范围
-- 仅文档：新增 `docs/PHASE_2D_SQLITE_EVALUATION.md`（122 行）
+- 仅文档：新增 `docs/archive/phase-2d-sqlite-evaluation.md`（122 行）
 - 无代码改动
 
 ### 关键改动

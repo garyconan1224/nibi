@@ -1,7 +1,7 @@
 # Nibi 多媒体内容分析系统 — 合并需求规范
 
 > **状态**：起草中（产品需求级，不含技术实现细节）
-> **生效后**：`nibi-spec-v2.md` 与 `system_design_v3_final.md` 都不再维护
+> **生效后**：`docs/archive/spec-v2.md` 与 `system_design_v3_final.md` 都不再维护
 > **目的**：把 v2 / v3 / 设计稿（`vidmirror/`）/ 现有代码 / 用户脑子里的想法合并成单一真相源
 > **方法**：分 8 个模块逐块对账 + Q&A 决议
 
@@ -1087,7 +1087,7 @@ yt-dlp 执行下载 + 实时进度
 - 哪些模块**直接进代码**（按本 spec 实现）
 - 是否需要把现有 Phase 3C 之前的代码**保留 / 重构 / 推翻**
 
-**生效后**：`nibi-spec-v2.md` 与 `system_design_v3_final.md` 在文件顶部加 deprecated 声明，指向本文档。
+**生效后**：`docs/archive/spec-v2.md` 与 `system_design_v3_final.md` 在文件顶部加 deprecated 声明，指向本文档。
 
 ---
 
@@ -1100,18 +1100,18 @@ yt-dlp 执行下载 + 实时进度
 | # | 任务 | 涉及文件 |
 |---|---|---|
 | 1 | **修改 CLAUDE.md** 优先级表 / 「项目执行计划维护流程」段落 | `CLAUDE.md` |
-| 2 | **重写 `docs/PROJECT_EXECUTION_PLAN.md`**：保留 Phase 1-3C 已完成记录，废弃 3D-3E 的"风格报告 / 暗色模式"路线，新增 **N1~Nx「合并 spec 落地差异」phase 路线** | `docs/PROJECT_EXECUTION_PLAN.md` |
+| 2 | **重写 `docs/EXECUTION_PLAN.md`**：保留 Phase 1-3C 已完成记录，废弃 3D-3E 的"风格报告 / 暗色模式"路线，新增 **N1~Nx「合并 spec 落地差异」phase 路线** | `docs/EXECUTION_PLAN.md` |
 | 3 | **重写 `docs/AI_HANDOFF.md`**：清除 Phase 2B 旧入口，改成 N1 的开工交接 | `docs/AI_HANDOFF.md` |
 | 4 | **更新 `docs/OUTSTANDING_TASKS.md`** | 同上 |
 | 5 | **归档旧 phase plan**：`docs/plans/phase-3d~phase-10.md` 全部 frontmatter 加 `status: archived`，注明"被合并 spec 取代" | `docs/plans/*.md` |
-| 6 | **加 deprecated 标记**：`nibi-spec-v2.md` / `system_design_v3_final.md` / `plan.md` / `system_design_for_claude_design_v1.md` 顶部 | 4 个文件 |
+| 6 | **加 deprecated 标记**：`docs/archive/spec-v2.md` / `system_design_v3_final.md` / `docs/archive/plan-v1.md` / `docs/archive/design-spec-v1.md` 顶部 | 4 个文件 |
 | 7 | **处理设计稿快照**：`vidmirror/` 目录 commit 到 `docs/design-source/`（作为历史），`design_reference/` 删除（重复），`vidmirror.zip` / `vidmirror-handoff.zip` 加 `.gitignore` | 多处 |
 | 8 | **删除 untracked 重复文件**：`system_design_for_claude_design_v1 (1).md`（与已 tracked 的 v1 重复） | 根目录 |
 | 9 | **同步 origin/main**：把 local main 上的 52 个未推送 commit 推到 origin（修复 CI + 让 GitHub 状态反映现实） | git push |
 
 ### C.2 N1~Nx「合并 spec 落地差异」初步划分（供 C.1 第 2 步参考）
 
-参考 phase 模板（最终在 PROJECT_EXECUTION_PLAN 里展开）：
+参考 phase 模板（最终在 EXECUTION_PLAN 里展开）：
 
 | Phase | 范围 | 估时 | 优先级 |
 |---|---|---|---|

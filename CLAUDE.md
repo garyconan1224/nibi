@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 > 这是项目级规则，会和 `~/.claude/CLAUDE.md` 全局规则一起生效。
 > Claude Code 启动时会自动读取本文件。
-> 项目根目录还有 `plan.md`（阶段计划）和 `system_design_for_claude_design_v1.md`（系统设计）。
+> 项目根目录还有 `docs/archive/plan-v1.md`（阶段计划）和 `docs/archive/design-spec-v1.md`（系统设计）。
 
 ---
 
@@ -124,55 +124,55 @@ python3 tests/e2e_qa.py
 
 ## 计划与边界
 
-> 📌 **唯一标准（Single Source of Truth）**：`docs/nibi-spec-merged.md`
+> 📌 **唯一标准（Single Source of Truth）**：`docs/SPEC.md`
 > 这是 2026-05-18 合并 v2 + v3 + 设计稿 + 现有代码 + 用户最新决议产出的 8 模块统一规范，是当前所有产品决议的最终仲裁。**Phase 推进、设计落地、AI 协作决策都以本文件为准**。
 >
 > **优先级（冲突仲裁，自上而下）**：
-> 1. `docs/nibi-spec-merged.md`（**唯一标准**，产品需求级粒度）
-> 2. `docs/PROJECT_EXECUTION_PLAN.md`（工程执行计划——Phase 打勾 + 当前在哪步）
+> 1. `docs/SPEC.md`（**唯一标准**，产品需求级粒度）
+> 2. `docs/EXECUTION_PLAN.md`（工程执行计划——Phase 打勾 + 当前在哪步）
 > 3. `docs/design/`（**设计稿源文件**——19 个 jsx 组件 / VidMirror.html / styles.css / system_design_v1.1.md）
 > 4. 当前代码（与 spec 偏差时优先反映到 spec 或新建差异 phase）
-> 5. ~~`nibi-spec-v2.md`、`docs/archive/system_design_v3_final.md`、`plan.md`、`system_design_for_claude_design_v1.md`~~ ⚠️ **已 DEPRECATED**，仅历史归档，不参与仲裁
+> 5. ~~`docs/archive/spec-v2.md`、`docs/archive/system_design_v3_final.md`、`docs/archive/plan-v1.md`、`docs/archive/design-spec-v1.md`~~ ⚠️ **已 DEPRECATED**，仅历史归档，不参与仲裁
 >
 > **设计稿路径**：`docs/design/`（19 个 jsx 组件 / VidMirror.html / styles.css / system_design_v1.1.md）。旧 `vidmirror-handoff/` 路径已废弃。
 >
 > **新会话启动必读顺序**：
 > ① [`docs/WORKFLOW.md`](docs/WORKFLOW.md)（总流程图 + 当前阶段，**第一份要读的**）
-> ② [`docs/nibi-spec-merged.md`](docs/nibi-spec-merged.md)（产品需求 8 模块）
-> ③ [`docs/PROJECT_EXECUTION_PLAN.md`](docs/PROJECT_EXECUTION_PLAN.md)（找未打勾子任务）
+> ② [`docs/SPEC.md`](docs/SPEC.md)（产品需求 8 模块）
+> ③ [`docs/EXECUTION_PLAN.md`](docs/EXECUTION_PLAN.md)（找未打勾子任务）
 > ④ [`AGENTS.md`](AGENTS.md)
 > ⑤ [`docs/AI_HANDOFF.md`](docs/AI_HANDOFF.md)（上次会话留下的开工笔记）
 >
 > 📋 **项目执行计划维护流程（任何 AI 工具开新会话都要遵守）**：
-> 1. 读完 `docs/PROJECT_EXECUTION_PLAN.md`，找第一个未打勾（`- [ ]`）的子任务
+> 1. 读完 `docs/EXECUTION_PLAN.md`，找第一个未打勾（`- [ ]`）的子任务
 > 2. 打开对应 `docs/plans/<file>.md` 详细计划：
 >    - 若 `status: pending` 且操作步骤段是 `TODO: 进入此阶段时再展开` → **停下问用户「要先展开这个 phase 的具体执行计划吗？」**，**不要自作主张展开**
 >    - 若 `status: ready` 或 `in_progress` 且已有操作步骤 → 按里面的步骤执行
 > 3. 每完成一个子任务，**同时**更新三处：
->    - ① `docs/PROJECT_EXECUTION_PLAN.md` 把对应方框从 `- [ ]` 改成 `- [x]`
+>    - ① `docs/EXECUTION_PLAN.md` 把对应方框从 `- [ ]` 改成 `- [x]`
 >    - ② 该 phase md 的 frontmatter：`status: done` + 填 `commits` / `completed_date` / `actual_hours`
 >    - ③ `docs/COMPLETED_WORK.md` 追加一段（按文件顶部"记录模板"格式）
 > 4. **不要跳着做**：当前 phase 所有子任务全部打勾后，再进下一个 phase。如果用户明确要求跳，照办，但要在 COMPLETED_WORK.md 注明"跳过原因"
-> 5. **本流程与"启动强制对账"配合**：先 git log 对账 → 再读 PROJECT_EXECUTION_PLAN → 找未打勾项
+> 5. **本流程与"启动强制对账"配合**：先 git log 对账 → 再读 EXECUTION_PLAN → 找未打勾项
 >
 > ⚠️ **启动强制对账（铁律，违反过一次就出过事故）**：读完启动必读 5 件套后，**必须立刻跑 `git log --oneline -20`**，把 `AI_HANDOFF.md` / `OUTSTANDING_TASKS.md` 里写的「下一步 Phase X」与 git 实际合并状态对照一次。规则：
 > - 若 git 显示某 phase 已有 commit 合入 main，而文档仍把它列为「下一步 / 待办」——**先停下来更新这两份文档，再向用户确认真正的下一步**，绝不能直接按文档动手。
 > - 若 git log 与文档一致，再开工。
 > - 这条规则的存在原因：2026-05-17 曾发生 AI 让用户重做已合并的 Phase 2C.1 的事故，根因就是 AI_HANDOFF / OUTSTANDING_TASKS 是手工快照、滞后于 git。**phase 文档不是事实来源，git log 才是。**
 
-> 🚀 **Phase 启动速查**（开工前对照 `nibi-spec-merged.md` 附录 C 的 N1~N11 路线 + 「模型选择策略」章）：
-> - **当前阶段：[A] 现状同步**（参见 `docs/WORKFLOW.md` §4），收尾事项：重写 PROJECT_EXECUTION_PLAN / 重写 AI_HANDOFF / 归档旧 plans / push 52 commits 到 origin
+> 🚀 **Phase 启动速查**（开工前对照 `SPEC.md` 附录 C 的 N1~N11 路线 + 「模型选择策略」章）：
+> - **当前阶段：[A] 现状同步**（参见 `docs/WORKFLOW.md` §4），收尾事项：重写 EXECUTION_PLAN / 重写 AI_HANDOFF / 归档旧 plans / push 52 commits 到 origin
 > - **下一阶段：[B] N1~N11 落地差异**——按 spec 附录 C 路线，依次推进
 > - **再下一阶段：[C] AI 导演**——N1~N11 完成之后才启动
 > - **简单阶段**（N1 / N2 / N3 / N11 等纯前后端 CRUD）：⭐ 小米 2.5 Pro（终端，免费）/ Sonnet 4.6，不开 worktree
 > - **复杂阶段**（N5 Preflight 抽屉子参数细化 / N6 任务级 LLM 对话 + RAG / N7 视频镜头分析）：Opus 4.7 + 新 worktree（`feat/phase<N>-<短名>` 分支）
 > - **决策速查**：复杂/SSE/状态机/加密 → Opus；中等多文件 CRUD → Sonnet；git/测试/文档/模板 → 小米；单行 typo → Haiku / 小米
 
-> ⚠️ **重要**：本文档与历史 `plan.md` / `nibi-spec-v2.md` 已不再一致——以本文档为准。
+> ⚠️ **重要**：本文档与历史 `docs/archive/plan-v1.md` / `docs/archive/spec-v2.md` 已不再一致——以本文档为准。
 > - 当历史文件与现实代码冲突时，**以代码 + 合并 spec + WORKFLOW.md 为准**。
 > - 旧 phase 编号（1A~3E / 4~10）已**完成或归档**，新工作走 N1~N11 路线。
 
-1. 新会话开始时**先扫 `git status --short --branch` + `git log --oneline -5`** 确认现状，再读 `WORKFLOW.md` → `nibi-spec-merged.md` → `PROJECT_EXECUTION_PLAN.md`。
+1. 新会话开始时**先扫 `git status --short --branch` + `git log --oneline -5`** 确认现状，再读 `WORKFLOW.md` → `SPEC.md` → `EXECUTION_PLAN.md`。
 2. **一个会话只做一个明确的子任务**，做完就停。
 3. 子任务完成后**主动提醒用户**：「子任务 X 完成，建议 git commit 后开新会话做下一个」。
 4. **不要主动跨子任务工作**，即使你觉得"顺手就改了"——这破坏了用户的 git 颗粒度。
@@ -332,7 +332,7 @@ git branch --show-current         # 确认当前分支
 
 ### 分支生命周期（简化）
 
-1. **开工**：复杂阶段（`nibi-spec-v2.md` §3 标"是"的）开 `feat/<编号>-<短名>` 或 `claude-official/<task>` 都行，由用户选；简单阶段直接打 main。
+1. **开工**：复杂阶段（`docs/archive/spec-v2.md` §3 标"是"的）开 `feat/<编号>-<短名>` 或 `claude-official/<task>` 都行，由用户选；简单阶段直接打 main。
 2. **收工**：commit 后通知用户 merge，**不自行 merge 到 main**（破坏性操作仍需用户授权）。
 3. **完工后**：用户决定何时把旧分支删掉（参考 main 上已合并的分支即可安全 `git branch -d`）。
 

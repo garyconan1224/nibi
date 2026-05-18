@@ -16,13 +16,13 @@
 
 | 序 | 文件 | 角色 |
 |---|---|---|
-| **1** | [`docs/nibi-spec-merged.md`](nibi-spec-merged.md) | **产品需求规范**（8 模块 + 附录 C 执行路线），所有产品决议以此为准 |
-| **2** | [`docs/PROJECT_EXECUTION_PLAN.md`](PROJECT_EXECUTION_PLAN.md) | **工程执行计划**（Phase 打勾 + 当前在哪一步） |
+| **1** | [`docs/SPEC.md`](SPEC.md) | **产品需求规范**（8 模块 + 附录 C 执行路线），所有产品决议以此为准 |
+| **2** | [`docs/EXECUTION_PLAN.md`](EXECUTION_PLAN.md) | **工程执行计划**（Phase 打勾 + 当前在哪一步） |
 | **3** | [`docs/design/`](design/) | **设计稿源文件**（VidMirror.html + 19 个 jsx 组件 + styles.css + v1.1 设计契约），视觉与交互细节以此为准 |
 | **4** | 当前工作目录代码 | 实际实现，与 spec 偏差时**优先反映到 spec 或新建差异 phase**，不静默修改代码 |
-| ~~5~~ | ~~`nibi-spec-v2.md`~~ | ⚠️ DEPRECATED，仅历史归档 |
+| ~~5~~ | ~~`docs/archive/spec-v2.md`~~ | ⚠️ DEPRECATED，仅历史归档 |
 | ~~6~~ | ~~`docs/archive/system_design_v3_final.md`~~ | ⚠️ DEPRECATED |
-| ~~7~~ | ~~`plan.md` / `system_design_for_claude_design_v1.md`~~ | ⚠️ DEPRECATED |
+| ~~7~~ | ~~`docs/archive/plan-v1.md` / `docs/archive/design-spec-v1.md`~~ | ⚠️ DEPRECATED |
 
 ---
 
@@ -79,7 +79,7 @@
 ## 4. 当前阶段 [A] 现状同步——9 项必做
 
 **已经做了**（在 PR #1 docs/spec-merged 分支上）：
-- [x] 1. 合并 spec md 写完（[`docs/nibi-spec-merged.md`](nibi-spec-merged.md)）
+- [x] 1. 合并 spec md 写完（[`docs/SPEC.md`](SPEC.md)）
 - [x] 2. 设计稿统一搬到 [`docs/design/`](design/)（旧 `design_reference/` 已删）
 - [x] 3. v3 文档归档到 [`docs/archive/`](archive/)
 - [x] 4. 旧 spec 顶部加 DEPRECATED 标记（nibi-spec-v2 / plan / v1 设计文档）
@@ -96,7 +96,7 @@
 > - **不 push**：按 CLAUDE.md §「Push 策略」，commit 留在 local main，等 [D] 开源准备阶段统一推
 
 待办：
-- [x] 9. 重写 [`docs/PROJECT_EXECUTION_PLAN.md`](PROJECT_EXECUTION_PLAN.md)：抛弃旧 Phase 3D-3E 路线，替换为 N1~N11 路线（路线初稿见 `docs/nibi-spec-merged.md` 附录 C.2）
+- [x] 9. 重写 [`docs/EXECUTION_PLAN.md`](EXECUTION_PLAN.md)：抛弃旧 Phase 3D-3E 路线，替换为 N1~N11 路线（路线初稿见 `docs/SPEC.md` 附录 C.2）
 - [x] 10. 重写 [`docs/AI_HANDOFF.md`](AI_HANDOFF.md)：清除 Phase 2B 旧入口，改 N1 开工交接（参考本文档 §4 模板）
 - [x] 11. 旧 `docs/plans/phase-3d~phase-10.md` 共 9 份，全部 frontmatter 加 `status: archived` + 顶部注明"被合并 spec 取代"
 
@@ -114,13 +114,13 @@ git status --short --branch
 git log --oneline -5
 
 # 2. 读真相源（按本文档第 1 节顺序）
-# 不要先读 nibi-spec-v2.md / plan.md / system_design_*.md，这些都 DEPRECATED
+# 不要先读 docs/archive/spec-v2.md / plan.md / system_design_*.md，这些都 DEPRECATED
 ```
 
 然后：
 1. 读本文档（WORKFLOW.md），知道总流程在哪
-2. 读 `docs/PROJECT_EXECUTION_PLAN.md`，找第一个未打勾的子任务
-3. 读 `docs/nibi-spec-merged.md` 对应模块，理解产品需求
+2. 读 `docs/EXECUTION_PLAN.md`，找第一个未打勾的子任务
+3. 读 `docs/SPEC.md` 对应模块，理解产品需求
 4. 读 `docs/design/components/<对应组件>.jsx`，理解视觉与交互
 5. 才能动手写代码
 
@@ -158,5 +158,5 @@ git log --oneline -5
 ## 8. 修改本工作流文档的规则
 
 - 改动需 commit 时附带原因（"因为 XXX，调整流程"）
-- 任何 phase 路线大改（如砍掉 AI 导演 / 加新 phase）都要同步改本文档与 `docs/nibi-spec-merged.md` 附录 C
+- 任何 phase 路线大改（如砍掉 AI 导演 / 加新 phase）都要同步改本文档与 `docs/SPEC.md` 附录 C
 - 本文档与 `CLAUDE.md` / `AGENTS.md` 三者**互相引用**，改一个必须考虑另外两个

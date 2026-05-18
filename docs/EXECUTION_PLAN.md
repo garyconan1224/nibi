@@ -11,7 +11,7 @@
 ## 使用方法（每个新会话开始时跑一遍）
 
 1. 读本文件，找到第一个未打勾的子任务
-2. 如果是 N1~N11 阶段，读 `docs/nibi-spec-merged.md` 对应模块理解产品需求
+2. 如果是 N1~N11 阶段，读 `docs/SPEC.md` 对应模块理解产品需求
 3. 如果该子任务有对应的 `docs/plans/<file>.md` 详细计划：
    - 若 `status: pending` 且操作步骤段是 `TODO` → 停下问用户「要先展开这个 phase 的具体执行计划吗？」
    - 若 `status: ready` 或 `in_progress` 且已有操作步骤 → 按里面的步骤执行
@@ -51,7 +51,7 @@
 
 ### N1~N11「合并 spec 落地差异」（当前主线）
 
-> 来源：`docs/nibi-spec-merged.md` 附录 C.2。每个 Phase 的具体子任务在进入时再展开（pending → ready → done）。
+> 来源：`docs/SPEC.md` 附录 C.2。每个 Phase 的具体子任务在进入时再展开（pending → ready → done）。
 
 - [ ] **N1** 任务系统差异：trashed/analyzed 状态 / 软删除垃圾桶 / 删 project_id — `4-6h` P0
 - [ ] **N2** 侧边栏从 8 砍到 4 + Taskboard 子标签 5→4（隐藏「导出」入口）— `2-3h` P0
@@ -76,7 +76,7 @@
 
 **N1 任务系统差异**（P0，估时 4-6h）。
 
-具体范围见 `docs/nibi-spec-merged.md` 附录 C.2 的 N1 行：
+具体范围见 `docs/SPEC.md` 附录 C.2 的 N1 行：
 - trashed / analyzed 状态字段
 - 软删除垃圾桶（前端 + 后端）
 - 删 project_id 冗余字段

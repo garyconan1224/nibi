@@ -10,7 +10,7 @@ Last updated: 2026-05-18（现状同步完成，进入 N1~N11 路线）
 
 - 最新合并：docs/spec-merged 分支全部内容已入 main（local main 领先 origin 59 commits）。
 - Phase 0~3C 全部完成，现状同步 [A] 已完成。
-- 详细进度见 `docs/PROJECT_EXECUTION_PLAN.md`。
+- 详细进度见 `docs/EXECUTION_PLAN.md`。
 
 ## P0 — 下一步
 
@@ -24,7 +24,7 @@ Last updated: 2026-05-18（现状同步完成，进入 N1~N11 路线）
 
 ## P0 — N1 之后
 
-按 `docs/PROJECT_EXECUTION_PLAN.md` 的 N1~N11 路线依次推进：
+按 `docs/EXECUTION_PLAN.md` 的 N1~N11 路线依次推进：
 - N2 侧边栏精简（2-3h）
 - N3 设置页重组（6-8h）
 - N4 添加素材模态（4-5h）
@@ -34,5 +34,5 @@ Last updated: 2026-05-18（现状同步完成，进入 N1~N11 路线）
 
 - Streamlit 旧入口冻结，除非用户明确要求维护。
 - 持续把文档对齐到 FastAPI + React/Vite 主线。
-- `docs/PHASE_X_MAIN_PIPELINE.md` 里记录的「任务存储路径漂移」问题 — 长期注意只从 `/Users/conan/Desktop/nibi` 主目录起服务，不在 worktree 内 `./start.sh`。
+- `docs/archive/phase-x-main-pipeline.md` 里记录的「任务存储路径漂移」问题 — 长期注意只从 `/Users/conan/Desktop/nibi` 主目录起服务，不在 worktree 内 `./start.sh`。
 - Push 策略：所有 push 暂缓到 [D] 开源准备阶段。
