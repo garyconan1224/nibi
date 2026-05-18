@@ -1169,3 +1169,79 @@ def workspace_search(workspace_id: str, req: WorkspaceSearchRequest) -> Dict[str
         raise HTTPException(status_code=404, detail=str(err)) from err
     except ValueError as err:
         raise HTTPException(status_code=400, detail=str(err)) from err
+
+
+# ── Phase 3C.3：标签 CRUD + 重新生成 ─────────────────────────
+
+
+class TagsUpdateRequest(BaseModel):
+    """手动校正标签请求体。"""
+
+    tags: Dict[str, Any]
+
+
+def _validate_tags(tags: Dict[str, Any]) -> None:
+    """校验系统 6 维度的 key/value 合法性，custom_tags 跳过 value 校验。"""
+    from shared.config import TAG_DIMENSIONS
+
+    system_dims = {k: v for k, v in TAG_DIMENSIONS.items() if k != "custom_tags"}
+    for key, value in tags.items():
+        if key.startswith("_"):
+            continue  # 跳过 _generated_at / _generated_model 等内部字段
+        if key == "custom_tags":
+            continue
+        if key not in system_dims:
+            raise HTTPException(
+                status_code=422,
+                detail=f"unknown tag dimension: {key!r}",
+            )
+        choices = system_dims[key].get("choices") or []
+        if choices and value not in choices:
+            raise HTTPException(
+                status_code=422,
+                detail=f"invalid value {value!r} for dimension {key!r}; expected one of {choices}",
+            )
+
+
+@router.get("/{workspace_id}/items/{item_id}/tags")
+def get_item_tags(workspace_id: str, item_id: str) -> Dict[str, Any]:
+    """返回指定素材的当前标签。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    _find_item(rec, item_id)
+    item = next(it for it in rec.items if it.item_id == item_id)
+    return {"tags": item.tags}
+
+
+@router.put("/{workspace_id}/items/{item_id}/tags")
+def update_item_tags(
+    workspace_id: str, item_id: str, req: TagsUpdateRequest
+) -> Dict[str, Any]:
+    """手动校正标签（做维度合法性校验）。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    _find_item(rec, item_id)
+    _validate_tags(req.tags)
+    rec = _store.update_item(workspace_id, item_id, tags=req.tags)
+    item = next(it for it in rec.items if it.item_id == item_id)
+    return {"tags": item.tags}
+
+
+@router.post("/{workspace_id}/items/{item_id}/tags/regenerate")
+def regenerate_item_tags(workspace_id: str, item_id: str) -> Dict[str, Any]:
+    """重新触发 LLM 打标并写回。"""
+    from backend.app.services.tag_generator import generate_tags
+
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+    try:
+        new_tags = generate_tags(item, rec, task_store=_pipeline_runner.store)
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=str(err)) from err
+    rec = _store.update_item(workspace_id, item_id, tags=new_tags)
+    item = next(it for it in rec.items if it.item_id == item_id)
+    return {"tags": item.tags}
