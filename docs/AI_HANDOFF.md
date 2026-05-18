@@ -1,6 +1,6 @@
 # AI Handoff
 
-Last updated: 2026-05-18（现状同步完成，进入 N1~N11 路线）
+Last updated: 2026-05-19（N1 完成，进入 N2）
 
 ---
 
@@ -12,43 +12,61 @@ Last updated: 2026-05-18（现状同步完成，进入 N1~N11 路线）
 | Phase 2A~2D | ✅ 已合并 main | 内容能力扩展完成（含 2D SQLite 评估） |
 | Phase 3A~3C | ✅ 已合并 main | 知识库 + 标签库完成 |
 | 现状同步 [A] | ✅ 已完成 | 合并 spec + 设计稿归位 + 文档体系重写 |
-| **N1 任务系统差异** | ⏳ **下一步** | P0，估时 4-6h |
+| **N1 任务系统差异** | ✅ 完成（待 merge） | 分支 `feat/phase-n1-task-system`，8 个 commit |
+| **N1b 磁盘布局重构** | ⏸ 已拆出 | 从 N1 分出，作为独立 P1 phase |
+| **N2 侧边栏精简** | ⏳ **下一步** | P0，估时 2-3h |
 
 > ⚠️ 写新交接前请**先 `git log --oneline -20` 对账**，不要相信本文件里写的「下一步」如果它和 git 冲突。
 
 ---
 
-## N1 开工交接（下一步）
+## N1 完工小结（待 merge）
 
-> 来源：`docs/SPEC.md` 附录 C.2 N1 行。
+- 分支：`feat/phase-n1-task-system`
+- worktree：`/Users/conan/Desktop/nibi-n1`（commit 全部已写入，等用户 merge 进 main 后可删）
+- commits：N1.1 模型字段、N1.2 列表过滤、N1.3 软删 + restore + permanent + 清空、N1.4 删上层 project_id、N1.5 前端类型 + 删 ProjectSwitcher、N1.6 垃圾桶页面、N1.7 测试修复 + 新增 4 个 trash 用例
+- 拆出未做：**磁盘布局 `data/projects/<project_id>/...` 仍保留**——拆为独立 phase **N1b**，因为牵涉到老数据搬家与十几个文件，不在 N1 4-6h 估时范围内。
+- 验证：`pytest tests/backend -q` 105 passed；`pnpm build` 仅余 4 个 baseline tsc 错误（与 N1 无关）。
+- 用户合并步骤：
+  ```bash
+  cd /Users/conan/Desktop/nibi
+  git merge --no-ff feat/phase-n1-task-system -m "Merge N1: 任务系统差异（trashed/analyzed/上层 project_id）"
+  git worktree remove /Users/conan/Desktop/nibi-n1
+  git branch -d feat/phase-n1-task-system
+  ```
 
-### N1 范围
+---
 
-- 标题：任务系统差异
-- 估时：4-6h
+## N2 开工交接（下一步）
+
+> 来源：`docs/SPEC.md` §1.7 / §1.8。
+
+### N2 范围
+
+- 标题：侧边栏从 8 砍到 4 + Taskboard 子标签 5→4
+- 估时：2-3h
 - 优先级：P0
-- **模型**：⭐ **Opus 4.7（桌面）** —— 跨后端模型 + routes + 前端 + **schema 迁移**（删 `project_id` 是破坏性），符合 CLAUDE.md「复杂阶段」定义
-- **分支**：**新开 worktree** + 分支 `feat/phase-n1-task-system`，**不在主 worktree** `/Users/conan/Desktop/nibi` **直接改代码**（主 worktree 仅用于 merge）
-- **不 push**：按 CLAUDE.md §「Push 策略」，commit 留本地，等 [D] 阶段统一推
+- **模型**：Sonnet 4.6 或 ⭐ 小米 2.5 Pro（纯前端入口隐藏 / 路由调整，符合 CLAUDE.md「简单阶段」）
+- **分支**：可直接在主 worktree 开 `feat/phase-n2-sidebar`
+- **不 push**：commit 留本地，等 [D] 阶段统一推
 
 ### 具体差异项
 
-1. **trashed / analyzed 状态字段**：后端 task 状态机增加这两个状态，前端状态徽章适配
-2. **软删除垃圾桶**：删除任务改为软删除（标记 trashed），新增垃圾桶页面/入口恢复或永久删除
-3. **删 project_id 冗余字段**：task 表去掉 project_id（如果 spec 决议如此）
+1. **一级导航砍至 4 项**：任务中心（Taskboard）/ 资料库 / AI 导演（灰显，等 [C] 阶段）/ 设置
+2. **Taskboard 子标签砍至 4 项**：素材 / 队列 / 标签库 / AI 对话（隐藏「导出」入口）
+3. **代码留备份**：仅入口隐藏，不删功能代码（导出仍可走 API 触发，只是 UI 不可见）
 
 ### 开工前准备
 
-1. 读 `docs/SPEC.md` 找 N1 相关模块描述
-2. 读现有 task 状态机代码（`backend/app/` 相关文件）
-3. 确认是否需要 schema 迁移（涉及数据库变更需先问用户）
-4. 拆子任务 → 写到 `docs/plans/phase-n1-task-system.md` → 问用户确认
+1. 读 `docs/SPEC.md` §1.7 / §1.8
+2. 找前端侧边栏 / Taskboard 组件
+3. 拆子任务（应该比 N1 简单很多）
 
 ### 不要做的事
 
-- ❌ 不要顺手改 N2/N3 的东西
-- ❌ 不要重构无关的任务系统代码
-- ❌ 不要引入新依赖（除非 spec 明确要求）
+- ❌ 不要顺手改 N3 设置页重组（那是 N3 的事）
+- ❌ 不要删被隐藏入口对应的页面代码 / 路由代码
+- ❌ N1b 磁盘布局重构属于独立 phase，不要在 N2 里捎带
 
 ---
 

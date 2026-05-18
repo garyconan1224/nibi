@@ -53,7 +53,8 @@
 
 > 来源：`docs/SPEC.md` 附录 C.2。每个 Phase 的具体子任务在进入时再展开（pending → ready → done）。
 
-- [ ] **N1** 任务系统差异：trashed/analyzed 状态 / 软删除垃圾桶 / 删 project_id — `4-6h` P0
+- [x] **N1** 任务系统差异：trashed/analyzed 状态 / 软删除垃圾桶 / 删 WorkspaceRecord 上层 project_id — `4-6h` P0
+- [ ] **N1b** 磁盘布局 `data/projects/<project_id>/...` → `data/workspaces/<workspace_id>/...` + 老数据搬家 — `6-10h` P1（从 N1 拆出）
 - [ ] **N2** 侧边栏从 8 砍到 4 + Taskboard 子标签 5→4（隐藏「导出」入口）— `2-3h` P0
 - [ ] **N3** 设置页重组 9→7（合并分析默认偏好 / 模型与渠道 / 新增任务垃圾桶）— `6-8h` P0
 - [ ] **N4** 添加素材模态升级（4 步合一 + 自动识别类型 + 智能默认勾选 + 背景信息折叠）— `4-5h` P1
@@ -74,16 +75,16 @@
 
 ## 当前下一步
 
-**N1 任务系统差异**（P0，估时 4-6h）。
+**N2 侧边栏从 8 砍到 4 + Taskboard 子标签 5→4**（P0，估时 2-3h）。
 
-具体范围见 `docs/SPEC.md` 附录 C.2 的 N1 行：
-- trashed / analyzed 状态字段
-- 软删除垃圾桶（前端 + 后端）
-- 删 project_id 冗余字段
+具体范围见 `docs/SPEC.md` §1.7 / §1.8：
+- 一级导航砍至 4 项（任务中心 / 资料库 / AI 导演[灰] / 设置）
+- Taskboard 子标签从 5 砍至 4（隐藏「导出」入口）
+- 砍掉的代码留备份，本 phase 仅做入口隐藏
 
-> 📍 **N1 开工参数（决议版）**：
-> - **模型**：⭐ **Opus 4.7（桌面）** —— schema 迁移 + 跨后端/前端，符合 CLAUDE.md「复杂阶段」
-> - **分支**：**新开 worktree** + `feat/phase-n1-task-system`，**不在主 worktree 直接改代码**
+> 📍 **N2 开工参数**：
+> - **模型**：Sonnet 4.6 或 ⭐ 小米 2.5 Pro（纯前端入口隐藏 / 路由调整，不动后端，符合 CLAUDE.md「简单阶段」）
+> - **分支**：直接在主 worktree 开 `feat/phase-n2-sidebar`
 > - **不 push**：commit 留本地，等 [D] 阶段统一推
 
 ---

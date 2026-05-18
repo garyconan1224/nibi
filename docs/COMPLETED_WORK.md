@@ -288,3 +288,37 @@ WorkspaceItem.tags = {
 ### 留给后续的影响
 - 侧栏导航项数组在 `frontend/src/layouts/AppShell.tsx` `NAV_ITEMS`——新增页面需要在此加项
 - 设计令牌的真相源仍是 `vidmirror-handoff/project/styles.css`，改色或字体应回去比对
+
+---
+
+## Phase N1 – 任务系统差异（trashed/analyzed/上层 project_id）
+
+**完成日期**：2026-05-19
+**模型 / 工具**：Opus 4.7
+**分支**：`feat/phase-n1-task-system`（worktree `/Users/conan/Desktop/nibi-n1`）
+**Commits**：6436504 / ebf9a48 / 5ff638c / a294448 / 89a5795 / ff77385 / c078617
+
+### 影响范围
+- 后端：`backend/app/models/workspace.py`、`backend/app/routes/workspaces.py`、`backend/app/services/workspace_store.py`
+- 前端：`frontend/src/types/workspace.ts`、`frontend/src/services/workspaces.ts`、`frontend/src/router.tsx`、`frontend/src/layouts/SettingsShell.tsx`、新增 `frontend/src/pages/SettingPage/TrashPage.tsx`、删除 `components/ProjectSwitcher.tsx` 与 `store/projectStore.ts`
+- 测试：新增 `tests/backend/test_workspaces_trash.py`（4 用例），修复 `test_workspace_knowledge.py` / `test_workspaces_api.py`
+
+### 关键改动
+- **WorkspaceStatus**：`COMPLETED("completed")` 重命名为 `ANALYZED("analyzed")`，`from_dict` 兼容老 `"completed"` 数据
+- **新增 trashed: bool 字段**：独立标志位，恢复时不动 status，原状态天然保留
+- **软删除路由**：DELETE 改为 `trashed=True`；新增 `POST /workspaces/{id}/restore`、`DELETE /workspaces/{id}/permanent`、`DELETE /workspaces/trash`
+- **列表过滤**：`GET /workspaces` 新增 `trashed_only` / `include_trashed` query 参数，默认排除 trashed
+- **删 WorkspaceRecord.project_id 字段**（仅上层）：前端 ProjectSwitcher 一并删除（孤儿组件，无引用点）
+- **保留 TaskRecord.project_id 与磁盘布局**：拆为独立 N1b phase（详见下面"为什么这么做"）
+- **前端垃圾桶页**：`/settings/trash` 路由，列表 + 恢复 + 彻底删除 + 清空，window.confirm 二次确认
+
+### 为什么这么做
+- **trashed 用独立字段而非 status 枚举**：spec §1.4 要求"恢复到原状态"。如果用 status="trashed" 覆盖原 status，恢复时需要额外的 `status_before_trash` 字段；用独立 bool 更干净。
+- **拆出 N1b（磁盘布局）**：开工后才发现 `shared/config.py::get_project_videos_dir(project_id)` 等 ~15 处把 project_id 当磁盘目录键，pipeline_tasks.py 全分支都用。彻底重构需 6-10h + 老数据搬家，远超 N1 4-6h 估时。用户决议"只拆能看到的那一层"——前端项目下拉框删除、上层字段删除；磁盘 `data/projects/<id>/...` 保留待 N1b。
+- **DELETE /trash 路由先于 /{workspace_id}**：FastAPI 路径按声明顺序匹配，否则 `trash` 会被当成 workspace_id 吞掉。
+
+### 留给后续的影响
+- 数据兼容：老 workspace JSON 里 `project_id` 字段被 `from_dict` 静默忽略；老 `status="completed"` 自动升级为 `"analyzed"`
+- 创建 workspace 后调 pipeline 任务，磁盘文件统一进 `data/projects/default_project/`——N1b 时再迁
+- 设置页「垃圾桶」入口当前用字面量 `"垃圾桶"`，N3 设置页重组时补 `layout.menu.trash` i18n key
+- N1b 待启动：磁盘布局 → `data/workspaces/<workspace_id>/<item_id>/`，附老数据搬家脚本
