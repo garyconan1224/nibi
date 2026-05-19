@@ -9,7 +9,7 @@ worktree: 是
 depends_on: [5]
 ---
 
-> ⚠️ **已归档**：本计划已被 `docs/nibi-spec-merged.md` 取代，不再参与执行。保留作历史参考。
+> ⚠️ **已归档**：本计划已被 `docs/SPEC.md` 取代，不再参与执行。保留作历史参考。
 
 ## 范围概述
 

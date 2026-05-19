@@ -10,7 +10,7 @@ depends_on: [3E]
 opensource_threshold: true   # 这一阶段完成 = 开源时刻
 ---
 
-> ⚠️ **已归档**：本计划已被 `docs/nibi-spec-merged.md` 取代，不再参与执行。保留作历史参考。
+> ⚠️ **已归档**：本计划已被 `docs/SPEC.md` 取代，不再参与执行。保留作历史参考。
 
 ## 范围概述
 

@@ -36,3 +36,4 @@ __pycache__/
 # Design source archives (already extracted to docs/design/)
 *.zip
 .DS_Store
+*.swp
