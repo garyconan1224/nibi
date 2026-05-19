@@ -69,11 +69,83 @@ def _normalize(text: str) -> str:
 
 # ── PDF ───────────────────────────────────────────────────
 
+# marker 模型加载（懒加载，进程内单例）
+_marker_converter = None
+
+
+def _get_marker_converter():
+    """懒加载 marker PdfConverter（模型 ~1.5GB，首次约 30s）。"""
+    global _marker_converter
+    if _marker_converter is not None:
+        return _marker_converter
+    try:
+        from marker.converters.pdf import PdfConverter
+        from marker.config.parser import ConfigParser
+        from marker.models import create_model_dict
+
+        model_dict = create_model_dict()
+        config_parser = ConfigParser({
+            "output_format": "markdown",
+            "disable_image_extraction": True,  # 图片保留占位符，不提取为文件
+        })
+        _marker_converter = PdfConverter(
+            artifact_dict=model_dict,
+            processor_list=config_parser.get_processors(),
+            renderer=config_parser.get_renderer(),
+        )
+    except Exception as err:  # noqa: BLE001
+        raise TextLoaderError(f"marker 初始化失败: {err}") from err
+    return _marker_converter
+
+
+def _load_pdf_marker(path: Path) -> TextDocument:
+    """用 marker 解析 PDF → Markdown（保留图片+表格，支持扫描件 OCR）。"""
+    converter = _get_marker_converter()
+    try:
+        result = converter(str(path))
+    except Exception as err:  # noqa: BLE001
+        raise TextLoaderError(f"marker PDF 解析失败: {err}") from err
+
+    md_text = getattr(result, "markdown", "") or ""
+    content = _normalize(md_text)
+    title = _extract_pdf_title_pypdf(path) or path.stem
+
+    return TextDocument(
+        title=title or path.stem,
+        content=content,
+        source_type="pdf",
+        source=str(path.resolve()),
+        char_count=len(content),
+        meta={"parser": "marker"},
+    )
+
+
+def _extract_pdf_title_pypdf(path: Path) -> str:
+    """用 pypdf 提取 PDF 标题（轻量，不加载 marker 模型）。"""
+    try:
+        from pypdf import PdfReader
+        reader = PdfReader(str(path))
+        meta_obj = reader.metadata or {}
+        return str(meta_obj.get("/Title") or "").strip()
+    except Exception:  # noqa: BLE001
+        return ""
+
 
 def load_pdf(path: Union[str, Path]) -> TextDocument:
+    """解析 PDF 文件。marker 优先（支持扫描件 OCR + 图片表格保留），pypdf 兜底。"""
     p = Path(path)
     if not p.is_file():
         raise TextLoaderError(f"PDF 文件不存在: {p}")
+
+    # 优先 marker
+    try:
+        return _load_pdf_marker(p)
+    except TextLoaderError:
+        pass  # marker 失败，fallback pypdf
+    except Exception:  # noqa: BLE001
+        pass  # marker 导入失败等
+
+    # fallback: pypdf（纯文本，无 OCR）
     try:
         from pypdf import PdfReader
     except ImportError as err:
@@ -81,7 +153,7 @@ def load_pdf(path: Union[str, Path]) -> TextDocument:
 
     try:
         reader = PdfReader(str(p))
-    except Exception as err:  # noqa: BLE001  pypdf 抛多种异常
+    except Exception as err:  # noqa: BLE001
         raise TextLoaderError(f"PDF 解析失败: {err}") from err
 
     pages: list[str] = []
@@ -107,7 +179,7 @@ def load_pdf(path: Union[str, Path]) -> TextDocument:
         source_type="pdf",
         source=str(p.resolve()),
         char_count=len(content),
-        meta={"page_count": len(reader.pages)},
+        meta={"parser": "pypdf", "page_count": len(reader.pages)},
     )
 
 

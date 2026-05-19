@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Star } from 'lucide-react'
+import { ArrowLeft, Star, ChevronDown, ChevronRight, Layers } from 'lucide-react'
 
 import {
   type TextResult,
+  type TextCompareResult,
   addPromptVersion,
   getTextItemResult,
+  getTextCompare,
 } from '@/services/workspaces'
 import { PromptVersionStack } from '@/components/result/PromptVersionStack'
 
@@ -23,6 +25,19 @@ export default function TextResultPage() {
     | { kind: 'error'; message: string }
   const [fetchState, setFetchState] = useState<FetchState>({ kind: 'loading' })
   const [favored, setFavored] = useState(false)
+
+  // N10: 折叠状态
+  const [assocOpen, setAssocOpen] = useState(true)
+  const [rewriteOpen, setRewriteOpen] = useState(true)
+  const [translateOpen, setTranslateOpen] = useState(true)
+
+  // N10: 多文对比弹窗
+  const [compareState, setCompareState] = useState<
+    | { kind: 'closed' }
+    | { kind: 'loading' }
+    | { kind: 'ready'; data: TextCompareResult }
+    | { kind: 'error'; message: string }
+  >({ kind: 'closed' })
 
   useEffect(() => {
     let cancelled = false
@@ -61,6 +76,18 @@ export default function TextResultPage() {
     })
   }, [])
 
+  // N10: 多文对比
+  const handleCompare = useCallback(async () => {
+    setCompareState({ kind: 'loading' })
+    try {
+      const data = await getTextCompare(workspaceId, itemId)
+      setCompareState({ kind: 'ready', data })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '多文对比失败'
+      setCompareState({ kind: 'error', message })
+    }
+  }, [workspaceId, itemId])
+
   if (fetchState.kind === 'loading') {
     return (
       <div className="vm-video-result-scope" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
@@ -83,6 +110,10 @@ export default function TextResultPage() {
       </div>
     )
   }
+
+  const hasAssociations = result.associations && Object.keys(result.associations).length > 0
+  const hasRewrites = result.rewrites && Object.keys(result.rewrites).length > 0
+  const hasTranslations = result.translations && Object.keys(result.translations).length > 0
 
   return (
     <div
@@ -145,7 +176,7 @@ export default function TextResultPage() {
         </div>
       </div>
 
-      {/* ════════ 右：摘要 + 元信息 + 提示词版本 ════════ */}
+      {/* ════════ 右：摘要 + 联想 + 改写翻译 + 元信息 + 版本栈 ════════ */}
       <div
         style={{
           borderLeft: '1px solid var(--line)',
@@ -161,9 +192,30 @@ export default function TextResultPage() {
             borderBottom: '1px solid var(--line)',
             flexShrink: 0,
             background: 'var(--bg-sunken)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
           }}
         >
           <span className="eyebrow">文本摘要</span>
+          {/* N10: 多文对比按钮 */}
+          <button
+            onClick={handleCompare}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: 11,
+              padding: '3px 8px',
+              borderRadius: 6,
+              border: '1px solid var(--line)',
+              background: 'var(--bg-elev)',
+              color: 'var(--ink-2)',
+              cursor: 'pointer',
+            }}
+          >
+            <Layers size={12} /> 多文对比
+          </button>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
@@ -173,6 +225,87 @@ export default function TextResultPage() {
               <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--ink-2)' }}>
                 {result.summary}
               </div>
+            </div>
+          )}
+
+          {/* N10: 联想归纳 */}
+          {hasAssociations && (
+            <div style={{ marginBottom: 14 }}>
+              <button
+                onClick={() => setAssocOpen(!assocOpen)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  padding: 0, marginBottom: 6,
+                }}
+              >
+                {assocOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                <span className="eyebrow">联想归纳</span>
+              </button>
+              {assocOpen && (
+                <div style={{ fontSize: 12, lineHeight: 1.7, color: 'var(--ink-2)' }}>
+                  {Object.entries(result.associations!).map(([dir, text]) => (
+                    <div key={dir} style={{ marginBottom: 8 }}>
+                      <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--ink-3)', marginBottom: 2 }}>{dir}</div>
+                      <div>{text}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* N10: 改写/润色 */}
+          {hasRewrites && (
+            <div style={{ marginBottom: 14 }}>
+              <button
+                onClick={() => setRewriteOpen(!rewriteOpen)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  padding: 0, marginBottom: 6,
+                }}
+              >
+                {rewriteOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                <span className="eyebrow">改写 / 润色</span>
+              </button>
+              {rewriteOpen && (
+                <div style={{ fontSize: 12, lineHeight: 1.7, color: 'var(--ink-2)' }}>
+                  {Object.entries(result.rewrites!).map(([style, text]) => (
+                    <div key={style} style={{ marginBottom: 8 }}>
+                      <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--ink-3)', marginBottom: 2 }}>{style}</div>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{text}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* N10: 翻译 */}
+          {hasTranslations && (
+            <div style={{ marginBottom: 14 }}>
+              <button
+                onClick={() => setTranslateOpen(!translateOpen)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  padding: 0, marginBottom: 6,
+                }}
+              >
+                {translateOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                <span className="eyebrow">翻译</span>
+              </button>
+              {translateOpen && (
+                <div style={{ fontSize: 12, lineHeight: 1.7, color: 'var(--ink-2)' }}>
+                  {Object.entries(result.translations!).map(([lang, text]) => (
+                    <div key={lang} style={{ marginBottom: 8 }}>
+                      <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--ink-3)', marginBottom: 2 }}>{lang}</div>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{text}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -231,6 +364,103 @@ export default function TextResultPage() {
           </button>
         </div>
       </div>
+
+      {/* N10: 多文对比弹窗 */}
+      {compareState.kind !== 'closed' && (
+        <TextCompareModal
+          state={compareState}
+          onClose={() => setCompareState({ kind: 'closed' })}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── 多文对比弹窗 ──────────────────────────────────────────────
+
+function TextCompareModal({
+  state,
+  onClose,
+}: {
+  state:
+    | { kind: 'loading' }
+    | { kind: 'ready'; data: TextCompareResult }
+    | { kind: 'error'; message: string }
+  onClose: () => void
+}) {
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center',
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--bg)', borderRadius: 12, width: '80vw', maxWidth: 900,
+          maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          border: '1px solid var(--line)',
+        }}
+      >
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontWeight: 600, fontSize: 14 }}>多文对比</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--ink-3)' }}>×</button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+          {state.kind === 'loading' && (
+            <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 40 }}>加载对比数据…</div>
+          )}
+          {state.kind === 'error' && (
+            <div style={{ textAlign: 'center', color: 'var(--accent)', padding: 40 }}>{state.message}</div>
+          )}
+          {state.kind === 'ready' && (
+            <TextCompareContent data={state.data} />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TextCompareContent({ data }: { data: TextCompareResult }) {
+  const items = data.texts.filter((t) => t.has_result)
+  if (items.length === 0) {
+    return <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 40 }}>没有已完成分析的文字素材</div>
+  }
+
+  return (
+    <div>
+      {/* 对比表格 */}
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 16 }}>
+        <thead>
+          <tr style={{ borderBottom: '2px solid var(--line)' }}>
+            <th style={{ textAlign: 'left', padding: '8px 6px', color: 'var(--ink-3)' }}>素材</th>
+            <th style={{ textAlign: 'left', padding: '8px 6px', color: 'var(--ink-3)' }}>字数</th>
+            <th style={{ textAlign: 'left', padding: '8px 6px', color: 'var(--ink-3)' }}>摘要</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((t) => (
+            <tr key={t.item_id} style={{ borderBottom: '1px solid var(--line)', background: t.is_current ? 'rgba(99,102,241,0.06)' : undefined }}>
+              <td style={{ padding: '8px 6px', fontWeight: t.is_current ? 600 : 400 }}>{t.name}</td>
+              <td style={{ padding: '8px 6px' }}>{t.char_count.toLocaleString()}</td>
+              <td style={{ padding: '8px 6px', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.summary}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* LLM 对比总结 */}
+      {data.llm_summary && (
+        <div style={{ marginTop: 12 }}>
+          <div className="eyebrow" style={{ marginBottom: 6 }}>AI 对比总结</div>
+          <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--ink-2)', whiteSpace: 'pre-wrap' }}>
+            {data.llm_summary}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

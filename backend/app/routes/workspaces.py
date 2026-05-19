@@ -806,6 +806,15 @@ def _bridge_to_pipeline_payload(
             "source": item.source_value,
             "source_type": item.source,  # "url" or "local"
         }
+        # N10: 透传 text 子参数 + 全局模型/key
+        models = item.preflight.models or {}
+        if models.get("text"):
+            payload["text_model"] = models["text"]
+        tasks = item.preflight.tasks or {}
+        for task_id in ("summary", "association", "rewrite", "translate", "multi_compare"):
+            params = tasks.get(task_id)
+            if isinstance(params, dict):
+                payload[task_id] = params
         return "text", payload
 
     if item.type == ItemType.IMAGE.value:
@@ -1249,6 +1258,94 @@ def get_image_compare(workspace_id: str, item_id: str) -> Dict[str, Any]:
         "current_item_id": item_id,
         "images": collected,
         "vlm_summary": vlm_summary,
+    }
+
+
+# ── 多文对比（N10）────────────────────────────────────────────
+
+
+@router.get("/{workspace_id}/items/{item_id}/text_compare")
+def get_text_compare(workspace_id: str, item_id: str) -> Dict[str, Any]:
+    """多文对比（N10）。
+
+    收集同工作空间内所有已完成分析的文字素材结果，
+    与当前文字进行结构化对比（摘要 / 要点 / 联想归纳）。
+    如果 LLM 可用，还会生成一段总结性对比分析。
+    """
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+    if item.type != ItemType.TEXT.value:
+        raise HTTPException(status_code=400, detail="text_compare 仅支持 text 类型素材")
+
+    # 收集同 workspace 内所有已完成的 text 素材的结果
+    text_items = [it for it in rec.items if it.type == ItemType.TEXT.value]
+    collected: List[Dict[str, Any]] = []
+    for it in text_items:
+        overlay = _sync_item_with_tasks(it)
+        results = dict(overlay.get("results", {})) if overlay and overlay.get("results") else dict(it.results or {})
+        has_real = isinstance(results, dict) and results.get("summary")
+        collected.append({
+            "item_id": it.item_id,
+            "name": it.name,
+            "is_current": it.item_id == item_id,
+            "source_value": it.source_value,
+            "summary": results.get("summary", ""),
+            "content_preview": (results.get("content", "") or "")[:500],
+            "associations": results.get("associations", {}),
+            "rewrites": results.get("rewrites", {}),
+            "translations": results.get("translations", {}),
+            "char_count": results.get("char_count", 0),
+            "has_result": has_real,
+        })
+
+    # 尝试 LLM 对比总结（best-effort）
+    llm_summary = ""
+    items_with_results = [c for c in collected if c["has_result"]]
+    if len(items_with_results) >= 2:
+        try:
+            from shared.settings_store import load_settings as _load_s
+            from shared.provider_registry import create_default_registry as _cdr
+            from shared.provider_base import ChatRequest as _CR
+
+            _s = _load_s()
+            _api_key = (_s.openai_api_key or "").strip()
+            if _api_key:
+                _reg = _cdr()
+                _prof = _reg.resolve_default_profile(_s, "chat")
+                _prov = _reg.build(_prof)
+                _model = _prof.default_models.get("chat") or (_s.text_model or "").strip()
+                if _model:
+                    summaries = []
+                    for idx, c in enumerate(items_with_results, 1):
+                        assoc_str = "; ".join(
+                            f"{k}: {v[:80]}" for k, v in (c["associations"] or {}).items()
+                        ) if c["associations"] else "无"
+                        summaries.append(
+                            f"文本{idx}「{c['name']}」（{c['char_count']}字）：{c['summary'][:200]}。联想：{assoc_str}"
+                        )
+                    compare_prompt = (
+                        f"以下是{len(items_with_results)}篇文本的分析结果，请做对比总结：\n\n"
+                        + "\n\n".join(summaries)
+                        + "\n\n请从以下维度对比：\n"
+                        "1. 观点异同\n2. 立场倾向\n3. 信息完整性\n4. 时间线梳理（若适用）\n"
+                        "用中文回答，300-500字。"
+                    )
+                    llm_summary = _prov.chat(_CR(
+                        model=_model,
+                        messages=[{"role": "user", "content": compare_prompt}],
+                        temperature=0.4,
+                        max_tokens=1200,
+                    )).strip()
+        except Exception:
+            pass  # LLM 对比是锦上添花，失败不影响结构化数据返回
+
+    return {
+        "workspace_id": workspace_id,
+        "current_item_id": item_id,
+        "texts": collected,
+        "llm_summary": llm_summary,
     }
 
 
