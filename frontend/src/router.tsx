@@ -4,11 +4,11 @@ import Index from '@/pages/Index'
 
 // 按路由做代码分割：每个页面组件通过动态 import 拆成独立 chunk
 const SettingPage = lazy(() => import('@/pages/SettingPage/index'))
-const ProvidersManagementPage = lazy(
-  () => import('@/pages/SettingPage/ProvidersManagementPage'),
+const ProvidersAndModelsPage = lazy(
+  () => import('@/pages/SettingPage/ProvidersAndModelsPage'),
 )
-const ModelManagementPage = lazy(
-  () => import('@/pages/SettingPage/ModelManagementPage'),
+const AnalysisDefaultsPage = lazy(
+  () => import('@/pages/SettingPage/AnalysisDefaultsPage'),
 )
 const NetworkSettingsPage = lazy(
   () => import('@/pages/SettingPage/NetworkSettingsPage'),
@@ -16,9 +16,6 @@ const NetworkSettingsPage = lazy(
 const DownloadSettingsPage = lazy(
   () => import('@/pages/SettingPage/DownloadSettingsPage'),
 )
-const TranscriberPage = lazy(() => import('@/pages/SettingPage/TranscriberPage'))
-const PromptFormatPage = lazy(() => import('@/pages/SettingPage/PromptFormatPage'))
-const ScreenshotPage = lazy(() => import('@/pages/SettingPage/ScreenshotPage'))
 const DeployMonitorPage = lazy(() => import('@/pages/SettingPage/DeployMonitorPage'))
 const AboutPage = lazy(() => import('@/pages/SettingPage/AboutPage'))
 const TrashPage = lazy(() => import('@/pages/SettingPage/TrashPage'))
@@ -74,17 +71,22 @@ export const router = createBrowserRouter([
         path: 'settings',
         element: withSuspense(<SettingPage />),
         children: [
-          { index: true, element: <Navigate to="/settings/providers" replace /> },
-          { path: 'providers', element: withSuspense(<ProvidersManagementPage />) },
-          { path: 'models', element: withSuspense(<ModelManagementPage />) },
+          { index: true, element: <Navigate to="/settings/providers-models" replace /> },
+          // N3 合并页
+          { path: 'providers-models', element: withSuspense(<ProvidersAndModelsPage />) },
+          { path: 'analysis-defaults', element: withSuspense(<AnalysisDefaultsPage />) },
+          // 保留的独立页
           { path: 'network', element: withSuspense(<NetworkSettingsPage />) },
           { path: 'download', element: withSuspense(<DownloadSettingsPage />) },
-          { path: 'transcriber', element: withSuspense(<TranscriberPage />) },
-          { path: 'prompt-formats', element: withSuspense(<PromptFormatPage />) },
-          { path: 'screenshot', element: withSuspense(<ScreenshotPage />) },
           { path: 'monitor', element: withSuspense(<DeployMonitorPage />) },
           { path: 'trash', element: withSuspense(<TrashPage />) },
           { path: 'about', element: withSuspense(<AboutPage />) },
+          // 旧路由重定向（向后兼容）
+          { path: 'providers', element: <Navigate to="/settings/providers-models" replace /> },
+          { path: 'models', element: <Navigate to="/settings/providers-models" replace /> },
+          { path: 'screenshot', element: <Navigate to="/settings/analysis-defaults" replace /> },
+          { path: 'transcriber', element: <Navigate to="/settings/analysis-defaults" replace /> },
+          { path: 'prompt-formats', element: <Navigate to="/settings/analysis-defaults" replace /> },
           { path: '*', element: withSuspense(<NotFoundPage />) },
         ],
       },

@@ -52,13 +52,10 @@ function buildDefaultTabs(
   t: (key: string) => string,
 ): TabItem[] {
   return [
-    { path: '/settings/providers', label: t('layout.menu.providers') },
-    { path: '/settings/models', label: t('layout.menu.models') },
-    { path: '/settings/network', label: t('layout.menu.network') },
+    { path: '/settings/providers-models', label: '模型与渠道' },
     { path: '/settings/download', label: t('layout.menu.download') },
-    { path: '/settings/transcriber', label: t('layout.menu.transcriber') },
-    { path: '/settings/prompt-formats', label: t('layout.menu.promptFormats') },
-    { path: '/settings/screenshot', label: t('layout.menu.screenshot') },
+    { path: '/settings/analysis-defaults', label: '分析默认偏好' },
+    { path: '/settings/network', label: t('layout.menu.network') },
     { path: '/settings/monitor', label: t('layout.menu.monitor') },
     { path: '/settings/trash', label: '垃圾桶' },
     { path: '/settings/about', label: t('layout.menu.about') },
