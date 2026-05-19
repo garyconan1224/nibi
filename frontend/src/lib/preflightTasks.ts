@@ -279,7 +279,7 @@ export function getTopLevelTasks(type: ItemType): TopLevelTask[] {
         { id: 'ocr', label: 'OCR 文字提取' },
         { id: 'frame_prompts', label: '画面提示词生成', desc: 'MJ / SD / JSON' },
         { id: 'association', label: '内容联想总结', desc: '用途 / 设计 / 竞品 / 情绪' },
-        { id: 'multi_compare', label: '多图对比', desc: '与同任务其他图片对比（实际生效待 N9 后端接入）' },
+        { id: 'multi_compare', label: '多图对比', desc: '与同任务其他图片对比' },
       ]
     case 'text':
       return [

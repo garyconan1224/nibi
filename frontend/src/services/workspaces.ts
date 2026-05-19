@@ -247,6 +247,7 @@ export interface ImageResult {
     json: string
   }
   tags: Record<string, string[]>
+  associations?: Record<string, string>
 }
 
 /** GET /workspaces/{id}/items/{itemId}/image_result — 图片结果页聚合数据 */
@@ -256,6 +257,39 @@ export async function getImageResult(
 ): Promise<ImageResult> {
   const res = await http.get<ImageResult>(
     `${BASE}/${workspaceId}/items/${itemId}/image_result`,
+  )
+  return res.data
+}
+
+// ── N9: 多图对比 ────────────────────────────────────────────
+
+export interface ImageCompareItem {
+  item_id: string
+  name: string
+  is_current: boolean
+  source_value: string
+  description: string
+  ocr_text: string
+  tags: Record<string, string[]>
+  prompts: Record<string, unknown>
+  associations: Record<string, string>
+  has_result: boolean
+}
+
+export interface ImageCompareResult {
+  workspace_id: string
+  current_item_id: string
+  images: ImageCompareItem[]
+  vlm_summary: string
+}
+
+/** GET /workspaces/{id}/items/{itemId}/image_compare — 多图对比 */
+export async function getImageCompare(
+  workspaceId: string,
+  itemId: string,
+): Promise<ImageCompareResult> {
+  const res = await http.get<ImageCompareResult>(
+    `${BASE}/${workspaceId}/items/${itemId}/image_compare`,
   )
   return res.data
 }
