@@ -62,7 +62,8 @@
 - [x] **N6** 任务级 LLM 对话上下文素材多选 chip + RAG 兜底 — `6-8h` P1
 - [x] **N7** 视频分支补全：PySceneDetect AI 镜头分析（路径 1 & 3 拆出 N7b）— `8-10h` P2
 - [ ] **N7b** 视频总结路径 1（字幕直接）+ 路径 3（视频模型直接）— `8-12h` P2（拆自 N7，依赖：item 字幕抽取 + 视频大模型 API 集成决策）
-- [ ] **N8** 音频分支补全：VAD 双路 / pyannote 说话人 / 音乐分析 — `8-10h` P2
+- [x] **N8** 音频分支补全：VAD（silero）/ pyannote 说话人 / 音乐分析（librosa + Suno/Udio）— `8-10h` P2
+- [ ] **N8b** 音频前端交互：无人声切音乐模式弹窗 / 说话人标签人工修正 UI / 多段音乐 6 维度切分 — `6-8h` P3
 - [ ] **N9** 图片分支补全：PaddleOCR / 4 联想方向 / 多图对比 — `6-8h` P2
 - [ ] **N10** 文字分支补全：marker/docling PDF / 改写翻译并排对照 / 多文对比 — `6-8h` P2
 - [ ] **N11** 砍掉的 UI 清理（仅入口隐藏，代码留备份）— `1-2h` P3
@@ -76,21 +77,17 @@
 
 ## 当前下一步
 
-**N8 音频分支补全**（P2，估时 8-10h）。
+**N9 图片分支补全**（P2，估时 6-8h）。
 
-具体范围见 `docs/SPEC.md` §5：
-- VAD 双路（webrtcvad 或 silero-vad）
-- pyannote 说话人分离
-- 音乐分析（BPM / 调性 / Suno-Udio 提示词）
+具体范围见 `docs/SPEC.md` §6：
+- PaddleOCR 接入（OCR 文字提取，替代/补充现有 OCR）
+- 4 联想方向多选（用途 / 设计 / 竞品 / 情绪）实际生效
+- 多图对比（跨同任务图片素材对比，UI 已在 N5 加入口）
 
-> 📍 **N8 开工参数**：
-> - **模型**：⭐ **Opus 4.7**（音频管线 + 多个新模型集成）
-> - **分支**：新 worktree `feat/phase-n8-audio-branch`
-> - **⚠️ 需用户授权装新依赖**：
->   - `silero-vad` 或 `webrtcvad`（VAD）
->   - `pyannote.audio`（**说话人分离 — 需要 HuggingFace token + 同意模型协议**）
->   - 可能还有 `librosa` / `essentia`（音乐分析）
-> - 在装依赖前**必须先和用户确认 pyannote 协议是否走通**
+> 📍 **N9 开工参数**：
+> - **模型**：⭐ **Opus 4.7** 或 Sonnet 4.6
+> - **分支**：新 worktree `feat/phase-n9-image-branch`
+> - **⚠️ 需用户授权装依赖**：`paddlepaddle` + `paddleocr`（较大，~1GB）；或考虑替代如 `easyocr`
 
 ---
 

@@ -41,6 +41,52 @@
 
 ---
 
+## Phase N8 – 音频分支：VAD + pyannote 说话人 + librosa 音乐分析
+
+**完成日期**：2026-05-19
+**模型 / 工具**：Opus 4.7
+**分支**：feat/phase-n8-audio-branch（worktree `/Users/conan/Desktop/nibi-n8`）
+**Commit**：dc14841 + N8.6 文档
+
+### 影响范围
+- 依赖：silero-vad / librosa / pyannote.audio（含 torch + torchaudio）
+- 后端：新增 shared/audio_analyzer.py（~330 行）+ pipeline_tasks::handle_audio_task 大改 + workspaces 路由 bridge 透传
+- 测试：新增 9 个 pytest（+1 个 opt-in 真模型 skip）
+
+### 用户决策
+- VAD：silero-vad
+- pyannote 说话人分离：做（首次需 HF_TOKEN + 同意模型协议）
+- 音乐分析：BPM + 调性 + Suno/Udio 提示词全做
+
+### 关键改动
+- 新增 `shared/audio_analyzer.py`：
+  - 数据类：VadResult / DiarizationResult / MusicAnalysis
+  - run_vad / run_diarization / analyze_music / generate_music_prompt / export_srt / export_txt / assign_speakers_to_segments
+  - 所有重模型 lazy import + 缺包 graceful skip
+- `handle_audio_task` 扩展：
+  - 1.5 VAD：转写前跑；无人声 + 无音乐分析 → 日志告警 + 跳过 ASR
+  - ASR 接 whisper_lang 透传给云端 /audio/transcriptions
+  - 3.5 说话人分离：HF_TOKEN 缺则跳过；否则跑 pyannote 把 speaker 回写到 transcript_segments
+  - 3.6 音乐分析：librosa 特征 + LLM 拼 Suno/Udio 提示词
+  - 3.7 字幕导出：.srt + .txt 落盘
+  - result JSON 加 vad / diarization / music / subtitle_paths 字段
+- `_bridge_to_pipeline_payload`：透传 asr / speaker_diarization / music_analysis / subtitle_file 子参数
+
+### 为什么这么做
+- **范围收缩到 N8b**：SPEC §5 含"无人声切音乐弹窗"/"说话人标签人工修正 UI"/"多段音乐 6 维度切分"，都涉及前端交互，本期只做后端管线
+- **lazy import + 缺包 graceful skip**：任何重模型装不上都不应让 audio 流程崩；让 CI 没装重模型的环境也能跑测试
+- **VAD 缺包按"有人声"continue**：保守假设，不主动阻塞 ASR
+- **HF_TOKEN 三层环境变量都查**：社区命名不统一（HF_TOKEN / HUGGINGFACE_TOKEN / HUGGING_FACE_HUB_TOKEN 都接）
+- **silero VAD 真模型测试默认 skip**：torch jit 模型加载污染 asyncio loop，让 starlette TestClient 测试 crash。`RUN_AUDIO_MODEL_TESTS=1` 才跑
+
+### 留给后续的影响
+- **HF_TOKEN 配置流程要文档化**：应在设置页加「HuggingFace Token」字段写入 settings_store
+- **音乐分析 LLM 没复用 chat_runner**：直接调 `provider.chat`，未来要接 chat 历史需要抽象化
+- **transcript_segments 形状跨供应商不一致**：OpenAI / SiliconFlow 各家略不同；export_srt 已对缺字段做 try/except 兜底，但极端情况字幕可能为空
+- **N9/N10 可复用模式**：generate_music_prompt 的"LLM 调用器注入 + 容错 JSON 解析"可复制到 image 联想 / text 改写流程
+
+---
+
 ## Phase N7 – 视频分支：AI 镜头分析（PySceneDetect 集成）
 
 **完成日期**：2026-05-19

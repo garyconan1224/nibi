@@ -1,13 +1,16 @@
 ---
 phase: N8
 title: 音频分支补全（VAD 双路 / pyannote 说话人 / 音乐分析）
-status: ready
+status: done
 priority: P2
 estimate_hours: 8-10
+actual_hours: ~3
 model: Opus 4.7
 branch: feat/phase-n8-audio-branch
 worktree: 是（/Users/conan/Desktop/nibi-n8）
 depends_on: [N5, N6]
+commits: [dc14841]
+completed_date: 2026-05-19
 spec_ref: docs/SPEC.md §5
 ---
 
