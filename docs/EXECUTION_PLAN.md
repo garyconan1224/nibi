@@ -60,7 +60,8 @@
 - [x] **N4** 添加素材模态升级（4 步合一 + 自动识别类型 + 智能默认勾选 + 背景信息折叠）— `4-5h` P1
 - [x] **N5** Preflight 抽屉细化（按素材类型展开所有子参数）— `4-6h` P1
 - [x] **N6** 任务级 LLM 对话上下文素材多选 chip + RAG 兜底 — `6-8h` P1
-- [ ] **N7** 视频分支补全：PySceneDetect AI 镜头分析 / 总结路径 1 & 3 / 视频运镜延后 — `8-10h` P2
+- [x] **N7** 视频分支补全：PySceneDetect AI 镜头分析（路径 1 & 3 拆出 N7b）— `8-10h` P2
+- [ ] **N7b** 视频总结路径 1（字幕直接）+ 路径 3（视频模型直接）— `8-12h` P2（拆自 N7，依赖：item 字幕抽取 + 视频大模型 API 集成决策）
 - [ ] **N8** 音频分支补全：VAD 双路 / pyannote 说话人 / 音乐分析 — `8-10h` P2
 - [ ] **N9** 图片分支补全：PaddleOCR / 4 联想方向 / 多图对比 — `6-8h` P2
 - [ ] **N10** 文字分支补全：marker/docling PDF / 改写翻译并排对照 / 多文对比 — `6-8h` P2
@@ -75,18 +76,21 @@
 
 ## 当前下一步
 
-**N7 视频分支补全**（P2，估时 8-10h）。
+**N8 音频分支补全**（P2，估时 8-10h）。
 
-具体范围见 `docs/SPEC.md` §4：
-- PySceneDetect AI 镜头分析（替代/补充按秒截帧）
-- 视频文案总结路径 1（字幕直接）和路径 3（视频模型直接）后端实现
-- 视频运镜提示词延后到 AI 导演阶段
+具体范围见 `docs/SPEC.md` §5：
+- VAD 双路（webrtcvad 或 silero-vad）
+- pyannote 说话人分离
+- 音乐分析（BPM / 调性 / Suno-Udio 提示词）
 
-> 📍 **N7 开工参数**：
-> - **模型**：⭐ **Opus 4.7**（视频管线 + scenedetect 集成 + 三路径分支）
-> - **分支**：新 worktree `feat/phase-n7-video-branch`
-> - **⚠️ 需用户授权装新依赖**：`scenedetect`（PySceneDetect）写入 `requirements.txt`
-> - **不 push**：commit 留本地
+> 📍 **N8 开工参数**：
+> - **模型**：⭐ **Opus 4.7**（音频管线 + 多个新模型集成）
+> - **分支**：新 worktree `feat/phase-n8-audio-branch`
+> - **⚠️ 需用户授权装新依赖**：
+>   - `silero-vad` 或 `webrtcvad`（VAD）
+>   - `pyannote.audio`（**说话人分离 — 需要 HuggingFace token + 同意模型协议**）
+>   - 可能还有 `librosa` / `essentia`（音乐分析）
+> - 在装依赖前**必须先和用户确认 pyannote 协议是否走通**
 
 ---
 

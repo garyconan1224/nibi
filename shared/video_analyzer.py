@@ -240,22 +240,89 @@ def get_video_info(video_path: Path) -> tuple[int, int, int]:
     return duration, estimated, interval
 
 
-def extract_frames(video_path: Path, interval_sec: int = 2):
-    """生成器：按间隔抽帧，yield (秒, frame)。"""
+def extract_frames(video_path: Path, interval_sec: int = 2, max_frames: int | None = None):
+    """生成器：按间隔抽帧，yield (秒, frame)。
+
+    max_frames: N7 引入；非 None 时最多产出指定帧数（对应 SPEC §4.2.1 模式 A 的「最大帧数」）。
+    """
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         raise RuntimeError(f"无法打开视频: {video_path}")
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     step = max(int(round(fps * interval_sec)), 1)
     idx = 0
+    yielded = 0
     while True:
         ret, frame = cap.read()
         if not ret:
             break
         if idx % step == 0:
             yield int(idx / fps), frame
+            yielded += 1
+            if max_frames is not None and yielded >= max_frames:
+                break
         idx += 1
     cap.release()
+
+
+def extract_frames_by_scenes(video_path: Path, frames_per_shot: int = 3):
+    """N7: 用 PySceneDetect 检测镜头切换，每镜头取 2 或 3 帧。
+
+    frames_per_shot=2 → 首帧 + 尾帧（适合简单运镜）
+    frames_per_shot=3 → 首帧 + 中间帧 + 尾帧（默认，适合复杂镜头）
+
+    返回生成器，yield (sec, frame) 与 extract_frames 同形状。
+    极短视频或无切换点时 fallback 到首帧。
+    """
+    try:
+        from scenedetect import ContentDetector, detect
+    except ImportError as err:
+        raise RuntimeError(
+            "scenedetect 未安装。请执行 pip install 'scenedetect>=0.6.4'"
+        ) from err
+
+    if frames_per_shot not in (2, 3):
+        frames_per_shot = 3
+
+    scenes = detect(str(video_path), ContentDetector())
+
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise RuntimeError(f"无法打开视频: {video_path}")
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    # 计算每镜头要取的 frame index 列表
+    targets: list[int] = []
+    if not scenes:
+        # fallback：取首帧（不抛错，让上层照常处理）
+        targets.append(0)
+    else:
+        for start_tc, end_tc in scenes:
+            start_f = start_tc.frame_num
+            end_f = max(end_tc.frame_num - 1, start_f)
+            if frames_per_shot == 2:
+                picks = [start_f, end_f]
+            else:
+                mid_f = (start_f + end_f) // 2
+                picks = [start_f, mid_f, end_f]
+            for f in picks:
+                if 0 <= f < total_frames and (not targets or f != targets[-1]):
+                    targets.append(f)
+
+    # 去重 + 排序后直接 seek 到每个目标 frame
+    targets = sorted(set(targets))
+    try:
+        for f in targets:
+            if f < 0 or f >= total_frames:
+                continue
+            cap.set(cv2.CAP_PROP_POS_FRAMES, f)
+            ret, frame = cap.read()
+            if not ret:
+                continue
+            yield int(f / fps), frame
+    finally:
+        cap.release()
 
 
 # ── 安全名称管理 ──────────────────────────────────────────────
@@ -634,6 +701,48 @@ def _analyze_frame_task(
     }
 
 
+@dataclass
+class CaptureParams:
+    """N7: 截帧子参数（来自 preflight.tasks.frame_prompts）。"""
+
+    mode: str = "scene"  # "interval" | "scene"
+    interval_sec: int = 5
+    max_frames: int = 100
+    frames_per_shot: int = 3  # 仅 scene 模式有效
+
+    @classmethod
+    def from_dict(cls, data: Any) -> "CaptureParams":
+        """从前端 preflight.tasks.frame_prompts 字段安全构造。
+
+        兼容老 boolean 形状（true → 默认值）和缺失字段。
+        """
+        if not isinstance(data, dict):
+            return cls()
+        mode = str(data.get("capture_mode") or "scene").lower()
+        if mode not in ("interval", "scene"):
+            mode = "scene"
+        try:
+            interval = int(data.get("interval_sec") or 5)
+        except (TypeError, ValueError):
+            interval = 5
+        try:
+            max_f = int(data.get("max_frames") or 100)
+        except (TypeError, ValueError):
+            max_f = 100
+        try:
+            fps = int(data.get("scene_frames_per_shot") or 3)
+        except (TypeError, ValueError):
+            fps = 3
+        if fps not in (2, 3):
+            fps = 3
+        return cls(
+            mode=mode,
+            interval_sec=max(1, interval),
+            max_frames=max(1, max_f),
+            frames_per_shot=fps,
+        )
+
+
 def process_video(
     api_key: str,
     video_path: Path,
@@ -645,6 +754,7 @@ def process_video(
     on_frame: Optional[Callable[[int, str], None]] = None,
     auto_sync_json: bool = True,
     target_json_dir: Path | None = None,
+    capture_params: Optional["CaptureParams"] = None,
 ) -> Optional[Path]:
     """
     完整处理单个视频：抽帧分析 → 全局总结 → 三位一体保存（支持断点续传）。
@@ -664,8 +774,16 @@ def process_video(
     total_fc = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     cap.release()
     duration = int(total_fc / fps)
-    interval = compute_frame_interval(duration)
-    estimated = max(duration // interval, 1)
+
+    # N7: 用 capture_params 决定截帧方式；未传时 fallback 到原 interval 行为
+    if capture_params is None:
+        capture_params = CaptureParams(mode="interval", interval_sec=compute_frame_interval(duration), max_frames=10**6, frames_per_shot=3)
+    interval = capture_params.interval_sec
+    if capture_params.mode == "scene":
+        # 估计值仅作进度显示参考，scene 模式的真实帧数要扫完才知道
+        estimated = max(duration // 3, 1) * capture_params.frames_per_shot
+    else:
+        estimated = min(capture_params.max_frames, max(duration // interval, 1))
 
     output_dir = get_output_dir(video_path)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -684,7 +802,15 @@ def process_video(
     with ThreadPoolExecutor(max_workers=concurrency) as executor:
         pending = {}
 
-        for sec, frame_img in extract_frames(video_path, interval):
+        if capture_params.mode == "scene":
+            frame_iter = extract_frames_by_scenes(video_path, capture_params.frames_per_shot)
+        else:
+            frame_iter = extract_frames(
+                video_path,
+                interval_sec=capture_params.interval_sec,
+                max_frames=capture_params.max_frames,
+            )
+        for sec, frame_img in frame_iter:
             ts = format_timestamp(sec)
             if ts in analyzed_ts:
                 frame_count += 1
@@ -748,6 +874,7 @@ def run_batch_analysis(
     progress_cb: ProgressCallback = None,
     auto_sync_json: bool = True,
     target_json_dir: Path | None = None,
+    capture_params: Optional["CaptureParams"] = None,
 ) -> AnalysisState:
     """
     批量分析视频（在后台线程中运行）。
@@ -773,6 +900,7 @@ def run_batch_analysis(
                     text_model=text_model,
                     auto_sync_json=auto_sync_json,
                     target_json_dir=target_json_dir,
+                    capture_params=capture_params,
                 )
             except Exception as e:
                 state.update(idx, status="failed", error=str(e))
