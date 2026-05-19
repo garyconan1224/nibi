@@ -903,7 +903,7 @@ def start_item_pipeline(workspace_id: str, item_id: str) -> Dict[str, Any]:
     item = _find_item(rec, item_id)
 
     # N1.4 移除 WorkspaceRecord.project_id 后，统一用 default_project 兜底。
-    # 磁盘布局（data/projects/<project_id>/...）作为 N1b 独立 phase 重构。
+    # N1b 磁盘布局已迁移至 data/workspaces/<id>/。
     project_id = "default_project"
 
     task_type, payload = _bridge_to_pipeline_payload(item, rec)
@@ -1403,8 +1403,8 @@ def get_audio_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
 
 
 def _read_text_result_from_disk(task_id: str, project_id: str) -> Optional[Dict[str, Any]]:
-    """从磁盘读取 text 任务产物（data/projects/<pid>/text/<task_id>.json）。"""
-    json_path = DATA_DIR / "projects" / project_id / "text" / f"{task_id}.json"
+    """从磁盘读取 text 任务产物（data/workspaces/<pid>/text/<task_id>.json）。"""
+    json_path = DATA_DIR / "workspaces" / project_id / "text" / f"{task_id}.json"
     if not json_path.is_file():
         return None
     try:

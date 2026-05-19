@@ -54,7 +54,7 @@
 > 来源：`docs/SPEC.md` 附录 C.2。每个 Phase 的具体子任务在进入时再展开（pending → ready → done）。
 
 - [x] **N1** 任务系统差异：trashed/analyzed 状态 / 软删除垃圾桶 / 删 WorkspaceRecord 上层 project_id — `4-6h` P0
-- [ ] **N1b** 磁盘布局 `data/projects/<project_id>/...` → `data/workspaces/<workspace_id>/...` + 老数据搬家 — `6-10h` P1（从 N1 拆出）
+- [x] **N1b** 磁盘布局 `data/projects/<project_id>/...` → `data/workspaces/<workspace_id>/...` + 老数据搬家 — `6-10h` P1（从 N1 拆出）
 - [x] **N2** 侧边栏从 8 砍到 4 + Taskboard 子标签 5→4（隐藏「导出」入口）— `2-3h` P0
 - [x] **N3** 设置页重组 9→7（合并分析默认偏好 / 模型与渠道 / 新增任务垃圾桶）— `6-8h` P0
 - [x] **N4** 添加素材模态升级（4 步合一 + 自动识别类型 + 智能默认勾选 + 背景信息折叠）— `4-5h` P1
@@ -80,7 +80,6 @@
 **N1~N11 主线全部完成**。
 
 剩余未合并的拆出子阶段：
-- **N1b** 磁盘布局重构（P1，6-10h）— `data/projects/` → `data/workspaces/`
 - **N7b** 视频总结路径 1/3（P2，8-12h）— 依赖字幕抽取 + 视频大模型 API 决策
 - **N8b** 音频前端交互（P3，6-8h）— 无人声弹窗 / 说话人修正 / 音乐切分
 

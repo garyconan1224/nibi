@@ -1,6 +1,6 @@
 # AI Handoff
 
-Last updated: 2026-05-19（N11 后收口：前端 build blocker + 文档状态同步）
+Last updated: 2026-05-19（N1b 磁盘布局迁移完成）
 
 ---
 
@@ -37,7 +37,7 @@ git branch --show-current
 | Phase 3A~3C | ✅ 已合并 main | 知识库 + 标签库完成 |
 | [A] 现状同步 | ✅ 已完成 | 合并 spec、设计稿归位、文档体系重写 |
 | [B] N1~N11 spec-gap | ✅ 已完成 | N1 到 N11 主线全部结束 |
-| N1b | ⏸ 待做 | 磁盘布局 `data/projects/` → `data/workspaces/` |
+| N1b | ✅ 已完成 | 磁盘布局 `data/projects/` → `data/workspaces/` + 迁移脚本 |
 | N7b | ⏸ 待做 | 视频总结路径 1（字幕直接）+ 路径 3（视频大模型直接） |
 | N8b | ⏸ 待做 | 音频前端交互：无人声弹窗 / 说话人修正 / 音乐切分 |
 | [C] AI 导演 | ⏸ 待选 | 需先补完整设计稿 |
@@ -103,9 +103,10 @@ git log --oneline -5
 
 ## 推荐下一步
 
-完成本次收口 commit 后，建议让用户在下面选一个：
+N1b 已完成（迁移脚本 + 调用方替换），建议下一步：
 
 1. `.git` 历史瘦身
 2. `[D] 开源准备`
 3. `[C] AI 导演设计补齐`
-4. `N1b` 磁盘布局重构
+4. `N7b` 视频总结路径 1/3
+5. `N8b` 音频前端交互

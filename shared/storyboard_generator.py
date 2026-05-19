@@ -14,8 +14,8 @@ from shared.config import (
     PLAN_MARKERS,
     TEXT_BACKEND_ANTHROPIC,
     VISION_MODEL_DEFAULT,
-    get_project_json_dir,
-    get_project_runtime_dir,
+    get_workspace_json_dir,
+    get_workspace_runtime_dir,
 )
 from shared.knowledge_base import (
     KnowledgeState,
@@ -142,7 +142,7 @@ def _resolve_knowledge_only_paths(
     rag_json_basenames: list[str] | None,
 ) -> tuple[Path, list[Path] | None]:
     """返回知识库目录与可选的 JSON 文件列表（basename 限定在项目 json_data 下）。"""
-    json_dir = get_project_json_dir(knowledge_project_id)
+    json_dir = get_workspace_json_dir(knowledge_project_id)
     json_dir.mkdir(parents=True, exist_ok=True)
     root = json_dir.resolve()
     raw_names = rag_json_basenames or []
@@ -186,7 +186,7 @@ def run_storyboard_generation(
             log(msg)
 
     settings = load_settings()
-    runtime_dir = get_project_runtime_dir(project_id)
+    runtime_dir = get_workspace_runtime_dir(project_id)
     runtime_dir.mkdir(parents=True, exist_ok=True)
 
     kpid = (rag_knowledge_project_id or "").strip() or project_id

@@ -12,9 +12,9 @@ from typing import Any, Dict, List, Optional
 from backend.app.models.tasks import TaskRecord, TaskStatus
 from backend.app.services.task_runner import TaskRunner
 from shared.config import (
-    get_project_json_dir,
-    get_project_text_dir,
-    get_project_videos_dir,
+    get_workspace_json_dir,
+    get_workspace_text_dir,
+    get_workspace_videos_dir,
 )
 from shared.settings_store import load_settings
 from shared.storyboard_generator import run_storyboard_generation
@@ -111,7 +111,7 @@ def handle_download_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, An
     url = str(record.payload.get("url") or "").strip()
     if not url:
         raise ValueError("download payload.url is required")
-    project_video_dir = get_project_videos_dir(record.project_id)
+    project_video_dir = get_workspace_videos_dir(record.project_id)
     project_video_dir.mkdir(parents=True, exist_ok=True)
 
     dl_kwargs = _resolve_download_kwargs(record.payload)
@@ -154,9 +154,9 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
         f"proxy={'✓' if proxy else '✗'}"
     )
 
-    project_video_dir = get_project_videos_dir(record.project_id)
+    project_video_dir = get_workspace_videos_dir(record.project_id)
     project_video_dir.mkdir(parents=True, exist_ok=True)   # 确保目录存在，防止 FileNotFoundError
-    project_json_dir = get_project_json_dir(record.project_id)
+    project_json_dir = get_workspace_json_dir(record.project_id)
     project_json_dir.mkdir(parents=True, exist_ok=True)
     videos = find_videos(project_video_dir)
     raw_names = payload.get("video_basenames")
@@ -243,7 +243,7 @@ def handle_create_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]
     )
     runner.set_progress(record.task_id, 1.0, "Creative generation finished")
 
-    runtime_dir = get_project_json_dir(record.project_id).parent / "runtime"
+    runtime_dir = get_workspace_json_dir(record.project_id).parent / "runtime"
     runtime_dir.mkdir(parents=True, exist_ok=True)
     out_file = runtime_dir / f"{record.task_id}.md"
     out_file.write_text(content, encoding="utf-8")
@@ -329,9 +329,9 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     )
 
     # ── 2. 准备项目目录 ────────────────────────────────────────
-    project_video_dir = get_project_videos_dir(record.project_id)
+    project_video_dir = get_workspace_videos_dir(record.project_id)
     project_video_dir.mkdir(parents=True, exist_ok=True)
-    project_json_dir = get_project_json_dir(record.project_id)
+    project_json_dir = get_workspace_json_dir(record.project_id)
     project_json_dir.mkdir(parents=True, exist_ok=True)
 
     # 中间产出容器
@@ -768,7 +768,7 @@ def handle_text_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
       - api_key / text_model / temperature / summary_max_tokens / summary_max_input_chars：可选
 
     状态机：FETCH → PARSE → EXTRACT → SUM → STORE → SUCCESS
-    产物：data/projects/<pid>/text/<task_id>.md + .json
+    产物：data/workspaces/<pid>/text/<task_id>.md + .json
     """
     payload = record.payload
     task_id = record.task_id
@@ -875,7 +875,7 @@ def handle_text_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     # ── 4. STORE ────────────────────────────────────────────
     runner.store.update(task_id, status=TaskStatus.STORE.value)
     runner.set_progress(task_id, 0.90, "归档文本产物...")
-    text_dir = get_project_text_dir(record.project_id)
+    text_dir = get_workspace_text_dir(record.project_id)
     text_dir.mkdir(parents=True, exist_ok=True)
     md_path = text_dir / f"{task_id}.md"
     json_path = text_dir / f"{task_id}.json"
@@ -948,7 +948,7 @@ def handle_image_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
       - frame_prompts: {enabled, format} N9 提示词格式
 
     状态机：FETCH → OCR → VLM → ASSOCIATION → STORE → SUCCESS
-    产物：data/projects/<pid>/image/<task_id>.json
+    产物：data/workspaces/<pid>/image/<task_id>.json
     """
     import re as _re
 
@@ -1159,8 +1159,8 @@ def handle_image_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     runner.store.update(task_id, status=TaskStatus.STORE.value)
     runner.set_progress(task_id, 0.90, "归档图片产物...")
 
-    from shared.config import get_project_root
-    image_dir = get_project_root(record.project_id) / "image"
+    from shared.config import get_workspace_root
+    image_dir = get_workspace_root(record.project_id) / "image"
     image_dir.mkdir(parents=True, exist_ok=True)
 
     result: Dict[str, Any] = {
@@ -1193,7 +1193,7 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
       - audio_model: 可选，默认 FunAudioLLM/SenseVoiceSmall
 
     状态机：FETCH → TRANSCRIBE → SUMMARIZE → STORE → SUCCESS
-    产物：data/projects/<pid>/audio/<task_id>.json
+    产物：data/workspaces/<pid>/audio/<task_id>.json
     """
     import mimetypes
 
@@ -1262,8 +1262,8 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     log(f"📦 音频已加载，{len(audio_bytes)//1024} KB，mime={audio_mime}，filename={audio_filename}")
 
     # N8: 写入磁盘供 VAD / pyannote / librosa 读（这些库都需要文件路径）
-    from shared.config import get_project_root
-    audio_dir = get_project_root(record.project_id) / "audio"
+    from shared.config import get_workspace_root
+    audio_dir = get_workspace_root(record.project_id) / "audio"
     audio_dir.mkdir(parents=True, exist_ok=True)
     audio_local_path = audio_dir / f"{task_id}_{audio_filename}"
     if not (source_type == "local" and Path(source).is_file()):

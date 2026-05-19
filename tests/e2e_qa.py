@@ -83,7 +83,7 @@ def setup_tmp_env() -> tuple[Path, Path]:
         settings_store.SETTINGS_DIR = tmp_local
         settings_store.SETTINGS_PATH = tmp_local / "settings.json"
         project_context.CURRENT_PROJECT_PATH = tmp_local / "current_project.json"
-        config.PROJECT_WORKSPACES_DIR = tmp_projects
+        config.WORKSPACES_DATA_DIR = tmp_projects
 
         yield tmp_local, tmp_projects
     finally:
@@ -166,13 +166,13 @@ def check_05_settings_clear() -> str:
 
 
 def check_06_project_dirs() -> str:
-    from shared.config import ensure_project_dirs, get_project_json_dir, get_project_runtime_dir, get_project_videos_dir
+    from shared.config import ensure_workspace_dirs, get_workspace_json_dir, get_workspace_runtime_dir, get_workspace_videos_dir
 
     pid = "qa_project_001"
-    ensure_project_dirs(pid)
-    _assert(get_project_videos_dir(pid).is_dir(), "videos 目录缺失")
-    _assert(get_project_json_dir(pid).is_dir(), "json_data 目录缺失")
-    _assert(get_project_runtime_dir(pid).is_dir(), "runtime 目录缺失")
+    ensure_workspace_dirs(pid)
+    _assert(get_workspace_videos_dir(pid).is_dir(), "videos 目录缺失")
+    _assert(get_workspace_json_dir(pid).is_dir(), "json_data 目录缺失")
+    _assert(get_workspace_runtime_dir(pid).is_dir(), "runtime 目录缺失")
     return "项目三类目录已创建"
 
 
@@ -204,13 +204,13 @@ def _create_dummy_video(path: Path, frame_count: int = 5) -> None:
 
 
 def check_08_video_analyzer_mock_and_09_json_sync() -> str:
-    from shared.config import get_project_json_dir, get_project_videos_dir
+    from shared.config import get_workspace_json_dir, get_workspace_videos_dir
     from shared.video_analyzer import AnalysisState, VideoProgress, assign_safe_names, process_video
     import shared.video_analyzer as va
 
     pid = "qa_project_003"
-    video_dir = get_project_videos_dir(pid)
-    json_dir = get_project_json_dir(pid)
+    video_dir = get_workspace_videos_dir(pid)
+    json_dir = get_workspace_json_dir(pid)
     video_path = video_dir / "Demo Product.mp4"
     _create_dummy_video(video_path, frame_count=5)
 
@@ -253,12 +253,12 @@ def check_08_video_analyzer_mock_and_09_json_sync() -> str:
 
 
 def check_10_knowledge_load_and_11_split() -> str:
-    from shared.config import get_project_json_dir
+    from shared.config import get_workspace_json_dir
     import shared.knowledge_base as kb
     from shared.knowledge_base import load_folder_as_knowledge, split_three_plans
 
     pid = "qa_project_003"
-    json_dir = get_project_json_dir(pid)
+    json_dir = get_workspace_json_dir(pid)
     _assert(any(json_dir.glob("*.json")), "项目 json_data 目录为空，无法测试知识库")
 
     orig_embed = kb.create_embeddings
