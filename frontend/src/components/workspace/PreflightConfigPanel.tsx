@@ -29,6 +29,14 @@ import type {
   PreflightSaveRequest,
   WorkspaceItem,
 } from '@/types/workspace'
+import {
+  getTaskParams,
+  getTopLevelTasks,
+  isTaskEnabled,
+  normalizeTasksShape,
+  setTaskParams,
+} from '@/lib/preflightTasks'
+import { TaskDetails } from './PreflightTaskDetails'
 
 /**
  * 前置配置面板（设计文档第 4 章）。
@@ -92,8 +100,8 @@ export default function PreflightConfigPanel({
   const [textModelId, setTextModelId] = useState('')
   const [videoModelId, setVideoModelId] = useState('')
 
-  // ── 3. 任务勾选 state（与 item.type 强相关） ─────
-  const [tasks, setTasks] = useState<Record<string, boolean>>({})
+  // ── 3. 任务勾选 state（N5：值是嵌套对象 {enabled, ...params}） ─────
+  const [tasks, setTasks] = useState<Record<string, unknown>>({})
 
   const {
     providers,
@@ -138,20 +146,12 @@ export default function PreflightConfigPanel({
     setTextProviderId(findProviderByModel(tId))
     setVideoProviderId(findProviderByModel(vidId))
 
-    setTasks((item.preflight.tasks as Record<string, boolean>) ?? {})
+    // N5：用 normalizeTasksShape 把老 boolean / 缺字段 task 都升级到 {enabled, ...} 形状
+    setTasks(normalizeTasksShape(item.preflight.tasks, item.type))
   }, [open, item, providerModels])
 
-  // 默认勾选项（仅在用户未配置过时使用，避免覆盖已保存值）
-  // 直接读 item.preflight.tasks 而非 tasks state，避免与上方回填 effect 的 race condition
-  const taskOptions = useMemo(() => getTaskOptionsByType(item.type), [item.type])
-  useEffect(() => {
-    if (!open) return
-    const saved = (item.preflight?.tasks as Record<string, boolean>) ?? {}
-    if (Object.keys(saved).length > 0) return
-    const defaults: Record<string, boolean> = {}
-    for (const opt of taskOptions) defaults[opt.id] = opt.defaultChecked
-    setTasks(defaults)
-  }, [open, item.type, item.preflight?.tasks, taskOptions])
+  // 一级任务列表（含图片多图对比 / 文字多文对比）
+  const topLevelTasks = useMemo(() => getTopLevelTasks(item.type), [item.type])
 
   const enabledProviders = providers.filter((p) => p.enabled && p.has_api_key)
   const visionProviders = enabledProviders.filter((p) =>
@@ -176,7 +176,7 @@ export default function PreflightConfigPanel({
         ...(textModelId && { text: textModelId }),
         ...(videoModelId && { video: videoModelId }),
       },
-      tasks: { ...tasks },
+      tasks: normalizeTasksShape(tasks, item.type),
     }
     onSave(payload)
   }
@@ -337,25 +337,54 @@ export default function PreflightConfigPanel({
             未勾选项完全跳过，不消耗模型调用。
           </p>
           <div className="space-y-2">
-            {taskOptions.map((opt) => (
-              <label
-                key={opt.id}
-                className="flex cursor-pointer items-start gap-2 rounded-md border p-3 transition hover:bg-muted/50"
-              >
-                <Checkbox
-                  checked={!!tasks[opt.id]}
-                  onCheckedChange={(v) =>
-                    setTasks((prev) => ({ ...prev, [opt.id]: !!v }))
-                  }
-                />
-                <div className="space-y-0.5">
-                  <div className="text-sm font-medium">{opt.label}</div>
-                  {opt.desc && (
-                    <div className="text-xs text-muted-foreground">{opt.desc}</div>
+            {topLevelTasks.map((opt) => {
+              const enabled = isTaskEnabled(tasks, opt.id)
+              const params = getTaskParams<Record<string, unknown>>(
+                tasks,
+                item.type,
+                opt.id,
+              )
+              return (
+                <div
+                  key={opt.id}
+                  className="space-y-2 rounded-md border p-3 transition hover:bg-muted/30"
+                >
+                  <label className="flex cursor-pointer items-start gap-2">
+                    <Checkbox
+                      checked={enabled}
+                      onCheckedChange={(v) =>
+                        setTasks((prev) =>
+                          setTaskParams(prev, opt.id, {
+                            ...getTaskParams(prev, item.type, opt.id),
+                            enabled: !!v,
+                          }),
+                        )
+                      }
+                    />
+                    <div className="space-y-0.5">
+                      <div className="text-sm font-medium">{opt.label}</div>
+                      {opt.desc && (
+                        <div className="text-xs text-muted-foreground">
+                          {opt.desc}
+                        </div>
+                      )}
+                    </div>
+                  </label>
+                  {enabled && (
+                    <div className="ml-6 border-l-2 border-violet-200 pl-3">
+                      <TaskDetails
+                        type={item.type}
+                        taskId={opt.id}
+                        params={params}
+                        onChange={(next) =>
+                          setTasks((prev) => setTaskParams(prev, opt.id, next))
+                        }
+                      />
+                    </div>
                   )}
                 </div>
-              </label>
-            ))}
+              )
+            })}
           </div>
         </section>
 
@@ -458,121 +487,13 @@ function ModelPicker({
   )
 }
 
-// ── 工具：按 item type 给出勾选项配置 ───────────────
-
-interface TaskOption {
-  id: string
-  label: string
-  desc?: string
-  defaultChecked: boolean
-}
+// ── 工具：素材类型中文标签 ───────────────
 
 const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   video: '视频内容',
   audio: '音频内容',
   image: '图片内容',
   text: '文字内容',
-}
-
-function getTaskOptionsByType(type: ItemType): TaskOption[] {
-  switch (type) {
-    case 'video':
-      return [
-        {
-          id: 'frame_prompts',
-          label: '画面提示词生成',
-          desc: '截帧 → 视觉模型 → MJ/SD 提示词',
-          defaultChecked: true,
-        },
-        {
-          id: 'video_summary',
-          label: '视频文案总结',
-          desc: '字幕直接总结 / 音视频合并 / 视频模型直接分析',
-          defaultChecked: true,
-        },
-        {
-          id: 'music_analysis',
-          label: '音乐分析（视频中的背景音乐）',
-          desc: '风格 / BPM / Suno-Udio 提示词',
-          defaultChecked: false,
-        },
-        {
-          id: 'subtitle_export',
-          label: '字幕导出',
-          desc: '转写完成后导出 .srt 文件',
-          defaultChecked: true,
-        },
-      ]
-    case 'audio':
-      return [
-        {
-          id: 'asr',
-          label: '人声转写 + 内容总结',
-          desc: 'Whisper 转写 + LLM 总结',
-          defaultChecked: true,
-        },
-        {
-          id: 'speaker_diarization',
-          label: '说话人音色区分',
-          desc: '配合「人声转写」使用',
-          defaultChecked: false,
-        },
-        {
-          id: 'subtitle_file',
-          label: '生成字幕文件（.srt / .txt）',
-          defaultChecked: true,
-        },
-        {
-          id: 'music_analysis',
-          label: '音乐分析',
-          desc: '风格 / BPM / 乐器 / Suno-Udio 提示词',
-          defaultChecked: false,
-        },
-      ]
-    case 'image':
-      return [
-        {
-          id: 'content_describe',
-          label: '内容识别描述',
-          desc: '主体 / 场景 / 色调 / 构图 / 风格',
-          defaultChecked: true,
-        },
-        { id: 'ocr', label: 'OCR 文字提取', defaultChecked: false },
-        {
-          id: 'frame_prompts',
-          label: '画面提示词生成',
-          desc: 'MJ / SD / JSON 多格式',
-          defaultChecked: true,
-        },
-        {
-          id: 'association',
-          label: '内容联想总结',
-          desc: '用途推断 / 设计分析 / 竞品洞察 / 情绪解读',
-          defaultChecked: false,
-        },
-      ]
-    case 'text':
-      return [
-        {
-          id: 'summary',
-          label: '摘要 / 要点 / 金句',
-          defaultChecked: true,
-        },
-        {
-          id: 'association',
-          label: '联想归纳',
-          desc: '深度解读 / 观点提炼 / 趋势判断 / 行动建议',
-          defaultChecked: false,
-        },
-        {
-          id: 'rewrite',
-          label: '改写 / 润色',
-          desc: '正式 / 口语 / 简洁 / 丰富',
-          defaultChecked: false,
-        },
-        { id: 'translate', label: '翻译', defaultChecked: false },
-      ]
-  }
 }
 
 function splitCsv(input: string): string[] {
