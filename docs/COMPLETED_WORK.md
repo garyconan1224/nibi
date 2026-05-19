@@ -41,6 +41,57 @@
 
 ---
 
+## Phase N7 – 视频分支：AI 镜头分析（PySceneDetect 集成）
+
+**完成日期**：2026-05-19
+**模型 / 工具**：Opus 4.7
+**分支**：feat/phase-n7-video-branch（worktree `/Users/conan/Desktop/nibi-n7`）
+**Commit**：7457d02
+
+### 影响范围
+- 依赖：requirements.txt 追加 scenedetect>=0.6.4
+- 后端：shared/video_analyzer.py 大改 + backend pipeline_tasks/workspaces.py 透传子参数
+- 测试：新增 9 个 pytest（CaptureParams 边界 + 合成视频烟雾）
+
+### 范围收缩决策（重要）
+原 N7 计划包含 3 项：AI 镜头 / 路径 1（字幕直接）/ 路径 3（视频模型直接）。
+**实际只做了 AI 镜头**，路径 1 & 3 拆出独立 N7b。原因：
+- 路径 1 需要 item 维度的字幕抽取——当前 item pipeline 无此步骤，要做需先做 N8 音频管线的 Whisper 集成
+- 路径 3 需要视频大模型 API 客户端（Gemini 1.5 Pro / Qwen-VL-Max-Video 等）——新供应商集成，需用户决定接哪家
+- 强行塞进 N7 会让估时膨胀到 15-20h+ 且引入多个待决问题
+
+### 关键改动
+- 新增 `shared/video_analyzer.py::extract_frames_by_scenes(video_path, frames_per_shot=3)`：
+  - PySceneDetect ContentDetector 检测镜头切换点
+  - 每镜头 2 帧（首+尾）或 3 帧（首+中+尾，默认）
+  - 直接 `cap.set(POS_FRAMES, f) + cap.read()` 定位 target frame，不需要全程顺序读
+  - 无切换点（极短视频 / 单镜头）fallback 到首帧
+- 新增 `CaptureParams` dataclass + `from_dict` 工厂：
+  - 兼容 N5 之前的老 boolean 形状（true → 全默认）
+  - 兼容缺字段（mode 非法 → scene；frames_per_shot 非 2/3 → 3）
+  - 字符串数字 / 负值自动 clamp
+- `extract_frames` 增加 `max_frames` 参数（之前没有上限）
+- `process_video` / `run_batch_analysis` 增 `capture_params: CaptureParams | None`：
+  - None → 旧 interval 行为（向后兼容老调用方，比如 legacy streamlit 入口）
+  - mode=scene → extract_frames_by_scenes
+  - mode=interval → extract_frames（含 max_frames）
+- `_bridge_to_pipeline_payload`：把 `item.preflight.tasks.frame_prompts` dict 透传到 payload
+- `handle_analyze_task`：从 payload 读 frame_prompts → CaptureParams.from_dict → 传给 run_batch_analysis，并在 log 里打印实际配置
+
+### 为什么这么做
+- **从 N5 一路打通到管线**：N5 立了 UI + 持久化数据，N7 把这些数据真正送到截帧引擎，闭环
+- **CaptureParams 而不是 \*\*kwargs**：参数 4 个，又要从 dict 反序列化，dataclass 更清楚 + 测试好写
+- **直接 seek vs 顺序读**：scene 检测后我们已经知道目标 frame index，没必要遍历整个视频读完丢弃 99% 的帧
+- **None capture_params = 老行为**：legacy streamlit 入口、CLI 脚本可能直接调 run_batch_analysis 不带新参数；保兼容
+
+### 留给后续的影响
+- **N7b**（路径 1 & 3）：需要 item 字幕抽取（依赖 N8）+ 视频大模型 API 集成（新供应商决策）
+- **N8 音频**：会引入 Whisper item-level 抽取——做完后 N7b 路径 1 就能动了
+- **PySceneDetect 长视频性能**：300+ MB 视频检测 30-60 秒，本 phase 没做异步进度上报，照任务运行中状态即可。如果用户反馈卡顿，加 scene detect 阶段的 set_progress
+- **frame_prompts.format / lang 字段**：N5 引入但 N7 未消费——这是「提示词输出」步骤的事，归 N7b/N9 范围
+
+---
+
 ## Phase N6 – 任务级 LLM 对话上下文素材多选 chip + RAG 兜底
 
 **完成日期**：2026-05-19

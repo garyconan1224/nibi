@@ -1,6 +1,6 @@
 # AI Handoff
 
-Last updated: 2026-05-19（N6 完成，进入 N7）
+Last updated: 2026-05-19（N7 完成，进入 N8；N7b 拆出待办）
 
 ---
 
@@ -18,8 +18,10 @@ Last updated: 2026-05-19（N6 完成，进入 N7）
 | **N3 设置页重组** | ✅ 已合并 main | 设置页 tabs 10→7，合并模型与渠道 / 分析默认偏好 |
 | **N4 添加素材模态** | ✅ 已合并 main | 4 步合一 + 自动识别 + 智能勾选 + 背景折叠 |
 | **N5 Preflight 抽屉** | ✅ 已合并 main | 4 类素材子参数全套 UI + tasks 形状升级 |
-| **N6 任务级 LLM 对话** | ✅ 待 merge | TaskChatPanel + 素材 chip 多选 + char-based 上下文兜底 |
-| **N7 视频分支补全** | ⏳ **下一步** | P2，估时 8-10h，**需授权装 scenedetect 依赖** |
+| **N6 任务级 LLM 对话** | ✅ 已合并 main | TaskChatPanel + 素材 chip 多选 + char-based 上下文兜底 |
+| **N7 视频分支补全** | ✅ 待 merge | AI 镜头分析端到端打通（scenedetect 集成）|
+| **N7b 视频总结路径 1/3** | ⏸ 已拆出 | 字幕直接 + 视频模型直接；依赖 item 字幕抽取 + 视频大模型 API 决策 |
+| **N8 音频分支补全** | ⏳ **下一步** | P2，估时 8-10h，**需授权装 silero-vad / pyannote.audio + HF 协议** |
 
 > ⚠️ 写新交接前请**先 `git log --oneline -20` 对账**，不要相信本文件里写的「下一步」如果它和 git 冲突。
 
@@ -118,41 +120,63 @@ Last updated: 2026-05-19（N6 完成，进入 N7）
 
 ---
 
-## N7 开工交接（下一步）
+## N7 完工小结
 
-> 来源：`docs/SPEC.md` §4 视频分支。
+- 分支：`feat/phase-n7-video-branch`，worktree `/Users/conan/Desktop/nibi-n7`，**待 merge**
+- commits：
+  - `7457d02` N7.1~N7.5 AI 镜头分析端到端打通（scenedetect 集成）
+- **范围收缩决策**：原 plan 含「路径 1 字幕直接」和「路径 3 视频模型直接」，调研后拆出独立 phase **N7b**。理由：
+  - 路径 1 依赖 item 维度的字幕抽取——当前 item pipeline 没有，要做需先在 N8 音频管线建 ASR
+  - 路径 3 依赖视频大模型 API 集成（Gemini 1.5 / Qwen-VL-Max-Video），是新供应商，需用户单独决定接哪家
+- 改动：
+  - 装 `scenedetect>=0.6.4`（写 requirements.txt）
+  - 新增 `shared/video_analyzer.py::extract_frames_by_scenes`：PySceneDetect 检测镜头切换 + 每镜头 2/3 帧取样 + 无切换点 fallback 到首帧
+  - 新增 `CaptureParams` dataclass + `from_dict`：兼容 N5 新嵌套形状 + 老 boolean
+  - `process_video` / `run_batch_analysis` 接 `capture_params` 参数（None = 旧 interval 行为，向后兼容）
+  - `_bridge_to_pipeline_payload` 透传 `item.preflight.tasks.frame_prompts` → payload
+  - `handle_analyze_task` 读 payload → CaptureParams → 传给 run_batch_analysis
+- 验证：`pytest tests/backend -q` 119 passed（基线 110 + N7 新增 9：7 个 CaptureParams 边界 + 2 个合成视频烟雾测试）
 
-### N7 范围
+---
 
-- 标题：视频分支补全（PySceneDetect AI 镜头分析 / 总结路径 1 & 3 / 视频运镜延后）
+## N7b 待办（已拆出）
+
+- 标题：视频总结路径 1（字幕直接）+ 路径 3（视频模型直接）
+- 估时：8-12h
+- 阻塞依赖：
+  - 路径 1：item pipeline 需先加字幕抽取——和 N8 ASR 共享 Whisper 调用
+  - 路径 3：用户决定接哪家视频大模型（Gemini 1.5 Pro / Qwen-VL-Max-Video / 别的）
+
+---
+
+## N8 开工交接（下一步）
+
+> 来源：`docs/SPEC.md` §5 音频分支。
+
+### N8 范围
+
+- 标题：音频分支补全（VAD 双路 / pyannote 说话人 / 音乐分析）
 - 估时：8-10h
 - 优先级：P2
-- **模型**：⭐ **Opus 4.7**（视频管线 + scenedetect 集成 + 三路径分支）
-- **分支**：`feat/phase-n7-video-branch`，新 worktree `/Users/conan/Desktop/nibi-n7`
+- **模型**：⭐ **Opus 4.7**（音频管线 + 多个新模型集成 + 协议处理）
+- **分支**：`feat/phase-n8-audio-branch`，新 worktree `/Users/conan/Desktop/nibi-n8`
 
-### ⚠️ 需用户授权装新依赖
+### ⚠️ 需用户授权 + 决策
 
-- `scenedetect`（PySceneDetect）→ 写入 `requirements.txt`
-- 装之前必须先问用户授权
-
-### 具体差异项
-
-1. **AI 镜头分析**：用 PySceneDetect 检测镜头切换，按 N5 已存的 `frame_prompts.capture_mode = 'scene'` 走这条路；用户在 Preflight 抽屉选 2 帧或 3 帧
-2. **总结路径 1（字幕直接）**：当 `video_summary.path = 'subtitle'` 时跳过截帧，字幕 → 模板 → LLM
-3. **总结路径 3（视频模型直接）**：当 `video_summary.path = 'video_model'` 时整段视频送 vision-video 模型
-4. **视频运镜提示词**：延后到 AI 导演模块，N7 不做
+1. **silero-vad 或 webrtcvad**：选哪个？silero 更准但更大，webrtc 轻量
+2. **pyannote.audio**：**需要 HuggingFace token + 在 HF 上同意 pyannote/speaker-diarization-3.1 模型协议**——用户必须先去 HF 操作，否则这一项做不了
+3. **音乐分析**：要不要装 librosa？是否做 Suno/Udio 提示词生成？
 
 ### 开工前准备
 
-1. 读 SPEC §4.2 / §4.3
-2. 看 `shared/video_analyzer.py` / `shared/storyboard_generator.py` 现有截帧逻辑
-3. 看 N5 引入的 `frame_prompts` / `video_summary` params 形状
+1. 读 SPEC §5
+2. 看现有 shared/transcriber.py（如果有）/ 当前 audio 路由
+3. 确认 pyannote 协议状态
 
 ### 不要做的事
 
-- ❌ 不要做 N8 音频分支（即使顺手也别动）
-- ❌ 不要碰 AI 导演模块代码
-- ❌ 不要在没拿到授权前装 scenedetect
+- ❌ 不要做 N9 图片分支
+- ❌ 不要在没拿到 HF token 前装 pyannote
 
 ---
 

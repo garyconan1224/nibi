@@ -1,13 +1,17 @@
 ---
 phase: N7
 title: 视频分支补全（PySceneDetect AI 镜头分析）
-status: ready
+status: done
 priority: P2
 estimate_hours: 8-10
+actual_hours: ~2
 model: Opus 4.7
 branch: feat/phase-n7-video-branch
 worktree: 是（/Users/conan/Desktop/nibi-n7）
 depends_on: [N5, N6]
+commits: [7457d02]
+completed_date: 2026-05-19
+scope_decision: 范围收缩——只做 AI 镜头分析，路径 1 & 3 拆出 N7b
 spec_ref: docs/SPEC.md §4
 ---
 
