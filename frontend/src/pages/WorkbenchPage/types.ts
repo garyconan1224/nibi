@@ -16,14 +16,6 @@ export interface PipelineStep {
   defaultOn: boolean
 }
 
-export interface WorkspaceOption {
-  id: string
-  name: string
-  count: number
-  color: string
-  active?: boolean
-}
-
 export interface TaskCard {
   id: string
   title: string
