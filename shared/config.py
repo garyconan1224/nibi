@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import json
+import warnings
 from pathlib import Path
 
 from shared.dotenv_loader import load_dotenv_if_present
@@ -23,7 +24,14 @@ DATA_DIR: Path = ROOT_DIR / "data"
 VIDEOS_DIR: Path = DATA_DIR / "videos"        # 下载器输出 / 视频分析输入
 JSON_DATA_DIR: Path = DATA_DIR / "json_data"  # 视频分析 JSON 输出 / 导演台知识库
 PROJECTS_DIR: Path = ROOT_DIR / "projects"    # 导演台项目存档
-PROJECT_WORKSPACES_DIR: Path = DATA_DIR / "projects"  # 每个项目独立数据空间
+
+# N1b 新布局：每个 workspace 的产物目录与 workspace_store 的 JSON 同住 data/workspaces/
+# 形态：data/workspaces/<id>.json + data/workspaces/<id>/{videos,json_data,text,runtime}/
+WORKSPACES_DATA_DIR: Path = DATA_DIR / "workspaces"
+
+# 旧名 alias：保留向后兼容，仍指向旧路径 data/projects/，N1b.3 迁移脚本搬完后由 N1b.4 切换调用方
+# 切完后此常量保留指向 WORKSPACES_DATA_DIR，便于第三方脚本继续工作
+PROJECT_WORKSPACES_DIR: Path = DATA_DIR / "projects"
 
 # 视频分析归档目录（相对 VIDEOS_DIR 的父目录，即 data/）
 COLLECT_DIR_NAME: str = "所有内容汇总"
@@ -32,42 +40,96 @@ ARCHIVE_DIR_NAME: str = "已完成"
 
 def ensure_data_dirs() -> None:
     """确保所有共享数据目录存在。"""
-    for d in (VIDEOS_DIR, JSON_DATA_DIR, PROJECTS_DIR, PROJECT_WORKSPACES_DIR):
+    for d in (VIDEOS_DIR, JSON_DATA_DIR, PROJECTS_DIR, WORKSPACES_DATA_DIR):
         d.mkdir(parents=True, exist_ok=True)
 
 
+def _sanitize_workspace_id(workspace_id: str) -> str:
+    safe = (workspace_id or "").strip().replace("/", "_").replace("\\", "_")
+    return safe or "default_workspace"
+
+
+# ── 新 API（N1b）：以 workspace 为命名，落盘到 data/workspaces/<id>/ ──
+
+def get_workspace_root(workspace_id: str) -> Path:
+    return WORKSPACES_DATA_DIR / _sanitize_workspace_id(workspace_id)
+
+
+def get_workspace_videos_dir(workspace_id: str) -> Path:
+    return get_workspace_root(workspace_id) / "videos"
+
+
+def get_workspace_json_dir(workspace_id: str) -> Path:
+    return get_workspace_root(workspace_id) / "json_data"
+
+
+def get_workspace_runtime_dir(workspace_id: str) -> Path:
+    return get_workspace_root(workspace_id) / "runtime"
+
+
+def get_workspace_text_dir(workspace_id: str) -> Path:
+    """文本任务产物目录：每个 text 任务一份 .md + .json。"""
+    return get_workspace_root(workspace_id) / "text"
+
+
+def ensure_workspace_dirs(workspace_id: str) -> None:
+    for d in (
+        get_workspace_videos_dir(workspace_id),
+        get_workspace_json_dir(workspace_id),
+        get_workspace_runtime_dir(workspace_id),
+        get_workspace_text_dir(workspace_id),
+    ):
+        d.mkdir(parents=True, exist_ok=True)
+
+
+# ── 旧 API alias（N1b）：保留向后兼容，调用时打 DeprecationWarning ──
+# N1b.3 迁移脚本搬完老数据后，N1b.4 会把调用方批量切到新函数；这些 alias 保留一个 release 后删除。
+
 def _sanitize_project_id(project_id: str) -> str:
-    safe = (project_id or "").strip().replace("/", "_").replace("\\", "_")
-    return safe or "default_project"
+    return _sanitize_workspace_id(project_id)
+
+
+def _warn_deprecated_project_api(old: str, new: str) -> None:
+    warnings.warn(
+        f"shared.config.{old}() is deprecated, use {new}() instead "
+        f"(N1b 磁盘布局迁移，旧名将在下个 release 删除)",
+        DeprecationWarning,
+        stacklevel=3,
+    )
 
 
 def get_project_root(project_id: str) -> Path:
-    return PROJECT_WORKSPACES_DIR / _sanitize_project_id(project_id)
+    _warn_deprecated_project_api("get_project_root", "get_workspace_root")
+    return PROJECT_WORKSPACES_DIR / _sanitize_workspace_id(project_id)
 
 
 def get_project_videos_dir(project_id: str) -> Path:
-    return get_project_root(project_id) / "videos"
+    _warn_deprecated_project_api("get_project_videos_dir", "get_workspace_videos_dir")
+    return PROJECT_WORKSPACES_DIR / _sanitize_workspace_id(project_id) / "videos"
 
 
 def get_project_json_dir(project_id: str) -> Path:
-    return get_project_root(project_id) / "json_data"
+    _warn_deprecated_project_api("get_project_json_dir", "get_workspace_json_dir")
+    return PROJECT_WORKSPACES_DIR / _sanitize_workspace_id(project_id) / "json_data"
 
 
 def get_project_runtime_dir(project_id: str) -> Path:
-    return get_project_root(project_id) / "runtime"
+    _warn_deprecated_project_api("get_project_runtime_dir", "get_workspace_runtime_dir")
+    return PROJECT_WORKSPACES_DIR / _sanitize_workspace_id(project_id) / "runtime"
 
 
 def get_project_text_dir(project_id: str) -> Path:
-    """文本输入层产物目录（Phase 2C.1）：每个 text 任务落一份 .md + .json。"""
-    return get_project_root(project_id) / "text"
+    _warn_deprecated_project_api("get_project_text_dir", "get_workspace_text_dir")
+    return PROJECT_WORKSPACES_DIR / _sanitize_workspace_id(project_id) / "text"
 
 
 def ensure_project_dirs(project_id: str) -> None:
+    _warn_deprecated_project_api("ensure_project_dirs", "ensure_workspace_dirs")
     for d in (
-        get_project_videos_dir(project_id),
-        get_project_json_dir(project_id),
-        get_project_runtime_dir(project_id),
-        get_project_text_dir(project_id),
+        PROJECT_WORKSPACES_DIR / _sanitize_workspace_id(project_id) / "videos",
+        PROJECT_WORKSPACES_DIR / _sanitize_workspace_id(project_id) / "json_data",
+        PROJECT_WORKSPACES_DIR / _sanitize_workspace_id(project_id) / "runtime",
+        PROJECT_WORKSPACES_DIR / _sanitize_workspace_id(project_id) / "text",
     ):
         d.mkdir(parents=True, exist_ok=True)
 
