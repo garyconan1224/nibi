@@ -9,8 +9,8 @@ import type { WorkspaceRecord } from '@/types/workspace'
 import { detectPlatform } from './platforms'
 import { listWorkspaces, createWorkspace } from '@/services/workspaces'
 import { useProviderStore } from '@/store/providerStore'
-import { useTaskStore } from '@/store/taskStore'
-import { createPipelineTask } from '@/services/pipeline'
+import { MixedContentModal } from './MixedContentModal'
+import { PreflightDrawer } from './PreflightDrawer'
 
 const PIPE_STEPS: PipelineStep[] = [
   { n: '1', t: '下载',   s: 'Download',  tone: null,     defaultOn: true  },
@@ -31,15 +31,6 @@ const WS_COLORS = [
   '#ef4444', '#ec4899', '#14b8a6', '#eab308',
 ]
 
-const STEP_BACKEND_MAP: Record<string, string> = {
-  '下载': 'download',
-  '抽帧': 'analyze',
-  '转录': 'transcribe',
-  '视觉': 'analyze',
-  '结构化': 'note',
-  '分镜': 'storyboard',
-}
-
 interface ComposerProps {
   onTaskCreated?: () => void
 }
@@ -51,7 +42,10 @@ export function Composer({ onTaskCreated }: ComposerProps) {
   const [frameMode, setFrameMode] = useState<FrameMode>('A')
   const [fps, setFps] = useState(2)
   const [maxFrames, setMaxFrames] = useState(128)
-  const [submitting, setSubmitting] = useState(false)
+  const [mixedOpen, setMixedOpen] = useState(false)
+  const [mixedSel, setMixedSel] = useState<Record<string, boolean>>({})
+  const [preflightOpen, setPreflightOpen] = useState(false)
+  const [preflightTypes, setPreflightTypes] = useState<string[]>([])
 
   const [workspaces, setWorkspaces] = useState<WorkspaceRecord[]>([])
   const [workspaceSel, setWorkspaceSel] = useState<string[]>([])
@@ -61,7 +55,6 @@ export function Composer({ onTaskCreated }: ComposerProps) {
   const popRef = useRef<HTMLDivElement>(null)
 
   const { providers, providerModels, fetchProviders } = useProviderStore()
-  const addTask = useTaskStore((s) => s.addTask)
 
   // Fetch workspaces on mount
   useEffect(() => {
@@ -137,47 +130,32 @@ export function Composer({ onTaskCreated }: ComposerProps) {
   const toggle = (i: number) =>
     setSteps((ss) => ss.map((v, j) => (j === i ? !v : v)))
 
-  const handleRun = async () => {
+  const handleRun = () => {
     if (!url.trim()) return
-    setSubmitting(true)
-    try {
-      const activeSteps = PIPE_STEPS
-        .filter((_, i) => steps[i])
-        .map((s) => STEP_BACKEND_MAP[s.t])
-        .filter(Boolean)
-      const uniqueSteps = [...new Set(activeSteps)]
-
-      const res = await createPipelineTask({
-        project_id: crypto.randomUUID(),
-        task_type: 'analyze',
-        payload: { url: url.trim() },
-        steps: uniqueSteps.length ? uniqueSteps : undefined,
-      })
-
-      addTask({
-        task_id: res.task_id,
-        project_id: '',
-        task_type: 'analyze',
-        payload: { url: url.trim() },
-        status: 'PENDING',
-        progress: 0,
-        log: [],
-        result: {},
-        error: '',
-        retry_of: '',
-        cancel_requested: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-
-      toast.success('任务已创建', { description: url.trim() })
-      setUrl('')
-      onTaskCreated?.()
-    } catch {
-      toast.error('创建任务失败，请检查后端连接')
-    } finally {
-      setSubmitting(false)
+    if (isMixed) {
+      // Initialize mixed selection with all types selected
+      const init: Record<string, boolean> = {}
+      for (const t of platform!.types) init[t] = true
+      setMixedSel(init)
+      setMixedOpen(true)
+    } else {
+      setPreflightTypes([])
+      setPreflightOpen(true)
     }
+  }
+
+  const handleMixedConfirm = () => {
+    const types = Object.entries(mixedSel).filter(([, v]) => v).map(([k]) => k)
+    if (types.length === 0) return
+    setMixedOpen(false)
+    setPreflightTypes(types)
+    setPreflightOpen(true)
+  }
+
+  const handlePreflightCreated = () => {
+    setPreflightOpen(false)
+    setUrl('')
+    onTaskCreated?.()
   }
 
   const metaText =
@@ -491,13 +469,33 @@ export function Composer({ onTaskCreated }: ComposerProps) {
           <span style={{ opacity: 0.5 }}>·</span>
           <span style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>{metaText}</span>
         </div>
-        <button className="wb-btn-run" onClick={handleRun} disabled={submitting || !url.trim()}>
-          {submitting ? '创建中...' : isMixed ? '选择内容类型' : '开始解析'}
+        <button className="wb-btn-run" onClick={handleRun} disabled={!url.trim()}>
+          {isMixed ? '选择内容类型' : '开始解析'}
           <span className="iconwrap">
             <ArrowRight size={14} />
           </span>
         </button>
       </div>
+
+      {/* Mixed content modal */}
+      <MixedContentModal
+        open={mixedOpen}
+        platform={platform}
+        selected={mixedSel}
+        onToggle={(t) => setMixedSel((s) => ({ ...s, [t]: !s[t] }))}
+        onConfirm={handleMixedConfirm}
+        onClose={() => setMixedOpen(false)}
+      />
+
+      {/* Preflight drawer */}
+      <PreflightDrawer
+        open={preflightOpen}
+        url={url.trim()}
+        platformName={platform?.name ?? null}
+        selectedTypes={preflightTypes.length ? preflightTypes : undefined}
+        onClose={() => setPreflightOpen(false)}
+        onCreated={handlePreflightCreated}
+      />
     </div>
   )
 }
