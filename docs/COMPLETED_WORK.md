@@ -41,6 +41,49 @@
 
 ---
 
+## Phase N5 – Preflight 抽屉细化（按素材类型展开所有子参数）
+
+**完成日期**：2026-05-19
+**模型 / 工具**：Opus 4.7
+**分支**：feat/phase-n5-preflight（worktree `/Users/conan/Desktop/nibi-n5`）
+**Commit**：02e8d7d (N5.1) / 644fae1 (N5.2~N5.5)
+
+### 影响范围
+- 前端（纯前端，不动后端）
+- 文件：
+  - 新增 `frontend/src/lib/preflightTasks.ts`
+  - 新增 `frontend/src/components/workspace/PreflightTaskDetails.tsx`
+  - 改 `frontend/src/components/workspace/PreflightConfigPanel.tsx`
+
+### 关键改动
+- **数据形状升级**：`PreflightConfig.tasks` 从 `{id: boolean}` 升到 `{id: {enabled, ...params}}`。后端类型 `Record<string, unknown>` 天然兼容，无需迁移。
+- **三个核心工具**（`preflightTasks.ts`）：
+  - `getTaskParams(tasks, type, id)`：读取任意旧/新形状，按 type+id 补齐默认字段
+  - `setTaskParams(tasks, id, params)`：不可变更新
+  - `normalizeTasksShape(tasks, type)`：把整个 tasks 升级到新形状（打开抽屉 + 保存时各调一次）
+  - `getTopLevelTasks(type)`：替代 PreflightConfigPanel 内联的 `getTaskOptionsByType`，新增图片「多图对比」/文字「多文对比」一级项
+- **子参数 UI**（`PreflightTaskDetails.tsx`）：按 (type, taskId) 派发
+  - 视频 `frame_prompts`：截帧模式 / 间隔秒数 / 最大帧数 / 镜头取帧数 / 格式 / 语言
+  - 视频 `video_summary`：3 条路径 + 总结深度
+  - 音频 `asr`：Whisper 语言（8 种）
+  - 视频/音频 `music_analysis`：Suno / Udio 格式开关
+  - 图片 `frame_prompts`：MJ/SD/JSON
+  - 图片/文字 `association`：4 维联想方向多选
+  - 文字 `summary`：摘要长度 / `rewrite`：4 种风格 / `translate`：7 种目标语
+- **PreflightConfigPanel 第三区**：从单层 Checkbox 列表 → 「一级开关 + 子参数面板」嵌套结构；勾选 enabled 才展开子参数
+
+### 为什么这么做
+- SPEC §3.4 明确要求 Preflight 抽屉「展开所有子参数」，与添加素材模态（粗粒度）和设置页（默认值）分层
+- **嵌套对象** vs **扁平 `id_field` 命名**：选嵌套——后端 schema 不用动、前端 TaskDetails 子组件直接接收完整 params、读写一致
+- **不动后端**：N5 只立 UI + 持久化；子参数实际生效要等 N7~N10 各分支接入
+
+### 留给后续的影响
+- **N7~N10 后端**：消费 `preflight.tasks[*].xxx` 时按新形状读，注意 `tasks[id]` 可能是老 boolean（来自 N5 前的存量数据），调用 `bool(task) if isinstance(task, bool) else task.get('enabled')`
+- **AddMaterialModal**：仍写老 boolean 形状（粗粒度），打开抽屉时由 `normalizeTasksShape` 自动升级——不需要同步改
+- **关联标识**：图片「多图对比」/ 文字「多文对比」一级项已加，但只是 UI 占位，实际跨素材对比逻辑在 N9/N10 实现
+
+---
+
 ## Phase 3C – 标签库 7 维度（自动打标 + 手动校正 + 按标签筛选）
 
 **完成日期**：2026-05-18
