@@ -37,6 +37,13 @@ yt-dlp>=2024.1.0
 # ── 本地语音识别（ASR）───────────────────────────────────────────
 # faster-whisper 用于本地转录，规避外部 API 限流与网络依赖
 faster-whisper>=1.0.0
+
+# ── 音频分析（N8）──────────────────────────────────────────────
+silero-vad>=5.0    # VAD 人声活动检测（轻量，torch 后端）
+librosa>=0.10      # 音乐特征：BPM / 调性 / 能量曲线
+# pyannote.audio：说话人分离。**首次运行需 HF_TOKEN + 同意
+# pyannote/speaker-diarization-3.1 模型协议**。代码 graceful skip 缺包/缺 token
+pyannote.audio>=3.1
 ctranslate2>=4.0.0
 
 # ── 系统监控（部署监控页 M4）────────────────────────────────────

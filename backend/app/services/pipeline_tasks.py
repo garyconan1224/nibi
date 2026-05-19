@@ -19,6 +19,15 @@ from shared.config import (
 from shared.settings_store import load_settings
 from shared.storyboard_generator import run_storyboard_generation
 from shared.text_loader import TextDocument, TextLoaderError, load_auto
+from shared.audio_analyzer import (
+    analyze_music,
+    assign_speakers_to_segments,
+    export_srt,
+    export_txt,
+    generate_music_prompt,
+    run_diarization,
+    run_vad,
+)
 from shared.video_analyzer import (
     CaptureParams,
     find_videos,
@@ -887,7 +896,30 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         "url" if source.startswith(("http://", "https://")) else "local"
     )
 
-    log(f"🎵 audio_task | source_type={source_type} | source={source[:80]}")
+    # N8: 读 audio 子参数（兼容老 boolean / 缺字段）
+    def _task_enabled(key: str, default: bool) -> bool:
+        v = payload.get(key)
+        if isinstance(v, dict):
+            return bool(v.get("enabled", default))
+        if isinstance(v, bool):
+            return v
+        return default
+
+    asr_params = payload.get("asr") if isinstance(payload.get("asr"), dict) else {}
+    music_params = payload.get("music_analysis") if isinstance(payload.get("music_analysis"), dict) else {}
+    subtitle_params = payload.get("subtitle_file") if isinstance(payload.get("subtitle_file"), dict) else {}
+
+    whisper_lang = str(asr_params.get("whisper_lang") or "auto").strip().lower()
+    asr_enabled = bool(asr_params.get("enabled", True)) if isinstance(payload.get("asr"), dict) else True
+    diarization_enabled = _task_enabled("speaker_diarization", False)
+    music_enabled = _task_enabled("music_analysis", False)
+    subtitle_enabled = _task_enabled("subtitle_file", True)
+
+    log(
+        f"🎵 audio_task | source_type={source_type} | source={source[:80]} | "
+        f"lang={whisper_lang} | diarize={diarization_enabled} | music={music_enabled} | "
+        f"subtitle={subtitle_enabled}"
+    )
 
     # ── 1. FETCH ────────────────────────────────────────────
     runner.store.update(task_id, status=TaskStatus.FETCH.value)
@@ -917,6 +949,30 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     audio_mime = guessed or content_type.split(";")[0].strip() or "audio/mpeg"
     log(f"📦 音频已加载，{len(audio_bytes)//1024} KB，mime={audio_mime}，filename={audio_filename}")
 
+    # N8: 写入磁盘供 VAD / pyannote / librosa 读（这些库都需要文件路径）
+    from shared.config import get_project_root
+    audio_dir = get_project_root(record.project_id) / "audio"
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    audio_local_path = audio_dir / f"{task_id}_{audio_filename}"
+    if not (source_type == "local" and Path(source).is_file()):
+        audio_local_path.write_bytes(audio_bytes)
+    else:
+        audio_local_path = Path(source)  # 本地源直接用原路径
+
+    # ── 1.5 VAD（N8）─────────────────────────────────────────
+    runner.set_progress(task_id, 0.15, "VAD 人声活动检测...")
+    vad_result = run_vad(audio_local_path)
+    log(
+        f"🔍 VAD | has_speech={vad_result.has_speech} | "
+        f"speech={vad_result.total_speech_duration:.1f}s / total={vad_result.total_duration:.1f}s"
+    )
+    # 无人声 + 用户没勾音乐分析 → 仅日志告警（不主动改 preflight，弹窗交互推迟到 N8b）
+    if not vad_result.has_speech and not music_enabled:
+        log("⚠️  未检测到人声，且未启用音乐分析。可在 Preflight 抽屉勾选「音乐分析」后重跑")
+
+    # 若无人声 + ASR 仍开启，按 spec 跳过 ASR（避免空 LLM 调用）
+    skip_asr = (not vad_result.has_speech) or (not asr_enabled)
+
     # ── 2. TRANSCRIBE ────────────────────────────────────────
     runner.store.update(task_id, status=TaskStatus.VLM.value)  # 借用 VLM 状态表示「模型推理中」
     runner.set_progress(task_id, 0.30, "语音转文字中...")
@@ -929,15 +985,19 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     transcript_text = ""
     transcript_segments: List[Dict[str, Any]] = []
 
-    if not api_key:
+    if skip_asr:
+        log("⏭️  跳过 ASR（无人声或未启用）")
+    elif not api_key:
         log("⚠️  未提供 api_key，跳过转写")
     else:
         # 用 multipart/form-data POST 到 /audio/transcriptions（OpenAI 兼容）
-        log(f"🔊 调用 audio model={audio_model}")
+        log(f"🔊 调用 audio model={audio_model} | language={whisper_lang}")
         boundary = "----PythonFormBoundary"
         body_parts = []
         body_parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\n{audio_model}\r\n".encode())
         body_parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"response_format\"\r\n\r\njson\r\n".encode())
+        if whisper_lang and whisper_lang != "auto":
+            body_parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"language\"\r\n\r\n{whisper_lang}\r\n".encode())
         body_parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{audio_filename}\"\r\nContent-Type: {audio_mime}\r\n\r\n".encode())
         body_parts.append(audio_bytes)
         body_parts.append(f"\r\n--{boundary}--\r\n".encode())
@@ -996,13 +1056,75 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             except Exception as err:
                 log(f"⚠️  摘要生成失败：{err}")
 
+    # ── 3.5 说话人分离（N8）──────────────────────────────────
+    diarization_dict: Optional[Dict[str, Any]] = None
+    if diarization_enabled and vad_result.has_speech:
+        runner.set_progress(task_id, 0.75, "说话人分离（pyannote）...")
+        log("🎤 说话人分离中（pyannote.audio）")
+        diar = run_diarization(audio_local_path)
+        if diar is None:
+            log("⚠️  说话人分离未执行（缺 HF_TOKEN / 模型协议未同意 / 包不可用）")
+        else:
+            diarization_dict = diar.to_dict()
+            log(f"✅ 检测到 {diar.num_speakers} 个说话人，{len(diar.segments)} 段")
+            if transcript_segments:
+                transcript_segments = assign_speakers_to_segments(transcript_segments, diar)
+
+    # ── 3.6 音乐分析（N8）──────────────────────────────────
+    music_dict: Optional[Dict[str, Any]] = None
+    if music_enabled:
+        runner.set_progress(task_id, 0.82, "音乐特征分析（librosa）...")
+        music_features = analyze_music(audio_local_path)
+        if music_features is None:
+            log("⚠️  音乐分析未执行（librosa 不可用或文件读取失败）")
+        else:
+            log(
+                f"🎼 BPM={music_features.bpm:.1f} | key={music_features.key} | "
+                f"duration={music_features.duration:.1f}s"
+            )
+            # LLM 生成 Suno/Udio 提示词（若有 api_key）
+            if api_key:
+                runner.set_progress(task_id, 0.86, "生成音乐提示词...")
+                registry = create_default_registry()
+                profile = registry.resolve_default_profile(settings, "chat")
+                provider = registry.build(profile)
+                music_chat_model = (
+                    str(payload.get("text_model") or "").strip()
+                    or (getattr(settings, "text_model", "") or "").strip()
+                    or "Qwen/Qwen2.5-7B-Instruct"
+                )
+
+                def _music_llm(system: str, user: str) -> str:
+                    return provider.chat(
+                        ChatRequest(
+                            model=music_chat_model,
+                            messages=[
+                                {"role": "system", "content": system},
+                                {"role": "user", "content": user},
+                            ],
+                            temperature=0.5,
+                            max_tokens=400,
+                        )
+                    )
+
+                music_features = generate_music_prompt(music_features, _music_llm)
+            music_dict = music_features.to_dict()
+
+    # ── 3.7 字幕导出（N8）──────────────────────────────────
+    subtitle_paths: Dict[str, str] = {}
+    if subtitle_enabled and transcript_segments:
+        srt_text = export_srt(transcript_segments)
+        txt_text = export_txt(transcript_segments, with_speaker=bool(diarization_dict))
+        srt_path = audio_dir / f"{task_id}.srt"
+        txt_path = audio_dir / f"{task_id}.txt"
+        srt_path.write_text(srt_text, encoding="utf-8")
+        txt_path.write_text(txt_text, encoding="utf-8")
+        subtitle_paths = {"srt": str(srt_path.resolve()), "txt": str(txt_path.resolve())}
+        log(f"📄 字幕已导出 .srt / .txt（{len(transcript_segments)} 段）")
+
     # ── 4. STORE ─────────────────────────────────────────────
     runner.store.update(task_id, status=TaskStatus.STORE.value)
-    runner.set_progress(task_id, 0.90, "归档音频产物...")
-
-    from shared.config import get_project_root
-    audio_dir = get_project_root(record.project_id) / "audio"
-    audio_dir.mkdir(parents=True, exist_ok=True)
+    runner.set_progress(task_id, 0.92, "归档音频产物...")
 
     result: Dict[str, Any] = {
         "task_id": task_id,
@@ -1017,6 +1139,10 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             "mime": audio_mime,
             "size_bytes": len(audio_bytes),
         },
+        "vad": vad_result.to_dict(),
+        "diarization": diarization_dict,
+        "music": music_dict,
+        "subtitle_paths": subtitle_paths,
     }
     json_path = audio_dir / f"{task_id}.json"
     json_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
