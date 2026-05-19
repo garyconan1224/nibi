@@ -4,7 +4,7 @@
 >
 > **维护规则**：每完成一个子任务，在本文件**追加**一段（不删旧记录），格式见下方"记录模板"。
 >
-> Last updated: 2026-05-19 (Phase N11 完成)
+> Last updated: 2026-05-19 (Phase N1b 完成)
 
 ---
 
@@ -38,6 +38,40 @@
 ---
 
 # 历史记录（倒序，最新在上）
+
+---
+
+## Phase N1b – 磁盘布局迁移：data/projects/ → data/workspaces/
+
+**完成日期**：2026-05-19
+**模型 / 工具**：Opus 4.7
+**分支**：feat/phase-n1b-workspace-layout
+**Commit**：94cfc0b (N1b.1 决议落盘) / d0dfa10 (N1b.2 常量改名) / a11512a (N1b.3 迁移脚本) / e411b0c (N1b.4 调用方替换)
+
+### 影响范围
+- shared/config.py：新增 WORKSPACES_DATA_DIR + get_workspace_*()，旧名保留为 deprecated alias
+- scripts/migrate_n1b_layout.py：半自动迁移脚本（dry-run 默认）
+- backend/app/routes/notes.py / workspaces.py：切到新 API
+- backend/app/services/pipeline_tasks.py：切到新 API
+- shared/storyboard_generator.py：切到新 API
+- tests/：同步更新 mock 目标
+
+### 关键改动
+- N1b.1：执行计划落盘（方案 A + 半自动迁移 + 常量改名 alias）
+- N1b.2：shared/config.py 新增 WORKSPACES_DATA_DIR / get_workspace_*()，旧 API 保留 DeprecationWarning
+- N1b.3：scripts/migrate_n1b_layout.py，--dry-run 扫描 + --apply 搬迁 + .bak 保留
+- N1b.4：所有调用方批量替换 get_project_* → get_workspace_*，注释中的 data/projects 刷为 data/workspaces
+
+### 为什么这么做
+- 产品术语从「project」切到「workspace」后，磁盘路径是唯一遗留不一致的地方
+- 选方案 A（目录与 JSON 同层）是因为 rename 即可，不需要改 workspace_store.py
+- 选半自动迁移是因为不想启动时静默改用户数据
+- 保留 deprecated alias 是为了给第三方脚本一个 release 的缓冲期
+
+### 留给后续的影响
+- deprecated alias 保留了一个 release 后删除
+- .bak 目录需用户手动清理
+- data/projects/ 已空（或改名），后续新 workspace 全部落到 data/workspaces/<id>/
 
 ---
 

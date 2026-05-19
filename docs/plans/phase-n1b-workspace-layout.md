@@ -1,7 +1,7 @@
 ---
 phase: N1b
 title: 磁盘布局迁移 data/projects/ → data/workspaces/
-status: ready
+status: done
 model: Opus 4.7
 branch: feat/phase-n1b-workspace-layout
 worktree: TBD
@@ -9,6 +9,8 @@ created: 2026-05-19
 priority: P1
 estimate_hours: 6-10
 depends_on: N1 (已合并)
+completed_date: 2026-05-19
+commits: a11512a (N1b.3 迁移脚本) / e411b0c (N1b.4 调用方替换)
 ---
 
 # N1b 磁盘布局迁移
