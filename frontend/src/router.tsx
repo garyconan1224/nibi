@@ -28,6 +28,7 @@ const AudioResultPage = lazy(() => import('@/pages/result/AudioResultPage'))
 const TextResultPage = lazy(() => import('@/pages/result/TextResultPage'))
 const FavoritesPage = lazy(() => import('@/pages/FavoritesPage/FavoritesPage'))
 const SearchPage = lazy(() => import('@/pages/SearchPage/SearchPage'))
+const WorkbenchPage = lazy(() => import('@/pages/WorkbenchPage/index'))
 
 // 懒加载 fallback：保持极简，避免把额外依赖拉进主 chunk
 const RouteFallback = () => (
@@ -47,6 +48,7 @@ export const router = createBrowserRouter([
     element: <Index />,
     children: [
       { index: true, element: <Navigate to="/workspaces" replace /> },
+      { path: 'workbench', element: withSuspense(<WorkbenchPage />) },
       { path: 'workspaces', element: withSuspense(<WorkspaceList />) },
       { path: 'favorites', element: withSuspense(<FavoritesPage />) },
       { path: 'search', element: withSuspense(<SearchPage />) },
