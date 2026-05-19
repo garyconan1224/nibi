@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { subscribeSse } from '@/services/events'
 import { ChatSidebar } from '@/components/workspace/ChatSidebar'
+import { TaskChatPanel } from '@/components/workspace/TaskChatPanel'
 import { AddMaterialModal } from '@/components/workspace/AddMaterialModal'
 import {
   ArrowLeft,
@@ -339,14 +340,7 @@ export default function WorkspaceDetail() {
         </TabsContent>
 
         <TabsContent value="chat">
-          <Card>
-            <CardContent className="pt-6">
-              <EmptyState
-                title="AI 对话即将上线"
-                description="任务级 LLM 对话功能开发中，敬请期待。"
-              />
-            </CardContent>
-          </Card>
+          <TaskChatPanel workspace={workspace} />
         </TabsContent>
       </Tabs>
 

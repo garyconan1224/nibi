@@ -28,6 +28,8 @@ export interface CreateChatTurnRequest {
   prompt: string
   chat_id?: string
   model?: string
+  /** N6: 选中的上下文素材 id 列表；空 = 无 item 上下文（兼容浮动入口） */
+  item_ids?: string[]
 }
 
 export interface CreateChatTurnResponse {
@@ -35,6 +37,10 @@ export interface CreateChatTurnResponse {
   chat_id: string
   workspace_id: string
   status: string
+  /** N6: 后端把 item 上下文截断了 → 前端展示「上下文已自动精简」 */
+  context_truncated?: boolean
+  /** N6: 实际成功注入的 item_ids（与请求里的 item_ids 对比可知哪些被丢） */
+  used_item_ids?: string[]
 }
 
 /** POST /workspaces/{id}/chat */
