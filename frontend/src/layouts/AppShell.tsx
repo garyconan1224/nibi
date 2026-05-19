@@ -5,7 +5,7 @@ import {
   Settings,
   Search,
   Sparkles,
-  Star,
+  Clapperboard,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -15,11 +15,13 @@ interface NavItem {
   path: string
   icon: LucideIcon
   label: string
+  disabled?: boolean
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'workspaces', path: '/workspaces', icon: Library, label: '工作区' },
-  { id: 'favorites', path: '/favorites', icon: Star, label: '收藏夹' },
+  { id: 'workspaces', path: '/workspaces', icon: Library, label: '任务中心' },
+  { id: 'search', path: '/search', icon: Search, label: '资料库' },
+  { id: 'director', path: '/director', icon: Clapperboard, label: 'AI 导演', disabled: true },
 ]
 
 const BOTTOM_ITEMS: NavItem[] = [
@@ -30,23 +32,27 @@ interface SidebarBtnProps {
   icon: LucideIcon
   label: string
   active: boolean
+  disabled?: boolean
   onClick: () => void
 }
 
-function SidebarBtn({ icon: Icon, label, active, onClick }: SidebarBtnProps) {
+function SidebarBtn({ icon: Icon, label, active, disabled, onClick }: SidebarBtnProps) {
   return (
     <button
       title={label}
       onClick={onClick}
+      disabled={disabled}
       className={cn(
         'relative flex size-10 items-center justify-center rounded-lg transition-colors',
-        active
-          ? 'bg-accent text-foreground shadow-sm'
-          : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+        disabled
+          ? 'cursor-not-allowed text-muted-foreground/40'
+          : active
+            ? 'bg-accent text-foreground shadow-sm'
+            : 'text-muted-foreground hover:bg-accent hover:text-foreground',
       )}
     >
       <Icon size={18} />
-      {active && (
+      {active && !disabled && (
         <span className="absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-r-full bg-foreground" />
       )}
     </button>
@@ -93,19 +99,10 @@ export function AppShell({ children }: AppShellProps) {
             icon={item.icon}
             label={item.label}
             active={isActive(item.path)}
+            disabled={item.disabled}
             onClick={() => navigate(item.path)}
           />
         ))}
-
-        <div className="my-1 h-px w-6 bg-border" />
-
-        {/* Search (Phase 3B：跨工作空间检索) */}
-        <SidebarBtn
-          icon={Search}
-          label="知识库检索"
-          active={isActive('/search')}
-          onClick={() => navigate('/search')}
-        />
 
         {/* Spacer */}
         <div className="flex-1" />

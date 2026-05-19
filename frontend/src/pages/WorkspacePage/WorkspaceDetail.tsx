@@ -21,6 +21,7 @@ import {
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -58,7 +59,6 @@ import { WorkspaceSearchBar } from './WorkspaceSearchBar'
 import {
   addWorkspaceItem,
   deleteWorkspace,
-  downloadExport,
   getWorkspace,
   removeWorkspaceItem,
   savePreflight,
@@ -122,24 +122,6 @@ export default function WorkspaceDetail() {
   // 前置配置面板状态——保存当前正在配置的 item 引用
   const [preflightItem, setPreflightItem] = useState<WorkspaceItem | null>(null)
   const [preflightSubmitting, setPreflightSubmitting] = useState(false)
-  const [exporting, setExporting] = useState(false)
-
-  // 找到第一个已完成的 video/image item 用于导出
-  const exportableItem = workspace?.items.find(
-    (it) => (it.type === 'video' || it.type === 'image') && it.status === 'done',
-  )
-
-  const handleExport = useCallback(async () => {
-    if (!workspace || !exportableItem) return
-    setExporting(true)
-    try {
-      await downloadExport(workspace.workspace_id, exportableItem.item_id)
-    } catch {
-      // downloadExport 内部已处理下载，这里只兜底
-    } finally {
-      setExporting(false)
-    }
-  }, [workspace, exportableItem])
 
   const refresh = useCallback(async () => {
     if (!id) return
@@ -388,11 +370,16 @@ export default function WorkspaceDetail() {
         </div>
       )}
 
-      {/* 主体：左主区 + 右侧栏 */}
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        {/* 左：素材列表 */}
-        <div className="space-y-4">
-          {/* Phase 3B.5：本工作空间内嵌检索 */}
+      {/* 主体：Taskboard 子标签 */}
+      <Tabs defaultValue="materials">
+        <TabsList>
+          <TabsTrigger value="materials">素材</TabsTrigger>
+          <TabsTrigger value="queue">队列</TabsTrigger>
+          <TabsTrigger value="tags">标签库</TabsTrigger>
+          <TabsTrigger value="chat">AI 对话</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="materials" className="space-y-4">
           <WorkspaceSearchBar workspaceId={workspace.workspace_id} />
           <Card>
             <CardHeader className="flex-row items-center justify-between space-y-0">
@@ -433,53 +420,41 @@ export default function WorkspaceDetail() {
               )}
             </CardContent>
           </Card>
-        </div>
+        </TabsContent>
 
-        {/* 右：侧栏占位 */}
-        <aside className="space-y-4">
+        <TabsContent value="queue">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">任务级 LLM 对话</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground">
-                跨素材问答（接通后端 RAG 后启用）。
-              </p>
-              <Button variant="outline" size="sm" disabled className="mt-3 w-full">
-                即将上线
-              </Button>
+            <CardContent className="pt-6">
+              <EmptyState
+                title="队列为空"
+                description="添加素材并触发分析后，进行中的任务会出现在这里。"
+              />
             </CardContent>
           </Card>
+        </TabsContent>
 
+        <TabsContent value="tags">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">复刻清单</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground">
-                收藏的参考帧 / 图片会出现在这里。当前 {workspace.favorites.length} 项。
-              </p>
+            <CardContent className="pt-6">
+              <EmptyState
+                title="暂无标签"
+                description="素材分析完成后，7 维度标签会自动归类到这里。"
+              />
             </CardContent>
           </Card>
+        </TabsContent>
 
+        <TabsContent value="chat">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">导出工作包</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!exportableItem || exporting}
-                className="w-full"
-                onClick={handleExport}
-              >
-                {exporting ? '导出中…' : exportableItem ? '导出 ZIP' : '先完成一个视频/图片分析任务'}
-              </Button>
+            <CardContent className="pt-6">
+              <EmptyState
+                title="AI 对话即将上线"
+                description="任务级 LLM 对话功能开发中，敬请期待。"
+              />
             </CardContent>
           </Card>
-        </aside>
-      </div>
+        </TabsContent>
+      </Tabs>
 
       {/* 添加素材模态 */}
       <Dialog
