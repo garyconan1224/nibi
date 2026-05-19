@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 from backend.app.models.tasks import LEGACY_STATUS_MAP, TERMINAL_STATUS_VALUES, TaskStatus
 from backend.app.routes.pipeline import _runner as _pipeline_runner
 from backend.app.routes.pipeline import _store as _pipeline_store
-from shared.config import ROOT_DIR, ensure_project_dirs, get_project_videos_dir
+from shared.config import ROOT_DIR, ensure_workspace_dirs, get_workspace_videos_dir
 from shared.settings_store import load_settings
 
 router = APIRouter(prefix="/api", tags=["bilinote-compat"])
@@ -52,14 +52,14 @@ def _err(msg: str, *, code: int = 1, data: Optional[Dict[str, Any]] = None) -> B
 
 # ── 辅助：当前项目解析 ────────────────────────────────────────
 # 后端进程无 streamlit 上下文，直接读取 `.local/current_project.json`；
-# 若文件缺失则兜底为 "default_project"（与 shared.config._sanitize_project_id 兜底一致）。
+# 若文件缺失则兜底为 "default_project"（与 shared.config._sanitize_workspace_id 兜底一致）。
 _CURRENT_PROJECT_PATH: Path = ROOT_DIR / ".local" / "current_project.json"
 
 
 def _resolve_project_id(project_id: Optional[str]) -> str:
     pid = (project_id or "").strip()
     if pid:
-        ensure_project_dirs(pid)
+        ensure_workspace_dirs(pid)
         return pid
     try:
         if _CURRENT_PROJECT_PATH.is_file():
@@ -67,12 +67,12 @@ def _resolve_project_id(project_id: Optional[str]) -> str:
             if isinstance(data, dict):
                 saved = str(data.get("project_id") or "").strip()
                 if saved:
-                    ensure_project_dirs(saved)
+                    ensure_workspace_dirs(saved)
                     return saved
     except Exception:
         pass
     fallback = "default_project"
-    ensure_project_dirs(fallback)
+    ensure_workspace_dirs(fallback)
     return fallback
 
 
@@ -265,9 +265,9 @@ async def upload_video(
     file: UploadFile = File(...),
     project_id: Optional[str] = Form(default=None),
 ) -> BiliNoteResponse:
-    """接收本地视频上传并保存到 `data/projects/<project>/videos/`。"""
+    """接收本地视频上传并保存到 `data/workspaces/<workspace>/videos/`。"""
     pid = _resolve_project_id(project_id)
-    target_dir = get_project_videos_dir(pid)
+    target_dir = get_workspace_videos_dir(pid)
     target_dir.mkdir(parents=True, exist_ok=True)
 
     safe_name = _sanitize_upload_name(file.filename or "upload.bin")

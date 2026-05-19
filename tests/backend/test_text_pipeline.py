@@ -130,10 +130,10 @@ def _wait_terminal(store: TaskStore, task_id: str, timeout: float = 5.0):
 
 
 def test_handle_text_task_happy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    # 改写 PROJECT_WORKSPACES_DIR，让产物落到 tmp 下
-    monkeypatch.setattr("shared.config.PROJECT_WORKSPACES_DIR", tmp_path)
-    # 注意：pipeline_tasks 是 from shared.config import get_project_text_dir
-    # 而 get_project_text_dir 内部读 PROJECT_WORKSPACES_DIR 模块级常量，monkeypatch 有效。
+    # 改写 WORKSPACES_DATA_DIR，让产物落到 tmp 下
+    monkeypatch.setattr("shared.config.WORKSPACES_DATA_DIR", tmp_path)
+    # 注意：pipeline_tasks 是 from shared.config import get_workspace_text_dir
+    # 而 get_workspace_text_dir 内部读 WORKSPACES_DATA_DIR 模块级常量，monkeypatch 有效。
 
     fake_doc = TextDocument(
         title="Fake Title",
