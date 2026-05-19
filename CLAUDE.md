@@ -23,8 +23,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - 当前主线是 **FastAPI 后端 + React/Vite 前端**。
 - `app.py`、`pages/`、`src/vidmirror/ui/` 属于 Streamlit legacy compatibility path；除非用户明确要求维护旧入口，否则不要往这里加新产品功能。
-- 新会话开始时先读 `AGENTS.md`、`docs/AI_HANDOFF.md`、`docs/OUTSTANDING_TASKS.md`，再判断任务边界。
-- 本次仓库卫生之后的下一步只能进入**产品选择**：先让用户选下一条产品主线，不要直接写功能。
+- 新会话开始时先读 `AGENTS.md`、`docs/WORKFLOW.md`、`docs/SPEC.md`、`docs/EXECUTION_PLAN.md`、`docs/AI_HANDOFF.md`、`docs/OUTSTANDING_TASKS.md`，再判断任务边界。
+- 当前处于 **N11 后收口决策点**：`[A]` 现状同步与 `[B]` N1~N11 spec-gap landing 均已完成。下一步只能在 `.git` 历史瘦身、拆出子阶段 `N1b / N7b / N8b`、`[C]` AI 导演、`[D]` 开源准备之间选择。
 
 ---
 
@@ -48,10 +48,10 @@ cd frontend && pnpm dev
 ### 测试 / 检查
 ```bash
 # 后端测试（CI 用同样命令）
-pytest tests/backend -q
+.venv/bin/python -m pytest tests/backend -q
 # 单文件 / 单用例
-pytest tests/backend/test_xxx.py -q
-pytest tests/backend/test_xxx.py::test_foo -q
+.venv/bin/python -m pytest tests/backend/test_xxx.py -q
+.venv/bin/python -m pytest tests/backend/test_xxx.py::test_foo -q
 
 # 前端
 cd frontend && pnpm lint        # ESLint
@@ -59,13 +59,13 @@ cd frontend && pnpm test        # vitest
 cd frontend && pnpm build       # tsc -b && vite build
 
 # 启动前自检（端口、依赖、.env）
-python3 scripts/preflight_check.py
+.venv/bin/python scripts/preflight_check.py
 
 # 端到端验收
-python3 tests/e2e_qa.py
+.venv/bin/python tests/e2e_qa.py
 ```
 
-> 注：根目录暂无 `tests/backend/` 目录树（CI 跑的就是这条命令，本地若缺应先确认是否在某个 worktree/分支里）。新增后端测试时遵循「每个端点 1 个 happy path + 1 个错误路径」。
+> 注：本仓库使用项目内 `.venv` 作为标准 Python 入口。新增后端测试时遵循「每个端点 1 个 happy path + 1 个错误路径」。
 
 ---
 
@@ -160,17 +160,17 @@ python3 tests/e2e_qa.py
 > - 若 git log 与文档一致，再开工。
 > - 这条规则的存在原因：2026-05-17 曾发生 AI 让用户重做已合并的 Phase 2C.1 的事故，根因就是 AI_HANDOFF / OUTSTANDING_TASKS 是手工快照、滞后于 git。**phase 文档不是事实来源，git log 才是。**
 
-> 🚀 **Phase 启动速查**（开工前对照 `SPEC.md` 附录 C 的 N1~N11 路线 + 「模型选择策略」章）：
-> - **当前阶段：[A] 现状同步**（参见 `docs/WORKFLOW.md` §4），收尾事项：重写 EXECUTION_PLAN / 重写 AI_HANDOFF / 归档旧 plans / push 52 commits 到 origin
-> - **下一阶段：[B] N1~N11 落地差异**——按 spec 附录 C 路线，依次推进
-> - **再下一阶段：[C] AI 导演**——N1~N11 完成之后才启动
+> 🚀 **Phase 启动速查**（开工前对照 `docs/EXECUTION_PLAN.md` + 「模型选择策略」章）：
+> - **当前阶段：N11 后收口决策点**。`[A]` 现状同步与 `[B]` N1~N11 落地差异已完成。
+> - **可选下一步**：`.git` 历史瘦身（需用户明确授权）/ `N1b` / `N7b` / `N8b` / `[C] AI 导演` / `[D] 开源准备`。
+> - **[C] AI 导演**：需先补完整 director 设计，再进入实现。
 > - **简单阶段**（N1 / N2 / N3 / N11 等纯前后端 CRUD）：⭐ 小米 2.5 Pro（终端，免费）/ Sonnet 4.6，不开 worktree
 > - **复杂阶段**（N5 Preflight 抽屉子参数细化 / N6 任务级 LLM 对话 + RAG / N7 视频镜头分析）：Opus 4.7 + 新 worktree（`feat/phase<N>-<短名>` 分支）
 > - **决策速查**：复杂/SSE/状态机/加密 → Opus；中等多文件 CRUD → Sonnet；git/测试/文档/模板 → 小米；单行 typo → Haiku / 小米
 
 > ⚠️ **重要**：本文档与历史 `docs/archive/plan-v1.md` / `docs/archive/spec-v2.md` 已不再一致——以本文档为准。
 > - 当历史文件与现实代码冲突时，**以代码 + 合并 spec + WORKFLOW.md 为准**。
-> - 旧 phase 编号（1A~3E / 4~10）已**完成或归档**，新工作走 N1~N11 路线。
+> - 旧 phase 编号（1A~3E / 4~10）已**完成或归档**，N1~N11 主线也已完成；后续只做明确选中的拆出子阶段或 `[C] / [D]`。
 
 1. 新会话开始时**先扫 `git status --short --branch` + `git log --oneline -5`** 确认现状，再读 `WORKFLOW.md` → `SPEC.md` → `EXECUTION_PLAN.md`。
 2. **一个会话只做一个明确的子任务**，做完就停。

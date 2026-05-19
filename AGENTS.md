@@ -30,7 +30,7 @@
 - `docs/archive/system_design_v3_final.md`
 - `docs/archive/plan-v1.md`, `docs/archive/design-spec-v1.md`
 
-**Current phase**: [A] state sync (see WORKFLOW.md §4). Next: [B] N1~N11 spec-gap landing per `docs/SPEC.md` Appendix C.
+**Current phase**: N11 后收口决策点。`[A]` 现状同步与 `[B]` N1~N11 spec-gap landing 均已完成；下一步只能在 `.git` 历史瘦身、拆出子阶段 `N1b / N7b / N8b`、`[C]` AI 导演、`[D]` 开源准备之间选择。
 
 Keep each turn scoped to one clear task. If a request starts to expand into product design plus implementation, separate the decision step from the coding step.
 

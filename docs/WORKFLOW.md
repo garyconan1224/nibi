@@ -6,7 +6,7 @@
 > - 哪份 spec 是真相源
 > - 怎么对账避免重做
 >
-> Last updated: 2026-05-18
+> Last updated: 2026-05-19
 
 ---
 
@@ -28,15 +28,21 @@
 
 ## 2. 整体工作流（从现在到开源 / v1 发布）
 
-合并 spec 已落地，项目进入"现状同步 + 差异补齐"阶段。**总流程图**：
+合并 spec 已落地，现状同步与 N1~N11 差异补齐已完成。项目现在处于 **N11 后决策点**。**总流程图**：
 
 ```
-[A] 现状同步                          ← 你现在在这里
+[A] 现状同步                          ✅ 已完成
     ↓
-[B] N1~N11 落地差异（按 spec 附录 C 路线）
+[B] N1~N11 落地差异（按 spec 附录 C 路线） ✅ 已完成
     ├─ N1-N3: 工程基建（任务系统差异 / 导航精简 / 设置页重组）
     ├─ N4-N6: 核心交互（添加素材模态 / Preflight 抽屉 / 任务级 LLM 对话）
     └─ N7-N11: 四大分支补齐（视频 / 音频 / 图片 / 文字 / UI 清理）
+    ↓
+当前决策点                          ← 你现在在这里
+    ├─ .git 历史瘦身（需用户明确授权）
+    ├─ N1b / N7b / N8b 拆出子阶段
+    ├─ [C] AI 导演模块
+    └─ [D] 安全 + 开源准备
     ↓
 [C] AI 导演模块（复刻功能）
     ├─ 收藏帧 + 提示词版本 UI
@@ -87,9 +93,9 @@
 
 ---
 
-## 4. 当前阶段 [A] 现状同步——9 项必做
+## 4. 已完成的 [A] 现状同步
 
-**已经做了**（在 PR #1 docs/spec-merged 分支上）：
+**已经做了**：
 - [x] 1. 合并 spec md 写完（[`docs/SPEC.md`](SPEC.md)）
 - [x] 2. 设计稿统一搬到 [`docs/design/`](design/)（旧 `design_reference/` 已删）
 - [x] 3. v3 文档归档到 [`docs/archive/`](archive/)
@@ -98,20 +104,13 @@
 - [x] 6. 写本工作流文档 `docs/WORKFLOW.md`
 - [x] 7. 更新 `CLAUDE.md` 优先级段落
 - [x] 8. 更新 `AGENTS.md` 同步
-
-**还差**（下一会话开干）：
-
-> 🛠️ **下一会话开工参数**（任何 AI 工具看这里即可，不用问）：
-> - **模型**：⭐ **小米 2.5 Pro（终端，免费）** —— 纯文档改写，符合 CLAUDE.md §「模型选择策略」档 3
-> - **分支**：**直接在 main 上做**，不开 worktree —— 纯文档不算"改代码"，CLAUDE.md §「Git 行为」第 4 条仅约束代码改动
-> - **不 push**：按 CLAUDE.md §「Push 策略」，commit 留在 local main，等 [D] 开源准备阶段统一推
-
-待办：
 - [x] 9. 重写 [`docs/EXECUTION_PLAN.md`](EXECUTION_PLAN.md)：抛弃旧 Phase 3D-3E 路线，替换为 N1~N11 路线（路线初稿见 `docs/SPEC.md` 附录 C.2）
 - [x] 10. 重写 [`docs/AI_HANDOFF.md`](AI_HANDOFF.md)：清除 Phase 2B 旧入口，改 N1 开工交接（参考本文档 §4 模板）
 - [x] 11. 旧 `docs/plans/phase-3d~phase-10.md` 共 9 份，全部 frontmatter 加 `status: archived` + 顶部注明"被合并 spec 取代"
 
-> ~~12. push 52 commits 到 origin~~ **取消**：按新 push 策略，暂缓所有 push 到 [D] 开源准备阶段。当前 local main 已包含 docs/spec-merged 全部内容（57 commits ahead of origin），本地状态完整。
+> ~~12. push 到 origin~~ **取消**：按新 push 策略，暂缓所有 push 到 [D] 开源准备阶段。当前 local main 允许领先 origin，本地状态以启动检查为准。
+
+**N1~N11 主线也已完成**。当前下一步不再从本节继续，而是按 `docs/EXECUTION_PLAN.md` 的「当前下一步」在 `.git` 清理、拆出子阶段、`[C]`、`[D]` 之间做选择。
 
 ---
 

@@ -140,7 +140,7 @@ export default function SearchPage() {
 
           {!loading && !submitted && (
             <EmptyState
-              icon={SearchIcon}
+              illustration={<SearchIcon className="size-6" />}
               title="开始你的第一次检索"
               description="在上方输入框中输入问题，按回车或点击搜索。"
             />
@@ -152,7 +152,7 @@ export default function SearchPage() {
 
           {!loading && submitted && !result && (
             <EmptyState
-              icon={SearchIcon}
+              illustration={<SearchIcon className="size-6" />}
               title="未返回结果"
               description="可能是网络异常或后端报错，请查看控制台或稍后重试。"
             />
@@ -181,7 +181,7 @@ function SearchResultView({ result }: { result: SearchResponse }) {
         </div>
         {result.sources.length === 0 ? (
           <EmptyState
-            icon={SearchIcon}
+            illustration={<SearchIcon className="size-6" />}
             title="无引用来源"
             description="模型未能在选定范围内匹配到相关片段。"
           />

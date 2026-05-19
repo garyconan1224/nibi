@@ -9,7 +9,7 @@ import { RefreshCw } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { TAG_DIMENSION_LABELS, SYSTEM_TAG_DIMENSIONS } from '@/constants/tagDimensions'
+import { SYSTEM_TAG_DIMENSIONS } from '@/constants/tagDimensions'
 import { getItemTags, regenerateItemTags } from '@/services/tags'
 import type { ItemTags, SystemTagDimension } from '@/types/workspace'
 
