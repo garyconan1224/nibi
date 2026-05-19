@@ -820,6 +820,19 @@ def _bridge_to_pipeline_payload(
             "source": item.source_value,
             "source_type": item.source,  # "url" or "local"
         }
+        # N8: 透传 audio 子参数 + 全局模型/key（与 video analyze 路径对齐）
+        models = item.preflight.models or {}
+        if models.get("text"):
+            payload["text_model"] = models["text"]
+        tasks = item.preflight.tasks or {}
+        if isinstance(tasks.get("asr"), dict):
+            payload["asr"] = tasks["asr"]
+        if isinstance(tasks.get("speaker_diarization"), dict):
+            payload["speaker_diarization"] = tasks["speaker_diarization"]
+        if isinstance(tasks.get("subtitle_file"), dict):
+            payload["subtitle_file"] = tasks["subtitle_file"]
+        if isinstance(tasks.get("music_analysis"), dict):
+            payload["music_analysis"] = tasks["music_analysis"]
         return "audio", payload
 
     if item.type not in (ItemType.VIDEO.value,):
