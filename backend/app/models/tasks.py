@@ -25,6 +25,9 @@ class TaskStatus(str, Enum):
     PARSE = "PARSE"            # 解析（PDF/DOCX/HTML → 原始文本）
     EXTRACT = "EXTRACT"        # 抽取（标题 + 正文规范化）
     SUM = "SUM"                # 总结（LLM 生成总结）
+    ASSOCIATE = "ASSOCIATE"    # N10: 联想归纳
+    REWRITE = "REWRITE"        # N10: 改写/润色
+    TRANSLATE = "TRANSLATE"    # N10: 翻译
     STORE = "STORE"            # 入库（写入任务数据库）
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"

@@ -545,15 +545,19 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     }
 
 
-def _summarize_text(
+def _text_llm_call(
     *,
     content: str,
     title: str,
+    sys_prompt: str,
+    user_prompt_suffix: str,
     settings,
     payload: Dict[str, Any],
     log: Any,
+    max_input_chars: int = 16000,
+    max_tokens: int = 1024,
 ) -> str:
-    """对正文做一轮 LLM 摘要。失败时返回空串（不抛异常，由调用方决定是否阻断）。"""
+    """通用文本 LLM 调用。失败返回空串。"""
     if not content.strip():
         return ""
     api_key = (
@@ -561,9 +565,8 @@ def _summarize_text(
         or (settings.openai_api_key or "").strip()
     )
     if not api_key:
-        log("⚠️  未提供 api_key，跳过 LLM 摘要")
+        log("⚠️  未提供 api_key，跳过 LLM 调用")
         return ""
-
     try:
         registry = create_default_registry()
         profile = registry.resolve_default_profile(settings, "chat")
@@ -574,24 +577,15 @@ def _summarize_text(
             or (settings.text_model or "").strip()
         )
         if not model:
-            log("⚠️  未配置 text_model，跳过 LLM 摘要")
+            log("⚠️  未配置 text_model，跳过 LLM 调用")
             return ""
-
-        # 控制传入 LLM 的正文长度，避免 token 超限（粗略字符截断，留给 Phase 3 上 chunk）
-        max_chars = int(payload.get("summary_max_input_chars") or 16000)
-        body = content[:max_chars]
-        truncated = len(content) > max_chars
-
-        sys_prompt = (
-            "你是一名严谨的中文文档摘要助手。请基于给定正文，输出 Markdown 格式的摘要，"
-            "结构为：1) 一句话摘要；2) 3–6 条要点（项目符号）；3) 关键术语（若有，最多 5 个）。"
-            "不要编造文中没有的事实。"
-        )
+        body = content[:max_input_chars]
+        truncated = len(content) > max_input_chars
         user_prompt = (
             f"# 文档标题\n{title or '(无标题)'}\n\n"
             f"# 正文（{'已截断' if truncated else '完整'}）\n{body}"
+            + (f"\n\n{user_prompt_suffix}" if user_prompt_suffix else "")
         )
-
         return provider.chat(
             ChatRequest(
                 model=model,
@@ -600,12 +594,169 @@ def _summarize_text(
                     {"role": "user", "content": user_prompt},
                 ],
                 temperature=float(payload.get("temperature") or 0.3),
-                max_tokens=int(payload.get("summary_max_tokens") or 1024),
+                max_tokens=max_tokens,
             )
         )
     except Exception as err:  # noqa: BLE001
-        log(f"⚠️  LLM 摘要失败：{err}")
+        log(f"⚠️  LLM 调用失败：{err}")
         return ""
+
+
+def _summarize_text(
+    *,
+    content: str,
+    title: str,
+    settings,
+    payload: Dict[str, Any],
+    log: Any,
+) -> str:
+    """对正文做一轮 LLM 摘要。支持 preflight summary.length 参数。"""
+    summary_params = payload.get("summary") or {}
+    length_map = {"short": 50, "medium": 100, "long": 200}
+    length = length_map.get(summary_params.get("length", "medium"), 100)
+
+    sys_prompt = (
+        f"你是一名严谨的中文文档摘要助手。请基于给定正文，输出 Markdown 格式的摘要，"
+        f"摘要约 {length} 字，结构为：1) 一句话摘要；2) 3–6 条要点（项目符号）；3) 关键术语（若有，最多 5 个）。"
+        "不要编造文中没有的事实。"
+    )
+    return _text_llm_call(
+        content=content,
+        title=title,
+        sys_prompt=sys_prompt,
+        user_prompt_suffix="",
+        settings=settings,
+        payload=payload,
+        log=log,
+        max_tokens=int(payload.get("summary_max_tokens") or 1024),
+    )
+
+
+def _associate_text(
+    *,
+    content: str,
+    title: str,
+    directions: list[str],
+    settings,
+    payload: Dict[str, Any],
+    log: Any,
+) -> Dict[str, str]:
+    """联想归纳（N10）。返回 {方向名: 分析结果}。"""
+    if not directions:
+        return {}
+    dir_str = "、".join(directions)
+    sys_prompt = (
+        "你是一名深度内容分析师。请基于给定正文，从以下方向进行联想归纳分析：\n"
+        f"方向：{dir_str}\n\n"
+        "要求：\n"
+        "- 每个方向独立输出，用 Markdown 二级标题分隔\n"
+        "- 每个方向 100-200 字\n"
+        "- 基于原文事实，不要编造\n"
+        "- 输出格式：## 方向名\n分析内容\n"
+    )
+    raw = _text_llm_call(
+        content=content,
+        title=title,
+        sys_prompt=sys_prompt,
+        user_prompt_suffix="",
+        settings=settings,
+        payload=payload,
+        log=log,
+        max_tokens=1500,
+    )
+    # 解析各方向结果
+    result: Dict[str, str] = {}
+    if not raw:
+        return result
+    current_dir = ""
+    current_lines: list[str] = []
+    for line in raw.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            if current_dir:
+                result[current_dir] = "\n".join(current_lines).strip()
+            current_dir = stripped[3:].strip()
+            current_lines = []
+        else:
+            current_lines.append(line)
+    if current_dir:
+        result[current_dir] = "\n".join(current_lines).strip()
+    # 如果解析失败，把整段作为通用结果
+    if not result and raw:
+        result["联想归纳"] = raw
+    return result
+
+
+def _rewrite_text(
+    *,
+    content: str,
+    title: str,
+    style: str,
+    settings,
+    payload: Dict[str, Any],
+    log: Any,
+) -> str:
+    """改写/润色（N10）。返回改写后的文本。"""
+    style_map = {
+        "formal": "正式、专业的书面语风格",
+        "casual": "轻松、口语化的表达风格",
+        "concise": "精简、去冗余的简洁风格",
+        "rich": "丰富、生动的文学风格",
+    }
+    style_desc = style_map.get(style, style)
+    sys_prompt = (
+        f"你是一名专业的文字改写助手。请将给定正文改写为{style_desc}。\n"
+        "要求：\n"
+        "- 保持原文核心信息不变\n"
+        "- 逐段改写，保留段落结构\n"
+        "- 不要添加原文没有的信息\n"
+        "- 直接输出改写后的正文，不要加前缀说明"
+    )
+    return _text_llm_call(
+        content=content,
+        title=title,
+        sys_prompt=sys_prompt,
+        user_prompt_suffix="",
+        settings=settings,
+        payload=payload,
+        log=log,
+        max_tokens=2048,
+    )
+
+
+def _translate_text(
+    *,
+    content: str,
+    title: str,
+    target_lang: str,
+    settings,
+    payload: Dict[str, Any],
+    log: Any,
+) -> str:
+    """翻译（N10）。返回翻译后的文本。"""
+    lang_map = {
+        "zh": "中文", "en": "英文", "ja": "日文", "ko": "韩文",
+        "es": "西班牙文", "fr": "法文", "de": "德文", "ru": "俄文", "pt": "葡萄牙文",
+    }
+    lang_name = lang_map.get(target_lang, target_lang)
+    sys_prompt = (
+        f"你是一名专业的翻译助手。请将给定正文翻译为{lang_name}。\n"
+        "要求：\n"
+        "- 翻译准确、通顺、自然\n"
+        "- 逐段翻译，保留段落结构\n"
+        "- 专有名词保留原文并在括号内注明\n"
+        "- 直接输出翻译结果，不要加前缀说明"
+    )
+    return _text_llm_call(
+        content=content,
+        title=title,
+        sys_prompt=sys_prompt,
+        user_prompt_suffix="",
+        settings=settings,
+        payload=payload,
+        log=log,
+        max_tokens=2048,
+    )
 
 
 def handle_text_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
@@ -669,6 +820,58 @@ def handle_text_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         log=log,
     )
 
+    # ── 3.5 N10: 联想归纳 ──────────────────────────────────
+    associations: Dict[str, str] = {}
+    assoc_params = payload.get("association") or {}
+    if assoc_params.get("enabled") and assoc_params.get("directions"):
+        runner.store.update(task_id, status=TaskStatus.ASSOCIATE.value)
+        runner.set_progress(task_id, 0.75, "联想归纳分析中...")
+        log(f"📄 联想归纳 | directions={assoc_params['directions']}")
+        associations = _associate_text(
+            content=doc.content,
+            title=doc.title,
+            directions=assoc_params["directions"],
+            settings=settings,
+            payload=payload,
+            log=log,
+        )
+
+    # ── 3.6 N10: 改写/润色 ─────────────────────────────────
+    rewrites: Dict[str, str] = {}
+    rewrite_params = payload.get("rewrite") or {}
+    if rewrite_params.get("enabled") and rewrite_params.get("style"):
+        runner.store.update(task_id, status=TaskStatus.REWRITE.value)
+        runner.set_progress(task_id, 0.80, f"改写中（{rewrite_params['style']}）...")
+        log(f"📄 改写 | style={rewrite_params['style']}")
+        result = _rewrite_text(
+            content=doc.content,
+            title=doc.title,
+            style=rewrite_params["style"],
+            settings=settings,
+            payload=payload,
+            log=log,
+        )
+        if result:
+            rewrites[rewrite_params["style"]] = result
+
+    # ── 3.7 N10: 翻译 ──────────────────────────────────────
+    translations: Dict[str, str] = {}
+    translate_params = payload.get("translate") or {}
+    if translate_params.get("enabled") and translate_params.get("target_lang"):
+        runner.store.update(task_id, status=TaskStatus.TRANSLATE.value)
+        runner.set_progress(task_id, 0.85, f"翻译中（{translate_params['target_lang']}）...")
+        log(f"📄 翻译 | target_lang={translate_params['target_lang']}")
+        result = _translate_text(
+            content=doc.content,
+            title=doc.title,
+            target_lang=translate_params["target_lang"],
+            settings=settings,
+            payload=payload,
+            log=log,
+        )
+        if result:
+            translations[translate_params["target_lang"]] = result
+
     # ── 4. STORE ────────────────────────────────────────────
     runner.store.update(task_id, status=TaskStatus.STORE.value)
     runner.set_progress(task_id, 0.90, "归档文本产物...")
@@ -677,13 +880,27 @@ def handle_text_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     md_path = text_dir / f"{task_id}.md"
     json_path = text_dir / f"{task_id}.json"
 
-    md_body = (
-        f"# {doc.title}\n\n"
-        f"> 来源：{doc.source} ｜ 类型：{doc.source_type} ｜ 字符数：{doc.char_count}\n\n"
-        f"## 摘要\n\n{summary.strip() if summary else '_（未生成摘要）_'}\n\n"
-        f"---\n\n## 正文\n\n{doc.content}\n"
-    )
-    md_path.write_text(md_body, encoding="utf-8")
+    # 构建 md 正文
+    md_parts = [
+        f"# {doc.title}\n\n",
+        f"> 来源：{doc.source} ｜ 类型：{doc.source_type} ｜ 字符数：{doc.char_count}\n\n",
+        f"## 摘要\n\n{summary.strip() if summary else '_（未生成摘要）_'}\n\n",
+    ]
+    if associations:
+        md_parts.append("## 联想归纳\n\n")
+        for direction, analysis in associations.items():
+            md_parts.append(f"### {direction}\n\n{analysis}\n\n")
+    if rewrites:
+        md_parts.append("## 改写/润色\n\n")
+        for style, text in rewrites.items():
+            md_parts.append(f"### {style}\n\n{text}\n\n")
+    if translations:
+        md_parts.append("## 翻译\n\n")
+        for lang, text in translations.items():
+            md_parts.append(f"### {lang}\n\n{text}\n\n")
+    md_parts.append(f"---\n\n## 正文\n\n{doc.content}\n")
+
+    md_path.write_text("".join(md_parts), encoding="utf-8")
     json_path.write_text(
         json.dumps(
             {
@@ -691,6 +908,9 @@ def handle_text_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 "project_id": record.project_id,
                 **doc.to_dict(),
                 "summary": summary,
+                "associations": associations,
+                "rewrites": rewrites,
+                "translations": translations,
             },
             ensure_ascii=False,
             indent=2,
@@ -704,6 +924,9 @@ def handle_text_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         "title": doc.title,
         "content": doc.content,
         "summary": summary,
+        "associations": associations,
+        "rewrites": rewrites,
+        "translations": translations,
         "char_count": doc.char_count,
         "source_type": doc.source_type,
         "source": doc.source,

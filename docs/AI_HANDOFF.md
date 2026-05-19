@@ -1,6 +1,6 @@
 # AI Handoff
 
-Last updated: 2026-05-19（N8 完成，进入 N9；N7b/N8b 拆出待办）
+Last updated: 2026-05-19（N10 完成，进入 N11）
 
 ---
 
@@ -24,7 +24,7 @@ Last updated: 2026-05-19（N8 完成，进入 N9；N7b/N8b 拆出待办）
 | **N8 音频分支补全** | ✅ 待 merge | silero-vad + pyannote + librosa Suno/Udio + 字幕导出 |
 | **N8b 音频前端交互** | ⏸ 已拆出 | 无人声切音乐弹窗 / 说话人标签修正 UI / 多段音乐 6 维度 |
 | **N9 图片分支补全** | ✅ 已合并 main | PaddleOCR + 4 联想方向 + 多图对比 |
-| **N10 文字分支补全** | ⏳ **下一步** | P2，估时 6-8h，PDF 解析 / 改写翻译并排 / 多文对比 |
+| **N10 文字分支补全** | ✅ 待 merge | marker PDF + 联想/改写/翻译 + 多文对比 |
 
 > ⚠️ 写新交接前请**先 `git log --oneline -20` 对账**，不要相信本文件里写的「下一步」如果它和 git 冲突。
 
@@ -204,33 +204,39 @@ Last updated: 2026-05-19（N8 完成，进入 N9；N7b/N8b 拆出待办）
 
 ---
 
-## N10 开工交接（下一步）
+## N10 完工小结
 
-> 来源：`docs/SPEC.md` §7 文字分支。
+- 分支：`feat/phase-n10-text-branch`，worktree `/Users/conan/Desktop/nibi-n10`，**待 merge**
+- commits：待提交
+- 装的依赖（用户授权选 marker）：
+  - `marker-pdf>=1.10.0`（PDF → Markdown，保留图片+表格，扫描件 OCR，模型 ~1.5GB）
+- 改动：
+  - **shared/text_loader.py**：`load_pdf()` 改为 marker 优先、pypdf 兜底；`TextDocument.meta` 增加 `parser` 字段
+  - **backend/app/models/tasks.py**：TaskStatus 新增 ASSOCIATE / REWRITE / TRANSLATE 三个状态
+  - **backend/app/routes/workspaces.py**：`_bridge_to_pipeline_payload` text 分支透传 preflight tasks（summary/association/rewrite/translate/multi_compare）+ text_model；新增 `GET /text_compare` 多文对比端点
+  - **backend/app/services/pipeline_tasks.py**：新增 `_text_llm_call` 通用 LLM 辅助、`_associate_text` 联想归纳、`_rewrite_text` 改写润色、`_translate_text` 翻译；`handle_text_task` 扩展状态机 SUM→ASSOCIATE→REWRITE→TRANSLATE→STORE
+  - **frontend/src/services/workspaces.ts**：TextResult 类型扩展（associations/rewrites/translations）+ TextCompareResult 类型 + getTextCompare API
+  - **frontend/src/pages/result/TextResultPage.tsx**：右侧面板增加联想归纳/改写/翻译折叠区 + 多文对比弹窗
+  - **tests/backend/test_text_pipeline.py**：适配 marker 行为（空白 PDF 可能返回 OCR 内容）
+- 验证：`pytest tests/backend -q` 129 passed, 2 skipped；`pnpm build` 仅余 4 条 baseline tsc 错误
 
-### N10 范围
+## N11 开工交接（下一步）
 
-- 标题：文字分支补全（marker/docling PDF / 改写翻译并排对照 / 多文对比）
-- 估时：6-8h
-- 优先级：P2
-- **模型**：Sonnet 4.6 或 Opus 4.7
-- **分支**：`feat/phase-n10-text-branch`，新 worktree `/Users/conan/Desktop/nibi-n10`
+> 来源：`docs/SPEC.md` §8.2 + WORKFLOW.md
 
-### ⚠️ 需用户确认
+### N11 范围
 
-- PDF 解析库选型：`marker`（准确但较慢）/ `docling`（IBM，中等）/ 现有 `load_auto` 够用？
-- 装之前问用户选哪个
+- 标题：砍掉的 UI 清理（仅入口隐藏，代码留备份）
+- 估时：1-2h
+- 优先级：P3
+- **模型**：小米 2.5 Pro（终端，免费）
+- **分支**：直接在 main 上做
 
 ### 具体差异项
 
-1. PDF 解析增强（marker/docling 替代/补充现有文本提取）
-2. 改写翻译并排对照 UI（左原文右改写/翻译）
-3. 多文对比（跨同任务文本素材交叉对比，前端已有 preflight 入口）
-
-### 不要做的事
-
-- ❌ 不要做 N11 UI 清理
-- ❌ 不要在没拿到 PDF 库选型授权前装包
+- 隐藏「导出工作包」入口（Taskboard 不显示导出子标签）
+- 隐藏已禁用的 UI 元素（如 AI 导演灰显入口等）
+- 代码保留不删
 
 ---
 

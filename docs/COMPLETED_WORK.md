@@ -547,3 +547,35 @@ WorkspaceItem.tags = {
 - 创建 workspace 后调 pipeline 任务，磁盘文件统一进 `data/projects/default_project/`——N1b 时再迁
 - 设置页「垃圾桶」入口当前用字面量 `"垃圾桶"`，N3 设置页重组时补 `layout.menu.trash` i18n key
 - N1b 待启动：磁盘布局 → `data/workspaces/<workspace_id>/<item_id>/`，附老数据搬家脚本
+
+---
+
+## Phase N10 – 文字分支补全（marker PDF / 联想改写翻译 / 多文对比）
+
+**完成日期**：2026-05-19
+**模型 / 工具**：Sonnet 4.6
+**分支**：`feat/phase-n10-text-branch`（worktree `/Users/conan/Desktop/nibi-n10`）
+
+### 影响范围
+- 后端：`shared/text_loader.py`、`backend/app/models/tasks.py`、`backend/app/services/pipeline_tasks.py`、`backend/app/routes/workspaces.py`
+- 前端：`frontend/src/services/workspaces.ts`、`frontend/src/pages/result/TextResultPage.tsx`
+- 测试：`tests/backend/test_text_pipeline.py`
+- 依赖：新增 `marker-pdf>=1.10.0`（~1.5GB 模型，首次运行自动下载）
+
+### 关键改动
+- **marker PDF 解析**：`load_pdf()` 改为 marker 优先（支持扫描件 OCR + 图片表格保留）、pypdf 兜底；`TextDocument.meta` 增加 `parser` 字段
+- **Preflight 参数透传**：`_bridge_to_pipeline_payload` text 分支透传 summary/association/rewrite/translate/multi_compare 子参数 + text_model
+- **LLM 分析能力**：新增 `_text_llm_call` 通用辅助、`_associate_text` 联想归纳（4 方向）、`_rewrite_text` 改写润色（4 风格）、`_translate_text` 翻译（9 种语言）
+- **状态机扩展**：TaskStatus 新增 ASSOCIATE / REWRITE / TRANSLATE，handle_text_task 状态机 SUM→ASSOCIATE→REWRITE→TRANSLATE→STORE
+- **多文对比端点**：新增 `GET /text_compare`，参考 image_compare 实现结构化对比 + LLM 总结
+- **前端结果页升级**：右侧面板增加联想归纳/改写/翻译折叠区 + 多文对比弹窗
+
+### 为什么这么做
+- **marker 而非 docling**：marker 是 2024 年社区最受好评的 PDF→Markdown 方案，保留图片+表格+扫描件 OCR 一体；docling 偏技术报告场景，通用性稍弱
+- **pypdf 兜底**：marker 模型加载较慢（~30s 首次），轻量场景 pypdf 秒出结果；两层 fallback 保证可用性
+- **折叠区而非平铺**：联想/改写/翻译结果可能很长，折叠区避免右侧面板过长影响摘要阅读
+
+### 留给后续的影响
+- marker 模型 ~1.5GB，首次运行需下载；后续可考虑模型缓存策略
+- 翻译/改写是单次 LLM 调用，超长文本可能截断；SPEC §7.4 的超长文本分段留到后续
+- PDF 内图片走图片分支分析（SPEC §7.3 第 4 点）未实现，留到后续

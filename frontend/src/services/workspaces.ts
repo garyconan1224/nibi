@@ -294,6 +294,40 @@ export async function getImageCompare(
   return res.data
 }
 
+// ── N10: 多文对比 ────────────────────────────────────────────
+
+export interface TextCompareItem {
+  item_id: string
+  name: string
+  is_current: boolean
+  source_value: string
+  summary: string
+  content_preview: string
+  associations: Record<string, string>
+  rewrites: Record<string, string>
+  translations: Record<string, string>
+  char_count: number
+  has_result: boolean
+}
+
+export interface TextCompareResult {
+  workspace_id: string
+  current_item_id: string
+  texts: TextCompareItem[]
+  llm_summary: string
+}
+
+/** GET /workspaces/{id}/items/{itemId}/text_compare — 多文对比 */
+export async function getTextCompare(
+  workspaceId: string,
+  itemId: string,
+): Promise<TextCompareResult> {
+  const res = await http.get<TextCompareResult>(
+    `${BASE}/${workspaceId}/items/${itemId}/text_compare`,
+  )
+  return res.data
+}
+
 // ── Phase 2B: 音频结果页聚合 ──────────────────────────────
 
 export interface AudioResult {
@@ -343,6 +377,12 @@ export interface TextResult {
   source_url: string
   meta: Record<string, unknown>
   prompt_versions: PromptVersion[]
+  /** N10: 联想归纳 {方向: 分析} */
+  associations?: Record<string, string>
+  /** N10: 改写/润色 {风格: 结果} */
+  rewrites?: Record<string, string>
+  /** N10: 翻译 {语言代码: 结果} */
+  translations?: Record<string, string>
 }
 
 /** GET /workspaces/{id}/items/{itemId}/text_result — 文本结果页聚合数据 */
