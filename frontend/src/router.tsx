@@ -47,8 +47,7 @@ export const router = createBrowserRouter([
     path: '/',
     element: <Index />,
     children: [
-      { index: true, element: <Navigate to="/workspaces" replace /> },
-      { path: 'workbench', element: withSuspense(<WorkbenchPage />) },
+      { index: true, element: withSuspense(<WorkbenchPage />) },
       { path: 'workspaces', element: withSuspense(<WorkspaceList />) },
       { path: 'favorites', element: withSuspense(<FavoritesPage />) },
       { path: 'search', element: withSuspense(<SearchPage />) },
