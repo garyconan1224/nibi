@@ -1,13 +1,16 @@
 ---
 phase: N6
 title: 任务级 LLM 对话上下文素材多选 chip + RAG 兜底
-status: ready
+status: done
 priority: P1
 estimate_hours: 6-8
+actual_hours: ~2
 model: Opus 4.7
 branch: feat/phase-n6-task-chat
 worktree: 是（/Users/conan/Desktop/nibi-n6）
 depends_on: [N5]
+commits: [ae7ed8b, 435e8cb, 935d933]
+completed_date: 2026-05-19
 spec_ref: docs/SPEC.md §1.5
 ---
 

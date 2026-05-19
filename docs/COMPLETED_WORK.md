@@ -41,6 +41,39 @@
 
 ---
 
+## Phase N6 – 任务级 LLM 对话上下文素材多选 chip + RAG 兜底
+
+**完成日期**：2026-05-19
+**模型 / 工具**：Opus 4.7
+**分支**：feat/phase-n6-task-chat（worktree `/Users/conan/Desktop/nibi-n6`）
+**Commit**：ae7ed8b (N6.1) / 435e8cb (N6.2~N6.3) / 935d933 (N6.4~N6.6)
+
+### 影响范围
+- 后端：新增 chat context 服务 + chat 路由扩展 + ChatRunner system_prompt 注入
+- 前端：新增 TaskChatPanel + chat service 类型扩展 + WorkspaceDetail AI 对话 tab
+- 测试：新增 5 个 pytest（chat_context 单元测试）
+
+### 关键改动
+- 新增 `backend/app/services/chat_context.py::build_item_context`：按 workspace + item_ids 拼 system prompt，覆盖 task 背景 + 每个 item 的 name/type/tags/results。char-based 阈值 12000 触发截断
+- `POST /workspaces/{id}/chat` 请求体加 `item_ids: list[str]`，返回值加 `context_truncated` / `used_item_ids`
+- `ChatRunner.start_turn` 加 `system_prompt` 参数：注入到 LLM history 第 0 位但**不落盘**（避免污染对话历史，允许下一轮换素材）
+- 新增 `frontend/src/components/workspace/TaskChatPanel.tsx`：素材 chip 多选条 + 全选 + 截断徽章
+- WorkspaceDetail AI 对话 tab 从占位 EmptyState 切到 TaskChatPanel
+- **保留**：浮动 ChatSidebar 不动，作为「无上下文」快捷入口
+
+### 为什么这么做
+- **char 阈值 vs 真 embedding RAG**：现有 `rag_qa_service` 基于 cross-workspace 索引（`project_json_dir`），与 task-level item 上下文不匹配。做真 task-level RAG 需新索引基础设施——超出 N6 6-8h 估时。char 截断在 v1 已覆盖 SPEC §1.5 的「token 兜底」要求。真 embedding RAG 等 N9/N10 跨素材聚合真有需求时再上
+- **system_prompt 不落盘**：每轮根据当前勾选重新生成，避免老 prompt 滞留污染后续对话；用户切素材也能即时反映
+- **保留浮动 ChatSidebar**：SPEC 没要求砍——它仍是右侧"任意问"快捷入口
+- **`results` 字段提取**：跨素材类型 results 形状差异大，用 `_pick_str` 多 key fallback（`summary` / `video_summary` / `asr_summary` 等）+ type 兜底
+
+### 留给后续的影响
+- **N7~N10 后端分支**：写新 results 字段时若想让 chat 看到，需在 `chat_context._format_results` 里加 key（或保持向后兼容的命名：`summary` / `transcript` / `ocr_text` / `description` / `frame_prompts`）
+- **真 RAG 接入路径**：未来若做 task-level embedding RAG，应在 `build_item_context` 内加「if 截断 → embedding 检索 query 相关 chunks 替换被截 items」，前端无需改动
+- **`item_ids` 校验**：路由层未校验 id 属于该 workspace，只在 `build_item_context` 里跳过未命中——理论上存在「跨 workspace 注入」风险，后续考虑路由层加严格校验
+
+---
+
 ## Phase N5 – Preflight 抽屉细化（按素材类型展开所有子参数）
 
 **完成日期**：2026-05-19
