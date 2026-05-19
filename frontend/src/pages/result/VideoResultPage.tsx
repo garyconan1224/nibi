@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Check, Copy, Download, Pause, Play, Settings2, Star } from 'lucide-react'
+import { ArrowLeft, Check, Copy, Pause, Play, Settings2, Star } from 'lucide-react'
 
 import {
   type PromptVersion,
   type VideoResult,
   type VideoResultFrame,
   addPromptVersion,
-  downloadExport,
+  // downloadExport, -- N11: 导出功能 UI 隐藏
   getItemResult,
   listPromptVersions,
 } from '@/services/workspaces'
@@ -259,6 +259,7 @@ export default function VideoResultPage() {
     })
   }, [frame, activeFrame, workspaceId, itemId])
 
+  /* N11: 导出功能 UI 隐藏（代码保留，见 SPEC §8.2）
   const handleExport = useCallback(async () => {
     try {
       await downloadExport(workspaceId, itemId)
@@ -267,6 +268,7 @@ export default function VideoResultPage() {
       toast.error('导出失败：' + (err instanceof Error ? err.message : '未知'))
     }
   }, [workspaceId, itemId])
+  */
 
   const handleAddPromptVersion = useCallback(async (content: string) => {
     const pv = await addPromptVersion(workspaceId, itemId, content)
@@ -443,6 +445,7 @@ export default function VideoResultPage() {
               DEMO
             </span>
           )}
+          {/* N11: 导出工作包入口隐藏（代码保留，见 SPEC §8.2）
           <button
             className="btn-ghost"
             onClick={handleExport}
@@ -451,6 +454,7 @@ export default function VideoResultPage() {
           >
             <Download size={13} /> 导出
           </button>
+          */}
         </div>
 
         {/* 标签展示 */}

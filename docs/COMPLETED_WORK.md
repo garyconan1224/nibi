@@ -4,7 +4,7 @@
 >
 > **维护规则**：每完成一个子任务，在本文件**追加**一段（不删旧记录），格式见下方"记录模板"。
 >
-> Last updated: 2026-05-19 (Phase N9 完成)
+> Last updated: 2026-05-19 (Phase N11 完成)
 
 ---
 
@@ -547,6 +547,31 @@ WorkspaceItem.tags = {
 - 创建 workspace 后调 pipeline 任务，磁盘文件统一进 `data/projects/default_project/`——N1b 时再迁
 - 设置页「垃圾桶」入口当前用字面量 `"垃圾桶"`，N3 设置页重组时补 `layout.menu.trash` i18n key
 - N1b 待启动：磁盘布局 → `data/workspaces/<workspace_id>/<item_id>/`，附老数据搬家脚本
+
+---
+
+## Phase N11 – 砍掉的 UI 清理（仅入口隐藏，代码留备份）
+
+**完成日期**：2026-05-19
+**模型 / 工具**：小米 2.5 Pro（终端，免费）
+**分支**：直接在 main
+
+### 影响范围
+- 前端：3 个结果页（Video / Image / Audio）
+
+### 关键改动
+- **隐藏「导出复刻工作包」按钮**：VideoResultPage / ImageResultPage / AudioResultPage 三个页面的导出按钮 + `handleExport` 函数 + `downloadExport` import 全部注释掉（代码保留）
+- **Taskboard 子标签**：确认已是 4 个（素材/队列/标签库/AI 对话），无需改动
+- **AI 导演侧边栏入口**：确认已是 `disabled: true` + 灰显，符合 SPEC §8.1「隐藏或灰显」
+
+### 为什么这么做
+- SPEC §8.2 明确：任务级 .zip 导出无强应用场景，代码保留但 UI 隐藏
+- 注释而非删除，保证恢复成本极低（取消注释即可）
+- `downloadExport` 服务函数保留在 `services/workspaces.ts` 不动
+
+### 留给后续的影响
+- 恢复导出功能：取消 3 个结果页的注释 + 恢复 `Download` import + 恢复 `downloadExport` import
+- 单素材级导出（.srt / .md / .json / 原文件下载）不受影响，各结果页独立保留
 
 ---
 

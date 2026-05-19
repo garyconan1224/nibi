@@ -1,6 +1,6 @@
 # AI Handoff
 
-Last updated: 2026-05-19（N10 完成，进入 N11）
+Last updated: 2026-05-19（N11 完成，N1~N11 主线全部结束）
 
 ---
 
@@ -21,10 +21,11 @@ Last updated: 2026-05-19（N10 完成，进入 N11）
 | **N6 任务级 LLM 对话** | ✅ 已合并 main | TaskChatPanel + 素材 chip 多选 + char-based 上下文兜底 |
 | **N7 视频分支补全** | ✅ 已合并 main | AI 镜头分析端到端打通（scenedetect 集成）|
 | **N7b 视频总结路径 1/3** | ⏸ 已拆出 | 字幕直接 + 视频模型直接；依赖 item 字幕抽取 + 视频大模型 API 决策 |
-| **N8 音频分支补全** | ✅ 待 merge | silero-vad + pyannote + librosa Suno/Udio + 字幕导出 |
+| **N8 音频分支补全** | ✅ 已合并 main | silero-vad + pyannote + librosa Suno/Udio + 字幕导出 |
 | **N8b 音频前端交互** | ⏸ 已拆出 | 无人声切音乐弹窗 / 说话人标签修正 UI / 多段音乐 6 维度 |
 | **N9 图片分支补全** | ✅ 已合并 main | PaddleOCR + 4 联想方向 + 多图对比 |
-| **N10 文字分支补全** | ✅ 待 merge | marker PDF + 联想/改写/翻译 + 多文对比 |
+| **N10 文字分支补全** | ✅ 已合并 main | marker PDF + 联想/改写/翻译 + 多文对比 |
+| **N11 UI 清理** | ✅ 已合并 main | 隐藏导出工作包按钮（代码保留），确认 AI 导演灰显 + Taskboard 4 标签 |
 
 > ⚠️ 写新交接前请**先 `git log --oneline -20` 对账**，不要相信本文件里写的「下一步」如果它和 git 冲突。
 
@@ -220,23 +221,15 @@ Last updated: 2026-05-19（N10 完成，进入 N11）
   - **tests/backend/test_text_pipeline.py**：适配 marker 行为（空白 PDF 可能返回 OCR 内容）
 - 验证：`pytest tests/backend -q` 129 passed, 2 skipped；`pnpm build` 仅余 4 条 baseline tsc 错误
 
-## N11 开工交接（下一步）
+## N11 完工小结
 
-> 来源：`docs/SPEC.md` §8.2 + WORKFLOW.md
-
-### N11 范围
-
-- 标题：砍掉的 UI 清理（仅入口隐藏，代码留备份）
-- 估时：1-2h
-- 优先级：P3
-- **模型**：小米 2.5 Pro（终端，免费）
-- **分支**：直接在 main 上做
-
-### 具体差异项
-
-- 隐藏「导出工作包」入口（Taskboard 不显示导出子标签）
-- 隐藏已禁用的 UI 元素（如 AI 导演灰显入口等）
-- 代码保留不删
+- 分支：直接在 main
+- 改动：
+  - VideoResultPage / ImageResultPage / AudioResultPage：注释掉「导出复刻工作包」按钮 + `handleExport` 函数 + `downloadExport` import（代码保留）
+  - Taskboard 子标签确认已是 4 个（素材/队列/标签库/AI 对话），无需改动
+  - AI 导演侧边栏确认已是 `disabled: true` + 灰显
+- 验证：`pnpm build` 零新增错误（4 条 baseline 不变）
+- **N1~N11 主线全部完成**。剩余：N1b / N7b / N8b 已拆出 + [C] AI 导演 + [D] 开源准备
 
 ---
 

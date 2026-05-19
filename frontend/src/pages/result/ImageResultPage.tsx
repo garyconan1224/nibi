@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, BarChart2, Check, Copy, Download, Settings2, Star } from 'lucide-react'
+import { ArrowLeft, BarChart2, Check, Copy, Settings2, Star } from 'lucide-react'
 
 import {
   type ImageCompareResult,
   type ImageResult,
   type PromptVersion,
   addPromptVersion,
-  downloadExport,
+  // downloadExport, -- N11: 导出功能 UI 隐藏
   getImageCompare,
   getImageResult,
   listPromptVersions,
@@ -148,6 +148,7 @@ export default function ImageResultPage() {
     })
   }, [])
 
+  /* N11: 导出功能 UI 隐藏（代码保留，见 SPEC §8.2）
   const handleExport = useCallback(async () => {
     try {
       await downloadExport(workspaceId, itemId)
@@ -156,6 +157,7 @@ export default function ImageResultPage() {
       toast.error('导出失败：' + (err instanceof Error ? err.message : '未知'))
     }
   }, [workspaceId, itemId])
+  */
 
   const handleCompare = useCallback(async () => {
     setCompareLoading(true)
@@ -310,6 +312,7 @@ export default function ImageResultPage() {
               DEMO
             </span>
           )}
+          {/* N11: 导出工作包入口隐藏（代码保留，见 SPEC §8.2）
           <button
             className="btn-ghost"
             onClick={handleExport}
@@ -318,6 +321,7 @@ export default function ImageResultPage() {
           >
             <Download size={13} /> 导出
           </button>
+          */}
         </div>
 
         {/* 标签展示 */}

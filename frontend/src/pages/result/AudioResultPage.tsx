@@ -3,12 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { toast } from 'sonner'
-import { ArrowLeft, Download, Pause, Play, Star } from 'lucide-react'
+import { ArrowLeft, Pause, Play, Star } from 'lucide-react'
 
 import {
   type AudioResult,
   type VideoResultTranscriptLine,
-  downloadExport,
+  // downloadExport, -- N11: 导出功能 UI 隐藏
   getAudioItemResult,
 } from '@/services/workspaces'
 
@@ -86,6 +86,7 @@ export default function AudioResultPage() {
     })
   }, [])
 
+  /* N11: 导出功能 UI 隐藏（代码保留，见 SPEC §8.2）
   const handleExport = useCallback(async () => {
     try {
       await downloadExport(workspaceId, itemId)
@@ -94,6 +95,7 @@ export default function AudioResultPage() {
       toast.error('导出失败：' + (err instanceof Error ? err.message : '未知'))
     }
   }, [workspaceId, itemId])
+  */
 
   // 高亮当前对应的 transcript 行
   const activeLineIdx = useMemo(() => {
@@ -205,6 +207,7 @@ export default function AudioResultPage() {
               DEMO
             </span>
           )}
+          {/* N11: 导出工作包入口隐藏（代码保留，见 SPEC §8.2）
           <button
             className="btn-ghost"
             onClick={handleExport}
@@ -213,6 +216,7 @@ export default function AudioResultPage() {
           >
             <Download size={13} /> 导出
           </button>
+          */}
         </div>
 
         {/* 标签展示 */}
