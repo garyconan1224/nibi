@@ -1,6 +1,6 @@
 # AI Handoff
 
-Last updated: 2026-05-19（N4 完成，进入 N5）
+Last updated: 2026-05-19（N5 完成，进入 N6）
 
 ---
 
@@ -17,7 +17,8 @@ Last updated: 2026-05-19（N4 完成，进入 N5）
 | **N2 侧边栏精简** | ✅ 已合并 main | 侧边栏 4 项 + Taskboard 4 子标签 |
 | **N3 设置页重组** | ✅ 已合并 main | 设置页 tabs 10→7，合并模型与渠道 / 分析默认偏好 |
 | **N4 添加素材模态** | ✅ 已合并 main | 4 步合一 + 自动识别 + 智能勾选 + 背景折叠 |
-| **N5 Preflight 抽屉** | ⏳ **下一步** | P1，估时 4-6h |
+| **N5 Preflight 抽屉** | ✅ 待 merge | 4 类素材子参数全套 UI + tasks 形状升级 |
+| **N6 任务级 LLM 对话** | ⏳ **下一步** | P1，估时 6-8h，素材 chip 多选 + RAG 兜底 |
 
 > ⚠️ 写新交接前请**先 `git log --oneline -20` 对账**，不要相信本文件里写的「下一步」如果它和 git 冲突。
 
@@ -75,36 +76,60 @@ Last updated: 2026-05-19（N4 完成，进入 N5）
 
 ---
 
-## N5 开工交接（下一步）
+## N5 完工小结
 
-> 来源：`docs/SPEC.md` §3.4。
+- 分支：`feat/phase-n5-preflight`，worktree `/Users/conan/Desktop/nibi-n5`，**待 merge**
+- commits：
+  - `02e8d7d` N5.1 类型与读写兼容层（`frontend/src/lib/preflightTasks.ts`，300 行）
+  - `644fae1` N5.2~N5.5 4 类素材子参数 UI 全套（新增 `PreflightTaskDetails.tsx` + 重写 PreflightConfigPanel 第三区）
+  - N5.6 文档更新（本提交）
+- 改动：
+  - 数据形状：`PreflightConfig.tasks` 从 `{id: boolean}` 升到 `{id: {enabled, ...params}}`。后端类型 `Record<string, unknown>` 兼容，**无需后端改动**
+  - 视频：截帧模式（AI 镜头/按秒）+ 间隔秒数 + 最大帧数 + 镜头取帧数（2/3）+ 提示词格式 + 提示词语言 + 3 条总结路径 + 总结深度
+  - 音频：Whisper 语言（8 种）+ 音乐分析 Suno/Udio 格式开关
+  - 图片：MJ/SD/JSON 格式 + 4 维联想方向多选 + 一级新增「多图对比」
+  - 文字：摘要长度 / 改写风格 / 7 种翻译目标语 / 4 维联想 + 一级新增「多文对比」
+- 验证：`pnpm tsc -b --noEmit` 除 4 条 baseline 错误外不新增（与 N1 完工后基线一致）
+- 用户合并步骤：
+  ```bash
+  cd /Users/conan/Desktop/nibi
+  git merge --no-ff feat/phase-n5-preflight -m "Merge N5: Preflight 抽屉子参数细化"
+  git worktree remove /Users/conan/Desktop/nibi-n5
+  git branch -d feat/phase-n5-preflight
+  ```
 
-### N5 范围
+---
 
-- 标题：Preflight 抽屉细化（按素材类型展开所有子参数）
-- 估时：4-6h
+## N6 开工交接（下一步）
+
+> 来源：`docs/SPEC.md`（任务级 AI 对话章节）。
+
+### N6 范围
+
+- 标题：任务级 LLM 对话上下文素材多选 chip + RAG 兜底
+- 估时：6-8h
 - 优先级：P1
-- **模型**：⭐ **Opus 4.7**（跨多素材类型 + 子参数细化，符合 CLAUDE.md「复杂阶段」）
-- **分支**：`feat/phase-n5-preflight`
-- **不 push**：commit 留本地，等 [D] 阶段统一推
+- **模型**：⭐ **Opus 4.7**（上下文拼接 + RAG 兜底逻辑，符合「复杂阶段」）
+- **分支**：`feat/phase-n6-task-chat`，新 worktree `/Users/conan/Desktop/nibi-n6`
+- **不 push**：commit 留本地
 
 ### 具体差异项
 
-1. **视频子参数**：截帧模式（按秒/AI 镜头分析）、间隔秒数、最大帧数、镜头取帧数、总结路径、总结深度
-2. **音频子参数**：Whisper 语言、说话人分离开关、Suno/Udio 格式开关
-3. **图片子参数**：提示词格式（MJ/SD/JSON）、联想方向（4 维度）
-4. **文字子参数**：摘要长度、联想方向、改写风格、翻译目标语
+1. WorkspaceDetail「AI 对话」Tab 内的对话输入框上方加素材 chip 多选条
+2. 选中素材 → 把对应 `item.results` / 摘要注入对话上下文
+3. 未选中、或上下文 token 超阈值 → 走 RAG 检索兜底（沿用 Phase 3B 的索引）
+4. UI 上展示「本次问答用了哪些素材 / RAG 命中片段」
 
 ### 开工前准备
 
-1. 读 `docs/SPEC.md` §3.4（Preflight 子参数表格）
-2. 读现有 PreflightConfigPanel.tsx
-3. 确认哪些子参数已有、哪些需要新增
+1. 读 `docs/SPEC.md` 任务级 AI 对话章节
+2. 看现有 `rag.py` 路由 + 前端 `services/rag.ts`
+3. 确认 token 阈值切到 RAG 的判定方式
 
 ### 不要做的事
 
-- ❌ 不要顺手改 N6 任务级 LLM 对话
-- ❌ 不要改动后端 pipeline 逻辑（N5 纯前端细化）
+- ❌ 不要顺手做 N7（视频 PySceneDetect 后端实现）
+- ❌ 不要修改 Phase 3B 已建立的 RAG 索引结构
 
 ---
 
