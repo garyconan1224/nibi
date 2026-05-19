@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse
 
 from backend.app.routes.workspaces import _store as _workspaces
+from backend.app.services.chat_context import build_item_context
 from backend.app.services.chat_runner import ChatRunner
 from shared.chat_store import get_default_store as get_chat_store
 
@@ -31,6 +32,8 @@ class ChatCreateRequest(BaseModel):
     prompt: str = Field(min_length=1)
     chat_id: Optional[str] = None
     model: Optional[str] = None
+    # N6: 选中的上下文素材 id 列表（空 = 兼容旧浮动入口，无 item 上下文）
+    item_ids: List[str] = Field(default_factory=list)
 
 
 def _require_workspace(workspace_id: str) -> None:
@@ -41,12 +44,19 @@ def _require_workspace(workspace_id: str) -> None:
 @router.post("/{workspace_id}/chat")
 def create_chat_turn(workspace_id: str, req: ChatCreateRequest) -> Dict[str, Any]:
     _require_workspace(workspace_id)
+
+    # N6: 根据 item_ids 拼 system prompt（空 list → ctx.system_prompt = ""）
+    workspace = _workspaces.get(workspace_id)
+    assert workspace is not None  # _require_workspace 已校验
+    ctx = build_item_context(workspace, list(req.item_ids or []))
+
     try:
         turn = _runner.start_turn(
             workspace_id=workspace_id,
             chat_id=req.chat_id,
             prompt=req.prompt,
             model=req.model,
+            system_prompt=ctx.system_prompt or None,
         )
     except ValueError as err:
         raise HTTPException(status_code=422, detail=str(err)) from err
@@ -55,6 +65,8 @@ def create_chat_turn(workspace_id: str, req: ChatCreateRequest) -> Dict[str, Any
         "chat_id": turn.chat_id,
         "workspace_id": workspace_id,
         "status": turn.status,
+        "context_truncated": ctx.truncated,
+        "used_item_ids": ctx.used_item_ids,
     }
 
 
