@@ -813,6 +813,17 @@ def _bridge_to_pipeline_payload(
             "source": item.source_value,
             "source_type": item.source,  # "url" or "local"
         }
+        # N9: 透传 image 子参数 + 全局模型/key
+        models = item.preflight.models or {}
+        if models.get("vision"):
+            payload["vision_model"] = models["vision"]
+        if models.get("text"):
+            payload["text_model"] = models["text"]
+        tasks = item.preflight.tasks or {}
+        for task_id in ("ocr", "frame_prompts", "association", "multi_compare"):
+            params = tasks.get(task_id)
+            if isinstance(params, dict):
+                payload[task_id] = params
         return "image", payload
 
     if item.type == ItemType.AUDIO.value:
@@ -1153,6 +1164,92 @@ def get_image_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
         return payload
 
     return _build_demo_image_result(item.item_id, item.name)
+
+
+@router.get("/{workspace_id}/items/{item_id}/image_compare")
+def get_image_compare(workspace_id: str, item_id: str) -> Dict[str, Any]:
+    """多图对比（N9）。
+
+    收集同工作空间内所有已完成分析的图片素材结果，
+    与当前图片进行结构化对比（标签 / 描述 / 联想）。
+    如果 VLM 可用，还会生成一段总结性对比分析。
+    """
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+    if item.type != ItemType.IMAGE.value:
+        raise HTTPException(status_code=400, detail="image_compare 仅支持 image 类型素材")
+
+    # 收集同 workspace 内所有已完成的 image 素材的结果
+    image_items = [it for it in rec.items if it.type == ItemType.IMAGE.value]
+    collected: List[Dict[str, Any]] = []
+    for it in image_items:
+        overlay = _sync_item_with_tasks(it)
+        results = dict(overlay.get("results", {})) if overlay and overlay.get("results") else dict(it.results or {})
+        has_real = isinstance(results, dict) and results.get("description")
+        collected.append({
+            "item_id": it.item_id,
+            "name": it.name,
+            "is_current": it.item_id == item_id,
+            "source_value": it.source_value,
+            "description": results.get("description", ""),
+            "ocr_text": results.get("ocr_text", ""),
+            "tags": results.get("tags", {}),
+            "prompts": results.get("prompts", {}),
+            "associations": results.get("associations", {}),
+            "has_result": has_real,
+        })
+
+    # 尝试 VLM 总结对比（best-effort）
+    vlm_summary = ""
+    items_with_results = [c for c in collected if c["has_result"]]
+    if len(items_with_results) >= 2:
+        try:
+            from shared.settings_store import load_settings as _load_s
+            from shared.provider_registry import create_default_registry as _cdr
+            from shared.provider_base import ChatRequest as _CR
+
+            _s = _load_s()
+            _api_key = (_s.openai_api_key or "").strip()
+            if _api_key:
+                _reg = _cdr()
+                _prof = _reg.resolve_default_profile(_s, "vision")
+                _prov = _reg.build(_prof)
+                _model = _prof.default_models.get("vision") or (_s.vision_model or "").strip()
+                if _model:
+                    # 构造对比 prompt
+                    summaries = []
+                    for idx, c in enumerate(items_with_results, 1):
+                        tag_str = ", ".join(
+                            v for vals in c["tags"].values() for v in vals
+                        ) if c["tags"] else "无"
+                        summaries.append(
+                            f"图片{idx}「{c['name']}」：{c['description'][:200]}。标签：{tag_str}"
+                        )
+                    compare_prompt = (
+                        f"以下是{len(items_with_results)}张图片的分析结果，请做对比总结：\n\n"
+                        + "\n\n".join(summaries)
+                        + "\n\n请从以下维度对比：\n"
+                        "1. 内容主题差异\n2. 风格/色调对比\n3. 各自优势和适用场景\n"
+                        "4. 如果要选一张做代表，选哪张？为什么？\n"
+                        "用中文回答，300-500字。"
+                    )
+                    vlm_summary = _prov.chat(_CR(
+                        model=_model,
+                        messages=[{"role": "user", "content": compare_prompt}],
+                        temperature=0.4,
+                        max_tokens=1200,
+                    )).strip()
+        except Exception:
+            pass  # VLM 对比是锦上添花，失败不影响结构化数据返回
+
+    return {
+        "workspace_id": workspace_id,
+        "current_item_id": item_id,
+        "images": collected,
+        "vlm_summary": vlm_summary,
+    }
 
 
 # ── 音频结果页（Phase 2B） ────────────────────────────────────

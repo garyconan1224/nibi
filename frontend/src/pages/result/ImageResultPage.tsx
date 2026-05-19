@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Check, Copy, Download, Settings2, Star } from 'lucide-react'
+import { ArrowLeft, BarChart2, Check, Copy, Download, Settings2, Star } from 'lucide-react'
 
 import {
+  type ImageCompareResult,
   type ImageResult,
   type PromptVersion,
   addPromptVersion,
   downloadExport,
+  getImageCompare,
   getImageResult,
   listPromptVersions,
 } from '@/services/workspaces'
@@ -22,6 +24,7 @@ import {
   renderTemplate,
   savePromptFormatsConfig,
 } from '@/services/promptFormats'
+import { ASSOCIATION_DIRECTION_LABELS, type AssociationDirection } from '@/lib/preflightTasks'
 
 import './tokens.css'
 import { ItemTagsPanel } from '@/components/workspace/ItemTagsPanel'
@@ -51,6 +54,11 @@ export default function ImageResultPage() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerSelection, setPickerSelection] = useState<string[]>([])
   const [promptVersions, setPromptVersions] = useState<PromptVersion[]>([])
+
+  // N9: 多图对比
+  const [compareOpen, setCompareOpen] = useState(false)
+  const [compareData, setCompareData] = useState<ImageCompareResult | null>(null)
+  const [compareLoading, setCompareLoading] = useState(false)
 
   // 拉提示词格式配置
   useEffect(() => {
@@ -146,6 +154,19 @@ export default function ImageResultPage() {
       toast.success('工作包已下载')
     } catch (err) {
       toast.error('导出失败：' + (err instanceof Error ? err.message : '未知'))
+    }
+  }, [workspaceId, itemId])
+
+  const handleCompare = useCallback(async () => {
+    setCompareLoading(true)
+    try {
+      const data = await getImageCompare(workspaceId, itemId)
+      setCompareData(data)
+      setCompareOpen(true)
+    } catch (err) {
+      toast.error('对比失败：' + (err instanceof Error ? err.message : '未知'))
+    } finally {
+      setCompareLoading(false)
     }
   }, [workspaceId, itemId])
 
@@ -482,6 +503,25 @@ export default function ImageResultPage() {
             </div>
           </div>
 
+          {/* N9: 联想分析（如有） */}
+          {result.associations && Object.keys(result.associations).length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <div className="eyebrow" style={{ marginBottom: 6 }}>联想分析</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {Object.entries(result.associations).map(([dir, text]) => (
+                  <div key={dir}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-3)', marginBottom: 2 }}>
+                      {ASSOCIATION_DIRECTION_LABELS[dir as AssociationDirection] ?? dir}
+                    </div>
+                    <div style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--ink-2)' }}>
+                      {text}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* EXIF 信息 */}
           {(result.exif?.time || result.exif?.location) && (
             <div style={{ marginBottom: 14 }}>
@@ -559,6 +599,28 @@ export default function ImageResultPage() {
             />
             {favored ? '已收藏此图 ★' : '收藏此图'}
           </button>
+          <button
+            onClick={handleCompare}
+            disabled={compareLoading}
+            style={{
+              width: '100%',
+              height: 36,
+              borderRadius: 10,
+              fontSize: 13,
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 7,
+              cursor: compareLoading ? 'wait' : 'pointer',
+              border: '1px solid var(--line)',
+              background: 'var(--bg-sunken)',
+              color: 'var(--ink-2)',
+            }}
+          >
+            <BarChart2 size={14} />
+            {compareLoading ? '对比分析中...' : '多图对比'}
+          </button>
           <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)', textAlign: 'center' }}>
             快捷键：C 复制 · F 收藏 · 1/2/3 切格式
           </span>
@@ -573,6 +635,14 @@ export default function ImageResultPage() {
           onToggle={togglePickerId}
           onCancel={() => setPickerOpen(false)}
           onSave={savePicker}
+        />
+      )}
+
+      {/* N9: 多图对比弹窗 */}
+      {compareOpen && compareData && (
+        <ImageCompareDialog
+          data={compareData}
+          onClose={() => setCompareOpen(false)}
         />
       )}
     </div>
@@ -704,5 +774,125 @@ function FormatPicker({ allFormats, selection, onToggle, onCancel, onSave }: For
         </div>
       </div>
     </div>
+  )
+}
+
+// ── N9: 多图对比弹窗 ────────────────────────────────────────
+
+function ImageCompareDialog({ data, onClose }: { data: ImageCompareResult; onClose: () => void }) {
+  const current = data.images.find((img) => img.is_current)
+  const others = data.images.filter((img) => !img.is_current && img.has_result)
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.5)',
+        zIndex: 60,
+        display: 'grid',
+        placeItems: 'center',
+        padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--bg-elev)',
+          border: '1px solid var(--line)',
+          borderRadius: 14,
+          padding: 20,
+          width: '100%',
+          maxWidth: 720,
+          maxHeight: '80vh',
+          overflow: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>多图对比</div>
+          <button
+            onClick={onClose}
+            style={{
+              height: 28,
+              padding: '0 10px',
+              borderRadius: 6,
+              fontSize: 11,
+              border: '1px solid var(--line)',
+              background: 'transparent',
+              cursor: 'pointer',
+            }}
+          >
+            关闭
+          </button>
+        </div>
+
+        {others.length === 0 ? (
+          <div style={{ fontSize: 13, color: 'var(--ink-3)', textAlign: 'center', padding: 20 }}>
+            同工作空间内暂无其他已完成分析的图片素材，无法对比。
+          </div>
+        ) : (
+          <>
+            {/* 结构化对比表 */}
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--line)' }}>
+                    <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--ink-3)', fontWeight: 600 }}>维度</th>
+                    {current && (
+                      <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--accent-warm)', fontWeight: 600 }}>
+                        {current.name}（当前）
+                      </th>
+                    )}
+                    {others.map((img) => (
+                      <th key={img.item_id} style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--ink-2)', fontWeight: 600 }}>
+                        {img.name}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  <CompareRow label="描述" values={[current, ...others].map((img) => img?.description?.slice(0, 100) || '—')} />
+                  <CompareRow
+                    label="标签"
+                    values={[current, ...others].map((img) =>
+                      img?.tags ? Object.values(img.tags).flat().join('、').slice(0, 80) || '—' : '—',
+                    )}
+                  />
+                  <CompareRow
+                    label="OCR 文字"
+                    values={[current, ...others].map((img) => img?.ocr_text?.slice(0, 60) || '—')}
+                  />
+                </tbody>
+              </table>
+            </div>
+
+            {/* VLM 总结 */}
+            {data.vlm_summary && (
+              <div>
+                <div className="eyebrow" style={{ marginBottom: 6 }}>AI 对比总结</div>
+                <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--ink-2)', whiteSpace: 'pre-wrap' }}>
+                  {data.vlm_summary}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function CompareRow({ label, values }: { label: string; values: string[] }) {
+  return (
+    <tr style={{ borderBottom: '1px solid var(--line)' }}>
+      <td style={{ padding: '6px 8px', fontWeight: 600, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{label}</td>
+      {values.map((v, i) => (
+        <td key={i} style={{ padding: '6px 8px', color: 'var(--ink-2)' }}>{v}</td>
+      ))}
+    </tr>
   )
 }

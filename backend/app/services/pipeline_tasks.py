@@ -714,16 +714,21 @@ def handle_text_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
 
 
 def handle_image_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
-    """图片分析任务（Phase X.4）。
+    """图片分析任务（Phase X.4 + N9 扩展）。
 
     payload 字段：
       - source: 必填，HTTP(S) URL 或本地文件路径
       - source_type: "url" | "local"（可省略，依赖 source 自动判断）
       - vision_model / text_model / api_key：可选，从 settings 兜底
+      - ocr: {enabled, ...} N9 PaddleOCR 开关
+      - association: {enabled, directions: [...]} N9 联想方向
+      - frame_prompts: {enabled, format} N9 提示词格式
 
-    状态机：FETCH → VLM → STORE → SUCCESS
+    状态机：FETCH → OCR → VLM → ASSOCIATION → STORE → SUCCESS
     产物：data/projects/<pid>/image/<task_id>.json
     """
+    import re as _re
+
     payload = record.payload
     task_id = record.task_id
     log = lambda msg: runner.append_log(task_id, msg)  # noqa: E731
@@ -735,7 +740,20 @@ def handle_image_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         "url" if source.startswith(("http://", "https://")) else "local"
     )
 
+    # N9: 读取 preflight 子参数
+    ocr_params = payload.get("ocr") or {}
+    ocr_enabled = isinstance(ocr_params, dict) and ocr_params.get("enabled", False)
+    assoc_params = payload.get("association") or {}
+    assoc_enabled = isinstance(assoc_params, dict) and assoc_params.get("enabled", False)
+    assoc_directions = assoc_params.get("directions", ["usage"]) if assoc_enabled else []
+    fp_params = payload.get("frame_prompts") or {}
+    prompt_format = fp_params.get("format", "mj") if isinstance(fp_params, dict) else "mj"
+
     log(f"🖼 image_task | source_type={source_type} | source={source[:80]}")
+    if ocr_enabled:
+        log("🔤 OCR 已启用（PaddleOCR）")
+    if assoc_enabled:
+        log(f"🔗 联想分析已启用 | directions={assoc_directions}")
 
     # ── 1. FETCH ────────────────────────────────────────────
     runner.store.update(task_id, status=TaskStatus.FETCH.value)
@@ -767,6 +785,22 @@ def handle_image_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     img_b64 = base64.b64encode(image_bytes).decode()
     log(f"📦 图片已加载，{len(image_bytes)//1024} KB，mime={mime}")
 
+    # ── 1.5 OCR（N9: PaddleOCR，独立于 VLM） ───────────────
+    ocr_text = ""
+    if ocr_enabled:
+        runner.set_progress(task_id, 0.15, "PaddleOCR 文字提取中...")
+        try:
+            from shared.ocr_service import extract_text
+
+            ocr_text = extract_text(image_bytes)
+            if ocr_text:
+                log(f"🔤 OCR 提取 {len(ocr_text)} 字")
+            else:
+                log("🔤 OCR 未检测到文字")
+        except Exception as err:
+            log(f"⚠️  PaddleOCR 失败，回退 VLM OCR：{err}")
+            ocr_text = ""  # 回退：VLM prompt 里也会提取 ocr_text
+
     # ── 2. VLM ──────────────────────────────────────────────
     runner.store.update(task_id, status=TaskStatus.VLM.value)
     runner.set_progress(task_id, 0.35, "视觉模型分析中...")
@@ -776,12 +810,35 @@ def handle_image_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         str(payload.get("api_key") or "").strip()
         or (settings.openai_api_key or "").strip()
     )
+
+    # 构造 VLM prompt——如果 PaddleOCR 已成功提取文字，则不在 prompt 里要求 ocr_text
+    ocr_json_line = (
+        "" if ocr_text
+        else '"ocr_text": "图中可见文字（无则空字符串）",\n'
+    )
+    # N9: 根据 prompt_format 调整提示词部分
+    if prompt_format == "sd":
+        prompt_block = (
+            '"prompts": {\n'
+            '   "sd": {"positive": "Stable Diffusion 正向提示词（英文）", "negative": "负向提示词"}\n'
+            ' }'
+        )
+    elif prompt_format == "json":
+        prompt_block = '"prompts": {\n   "json": "结构化场景描述（英文 JSON 字符串）"\n }'
+    else:
+        prompt_block = (
+            '"prompts": {\n'
+            '   "mj": "Midjourney 提示词（英文，50-80词）",\n'
+            '   "sd": {"positive": "Stable Diffusion 正向提示词（英文）", "negative": "负向提示词"},\n'
+            '   "json": "结构化场景描述（英文 JSON 字符串）"\n'
+            ' }'
+        )
+
     if not api_key:
         log("⚠️  未提供 api_key，跳过视觉分析")
         description = ""
         prompts: Dict[str, Any] = {"mj": "", "sd": {"positive": "", "negative": ""}, "json": ""}
         tags: Dict[str, List[str]] = {}
-        ocr_text = ""
     else:
         registry = create_default_registry()
         profile = registry.resolve_default_profile(settings, "vision")
@@ -796,19 +853,14 @@ def handle_image_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             description = ""
             prompts = {"mj": "", "sd": {"positive": "", "negative": ""}, "json": ""}
             tags = {}
-            ocr_text = ""
         else:
             log(f"🔍 调用 vision model={vision_model}")
             analysis_prompt = (
                 "你是一名专业的图像分析助手。请分析这张图片并以纯 JSON 格式输出，不要有 markdown 代码块。\n"
                 "JSON 结构如下：\n"
                 '{"description": "中文详细描述（100-200字）",\n'
-                ' "ocr_text": "图中可见文字（无则空字符串）",\n'
-                ' "prompts": {\n'
-                '   "mj": "Midjourney 提示词（英文，50-80词）",\n'
-                '   "sd": {"positive": "Stable Diffusion 正向提示词（英文）", "negative": "负向提示词"},\n'
-                '   "json": "结构化场景描述（英文 JSON 字符串）"\n'
-                ' },\n'
+                f' {ocr_json_line}'
+                f' {prompt_block},\n'
                 ' "tags": {"subject": [], "scene": [], "style": [], "lighting": [], "color": [], "composition": []}}'
             )
             try:
@@ -826,7 +878,6 @@ def handle_image_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                         max_tokens=1200,
                     )
                 )
-                import re as _re
                 m = _re.search(r"\{[\s\S]*\}", raw)
                 parsed: Dict[str, Any] = json.loads(m.group()) if m else {}
             except Exception as err:
@@ -834,21 +885,57 @@ def handle_image_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 parsed = {}
 
             description = str(parsed.get("description") or "")
-            ocr_text = str(parsed.get("ocr_text") or "")
+            # PaddleOCR 优先；仅当 PaddleOCR 无结果时用 VLM 的 ocr_text
+            if not ocr_text:
+                ocr_text = str(parsed.get("ocr_text") or "")
             prompts = parsed.get("prompts") or {"mj": "", "sd": {"positive": "", "negative": ""}, "json": ""}
             tags = parsed.get("tags") or {}
 
     log(f"📊 分析完成 | description={description[:40]}...")
 
+    # ── 2.5 联想分析（N9: 多方向 VLM 调用） ────────────────
+    associations: Dict[str, str] = {}
+    if assoc_enabled and assoc_directions and api_key:
+        runner.set_progress(task_id, 0.70, "联想分析中...")
+        direction_prompts: Dict[str, str] = {
+            "usage": "从用途角度分析这张图片：它适合用在什么场景？（如社交媒体、印刷、UI 设计、广告等）给出 3-5 个具体用途建议。",
+            "design": "从设计角度分析这张图片：构图、配色、排版、视觉层次各有什么特点？哪些设计手法值得借鉴？",
+            "competitor": "从竞品角度分析这张图片：同类型内容中，这种风格/手法的优劣势是什么？有哪些改进空间？",
+            "emotion": "从情绪角度分析这张图片：它传达了什么情绪和氛围？目标受众会产生什么感受？如何强化或调整情绪表达？",
+        }
+        # 确保有可用的 vision model
+        if not vision_model:
+            log("⚠️  未配置 vision_model，跳过联想分析")
+        else:
+            for direction in assoc_directions:
+                d_prompt = direction_prompts.get(direction)
+                if not d_prompt:
+                    continue
+                try:
+                    resp = provider.chat(
+                        ChatRequest(
+                            model=vision_model,
+                            messages=[{
+                                "role": "user",
+                                "content": [
+                                    {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{img_b64}"}},
+                                    {"type": "text", "text": d_prompt + "\n请用中文回答，200-400字。"},
+                                ],
+                            }],
+                            temperature=0.5,
+                            max_tokens=800,
+                        )
+                    )
+                    associations[direction] = resp.strip()
+                    log(f"🔗 联想 [{direction}] 完成，{len(resp)}字")
+                except Exception as err:
+                    log(f"⚠️  联想 [{direction}] 失败：{err}")
+                    associations[direction] = ""
+
     # ── 3. STORE ────────────────────────────────────────────
     runner.store.update(task_id, status=TaskStatus.STORE.value)
     runner.set_progress(task_id, 0.90, "归档图片产物...")
 
-    image_dir = Path(settings.data_dir) / "projects" / record.project_id / "image" \
-        if hasattr(settings, "data_dir") and settings.data_dir \
-        else Path(__file__).resolve().parents[4] / "data" / "projects" / record.project_id / "image"
-
-    # 保险兜底：通过 config 拿 project root
     from shared.config import get_project_root
     image_dir = get_project_root(record.project_id) / "image"
     image_dir.mkdir(parents=True, exist_ok=True)
@@ -863,6 +950,8 @@ def handle_image_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         "prompts": prompts,
         "tags": tags,
     }
+    if associations:
+        result["associations"] = associations
     json_path = image_dir / f"{task_id}.json"
     json_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
 
