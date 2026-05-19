@@ -1,6 +1,6 @@
 # AI Handoff
 
-Last updated: 2026-05-19（N5 完成，进入 N6）
+Last updated: 2026-05-19（N6 完成，进入 N7）
 
 ---
 
@@ -17,8 +17,9 @@ Last updated: 2026-05-19（N5 完成，进入 N6）
 | **N2 侧边栏精简** | ✅ 已合并 main | 侧边栏 4 项 + Taskboard 4 子标签 |
 | **N3 设置页重组** | ✅ 已合并 main | 设置页 tabs 10→7，合并模型与渠道 / 分析默认偏好 |
 | **N4 添加素材模态** | ✅ 已合并 main | 4 步合一 + 自动识别 + 智能勾选 + 背景折叠 |
-| **N5 Preflight 抽屉** | ✅ 待 merge | 4 类素材子参数全套 UI + tasks 形状升级 |
-| **N6 任务级 LLM 对话** | ⏳ **下一步** | P1，估时 6-8h，素材 chip 多选 + RAG 兜底 |
+| **N5 Preflight 抽屉** | ✅ 已合并 main | 4 类素材子参数全套 UI + tasks 形状升级 |
+| **N6 任务级 LLM 对话** | ✅ 待 merge | TaskChatPanel + 素材 chip 多选 + char-based 上下文兜底 |
+| **N7 视频分支补全** | ⏳ **下一步** | P2，估时 8-10h，**需授权装 scenedetect 依赖** |
 
 > ⚠️ 写新交接前请**先 `git log --oneline -20` 对账**，不要相信本文件里写的「下一步」如果它和 git 冲突。
 
@@ -100,36 +101,58 @@ Last updated: 2026-05-19（N5 完成，进入 N6）
 
 ---
 
-## N6 开工交接（下一步）
+## N6 完工小结
 
-> 来源：`docs/SPEC.md`（任务级 AI 对话章节）。
+- 分支：`feat/phase-n6-task-chat`，worktree `/Users/conan/Desktop/nibi-n6`，**待 merge**
+- commits：
+  - `ae7ed8b` N6.1 chat_context 工具（`backend/app/services/chat_context.py`，187 行）
+  - `435e8cb` N6.2~N6.3 chat 路由接入 item_ids + system prompt 注入 + 5 个 pytest
+  - `935d933` N6.4~N6.6 前端 TaskChatPanel + WorkspaceDetail 接入
+- 改动：
+  - **后端**：`ChatCreateRequest` 加 `item_ids`，`ChatRunner.start_turn` 加 `system_prompt`（注入到 history 第 0 位但不落盘，避免污染历史）
+  - **char-based 兜底**：阈值 12000 chars（约 6k token），超时按 item 顺序截断 + 返回 `context_truncated: true`
+  - **真 embedding RAG 推迟**：现有 `rag_qa_service` 基于 cross-workspace 索引，与 task-level 上下文不匹配；v1 用 char 截断够用，真 RAG 等 N9/N10 跨素材对比时再做
+  - **前端**：新建 `TaskChatPanel.tsx`，顶部素材 chip 条 + 「全任务上下文」全选 + 截断徽章；浮动 `ChatSidebar` 保留作"无上下文"快捷入口
+  - **WorkspaceDetail**：AI 对话 tab 从 EmptyState 切到 `TaskChatPanel`
+- 验证：`pytest tests/backend -q` 110 passed（基线 105 + N6 新增 5）；`tsc -b --noEmit` 仅余 4 条 baseline 错误
 
-### N6 范围
+---
 
-- 标题：任务级 LLM 对话上下文素材多选 chip + RAG 兜底
-- 估时：6-8h
-- 优先级：P1
-- **模型**：⭐ **Opus 4.7**（上下文拼接 + RAG 兜底逻辑，符合「复杂阶段」）
-- **分支**：`feat/phase-n6-task-chat`，新 worktree `/Users/conan/Desktop/nibi-n6`
-- **不 push**：commit 留本地
+## N7 开工交接（下一步）
+
+> 来源：`docs/SPEC.md` §4 视频分支。
+
+### N7 范围
+
+- 标题：视频分支补全（PySceneDetect AI 镜头分析 / 总结路径 1 & 3 / 视频运镜延后）
+- 估时：8-10h
+- 优先级：P2
+- **模型**：⭐ **Opus 4.7**（视频管线 + scenedetect 集成 + 三路径分支）
+- **分支**：`feat/phase-n7-video-branch`，新 worktree `/Users/conan/Desktop/nibi-n7`
+
+### ⚠️ 需用户授权装新依赖
+
+- `scenedetect`（PySceneDetect）→ 写入 `requirements.txt`
+- 装之前必须先问用户授权
 
 ### 具体差异项
 
-1. WorkspaceDetail「AI 对话」Tab 内的对话输入框上方加素材 chip 多选条
-2. 选中素材 → 把对应 `item.results` / 摘要注入对话上下文
-3. 未选中、或上下文 token 超阈值 → 走 RAG 检索兜底（沿用 Phase 3B 的索引）
-4. UI 上展示「本次问答用了哪些素材 / RAG 命中片段」
+1. **AI 镜头分析**：用 PySceneDetect 检测镜头切换，按 N5 已存的 `frame_prompts.capture_mode = 'scene'` 走这条路；用户在 Preflight 抽屉选 2 帧或 3 帧
+2. **总结路径 1（字幕直接）**：当 `video_summary.path = 'subtitle'` 时跳过截帧，字幕 → 模板 → LLM
+3. **总结路径 3（视频模型直接）**：当 `video_summary.path = 'video_model'` 时整段视频送 vision-video 模型
+4. **视频运镜提示词**：延后到 AI 导演模块，N7 不做
 
 ### 开工前准备
 
-1. 读 `docs/SPEC.md` 任务级 AI 对话章节
-2. 看现有 `rag.py` 路由 + 前端 `services/rag.ts`
-3. 确认 token 阈值切到 RAG 的判定方式
+1. 读 SPEC §4.2 / §4.3
+2. 看 `shared/video_analyzer.py` / `shared/storyboard_generator.py` 现有截帧逻辑
+3. 看 N5 引入的 `frame_prompts` / `video_summary` params 形状
 
 ### 不要做的事
 
-- ❌ 不要顺手做 N7（视频 PySceneDetect 后端实现）
-- ❌ 不要修改 Phase 3B 已建立的 RAG 索引结构
+- ❌ 不要做 N8 音频分支（即使顺手也别动）
+- ❌ 不要碰 AI 导演模块代码
+- ❌ 不要在没拿到授权前装 scenedetect
 
 ---
 

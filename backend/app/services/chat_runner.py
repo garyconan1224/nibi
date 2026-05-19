@@ -62,7 +62,13 @@ class ChatRunner:
         chat_id: str | None,
         prompt: str,
         model: str | None = None,
+        system_prompt: str | None = None,
     ) -> ChatTurn:
+        """启动一轮对话。
+
+        system_prompt（N6）：本轮注入的素材上下文。**不落盘**，只在本次 LLM 调用前置入 history 第 0 位，
+        历史记录里仍只有 user/assistant，避免污染后续对话且允许下一轮换素材。
+        """
         prompt = (prompt or "").strip()
         if not prompt:
             raise ValueError("prompt 不能为空")
@@ -81,10 +87,13 @@ class ChatRunner:
         with self._lock:
             self._turns[turn.turn_id] = turn
 
-        history = [
+        history: list[dict] = []
+        if system_prompt and system_prompt.strip():
+            history.append({"role": "system", "content": system_prompt})
+        history.extend(
             {"role": m.role, "content": m.content}
             for m in self._store.list(workspace_id, chat_id=cid)
-        ]
+        )
         threading.Thread(
             target=self._run,
             args=(turn, history),
