@@ -23,7 +23,8 @@ Last updated: 2026-05-19（N8 完成，进入 N9；N7b/N8b 拆出待办）
 | **N7b 视频总结路径 1/3** | ⏸ 已拆出 | 字幕直接 + 视频模型直接；依赖 item 字幕抽取 + 视频大模型 API 决策 |
 | **N8 音频分支补全** | ✅ 待 merge | silero-vad + pyannote + librosa Suno/Udio + 字幕导出 |
 | **N8b 音频前端交互** | ⏸ 已拆出 | 无人声切音乐弹窗 / 说话人标签修正 UI / 多段音乐 6 维度 |
-| **N9 图片分支补全** | ⏳ **下一步** | P2，估时 6-8h，PaddleOCR / 4 联想方向 / 多图对比 |
+| **N9 图片分支补全** | ✅ 已合并 main | PaddleOCR + 4 联想方向 + 多图对比 |
+| **N10 文字分支补全** | ⏳ **下一步** | P2，估时 6-8h，PDF 解析 / 改写翻译并排 / 多文对比 |
 
 > ⚠️ 写新交接前请**先 `git log --oneline -20` 对账**，不要相信本文件里写的「下一步」如果它和 git 冲突。
 
@@ -186,33 +187,50 @@ Last updated: 2026-05-19（N8 完成，进入 N9；N7b/N8b 拆出待办）
 
 ---
 
-## N9 开工交接（下一步）
+## N9 完工小结
 
-> 来源：`docs/SPEC.md` §6 图片分支。
+- 分支：`feat/phase-n9-image-branch`，已合并 main
+- commits：`fadeb9a` N9 全部（PaddleOCR + 联想分析 + 多图对比）
+- 装的依赖（用户授权选 PaddleOCR）：
+  - `paddlepaddle` + `paddleocr`（中英双语 OCR，首次运行自动下载模型 ~100MB）
+- 改动：
+  - 新增 `shared/ocr_service.py`：PaddleOCR 封装（懒加载引擎，`extract_text(image_bytes) -> str`）
+  - `handle_image_task`：读 preflight 子参数（ocr/association/frame_prompts）；PaddleOCR 优先提取文字（VLM 兜底）；4 方向联想分析（用途/设计/竞品/情绪）；prompt_format 按格式调整输出
+  - `_bridge_to_pipeline_payload`：image 类型透传 ocr/association/frame_prompts 子参数 + vision/text model
+  - 新增 `GET /workspaces/{wid}/items/{item_id}/image_compare`：多图对比端点（结构化对比表 + VLM 总结）
+  - `ImageResultPage`：展示联想分析结果 + 多图对比弹窗按钮
+  - `ImageResult` 类型新增 `associations` 字段
+- 验证：`pytest tests/backend -q` 通过（7 passed, 1 skipped）；`tsc -b --noEmit` 仅余 4 条 baseline 错误
 
-### N9 范围
+---
 
-- 标题：图片分支补全（PaddleOCR / 4 联想方向 / 多图对比）
+## N10 开工交接（下一步）
+
+> 来源：`docs/SPEC.md` §7 文字分支。
+
+### N10 范围
+
+- 标题：文字分支补全（marker/docling PDF / 改写翻译并排对照 / 多文对比）
 - 估时：6-8h
 - 优先级：P2
-- **模型**：⭐ Opus 4.7 或 Sonnet 4.6
-- **分支**：`feat/phase-n9-image-branch`，新 worktree `/Users/conan/Desktop/nibi-n9`
+- **模型**：Sonnet 4.6 或 Opus 4.7
+- **分支**：`feat/phase-n10-text-branch`，新 worktree `/Users/conan/Desktop/nibi-n10`
 
-### ⚠️ 需用户授权装新依赖
+### ⚠️ 需用户确认
 
-- OCR 库选型：`paddleocr`（准确但 ~1GB）/ `easyocr`（中等）/ `tesseract`（最轻但中文一般）
+- PDF 解析库选型：`marker`（准确但较慢）/ `docling`（IBM，中等）/ 现有 `load_auto` 够用？
 - 装之前问用户选哪个
 
 ### 具体差异项
 
-1. OCR 文字提取（替代/补充现有 OCR）
-2. 4 联想方向多选实际生效（N5 已存数据形状）
-3. 多图对比（同任务图片素材交叉对比，N5 已加 UI 一级开关）
+1. PDF 解析增强（marker/docling 替代/补充现有文本提取）
+2. 改写翻译并排对照 UI（左原文右改写/翻译）
+3. 多文对比（跨同任务文本素材交叉对比，前端已有 preflight 入口）
 
 ### 不要做的事
 
-- ❌ 不要做 N10 文字分支
-- ❌ 不要在没拿到 OCR 库选型授权前装包
+- ❌ 不要做 N11 UI 清理
+- ❌ 不要在没拿到 PDF 库选型授权前装包
 
 ---
 

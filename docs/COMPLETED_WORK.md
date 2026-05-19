@@ -4,7 +4,7 @@
 >
 > **维护规则**：每完成一个子任务，在本文件**追加**一段（不删旧记录），格式见下方"记录模板"。
 >
-> Last updated: 2026-05-18 (Phase 3C 完成)
+> Last updated: 2026-05-19 (Phase N9 完成)
 
 ---
 
@@ -38,6 +38,58 @@
 ---
 
 # 历史记录（倒序，最新在上）
+
+---
+
+## Phase N9 – 图片分支：PaddleOCR + 联想分析 + 多图对比
+
+**完成日期**：2026-05-19
+**模型 / 工具**：Opus 4.7
+**分支**：feat/phase-n9-image-branch
+**Commit**：fadeb9a
+
+### 影响范围
+- 依赖：paddlepaddle + paddleocr（中英双语 OCR，~1GB）
+- 后端：新增 shared/ocr_service.py + pipeline_tasks::handle_image_task 扩展 + workspaces 路由 bridge 透传 + 新增 image_compare 端点
+- 前端：ImageResultPage 加联想分析展示 + 多图对比弹窗 + workspaces 服务新增 compare 类型
+- 测试：新增 tests/backend/test_ocr_service.py（2 个用例）
+
+### 用户决策
+- OCR 库选型：PaddleOCR（准确、中文优化）
+- 4 联想方向全做（用途 / 设计 / 竞品 / 情绪）
+- 多图对比：结构化对比表 + VLM 总结（best-effort）
+
+### 关键改动
+- 新增 `shared/ocr_service.py`：
+  - `extract_text(image_bytes, min_confidence=0.5) -> str`
+  - 懒加载 PaddleOCR 引擎（use_textline_orientation 替代已弃用 use_angle_cls）
+  - 临时文件写入 + 自动清理
+- `handle_image_task` 扩展：
+  - 读 preflight 子参数：ocr / association / frame_prompts
+  - OCR 路径：PaddleOCR 优先 → VLM 兜底（ocr_text 仅在 PaddleOCR 无结果时用 VLM 的）
+  - 联想分析：4 方向独立 VLM 调用（用途/设计/竞品/情绪），结果存入 associations dict
+  - prompt_format：按 mj/sd/json 格式调整 VLM prompt 中的提示词部分
+- `_bridge_to_pipeline_payload`：image 类型透传 vision/text model + ocr/association/frame_prompts/multi_compare 子参数
+- 新增 `GET /workspaces/{wid}/items/{item_id}/image_compare`：
+  - 收集同 workspace 内所有已完成 image 素材的结果
+  - 结构化对比（描述/标签/OCR）
+  - VLM 总结对比（best-effort，失败不影响返回）
+- `ImageResultPage`：
+  - 标签下方新增联想分析展示区（按方向分段）
+  - 底部新增「多图对比」按钮 + ImageCompareDialog 弹窗
+  - ImageCompareDialog：表格对比 + VLM 总结
+
+### 为什么这么做
+- **PaddleOCR 优先于 VLM OCR**：VLM 的 ocr_text 是"看图猜字"，PaddleOCR 是真正的 OCR 引擎，准确率更高
+- **联想方向独立 VLM 调用**：每个方向 prompt 不同，合并成一次调用容易互相干扰
+- **多图对比 best-effort VLM**：对比是锦上添花，结构化数据（描述/标签对比表）已足够有价值
+- **对比端点用 GET 不用 POST**：对比不产生副作用，GET 更 RESTful
+
+### 留给后续的影响
+- **PaddleOCR 首次运行会下载模型**：~100MB，需联网；后续运行用缓存
+- **联想分析结果存入 result JSON 的 associations 字段**：前端 ImageResult 类型已加 associations 可选字段
+- **多图对比端点是 workspace 级别的**：收集所有 image items，不限于同一次 pipeline
+- **N10 可复用联想分析模式**：text 类型的 association 也可用类似 4 方向独立 LLM 调用
 
 ---
 
