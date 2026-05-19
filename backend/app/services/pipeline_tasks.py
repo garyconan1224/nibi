@@ -20,6 +20,7 @@ from shared.settings_store import load_settings
 from shared.storyboard_generator import run_storyboard_generation
 from shared.text_loader import TextDocument, TextLoaderError, load_auto
 from shared.video_analyzer import (
+    CaptureParams,
     find_videos,
     get_output_dir,
     get_safe_name,
@@ -156,6 +157,18 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
     if not videos:
         raise ValueError(f"no videos found in {project_video_dir}")
 
+    # N7: 从 payload 读 frame_prompts 子参数（截帧模式 / 间隔 / 最大帧数 / 每镜头帧数）
+    frame_prompts = payload.get("frame_prompts")
+    capture_params = CaptureParams.from_dict(frame_prompts) if frame_prompts is not None else None
+    if capture_params is not None:
+        runner.append_log(
+            task_id,
+            f"🎬 capture_params | mode={capture_params.mode} | "
+            f"interval={capture_params.interval_sec}s | "
+            f"max_frames={capture_params.max_frames} | "
+            f"frames_per_shot={capture_params.frames_per_shot}"
+        )
+
     runner.set_progress(record.task_id, 0.1, f"Found {len(videos)} videos")
     state = run_batch_analysis(
         api_key=api_key,
@@ -164,6 +177,7 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
         text_model=text_model,
         auto_sync_json=True,
         target_json_dir=project_json_dir,
+        capture_params=capture_params,
     )
     while not state.finished:
         if runner.is_cancel_requested(record.task_id):

@@ -845,6 +845,11 @@ def _bridge_to_pipeline_payload(
         payload["vision_model"] = models["vision"]
     if models.get("text"):
         payload["text_model"] = models["text"]
+    # N7: 透传截帧子参数（capture_mode / interval / max_frames / frames_per_shot）
+    tasks = item.preflight.tasks or {}
+    frame_prompts_params = tasks.get("frame_prompts")
+    if isinstance(frame_prompts_params, dict):
+        payload["frame_prompts"] = frame_prompts_params
     return "analyze", payload
 
 
