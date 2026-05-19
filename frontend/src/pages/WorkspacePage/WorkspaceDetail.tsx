@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import axios from 'axios'
 import { subscribeSse } from '@/services/events'
 import { ChatSidebar } from '@/components/workspace/ChatSidebar'
+import { AddMaterialModal } from '@/components/workspace/AddMaterialModal'
 import {
   ArrowLeft,
   Plus,
@@ -15,8 +15,6 @@ import {
   PlayCircle,
   Eye,
   Settings2,
-  Upload,
-  X,
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -25,16 +23,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -57,20 +47,17 @@ import {
 import PreflightConfigPanel from '@/components/workspace/PreflightConfigPanel'
 import { WorkspaceSearchBar } from './WorkspaceSearchBar'
 import {
-  addWorkspaceItem,
   deleteWorkspace,
   getWorkspace,
   removeWorkspaceItem,
   savePreflight,
   startItemPipeline,
   updateWorkspace,
-  uploadWorkspaceItem,
 } from '@/services/workspaces'
 import {
   ITEM_TYPE_COLOR,
   ITEM_TYPE_TEXT,
   WORKSPACE_STATUS_TEXT,
-  type ItemSource,
   type ItemType,
   type PreflightSaveRequest,
   type WorkspaceItem,
@@ -108,16 +95,6 @@ export default function WorkspaceDetail() {
 
   // 添加素材模态状态
   const [addOpen, setAddOpen] = useState(false)
-  const [adding, setAdding] = useState(false)
-  const [addError, setAddError] = useState<string | null>(null)
-  const [newItemType, setNewItemType] = useState<ItemType>('video')
-  const [newItemSource, setNewItemSource] = useState<ItemSource>('url')
-  const [newItemValue, setNewItemValue] = useState('')
-  const [newItemName, setNewItemName] = useState('')
-  const [uploadFile, setUploadFile] = useState<File | null>(null)
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [uploadDragOver, setUploadDragOver] = useState(false)
-  const uploadInputRef = useRef<HTMLInputElement>(null)
 
   // 前置配置面板状态——保存当前正在配置的 item 引用
   const [preflightItem, setPreflightItem] = useState<WorkspaceItem | null>(null)
@@ -180,84 +157,6 @@ export default function WorkspaceDetail() {
       setError(err instanceof Error ? err.message : '删除失败')
     } finally {
       setDeleting(false)
-    }
-  }
-
-  const resetAddForm = () => {
-    setNewItemValue('')
-    setNewItemName('')
-    setUploadFile(null)
-    setUploadProgress(0)
-    setUploadDragOver(false)
-    setAddError(null)
-  }
-
-  const isValidNetworkUrl = (raw: string): boolean => {
-    const value = raw.trim()
-    if (!value) return false
-    try {
-      const u = new URL(value)
-      return (u.protocol === 'http:' || u.protocol === 'https:') && !!u.host
-    } catch {
-      return false
-    }
-  }
-
-  const extractErrorMessage = (err: unknown, fallback: string): string => {
-    if (axios.isAxiosError(err)) {
-      const detail = (err.response?.data as { detail?: unknown } | undefined)
-        ?.detail
-      if (typeof detail === 'string') return detail
-    }
-    return err instanceof Error ? err.message : fallback
-  }
-
-  const handleUploadFileSelect = (file: File) => {
-    setUploadFile(file)
-    setUploadProgress(0)
-    const inferredType = inferItemTypeFromFile(file)
-    if (inferredType) setNewItemType(inferredType)
-    if (!newItemName.trim()) {
-      setNewItemName(file.name)
-    }
-  }
-
-  const handleAdd = async () => {
-    if (!id) return
-    if (newItemSource === 'local' && !uploadFile && !newItemValue.trim()) return
-    if (newItemSource !== 'local' && !newItemValue.trim()) return
-
-    if (newItemSource === 'url' && !isValidNetworkUrl(newItemValue)) {
-      setAddError('请输入有效的网络链接，必须以 http:// 或 https:// 开头')
-      return
-    }
-
-    setAdding(true)
-    setError(null)
-    setAddError(null)
-    try {
-      const updated =
-        newItemSource === 'local' && uploadFile
-          ? await uploadWorkspaceItem(id, uploadFile, {
-              name: newItemName.trim() || undefined,
-              onProgress: setUploadProgress,
-            })
-          : await addWorkspaceItem(id, {
-              type: newItemType,
-              source: newItemSource,
-              source_value: newItemValue.trim(),
-              name: newItemName.trim() || undefined,
-            })
-      setWorkspace(updated)
-      setAddOpen(false)
-      resetAddForm()
-      // 添加完毕，直接打开前置配置面板，等用户填好就一键开始分析
-      const newest = updated.items[updated.items.length - 1]
-      if (newest) setPreflightItem(newest)
-    } catch (err: unknown) {
-      setAddError(extractErrorMessage(err, '添加失败'))
-    } finally {
-      setAdding(false)
     }
   }
 
@@ -325,11 +224,6 @@ export default function WorkspaceDetail() {
       </div>
     )
   }
-
-  const canAddItem =
-    newItemSource === 'local'
-      ? !!uploadFile || !!newItemValue.trim()
-      : !!newItemValue.trim()
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6 p-6">
@@ -456,197 +350,16 @@ export default function WorkspaceDetail() {
         </TabsContent>
       </Tabs>
 
-      {/* 添加素材模态 */}
-      <Dialog
-        open={addOpen}
-        onOpenChange={(open) => {
-          setAddOpen(open)
-          if (!open && !adding) resetAddForm()
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>添加内容</DialogTitle>
-            <DialogDescription>
-              支持网络链接和本地文件路径。后续会自动路由到对应的分析分支。
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            {addError && (
-              <div
-                role="alert"
-                className="rounded-md border border-destructive/50 bg-destructive/10 p-2 text-sm text-destructive"
-              >
-                {addError}
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>素材类型</Label>
-                <Select
-                  value={newItemType}
-                  onValueChange={(v) => setNewItemType(v as ItemType)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="video">视频</SelectItem>
-                    <SelectItem value="audio">音频</SelectItem>
-                    <SelectItem value="image">图片</SelectItem>
-                    <SelectItem value="text">文字</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>来源</Label>
-                <Select
-                  value={newItemSource}
-                  onValueChange={(v) => {
-                    setNewItemSource(v as ItemSource)
-                    setUploadFile(null)
-                    setUploadProgress(0)
-                    setAddError(null)
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="url">网络链接</SelectItem>
-                    <SelectItem value="local">本地路径</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            {newItemSource === 'local' && (
-              <div className="space-y-2">
-                <Label>上传文件</Label>
-                <input
-                  ref={uploadInputRef}
-                  type="file"
-                  className="hidden"
-                  accept="video/*,audio/*,image/*,.txt,.md,.srt,.vtt,.json"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) handleUploadFileSelect(file)
-                    e.target.value = ''
-                  }}
-                />
-                <div
-                  role="button"
-                  tabIndex={0}
-                  aria-label="上传本地文件"
-                  onClick={() => uploadInputRef.current?.click()}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') uploadInputRef.current?.click()
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault()
-                    setUploadDragOver(true)
-                  }}
-                  onDragLeave={(e) => {
-                    e.preventDefault()
-                    setUploadDragOver(false)
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault()
-                    setUploadDragOver(false)
-                    const file = e.dataTransfer.files[0]
-                    if (file) handleUploadFileSelect(file)
-                  }}
-                  className={[
-                    'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed px-4 py-6 text-sm transition-colors',
-                    uploadDragOver
-                      ? 'border-primary bg-primary/5 text-primary'
-                      : 'border-border bg-muted/30 text-muted-foreground hover:border-primary/60 hover:bg-primary/5',
-                    adding ? 'pointer-events-none opacity-50' : '',
-                  ].join(' ')}
-                >
-                  <Upload className="h-5 w-5" />
-                  <span>拖入文件或点击选择</span>
-                </div>
-
-                {uploadFile && (
-                  <div className="space-y-2 rounded-md border bg-background px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <Upload className="h-4 w-4 shrink-0 text-primary" />
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium">
-                          {uploadFile.name}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {formatFileSize(uploadFile.size)}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        aria-label="移除上传文件"
-                        disabled={adding}
-                        className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
-                        onClick={() => {
-                          setUploadFile(null)
-                          setUploadProgress(0)
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                    {uploadProgress > 0 && (
-                      <div className="space-y-1">
-                        <Progress value={uploadProgress} className="h-1.5" />
-                        <div className="text-right text-xs text-muted-foreground">
-                          {uploadProgress}%
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="item-value">
-                {newItemSource === 'url' ? '链接 URL' : '本地文件路径（可选）'}
-              </Label>
-              <Input
-                id="item-value"
-                autoFocus={newItemSource === 'url'}
-                placeholder={
-                  newItemSource === 'url'
-                    ? 'https://www.bilibili.com/video/BV1...'
-                    : '/Users/you/Desktop/video.mp4'
-                }
-                value={newItemValue}
-                onChange={(e) => setNewItemValue(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="item-name">显示名（可选）</Label>
-              <Input
-                id="item-name"
-                placeholder="不填则自动从链接/路径推导"
-                value={newItemName}
-                onChange={(e) => setNewItemName(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setAddOpen(false)}
-              disabled={adding}
-            >
-              取消
-            </Button>
-            <Button
-              onClick={handleAdd}
-              disabled={!canAddItem || adding}
-            >
-              {adding ? '添加中…' : uploadFile ? '上传并添加' : '添加'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* N4: 添加素材模态（4 步合一） */}
+      {workspace && (
+        <AddMaterialModal
+          open={addOpen}
+          onOpenChange={setAddOpen}
+          workspaceId={workspace.workspace_id}
+          workspaceBackground={workspace.background}
+          onAdded={(updated) => setWorkspace(updated)}
+        />
+      )}
 
       {/* 改名模态 */}
       <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
@@ -862,30 +575,4 @@ function ItemRow({
       </button>
     </div>
   )
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-function inferItemTypeFromFile(file: File): ItemType | null {
-  const mime = file.type.toLowerCase()
-  if (mime.startsWith('video/')) return 'video'
-  if (mime.startsWith('audio/')) return 'audio'
-  if (mime.startsWith('image/')) return 'image'
-  if (mime.startsWith('text/')) return 'text'
-
-  const ext = file.name.split('.').pop()?.toLowerCase()
-  if (!ext) return null
-  if (['mp4', 'mov', 'avi', 'mkv', 'flv', 'wmv', 'webm'].includes(ext)) {
-    return 'video'
-  }
-  if (['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg'].includes(ext)) {
-    return 'audio'
-  }
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) return 'image'
-  if (['txt', 'md', 'srt', 'vtt', 'json'].includes(ext)) return 'text'
-  return null
 }
