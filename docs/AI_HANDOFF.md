@@ -1,6 +1,6 @@
 # AI Handoff
 
-Last updated: 2026-05-19（N1 完成，进入 N2）
+Last updated: 2026-05-19（N2 完成，进入 N3）
 
 ---
 
@@ -12,9 +12,10 @@ Last updated: 2026-05-19（N1 完成，进入 N2）
 | Phase 2A~2D | ✅ 已合并 main | 内容能力扩展完成（含 2D SQLite 评估） |
 | Phase 3A~3C | ✅ 已合并 main | 知识库 + 标签库完成 |
 | 现状同步 [A] | ✅ 已完成 | 合并 spec + 设计稿归位 + 文档体系重写 |
-| **N1 任务系统差异** | ✅ 完成（待 merge） | 分支 `feat/phase-n1-task-system`，8 个 commit |
+| **N1 任务系统差异** | ✅ 已合并 main | 8 个 commit，含 trashed/analyzed/软删垃圾桶/删 project_id |
 | **N1b 磁盘布局重构** | ⏸ 已拆出 | 从 N1 分出，作为独立 P1 phase |
-| **N2 侧边栏精简** | ⏳ **下一步** | P0，估时 2-3h |
+| **N2 侧边栏精简** | ✅ 已合并 main | 侧边栏 4 项 + Taskboard 4 子标签 |
+| **N3 设置页重组** | ⏳ **下一步** | P0，估时 6-8h |
 
 > ⚠️ 写新交接前请**先 `git log --oneline -20` 对账**，不要相信本文件里写的「下一步」如果它和 git 冲突。
 
@@ -37,36 +38,47 @@ Last updated: 2026-05-19（N1 完成，进入 N2）
 
 ---
 
-## N2 开工交接（下一步）
+## N2 完工小结
 
-> 来源：`docs/SPEC.md` §1.7 / §1.8。
+- 分支：`feat/phase-n2-nav-cleanup`，已合并 main
+- commits：1 个（N2.1 侧边栏精简 4 项 + Taskboard 子标签切换）
+- 改动：
+  - AppShell.tsx：工作区→任务中心、砍收藏夹、知识库检索→资料库、新增 AI 导演（灰显 disabled）
+  - WorkspaceDetail.tsx：平铺→Tabs（素材/队列/标签库/AI 对话），移除导出 ZIP 卡片及关联代码
+- 验证：改动文件无 lint/build 错误（其他文件有 baseline 错误，与 N2 无关）
 
-### N2 范围
+---
 
-- 标题：侧边栏从 8 砍到 4 + Taskboard 子标签 5→4
-- 估时：2-3h
+## N3 开工交接（下一步）
+
+> 来源：`docs/SPEC.md` §3.5。
+
+### N3 范围
+
+- 标题：设置页重组 9→7
+- 估时：6-8h
 - 优先级：P0
-- **模型**：Sonnet 4.6 或 ⭐ 小米 2.5 Pro（纯前端入口隐藏 / 路由调整，符合 CLAUDE.md「简单阶段」）
-- **分支**：可直接在主 worktree 开 `feat/phase-n2-sidebar`
+- **模型**：Sonnet 4.6（多文件 CRUD，3-5 个文件）
+- **分支**：`feat/phase-n3-settings`
 - **不 push**：commit 留本地，等 [D] 阶段统一推
 
 ### 具体差异项
 
-1. **一级导航砍至 4 项**：任务中心（Taskboard）/ 资料库 / AI 导演（灰显，等 [C] 阶段）/ 设置
-2. **Taskboard 子标签砍至 4 项**：素材 / 队列 / 标签库 / AI 对话（隐藏「导出」入口）
-3. **代码留备份**：仅入口隐藏，不删功能代码（导出仍可走 API 触发，只是 UI 不可见）
+1. **合并分析默认偏好**：原 ScreenshotPage + TranscriberPage + PromptFormat → 统一「分析默认偏好」页
+2. **合并模型与渠道**：原 ProvidersManagement + ModelManagement → 统一「模型与渠道」页
+3. **新增任务垃圾桶**：设置页新增 TrashPage（N1 已实现 TrashPage 组件，需接入设置页导航）
+4. **砍掉独立页面**：PromptFormat / ScreenshotPage / TranscriberPage / ModelManagement 独立路由移除
 
 ### 开工前准备
 
-1. 读 `docs/SPEC.md` §1.7 / §1.8
-2. 找前端侧边栏 / Taskboard 组件
-3. 拆子任务（应该比 N1 简单很多）
+1. 读 `docs/SPEC.md` §3.5（设置页结构 7 页）
+2. 读现有 SettingsShell 和各设置子页面
+3. 确认哪些页面需要合并、哪些需要新建
 
 ### 不要做的事
 
-- ❌ 不要顺手改 N3 设置页重组（那是 N3 的事）
-- ❌ 不要删被隐藏入口对应的页面代码 / 路由代码
-- ❌ N1b 磁盘布局重构属于独立 phase，不要在 N2 里捎带
+- ❌ 不要顺手改 N4 添加素材模态
+- ❌ 不要重构设置页以外的组件
 
 ---
 
