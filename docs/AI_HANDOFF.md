@@ -1,6 +1,6 @@
 # AI Handoff
 
-Last updated: 2026-05-19（N2 完成，进入 N3）
+Last updated: 2026-05-19（N3 完成，进入 N4）
 
 ---
 
@@ -15,7 +15,8 @@ Last updated: 2026-05-19（N2 完成，进入 N3）
 | **N1 任务系统差异** | ✅ 已合并 main | 8 个 commit，含 trashed/analyzed/软删垃圾桶/删 project_id |
 | **N1b 磁盘布局重构** | ⏸ 已拆出 | 从 N1 分出，作为独立 P1 phase |
 | **N2 侧边栏精简** | ✅ 已合并 main | 侧边栏 4 项 + Taskboard 4 子标签 |
-| **N3 设置页重组** | ⏳ **下一步** | P0，估时 6-8h |
+| **N3 设置页重组** | ✅ 已合并 main | 设置页 tabs 10→7，合并模型与渠道 / 分析默认偏好 |
+| **N4 添加素材模态** | ⏳ **下一步** | P1，估时 4-5h |
 
 > ⚠️ 写新交接前请**先 `git log --oneline -20` 对账**，不要相信本文件里写的「下一步」如果它和 git 冲突。
 
@@ -49,36 +50,49 @@ Last updated: 2026-05-19（N2 完成，进入 N3）
 
 ---
 
-## N3 开工交接（下一步）
+## N3 完工小结
 
-> 来源：`docs/SPEC.md` §3.5。
+- 分支：`feat/phase-n3-settings`，已合并 main
+- commits：1 个（N3.1 设置页重组 9→7）
+- 改动：
+  - ProvidersAndModelsPage.tsx：合并供应商管理 + 模型管理，内部 Tabs 切换
+  - AnalysisDefaultsPage.tsx：合并截帧/转写/提示词模板 + 任务默认勾选占位
+  - SettingsShell.tsx：tabs 从 10 个精简为 7 个
+  - router.tsx：新增 providers-models / analysis-defaults 路由，旧路由重定向
+- 验证：新文件编译通过，lint 无新增错误
 
-### N3 范围
+---
 
-- 标题：设置页重组 9→7
-- 估时：6-8h
-- 优先级：P0
-- **模型**：Sonnet 4.6（多文件 CRUD，3-5 个文件）
-- **分支**：`feat/phase-n3-settings`
+## N4 开工交接（下一步）
+
+> 来源：`docs/SPEC.md` §2.1 / §2.6。
+
+### N4 范围
+
+- 标题：添加素材模态升级（4 步合一 + 自动识别类型 + 智能默认勾选 + 背景信息折叠）
+- 估时：4-5h
+- 优先级：P1
+- **模型**：Sonnet 4.6（前端组件开发）
+- **分支**：`feat/phase-n4-add-material`
 - **不 push**：commit 留本地，等 [D] 阶段统一推
 
 ### 具体差异项
 
-1. **合并分析默认偏好**：原 ScreenshotPage + TranscriberPage + PromptFormat → 统一「分析默认偏好」页
-2. **合并模型与渠道**：原 ProvidersManagement + ModelManagement → 统一「模型与渠道」页
-3. **新增任务垃圾桶**：设置页新增 TrashPage（N1 已实现 TrashPage 组件，需接入设置页导航）
-4. **砍掉独立页面**：PromptFormat / ScreenshotPage / TranscriberPage / ModelManagement 独立路由移除
+1. **4 步合一模态**：素材类型 → 输入源 → 勾选分析任务 → 背景信息（折叠）
+2. **自动识别类型**：粘贴 URL 后自动回填素材类型（平台识别），拖入文件后自动识别格式
+3. **智能默认勾选**：按素材类型预勾最常用分析任务（SPEC §2.6 表格）
+4. **背景信息折叠**：④ 默认继承任务级背景，可改可不改
 
 ### 开工前准备
 
-1. 读 `docs/SPEC.md` §3.5（设置页结构 7 页）
-2. 读现有 SettingsShell 和各设置子页面
-3. 确认哪些页面需要合并、哪些需要新建
+1. 读 `docs/SPEC.md` §2.1（添加素材模态）+ §2.6（任务勾选默认）
+2. 读现有 WorkspaceDetail 中的添加素材模态代码
+3. 读 `docs/design/` 中对应的组件设计稿
 
 ### 不要做的事
 
-- ❌ 不要顺手改 N4 添加素材模态
-- ❌ 不要重构设置页以外的组件
+- ❌ 不要顺手改 N5 Preflight 抽屉
+- ❌ 不要改动后端 API（N4 纯前端改动）
 
 ---
 
