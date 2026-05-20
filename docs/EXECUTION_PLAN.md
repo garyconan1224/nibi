@@ -70,12 +70,12 @@
 
 ### H 系列「首页 / 设计稿 1:1 复刻」（用户决议 2026-05-19）
 
-- [ ] **H1** 工作台（Workbench）1:1 复刻，`/` 路由切换为新首页 — `12-18h` P2
-  - [ ] H1.1 设计 tokens + `DESIGN_SYSTEM.md`（小米）— 2-3h
-  - [ ] H1.2 WorkbenchPage 静态骨架（Sonnet 4.6）— 4-6h
-  - [ ] H1.3 Composer 接后端（Sonnet 4.6）— 3-4h
-  - [ ] H1.4 平台检测 + 混合内容弹窗 + Preflight 接入（Sonnet 4.6）— 2-3h
-  - [ ] H1.5 路由切换 + 侧边栏图标系统（小米）— 1-2h
+- [x] **H1** 工作台（Workbench）1:1 复刻，`/` 路由切换为新首页 — `12-18h` P2
+  - [x] H1.1 设计 tokens + `DESIGN_SYSTEM.md`（小米）— 2-3h
+  - [x] H1.2 WorkbenchPage 静态骨架（Sonnet 4.6）— 4-6h
+  - [x] H1.3 Composer 接后端（小米）— 3-4h
+  - [x] H1.4 平台检测 + 混合内容弹窗 + Preflight 接入（小米）— 2-3h
+  - [x] H1.5 路由切换 + 侧边栏图标系统（小米）— 1-2h
 - [ ] **H2** Taskboard 任务中心 1:1 复刻 — TBD
 - [ ] **H3** Processing 处理中页面 1:1 复刻 — TBD
 - [ ] **H4** Results 结果页 1:1 复刻 — TBD
@@ -94,8 +94,8 @@
 
 **N1~N11 主线全部完成**。用户 2026-05-19 决议：先做 H 系列首页复刻，N7b/N8b 后做，[C]/[D] 最后。
 
-正在进行：**H1 工作台 1:1 复刻**（分支 `feat/homepage-h1-workbench`）
-下一个子任务：H1.1 设计 tokens + DESIGN_SYSTEM.md（终端小米执行）
+H1 工作台已完成（2026-05-20，5 个 commit 全部落地，UI 1:1 复刻设计稿）。
+下一个：**H2 Taskboard 任务中心 1:1 复刻**（待 plan 展开）
 
 延后子阶段：
 - **N7b** 视频总结路径 1/3（P2，8-12h）— 依赖字幕抽取 + 视频大模型 API 决策

@@ -1,13 +1,15 @@
 ---
 phase: H1
 title: 首页 · 工作台 1:1 复刻
-status: ready
+status: done
 branch: feat/homepage-h1-workbench
-worktree: TBD
+worktree: 无（直接分支）
 created: 2026-05-19
+completed_date: 2026-05-20
 priority: P2
 estimate_hours: 12-18
 depends_on: N11 已合并；与 N7b/N8b 并行不冲突
+commits: 8f68740 (H1.1) / fb297b3 (H1.2) / 12176ab (H1.3) / 0d3f726 (H1.4) / 27fae68 (H1.5)
 ---
 
 # H1 工作台（Workbench）1:1 复刻
