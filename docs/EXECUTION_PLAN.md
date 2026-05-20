@@ -82,7 +82,7 @@
   - [x] H2.3 Queue + Favorites + Versions 整合（小米）
   - [x] H2.4 Tags + Chat + Export Tab（Sonnet 4.6）
   - [ ] H2.5+ Style + A/B 对比（押后到 [C] 一起做）
-  - [ ] H2.6 删除旧 WorkspaceDetail.tsx（待确认无回归后）
+  - [x] H2.6 删除旧 WorkspaceDetail.tsx + WorkspaceSearchBar.tsx（-680 行）
 
 详细执行计划：[docs/plans/phase-h2-taskboard.md](plans/phase-h2-taskboard.md)
 - [x] **H3** Processing 处理中页面 1:1 复刻 — `4-6h` P2（方案 A 新路由）
@@ -126,21 +126,20 @@
 
 ---
 
-**H 系列首页 1:1 复刻全部完成**（2026-05-20）：
-- H1 工作台 ✅
-- H2 任务中心（9 Tab）✅
-- H3 Processing 处理中 ✅
-- H4 Results 结果页 4 子页 ✅
-- H5 Storyboard 分镜页 ✅（方案 A markdown 直展，shot 网格 + 生成留 [C]）
+**H 系列 + IP 系列全部完工**（2026-05-20，一日产出 ~30 个 commit）：
+- H1~H5 设计稿 1:1 复刻 ✅
+- IP.1~IP.8 Connection Audit（死按钮死参数清零 + 所有现存后端接到 UI）✅
+- 阻塞 bug 修复：TaskRunner.append_log / PreflightDrawer 绕过桥接 ✅
+- 清理：H2.6 删旧 WorkspaceDetail（-680 行）✅
 
-下一步候选（待用户拍板）：
-- **N7b** 视频总结路径 1/3（依赖字幕抽取 + 视频大模型 API 决策）
-- **N8b** 音频前端交互
-- **H2.6** 删除旧 WorkspaceDetail.tsx（确认无回归）
-- **[C] AI 导演模块**（首页全套已就位，可以开始）
-- **[D] 安全 + 开源准备**
+**当前 main**：`ff2cab0` — UI ↔ 后端 100% 接通
 
-发现的待修后端 bug：`'TaskRunner' object has no attribute 'append_log'`（已写日志的失败任务展示触发，独立修复任务）
+下一步候选（按 ROI 排序）：
+1. 🥇 **端到端冒烟测试**（用户自己跑，~30min）—— IP.7 修了阻塞 bug 但没真正粘 URL 走完链路
+2. 🥈 **[C] AI 导演模块**（4-7 天 Opus）—— 需先补设计稿 + 拍板生成模型 API
+3. 🥈 **[D] 开源准备**（2-3 天）—— 加密 / CI / push / 仓库整理
+4. 🥉 **N7b** 视频总结路径 1/3（依赖字幕抽取 + 视频大模型 API 决策）
+5. 🥉 **N8b** 音频前端交互
 
 延后子阶段：
 - **N7b** 视频总结路径 1/3（P2，8-12h）— 依赖字幕抽取 + 视频大模型 API 决策
