@@ -13,6 +13,7 @@ import { FavoritesTab } from './FavoritesTab'
 import { MaterialsTab } from './MaterialsTab'
 import { QueueTab } from './QueueTab'
 import { TagsTab } from './TagsTab'
+import { BackgroundEditor } from './BackgroundEditor'
 import { TaskboardHead } from './TaskboardHead'
 import { TabsNav } from './TabsNav'
 import type { TabId } from './types'
@@ -31,6 +32,7 @@ export default function TaskboardPage() {
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<TabId>('materials')
   const [addOpen, setAddOpen] = useState(false)
+  const [bgOpen, setBgOpen] = useState(false)
   const tasks = useTaskStore((s) => s.tasks)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -84,6 +86,7 @@ export default function TaskboardPage() {
       <TaskboardHead
         name={workspace.name}
         background={workspace.background}
+        onEditBackground={() => setBgOpen(true)}
         onAddMaterial={() => setAddOpen(true)}
       />
 
@@ -106,7 +109,13 @@ export default function TaskboardPage() {
           />
         )}
         {tab === 'history' && <VersionsTab />}
-        {tab === 'tags' && <TagsTab items={workspace.items} />}
+        {tab === 'tags' && (
+          <TagsTab
+            items={workspace.items}
+            workspaceId={workspace.workspace_id}
+            onTagsChanged={() => getWorkspace(workspace.workspace_id).then(setWorkspace).catch(() => {})}
+          />
+        )}
         {tab === 'chat' && <ChatTab workspace={workspace} />}
         {tab === 'export' && (
           <ExportTab items={workspace.items} workspaceId={workspace.workspace_id} />
@@ -121,6 +130,14 @@ export default function TaskboardPage() {
         onOpenChange={setAddOpen}
         workspaceId={workspace.workspace_id}
         onAdded={(updated) => setWorkspace(updated)}
+      />
+
+      <BackgroundEditor
+        open={bgOpen}
+        workspaceId={workspace.workspace_id}
+        initial={workspace.background}
+        onClose={() => setBgOpen(false)}
+        onSaved={(updated) => setWorkspace(updated)}
       />
     </div>
   )

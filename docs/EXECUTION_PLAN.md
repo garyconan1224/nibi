@@ -114,6 +114,10 @@
 
 **N1~N11 主线全部完成**。用户 2026-05-19 决议：先做 H 系列首页复刻，N7b/N8b 后做，[C]/[D] 最后。
 
+**Integration Pass（IP）**（2026-05-20）：UI ↔ 后端对接补齐，6 个子任务全部 ⭐ 小米执行。详见 [phase-integration-pass.md](plans/phase-integration-pass.md)
+
+---
+
 **H 系列首页 1:1 复刻全部完成**（2026-05-20）：
 - H1 工作台 ✅
 - H2 任务中心（9 Tab）✅

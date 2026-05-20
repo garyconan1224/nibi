@@ -166,6 +166,15 @@ export async function savePreflight(
   return res.data
 }
 
+/** PUT /workspaces/{id}/items/{itemId}/tags — 更新素材标签 */
+export async function updateItemTags(
+  workspaceId: string,
+  itemId: string,
+  tags: Record<string, unknown>,
+): Promise<void> {
+  await http.put(`${BASE}/${workspaceId}/items/${itemId}/tags`, { tags })
+}
+
 /** POST /workspaces/{id}/items/{itemId}/start — 触发 pipeline 任务 */
 export async function startItemPipeline(
   workspaceId: string,

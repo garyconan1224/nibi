@@ -11,6 +11,7 @@ import { listWorkspaces, createWorkspace } from '@/services/workspaces'
 import { useProviderStore } from '@/store/providerStore'
 import { MixedContentModal } from './MixedContentModal'
 import { PreflightDrawer } from './PreflightDrawer'
+import { AddMaterialModal } from '@/components/workspace/AddMaterialModal'
 
 const PIPE_STEPS: PipelineStep[] = [
   { n: '1', t: '下载',   s: 'Download',  tone: null,     defaultOn: true  },
@@ -42,10 +43,14 @@ export function Composer({ onTaskCreated }: ComposerProps) {
   const [frameMode, setFrameMode] = useState<FrameMode>('A')
   const [fps, setFps] = useState(2)
   const [maxFrames, setMaxFrames] = useState(128)
+  const [asrModel, setAsrModel] = useState('')
+  const [visionModel, setVisionModel] = useState('')
+  const [textModel, setTextModel] = useState('')
   const [mixedOpen, setMixedOpen] = useState(false)
   const [mixedSel, setMixedSel] = useState<Record<string, boolean>>({})
   const [preflightOpen, setPreflightOpen] = useState(false)
   const [preflightTypes, setPreflightTypes] = useState<string[]>([])
+  const [uploadOpen, setUploadOpen] = useState(false)
 
   const [workspaces, setWorkspaces] = useState<WorkspaceRecord[]>([])
   const [workspaceSel, setWorkspaceSel] = useState<string[]>([])
@@ -86,16 +91,16 @@ export function Composer({ onTaskCreated }: ComposerProps) {
 
   // Build model options from providerStore
   const { asrOpts, visionOpts, textOpts } = useMemo(() => {
-    const asr: { label: string; value: string }[] = []
-    const vision: { label: string; value: string }[] = []
-    const text: { label: string; value: string }[] = []
+    const asr: { label: string; value: string; combined: string }[] = []
+    const vision: { label: string; value: string; combined: string }[] = []
+    const text: { label: string; value: string; combined: string }[] = []
     for (const p of providers) {
       if (!p.enabled) continue
       const models = providerModels[p.id]
       if (!models?.length) continue
       const caps = p.capabilities ?? []
       for (const m of models) {
-        const entry = { label: m.name, value: m.id }
+        const entry = { label: m.name, value: m.id, combined: `${p.id}__${m.id}` }
         if (caps.includes('asr') || caps.includes('audio')) asr.push(entry)
         if (caps.includes('vision')) vision.push(entry)
         if (caps.includes('chat') || caps.includes('text')) text.push(entry)
@@ -103,6 +108,11 @@ export function Composer({ onTaskCreated }: ComposerProps) {
     }
     return { asrOpts: asr, visionOpts: vision, textOpts: text }
   }, [providers, providerModels])
+
+  // Default model IDs (first available option for each)
+  const defaultAsrModel = asrOpts[0]?.value ?? ''
+  const defaultVisionModel = visionOpts[0]?.value ?? ''
+  const defaultTextModel = textOpts[0]?.value ?? ''
 
   const toggleWs = useCallback((id: string) =>
     setWorkspaceSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id])), [])
@@ -158,6 +168,21 @@ export function Composer({ onTaskCreated }: ComposerProps) {
     onTaskCreated?.()
   }
 
+  const handleUploadClick = () => {
+    if (workspaceSel.length === 0) {
+      toast.error('请先选择工作空间')
+      setWsOpen(true)
+      return
+    }
+    setUploadOpen(true)
+  }
+
+  const handleUploadAdded = () => {
+    setUploadOpen(false)
+    listWorkspaces().then(setWorkspaces).catch(() => {})
+    onTaskCreated?.()
+  }
+
   const metaText =
     frameMode === 'A'
       ? `按秒截帧 ${fps}s · ≤${maxFrames}帧`
@@ -196,7 +221,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
           </div>
         )}
 
-        <button className="btn btn-ghost" title="上传本地文件" style={{ gap: 6 }}>
+        <button className="btn btn-ghost" title="上传本地文件" style={{ gap: 6 }} onClick={handleUploadClick}>
           <Upload size={15} />
           上传
         </button>
@@ -389,9 +414,16 @@ export function Composer({ onTaskCreated }: ComposerProps) {
           <div className="opt-label">ASR</div>
           <div className="opt-value">
             {asrOpts.length > 0 ? (
-              <select>
+              <select
+                value={asrModel || defaultAsrModel}
+                onChange={(e) => {
+                  const v = e.target.value
+                  const idx = v.indexOf('__')
+                  setAsrModel(idx >= 0 ? v.slice(idx + 2) : v)
+                }}
+              >
                 {asrOpts.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <option key={o.combined} value={o.combined}>{o.label}</option>
                 ))}
               </select>
             ) : (
@@ -403,9 +435,16 @@ export function Composer({ onTaskCreated }: ComposerProps) {
           <div className="opt-label">视觉 LLM</div>
           <div className="opt-value">
             {visionOpts.length > 0 ? (
-              <select>
+              <select
+                value={visionModel || defaultVisionModel}
+                onChange={(e) => {
+                  const v = e.target.value
+                  const idx = v.indexOf('__')
+                  setVisionModel(idx >= 0 ? v.slice(idx + 2) : v)
+                }}
+              >
                 {visionOpts.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <option key={o.combined} value={o.combined}>{o.label}</option>
                 ))}
               </select>
             ) : (
@@ -417,9 +456,16 @@ export function Composer({ onTaskCreated }: ComposerProps) {
           <div className="opt-label">文本 LLM</div>
           <div className="opt-value">
             {textOpts.length > 0 ? (
-              <select>
+              <select
+                value={textModel || defaultTextModel}
+                onChange={(e) => {
+                  const v = e.target.value
+                  const idx = v.indexOf('__')
+                  setTextModel(idx >= 0 ? v.slice(idx + 2) : v)
+                }}
+              >
                 {textOpts.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <option key={o.combined} value={o.combined}>{o.label}</option>
                 ))}
               </select>
             ) : (
@@ -493,8 +539,28 @@ export function Composer({ onTaskCreated }: ComposerProps) {
         url={url.trim()}
         platformName={platform?.name ?? null}
         selectedTypes={preflightTypes.length ? preflightTypes : undefined}
+        workspaceId={workspaceSel[0]}
+        composerDefaults={{
+          quality,
+          frameMode,
+          fps,
+          maxFrames,
+          stepIds: PIPE_STEPS.filter((_, i) => steps[i]).map((s) => s.s.toLowerCase()),
+          asrModelId: asrModel || defaultAsrModel,
+          visionModelId: visionModel || defaultVisionModel,
+          textModelId: textModel || defaultTextModel,
+          promptStyle: 'midjourney_bilingual',
+        }}
         onClose={() => setPreflightOpen(false)}
         onCreated={handlePreflightCreated}
+      />
+
+      {/* Upload modal */}
+      <AddMaterialModal
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        workspaceId={workspaceSel[0] ?? ''}
+        onAdded={handleUploadAdded}
       />
     </div>
   )
