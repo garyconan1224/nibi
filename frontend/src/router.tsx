@@ -21,7 +21,7 @@ const AboutPage = lazy(() => import('@/pages/SettingPage/AboutPage'))
 const TrashPage = lazy(() => import('@/pages/SettingPage/TrashPage'))
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
 const WorkspaceList = lazy(() => import('@/pages/WorkspacePage/WorkspaceList'))
-const WorkspaceDetail = lazy(() => import('@/pages/WorkspacePage/WorkspaceDetail'))
+const TaskboardPage = lazy(() => import('@/pages/WorkspacePage/TaskboardPage'))
 const VideoResultPage = lazy(() => import('@/pages/result/VideoResultPage'))
 const ImageResultPage = lazy(() => import('@/pages/result/ImageResultPage'))
 const AudioResultPage = lazy(() => import('@/pages/result/AudioResultPage'))
@@ -51,7 +51,7 @@ export const router = createBrowserRouter([
       { path: 'workspaces', element: withSuspense(<WorkspaceList />) },
       { path: 'favorites', element: withSuspense(<FavoritesPage />) },
       { path: 'search', element: withSuspense(<SearchPage />) },
-      { path: 'workspaces/:id', element: withSuspense(<WorkspaceDetail />) },
+      { path: 'workspaces/:id', element: withSuspense(<TaskboardPage />) },
       {
         path: 'workspaces/:workspaceId/items/:itemId/result',
         element: withSuspense(<VideoResultPage />),
