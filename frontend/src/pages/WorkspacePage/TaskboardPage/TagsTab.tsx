@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
+import { toast } from 'sonner'
 import { SYSTEM_TAG_DIMENSIONS } from '@/constants/tagDimensions'
+import { updateItemTags } from '@/services/workspaces'
 import type { WorkspaceItem, SystemTagDimension } from '@/types/workspace'
 
 type FilterMode = 'all' | 'auto' | 'manual'
@@ -9,42 +11,48 @@ interface TagEntry {
   tag: string
   count: number
   auto: boolean
+  itemIds: string[]
 }
 
 interface TagsTabProps {
   items: WorkspaceItem[]
+  workspaceId: string
+  onTagsChanged: () => void
 }
 
 /**
  * Tags tab — 标签库，从 workspace items 的 tags 中聚合标签，按维度分组展示。
- * 设计稿来源：taskboard.jsx TBTags。
+ * 支持手动添加/删除标签（optimistic update）。
  */
-export function TagsTab({ items }: TagsTabProps) {
+export function TagsTab({ items, workspaceId, onTagsChanged }: TagsTabProps) {
   const [filter, setFilter] = useState<FilterMode>('all')
+  const [editingDim, setEditingDim] = useState<string | null>(null)
+  const [newTag, setNewTag] = useState('')
 
-  /** 按维度聚合标签 */
+  /** 按维度聚合标签（附带 itemIds 用于 CRUD） */
   const tagLib = useMemo(() => {
     const result: Record<string, TagEntry[]> = {}
     for (const dim of SYSTEM_TAG_DIMENSIONS) {
-      const counts = new Map<string, { count: number; auto: boolean }>()
+      const counts = new Map<string, { count: number; auto: boolean; itemIds: string[] }>()
       for (const item of items) {
         const val = item.tags?.[dim.key as SystemTagDimension]
         if (!val) continue
         const existing = counts.get(val)
         if (existing) {
           existing.count++
+          existing.itemIds.push(item.item_id)
         } else {
-          counts.set(val, { count: 1, auto: true })
+          counts.set(val, { count: 1, auto: true, itemIds: [item.item_id] })
         }
       }
-      // 也收集 custom_tags
       for (const item of items) {
         for (const ct of item.tags?.custom_tags ?? []) {
           const existing = counts.get(ct)
           if (existing) {
             existing.count++
+            if (!existing.itemIds.includes(item.item_id)) existing.itemIds.push(item.item_id)
           } else {
-            counts.set(ct, { count: 1, auto: false })
+            counts.set(ct, { count: 1, auto: false, itemIds: [item.item_id] })
           }
         }
       }
@@ -52,6 +60,7 @@ export function TagsTab({ items }: TagsTabProps) {
         tag,
         count: v.count,
         auto: v.auto,
+        itemIds: v.itemIds,
       }))
     }
     return result
@@ -59,6 +68,56 @@ export function TagsTab({ items }: TagsTabProps) {
 
   const allEntries = Object.entries(tagLib)
   const totalTags = allEntries.reduce((a, [, tags]) => a + tags.length, 0)
+
+  /** 删除标签：从所有包含该标签的 item 中移除 */
+  const handleDelete = async (dimKey: string, tag: string, itemIds: string[]) => {
+    try {
+      await Promise.all(
+        itemIds.map(async (itemId) => {
+          const item = items.find((i) => i.item_id === itemId)
+          if (!item) return
+          const newTags: Record<string, unknown> = { ...item.tags }
+          if (dimKey === 'custom_tags') {
+            newTags.custom_tags = (item.tags.custom_tags ?? []).filter((t) => t !== tag)
+          } else {
+            delete newTags[dimKey]
+          }
+          await updateItemTags(workspaceId, itemId, newTags)
+        }),
+      )
+      toast.success(`已删除标签「${tag}」`)
+      onTagsChanged()
+    } catch {
+      toast.error('删除失败')
+    }
+  }
+
+  /** 新增标签 */
+  const handleAdd = async (dimKey: string, dimLabel: string) => {
+    const value = newTag.trim()
+    if (!value) return
+
+    const targetItems = items.filter((item) => !item.tags?.[dimKey as SystemTagDimension])
+    if (targetItems.length === 0) {
+      toast.error(`所有素材已有「${dimLabel}」，无空位可填`)
+      return
+    }
+
+    try {
+      await Promise.all(
+        targetItems.map(async (item) => {
+          const newTags: Record<string, unknown> = { ...item.tags, [dimKey]: value }
+          await updateItemTags(workspaceId, item.item_id, newTags)
+        }),
+      )
+      toast.success(`已添加「${value}」到 ${targetItems.length} 个素材`)
+      setNewTag('')
+      setEditingDim(null)
+      onTagsChanged()
+    } catch {
+      toast.error('添加失败')
+    }
+  }
 
   return (
     <>
@@ -92,19 +151,17 @@ export function TagsTab({ items }: TagsTabProps) {
               </button>
             ))}
           </div>
-          <button className="btn">
-            <Plus size={13} /> 新标签
-          </button>
         </div>
       </div>
 
       <div className="tb-tag-grid">
         {allEntries.map(([dim, tags]) => {
+          const dimSpec = SYSTEM_TAG_DIMENSIONS.find((d) => d.label === dim)
+          const dimKey = dimSpec?.key ?? ''
           const filtered = tags.filter(
-            (t) =>
-              filter === 'all' || (filter === 'auto' ? t.auto : !t.auto),
+            (t) => filter === 'all' || (filter === 'auto' ? t.auto : !t.auto),
           )
-          if (filtered.length === 0) return null
+          if (filtered.length === 0 && editingDim !== dim) return null
           return (
             <div key={dim} className="tag-col">
               <div className="tag-col-h">
@@ -140,9 +197,38 @@ export function TagsTab({ items }: TagsTabProps) {
                       <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>
                         {t.count}素材
                       </span>
+                      <button
+                        className="tag-del"
+                        title={`删除「${t.tag}」`}
+                        onClick={() => handleDelete(dimKey, t.tag, t.itemIds)}
+                      >
+                        <X size={10} />
+                      </button>
                     </div>
                   </div>
                 ))}
+
+                {/* 新增标签 */}
+                {editingDim === dim ? (
+                  <div className="tag-add-input">
+                    <input
+                      autoFocus
+                      placeholder="输入标签名"
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleAdd(dimKey, dim)
+                        if (e.key === 'Escape') { setEditingDim(null); setNewTag('') }
+                      }}
+                    />
+                    <button onClick={() => handleAdd(dimKey, dim)}>确定</button>
+                    <button onClick={() => { setEditingDim(null); setNewTag('') }}>取消</button>
+                  </div>
+                ) : (
+                  <button className="tag-add" onClick={() => setEditingDim(dim)}>
+                    <Plus size={11} /> 新增
+                  </button>
+                )}
               </div>
             </div>
           )

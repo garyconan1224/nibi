@@ -109,7 +109,13 @@ export default function TaskboardPage() {
           />
         )}
         {tab === 'history' && <VersionsTab />}
-        {tab === 'tags' && <TagsTab items={workspace.items} />}
+        {tab === 'tags' && (
+          <TagsTab
+            items={workspace.items}
+            workspaceId={workspace.workspace_id}
+            onTagsChanged={() => getWorkspace(workspace.workspace_id).then(setWorkspace).catch(() => {})}
+          />
+        )}
         {tab === 'chat' && <ChatTab workspace={workspace} />}
         {tab === 'export' && (
           <ExportTab items={workspace.items} workspaceId={workspace.workspace_id} />
