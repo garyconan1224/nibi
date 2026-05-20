@@ -27,6 +27,7 @@ import { nearestFrameIdx } from './helpers'
 import { ItemTagsPanel } from '@/components/workspace/ItemTagsPanel'
 
 import './tokens.css'
+import './result.css'
 
 const ACTIVE_LIMIT = 3
 
@@ -382,79 +383,24 @@ export default function VideoResultPage() {
   const progress = totalSec > 0 ? Math.min(1, currentSec / totalSec) : 0
 
   return (
-    <div
-      className="vm-video-result-scope"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 320px',
-        height: '100%',
-        overflow: 'hidden',
-      }}
-    >
+    <div className="vm-video-result-scope vd-layout">
       {/* ════════ 左：播放器 + 三轨 ════════ */}
-      <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="vd-left">
         {/* 顶部导航 */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            padding: '10px 20px',
-            borderBottom: '1px solid var(--line)',
-            flexShrink: 0,
-            background: 'var(--bg-elev)',
-          }}
-        >
-          <button
-            className="btn-ghost"
-            onClick={() => navigate(-1)}
-            style={{ height: 28, padding: '0 10px', fontSize: 12 }}
-          >
+        <div className="vd-nav">
+          <button className="btn-ghost" onClick={() => navigate(-1)} style={{ height: 28, padding: '0 10px', fontSize: 12 }}>
             <ArrowLeft size={13} /> 任务中心
           </button>
-          <span style={{ width: 1, height: 16, background: 'var(--line)', flexShrink: 0 }} />
-          <span
-            style={{
-              fontWeight: 600,
-              fontSize: 13,
-              flex: 1,
-              minWidth: 0,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {result.video.title}
-          </span>
+          <span className="vd-sep" />
+          <span className="vd-title">{result.video.title}</span>
           <span className="kw mono" style={{ fontSize: 10, flexShrink: 0 }}>
             VIDEO · {result.video.duration_str || formatSec(totalSec)}
           </span>
           {result.source === 'demo_fixture' && (
-            <span
-              className="mono"
-              style={{
-                fontSize: 10,
-                padding: '2px 8px',
-                borderRadius: 6,
-                background: 'var(--accent-warm)',
-                color: '#fff',
-                fontWeight: 600,
-              }}
-              title="results 尚未填充，正在使用 demo fixture"
-            >
+            <span className="mono" style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'var(--accent-warm)', color: '#fff', fontWeight: 600 }} title="results 尚未填充，正在使用 demo fixture">
               DEMO
             </span>
           )}
-          {/* N11: 导出工作包入口隐藏（代码保留，见 SPEC §8.2）
-          <button
-            className="btn-ghost"
-            onClick={handleExport}
-            title="导出复刻工作包 (.zip)"
-            style={{ height: 28, padding: '0 10px', fontSize: 12, flexShrink: 0 }}
-          >
-            <Download size={13} /> 导出
-          </button>
-          */}
         </div>
 
         {/* 标签展示 */}
@@ -463,113 +409,32 @@ export default function VideoResultPage() {
         </div>
 
         {/* 播放器 */}
-        <div style={{ padding: '14px 20px 10px', flexShrink: 0 }}>
-          <div
-            onClick={togglePlay}
-            style={{
-              position: 'relative',
-              borderRadius: 16,
-              overflow: 'hidden',
-              cursor: 'pointer',
-              background: `linear-gradient(135deg, var(--accent), var(--accent-2))`,
-              aspectRatio: '16/9',
-              maxHeight: 260,
-            }}
-          >
+        <div className="vd-player-wrap">
+          <div className="vd-player" onClick={togglePlay}>
             {hasVideoSource ? (
-              <video
-                ref={videoRef}
-                src={result.video.url}
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                preload="metadata"
-              />
+              <video ref={videoRef} src={result.video.url} preload="metadata" />
             ) : (
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  display: 'grid',
-                  placeItems: 'center',
-                  color: 'rgba(255,255,255,0.92)',
-                  fontFamily: 'var(--display)',
-                  fontSize: 28,
-                  letterSpacing: '-0.01em',
-                  textAlign: 'center',
-                  padding: 24,
-                }}
-              >
+              <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.92)', fontFamily: 'var(--display)', fontSize: 28, letterSpacing: '-0.01em', textAlign: 'center', padding: 24 }}>
                 {frame.title}
               </div>
             )}
 
-            <div
-              style={{
-                position: 'absolute',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                padding: '14px 16px',
-                background: 'linear-gradient(0deg,rgba(0,0,0,0.78) 0%,transparent)',
-              }}
-            >
-              <div className="mono" style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)' }}>
-                {frame.ts} · {frame.shot_type}
-              </div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginTop: 2 }}>
-                {frame.title}
-              </div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 1 }}>
-                {frame.subtitle}
-              </div>
+            <div className="vd-overlay">
+              <div className="vd-ov-meta">{frame.ts} · {frame.shot_type}</div>
+              <div className="vd-ov-title">{frame.title}</div>
+              <div className="vd-ov-sub">{frame.subtitle}</div>
             </div>
 
-            <div
-              style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%,-50%)',
-                width: 48,
-                height: 48,
-                borderRadius: 99,
-                background: 'rgba(255,255,255,0.9)',
-                display: 'grid',
-                placeItems: 'center',
-                color: '#000',
-              }}
-            >
+            <div className="vd-play-btn">
               {playing ? <Pause size={18} /> : <Play size={18} />}
             </div>
 
-            <div
-              style={{
-                position: 'absolute',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                height: 3,
-                background: 'rgba(255,255,255,0.15)',
-              }}
-            >
-              <div
-                style={{
-                  height: '100%',
-                  width: `${progress * 100}%`,
-                  background: 'var(--accent)',
-                  transition: 'width 200ms linear',
-                }}
-              />
+            <div className="vd-progress">
+              <div className="vd-progress-fill" style={{ width: `${progress * 100}%` }} />
             </div>
           </div>
 
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginTop: 8,
-            }}
-          >
+          <div className="vd-controls">
             <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>
               {formatSec(currentSec)} / {formatSec(totalSec)}
             </span>
@@ -591,255 +456,77 @@ export default function VideoResultPage() {
       </div>
 
       {/* ════════ 右：当前帧浮动面板 ════════ */}
-      <div
-        style={{
-          borderLeft: '1px solid var(--line)',
-          display: 'flex',
-          flexDirection: 'column',
-          background: 'var(--bg-elev)',
-          overflow: 'hidden',
-        }}
-      >
-        <div
-          style={{
-            position: 'relative',
-            flexShrink: 0,
-            aspectRatio: '16/9',
-            background: `linear-gradient(135deg, var(--accent-2), var(--accent-3))`,
-          }}
-        >
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'grid',
-              placeItems: 'center',
-              color: 'rgba(255,255,255,0.92)',
-              fontFamily: 'var(--display)',
-              fontSize: 22,
-              padding: 16,
-              textAlign: 'center',
-            }}
-          >
-            {frame.title}
-          </div>
-          <div
-            className="mono"
-            style={{
-              position: 'absolute',
-              bottom: 8,
-              left: 10,
-              fontSize: 9,
-              color: 'rgba(255,255,255,0.85)',
-              background: 'rgba(0,0,0,0.55)',
-              padding: '2px 7px',
-              borderRadius: 5,
-            }}
-          >
-            {frame.ts} · {frame.shot_type}
-          </div>
+      <div className="vd-right">
+        {/* 帧预览：有 image_path 时显示实际帧图，否则 gradient + title */}
+        <div className="vd-frame-preview">
+          {frame.image_path ? (
+            <img src={frame.image_path} alt={frame.title} />
+          ) : (
+            <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.92)', fontFamily: 'var(--display)', fontSize: 22, padding: 16, textAlign: 'center' }}>
+              {frame.title}
+            </div>
+          )}
+          <div className="vd-frame-badge mono">{frame.ts} · {frame.shot_type}</div>
           {favored[activeFrame] && (
-            <div style={{ position: 'absolute', top: 8, right: 10 }}>
+            <div className="vd-frame-star">
               <Star size={16} fill="var(--accent-warm)" color="var(--accent-warm)" />
             </div>
           )}
         </div>
 
-        <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, lineHeight: 1.3 }}>{frame.title}</div>
-          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>{frame.subtitle}</div>
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 8 }}>
-            {Object.values(frame.tags ?? {})
-              .flat()
-              .slice(0, 6)
-              .map((t) => (
-                <span key={t} className="kw" style={{ fontSize: 10 }}>
-                  {t}
-                </span>
-              ))}
+        <div className="vd-frame-info">
+          <div className="vd-fi-title">{frame.title}</div>
+          <div className="vd-fi-sub">{frame.subtitle}</div>
+          <div className="vd-fi-tags">
+            {Object.values(frame.tags ?? {}).flat().slice(0, 6).map((t) => (
+              <span key={t} className="kw" style={{ fontSize: 10 }}>{t}</span>
+            ))}
           </div>
         </div>
 
         {/* tabs */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            padding: '8px 12px',
-            borderBottom: '1px solid var(--line)',
-            flexShrink: 0,
-            background: 'var(--bg-sunken)',
-          }}
-        >
+        <div className="vd-tabs-bar">
           <span className="eyebrow" style={{ flex: 1 }}>提示词格式</span>
-          <button
-            onClick={openPicker}
-            title="选择 3 个图片类格式作为 tabs（JSON 自动附加）"
-            style={{
-              height: 26,
-              padding: '0 8px',
-              borderRadius: 6,
-              fontSize: 10,
-              fontFamily: 'var(--mono)',
-              border: '1px solid var(--line)',
-              background: 'transparent',
-              color: 'var(--ink-3)',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-            }}
-          >
+          <button onClick={openPicker} title="选择 3 个图片类格式作为 tabs（JSON 自动附加）"
+            style={{ height: 26, padding: '0 8px', borderRadius: 6, fontSize: 10, fontFamily: 'var(--mono)', border: '1px solid var(--line)', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <Settings2 size={11} /> 选择
           </button>
         </div>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            padding: '6px 12px 8px',
-            borderBottom: '1px solid var(--line)',
-            flexShrink: 0,
-            background: 'var(--bg-sunken)',
-            overflowX: 'auto',
-          }}
-        >
+        <div className="vd-tabs-row">
           {tabs.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setPromptStyle(t.key)}
-              style={{
-                height: 26,
-                padding: '0 10px',
-                borderRadius: 6,
-                fontSize: 11,
-                fontWeight: 700,
-                fontFamily: 'var(--mono)',
-                border: 'none',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                background: promptStyle === t.key ? 'var(--ink)' : 'transparent',
-                color: promptStyle === t.key ? 'var(--bg)' : 'var(--ink-3)',
-              }}
-            >
+            <button key={t.key} className="vd-tab-btn" data-active={promptStyle === t.key} onClick={() => setPromptStyle(t.key)}>
               {t.label}
             </button>
           ))}
           {!tabs.length && (
-            <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>
-              （提示词格式未加载）
-            </span>
+            <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>（提示词格式未加载）</span>
           )}
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
-          <div
-            style={{
-              fontFamily: 'var(--mono)',
-              fontSize: 11.5,
-              lineHeight: 1.72,
-              background: 'var(--bg-sunken)',
-              padding: '12px 13px',
-              borderRadius: 12,
-              border: '1px solid var(--line)',
-              color: 'var(--ink)',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-            }}
-          >
-            {promptText}
-          </div>
-
-          {/* 提示词版本栈 */}
+        <div className="vd-prompt-area">
+          <div className="vd-prompt-text">{promptText}</div>
           <div style={{ marginTop: 14 }}>
-            <PromptVersionStack
-              versions={promptVersions}
-              onAddVersion={handleAddPromptVersion}
-            />
+            <PromptVersionStack versions={promptVersions} onAddVersion={handleAddPromptVersion} />
           </div>
         </div>
 
-        <div
-          style={{
-            padding: '10px 12px',
-            borderTop: '1px solid var(--line)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 7,
-            flexShrink: 0,
-          }}
-        >
-          <button
-            onClick={handleCopy}
-            style={{
-              width: '100%',
-              height: 36,
-              borderRadius: 10,
-              fontSize: 13,
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 7,
-              cursor: 'pointer',
-              border: 'none',
-              background: 'var(--ink)',
-              color: 'var(--bg)',
-            }}
-          >
+        <div className="vd-actions">
+          <button className="vd-btn-main" onClick={handleCopy}>
             {copied ? <Check size={14} /> : <Copy size={14} />}
             {copied ? '已复制！' : '一键复制提示词'}
           </button>
-          <button
-            onClick={handleFavorite}
-            style={{
-              width: '100%',
-              height: 36,
-              borderRadius: 10,
-              fontSize: 13,
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 7,
-              cursor: 'pointer',
-              border: '1px solid var(--line)',
-              background: favored[activeFrame] ? 'rgba(255,184,76,0.12)' : 'var(--bg-sunken)',
-              color: favored[activeFrame] ? 'var(--accent-warm)' : 'var(--ink-2)',
-            }}
-          >
-            <Star
-              size={14}
-              fill={favored[activeFrame] ? 'var(--accent-warm)' : 'none'}
-              color={favored[activeFrame] ? 'var(--accent-warm)' : 'currentColor'}
-            />
+          <button className="vd-btn-sub" data-favored={!!favored[activeFrame]} onClick={handleFavorite}>
+            <Star size={14} fill={favored[activeFrame] ? 'var(--accent-warm)' : 'none'} color={favored[activeFrame] ? 'var(--accent-warm)' : 'currentColor'} />
             {favored[activeFrame] ? '已收藏此帧 ★' : '收藏此帧'}
           </button>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="vd-frame-nav">
             <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>
               帧 {activeFrame + 1} / {frames.length} · {frame.shot_type}
             </span>
             <div style={{ display: 'flex', gap: 4 }}>
-              <button
-                className="btn-ghost"
-                style={{ width: 26, height: 26, padding: 0, display: 'grid', placeItems: 'center' }}
-                onClick={() => jumpFrame(-1)}
-                title="上一帧 (Shift+←)"
-              >
-                ‹
-              </button>
-              <button
-                className="btn-ghost"
-                style={{ width: 26, height: 26, padding: 0, display: 'grid', placeItems: 'center' }}
-                onClick={() => jumpFrame(1)}
-                title="下一帧 (Shift+→)"
-              >
-                ›
-              </button>
+              <button className="vd-frame-nav-btn" onClick={() => jumpFrame(-1)} title="上一帧 (Shift+←)">‹</button>
+              <button className="vd-frame-nav-btn" onClick={() => jumpFrame(1)} title="下一帧 (Shift+→)">›</button>
             </div>
           </div>
         </div>
@@ -847,9 +534,7 @@ export default function VideoResultPage() {
 
       {pickerOpen && formatsCfg && (
         <FormatPicker
-          allFormats={formatsCfg.formats.filter(
-            (f) => f.category === 'image' && !isJsonFormat(f),
-          )}
+          allFormats={formatsCfg.formats.filter((f) => f.category === 'image' && !isJsonFormat(f))}
           selection={pickerSelection}
           onToggle={togglePickerId}
           onCancel={() => setPickerOpen(false)}
