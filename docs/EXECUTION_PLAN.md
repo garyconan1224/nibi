@@ -89,8 +89,8 @@
   - [x] H3.1 ProcessingPage 骨架 + SSE 接线（⭐ 小米）
 
 - [ ] **H4** Results 结果页 1:1 复刻（4 子页）— `10-14h` P2
-  - [ ] H4.1 VideoResultPage 改造（⭐ 小米）— 3-4h
-  - [ ] H4.2 AudioResultPage 改造（⭐ 小米）— 3-4h
+  - [x] H4.1 VideoResultPage 改造（⭐ 小米）— 3-4h
+  - [x] H4.2 AudioResultPage 改造（⭐ 小米）— 3-4h
   - [ ] H4.3 ImageResultPage 改造（⭐ 小米）— 2-3h
   - [ ] H4.4 TextResultPage 改造（⭐ 小米）— 2-3h
 
