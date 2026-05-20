@@ -22,10 +22,12 @@ from __future__ import annotations
 """
 
 import json
+import logging
 import re
 import shutil
 import threading
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
@@ -211,6 +213,13 @@ class PreflightSaveRequest(BaseModel):
         default_factory=dict,
         description="勾选项及子参数；结构按 item.type 区分",
     )
+
+
+class AutoCreateRequest(BaseModel):
+    """自动创建工作空间请求体。"""
+
+    hint_url: Optional[str] = Field(default=None, description="提示 URL，用于推导名称")
+    hint_text: Optional[str] = Field(default=None, description="提示文本，用于推导名称")
 
 
 class PromptVersionRequest(BaseModel):
@@ -464,6 +473,74 @@ def create_workspace(req: WorkspaceCreateRequest) -> Dict[str, Any]:
         workspace_id=str(uuid.uuid4()),
         name=req.name.strip(),
         background=bg,
+    )
+    _store.create(rec)
+    return rec.to_dict()
+
+
+_AUTO_CREATE_LOGGER = logging.getLogger(f"{__name__}.auto_create")
+
+
+def _generate_workspace_name(hint_url: str | None, hint_text: str | None) -> str:
+    """用 LLM 根据 hint 生成 4-12 个汉字的工作空间名称；失败时 fallback。"""
+    hint = (hint_url or hint_text or "").strip()
+    if hint:
+        prompt = (
+            "根据下面的 URL 或文本，给一个 4-12 个汉字的简短中文工作空间名称"
+            "（不要引号、不要标点）：\n" + hint
+        )
+    else:
+        prompt = "给一个 4-12 个汉字的简短中文工作空间名称（不要引号、不要标点）"
+
+    try:
+        from src.vidmirror.core.providers import ChatRequest
+        from src.vidmirror.core.providers.registry import create_default_registry
+
+        reg = create_default_registry()
+        from shared.settings_store import load_settings
+
+        settings = load_settings()
+        profile = reg.resolve_default_profile(settings, "chat")
+        provider = reg.build(profile)
+        model = (profile.default_models.get("chat") or "").strip()
+        if not model:
+            raise ValueError("no default chat model configured")
+        resp = provider.chat(ChatRequest(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=64,
+        ))
+        name = resp.strip().strip("「」\"'。，、")
+        if 2 <= len(name) <= 20:
+            return name
+        _AUTO_CREATE_LOGGER.warning("LLM returned unexpected name length: %r", name)
+    except Exception:
+        _AUTO_CREATE_LOGGER.debug("LLM name generation failed, using fallback", exc_info=True)
+
+    # fallback: hostname + 时间
+    hostname = ""
+    if hint_url:
+        try:
+            hostname = urlparse(hint_url).hostname or ""
+        except Exception:
+            pass
+    # 取 hostname 第一段（如 www.bilibili.com → bilibili）
+    if hostname:
+        parts = hostname.split(".")
+        hostname = parts[-2] if len(parts) >= 2 else parts[0]
+        hostname = hostname.capitalize()
+    ts = datetime.now(timezone.utc).strftime("%m%d-%H%M")
+    return f"{hostname} · {ts}" if hostname else f"工作空间 · {ts}"
+
+
+@router.post("/auto-create")
+def auto_create_workspace(req: AutoCreateRequest) -> Dict[str, Any]:
+    """根据 hint URL/text 用 LLM 生成名字，自动建空间。"""
+    name = _generate_workspace_name(req.hint_url, req.hint_text)
+    rec = WorkspaceRecord(
+        workspace_id=str(uuid.uuid4()),
+        name=name,
     )
     _store.create(rec)
     return rec.to_dict()
@@ -864,6 +941,12 @@ def _bridge_to_pipeline_payload(
     if item.source == "url":
         # download 任务最小 payload：url 必填，其余从 preflight 透传可选项
         payload: Dict[str, Any] = {"url": item.source_value}
+        # TODO: quality 等高级参数目前 _resolve_download_kwargs 不消费，
+        # 等 download handler 支持 format_selector 映射后再启用。
+        bg = item.preflight.background_overrides or {}
+        for k in ("quality", "frame_mode", "frame_interval_sec", "max_frames", "enabled_steps", "prompt_style"):
+            if k in bg:
+                payload[k] = bg[k]
         return "download", payload
 
     # local：直接走 analyze

@@ -121,6 +121,7 @@
 - [x] IP.4 TagsTab 加编辑能力
 - [x] IP.5 Storyboard 触发入口
 - [x] IP.6 Composer 工作空间选择真传后端
+- [x] IP.7 PreflightDrawer 真接 workspace 流程 + 自动建空间（修 URL 任务跑不通）
 - 后端 bug 修复：TaskRunner.append_log 缺失（download 任务从此不再 FAILED）
 
 ---

@@ -4,8 +4,12 @@ import { X, ArrowRight, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useProviderStore } from '@/store/providerStore'
 import { useTaskStore } from '@/store/taskStore'
-import { createPipelineTask } from '@/services/pipeline'
-import { addWorkspaceItem } from '@/services/workspaces'
+import {
+  addWorkspaceItem,
+  autoCreateWorkspace,
+  savePreflight,
+  startItemPipeline,
+} from '@/services/workspaces'
 import type { ComposerDefaults, QualityOption } from './types'
 
 const QUALITY_MAP: Record<QualityOption, string> = {
@@ -131,48 +135,55 @@ export function PreflightDrawer({
   const handleConfirm = async () => {
     setSubmitting(true)
     try {
-      const payload: Record<string, unknown> = { url }
-      if (visionModelId) payload.vision_model = visionModelId
-      if (textModelId) payload.text_model = textModelId
-      if (contentType) payload.content_type = contentType
-      if (purpose) payload.purpose = purpose
-      if (topic) payload.topic = topic
-
-      // IP.1: Composer 高级参数透传
-      if (cd) {
-        payload.quality = QUALITY_MAP[cd.quality] ?? cd.quality
-        payload.frame_mode = cd.frameMode
-        payload.frame_interval_sec = cd.fps
-        payload.max_frames = cd.maxFrames
-        payload.enabled_steps = cd.stepIds
-        payload.prompt_style = cd.promptStyle
+      // 1. 工作空间决定（如果没选，自动建）
+      let wsId = workspaceId
+      if (!wsId) {
+        const ws = await autoCreateWorkspace({ hint_url: url })
+        wsId = ws.workspace_id
+        toast.info(`已自动创建工作空间「${ws.name}」`)
       }
 
-      const res = await createPipelineTask({
-        project_id: crypto.randomUUID(),
-        task_type: 'analyze',
-        payload,
+      // 2. 创建 item
+      const itemRes = await addWorkspaceItem(wsId, {
+        type: 'video',
+        source: 'url',
+        source_value: url,
+        name: url.split('/').pop()?.split('?')[0] || url,
+      })
+      const newItem = itemRes.items.find((it) => it.source_value === url)
+      const itemId = newItem?.item_id ?? itemRes.items[itemRes.items.length - 1]?.item_id
+      if (!itemId) throw new Error('创建素材失败')
+
+      // 3. 保存 preflight
+      const preflightPayload: Record<string, unknown> = {
+        content_type: contentType,
+        topic,
+        purpose,
+      }
+      if (cd) {
+        preflightPayload.quality = QUALITY_MAP[cd.quality] ?? cd.quality
+        preflightPayload.frame_mode = cd.frameMode
+        preflightPayload.frame_interval_sec = cd.fps
+        preflightPayload.max_frames = cd.maxFrames
+        preflightPayload.enabled_steps = cd.stepIds
+        preflightPayload.prompt_style = cd.promptStyle
+      }
+      await savePreflight(wsId, itemId, {
+        background_overrides: preflightPayload,
+        models: {
+          ...(visionModelId && { vision: visionModelId }),
+          ...(textModelId && { text: textModelId }),
+        },
+        tasks: {},
       })
 
-      // IP.6: 如果选了工作空间，同时创建 workspace item
-      if (workspaceId) {
-        try {
-          await addWorkspaceItem(workspaceId, {
-            type: 'video',
-            source: 'url',
-            source_value: url,
-            name: url.split('/').pop()?.split('?')[0] || url,
-          })
-        } catch {
-          // workspace item 创建失败不阻塞主流程
-        }
-      }
-
+      // 4. 触发 start
+      const startRes = await startItemPipeline(wsId, itemId)
       addTask({
-        task_id: res.task_id,
+        task_id: startRes.task_id,
         project_id: '',
-        task_type: 'analyze',
-        payload,
+        task_type: startRes.task_type,
+        payload: {},
         status: 'PENDING',
         progress: 0,
         log: [],
@@ -186,9 +197,9 @@ export function PreflightDrawer({
 
       toast.success('任务已创建', { description: url })
       onCreated()
-      navigate(`/processing/${res.task_id}`, { state: { url } })
-    } catch {
-      toast.error('创建任务失败')
+      navigate(`/processing/${startRes.task_id}`, { state: { url } })
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '提交失败')
     } finally {
       setSubmitting(false)
     }

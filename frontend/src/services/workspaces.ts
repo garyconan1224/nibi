@@ -46,6 +46,15 @@ export async function createWorkspace(
   return res.data
 }
 
+/** POST /workspaces/auto-create — 根据 hint URL/text 用 LLM 自动生成名称并创建工作空间 */
+export async function autoCreateWorkspace(req: {
+  hint_url?: string
+  hint_text?: string
+}): Promise<WorkspaceRecord> {
+  const res = await http.post<WorkspaceRecord>(`${BASE}/auto-create`, req)
+  return res.data
+}
+
 /** PATCH /workspaces/{id} — 更新名称 / 状态 / 背景信息 */
 export async function updateWorkspace(
   workspaceId: string,
