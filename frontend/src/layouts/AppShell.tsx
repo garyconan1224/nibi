@@ -31,7 +31,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'processing',  path: '/processing',  icon: Sparkles,     label: '处理中',    disabled: true },
   { id: 'results',     path: '/results',     icon: Clapperboard, label: '结果',      disabled: true },
   { id: 'storyboard',  path: '/storyboard',  icon: Film,         label: '分镜' },
-  { id: 'library',     path: '/library',     icon: Library,      label: '资料库',    disabled: true },
+  { id: 'library',     path: '/search',      icon: Library,      label: '资料库' },
   { id: 'director',    path: '/director',    icon: Wand2,        label: 'AI 导演',   disabled: true, tooltipExtra: ' · Phase [C]' },
   { id: 'overview',    path: '/overview',    icon: LayoutGrid,   label: '12 屏概览', disabled: true },
 ]
