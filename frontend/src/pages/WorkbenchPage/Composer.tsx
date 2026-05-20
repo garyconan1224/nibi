@@ -11,6 +11,7 @@ import { listWorkspaces, createWorkspace } from '@/services/workspaces'
 import { useProviderStore } from '@/store/providerStore'
 import { MixedContentModal } from './MixedContentModal'
 import { PreflightDrawer } from './PreflightDrawer'
+import { AddMaterialModal } from '@/components/workspace/AddMaterialModal'
 
 const PIPE_STEPS: PipelineStep[] = [
   { n: '1', t: '下载',   s: 'Download',  tone: null,     defaultOn: true  },
@@ -49,6 +50,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
   const [mixedSel, setMixedSel] = useState<Record<string, boolean>>({})
   const [preflightOpen, setPreflightOpen] = useState(false)
   const [preflightTypes, setPreflightTypes] = useState<string[]>([])
+  const [uploadOpen, setUploadOpen] = useState(false)
 
   const [workspaces, setWorkspaces] = useState<WorkspaceRecord[]>([])
   const [workspaceSel, setWorkspaceSel] = useState<string[]>([])
@@ -166,6 +168,21 @@ export function Composer({ onTaskCreated }: ComposerProps) {
     onTaskCreated?.()
   }
 
+  const handleUploadClick = () => {
+    if (workspaceSel.length === 0) {
+      toast.error('请先选择工作空间')
+      setWsOpen(true)
+      return
+    }
+    setUploadOpen(true)
+  }
+
+  const handleUploadAdded = () => {
+    setUploadOpen(false)
+    listWorkspaces().then(setWorkspaces).catch(() => {})
+    onTaskCreated?.()
+  }
+
   const metaText =
     frameMode === 'A'
       ? `按秒截帧 ${fps}s · ≤${maxFrames}帧`
@@ -204,7 +221,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
           </div>
         )}
 
-        <button className="btn btn-ghost" title="上传本地文件" style={{ gap: 6 }}>
+        <button className="btn btn-ghost" title="上传本地文件" style={{ gap: 6 }} onClick={handleUploadClick}>
           <Upload size={15} />
           上传
         </button>
@@ -535,6 +552,14 @@ export function Composer({ onTaskCreated }: ComposerProps) {
         }}
         onClose={() => setPreflightOpen(false)}
         onCreated={handlePreflightCreated}
+      />
+
+      {/* Upload modal */}
+      <AddMaterialModal
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        workspaceId={workspaceSel[0] ?? ''}
+        onAdded={handleUploadAdded}
       />
     </div>
   )
