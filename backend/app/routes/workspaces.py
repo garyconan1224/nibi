@@ -888,7 +888,7 @@ def _bridge_to_pipeline_payload(
         if models.get("text"):
             payload["text_model"] = models["text"]
         tasks = item.preflight.tasks or {}
-        for task_id in ("summary", "association", "rewrite", "translate", "multi_compare"):
+        for task_id in ("summary", "assoc", "rewrite", "translate", "multi"):
             params = tasks.get(task_id)
             if isinstance(params, dict):
                 payload[task_id] = params
@@ -906,7 +906,7 @@ def _bridge_to_pipeline_payload(
         if models.get("text"):
             payload["text_model"] = models["text"]
         tasks = item.preflight.tasks or {}
-        for task_id in ("ocr", "frame_prompts", "association", "multi_compare"):
+        for task_id in ("ocr", "prompt", "assoc", "compare"):
             params = tasks.get(task_id)
             if isinstance(params, dict):
                 payload[task_id] = params
@@ -924,12 +924,12 @@ def _bridge_to_pipeline_payload(
         tasks = item.preflight.tasks or {}
         if isinstance(tasks.get("asr"), dict):
             payload["asr"] = tasks["asr"]
-        if isinstance(tasks.get("speaker_diarization"), dict):
-            payload["speaker_diarization"] = tasks["speaker_diarization"]
-        if isinstance(tasks.get("subtitle_file"), dict):
-            payload["subtitle_file"] = tasks["subtitle_file"]
-        if isinstance(tasks.get("music_analysis"), dict):
-            payload["music_analysis"] = tasks["music_analysis"]
+        if isinstance(tasks.get("voiceprint"), dict):
+            payload["voiceprint"] = tasks["voiceprint"]
+        if isinstance(tasks.get("srt"), dict):
+            payload["srt"] = tasks["srt"]
+        if isinstance(tasks.get("music"), dict):
+            payload["music"] = tasks["music"]
         return "audio", payload
 
     if item.type not in (ItemType.VIDEO.value,):
@@ -963,9 +963,9 @@ def _bridge_to_pipeline_payload(
         payload["text_model"] = models["text"]
     # N7: 透传截帧子参数（capture_mode / interval / max_frames / frames_per_shot）
     tasks = item.preflight.tasks or {}
-    frame_prompts_params = tasks.get("frame_prompts")
+    frame_prompts_params = tasks.get("frame_prompt")
     if isinstance(frame_prompts_params, dict):
-        payload["frame_prompts"] = frame_prompts_params
+        payload["frame_prompt"] = frame_prompts_params
     return "analyze", payload
 
 

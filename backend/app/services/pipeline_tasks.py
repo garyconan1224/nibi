@@ -166,8 +166,8 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
     if not videos:
         raise ValueError(f"no videos found in {project_video_dir}")
 
-    # N7: 从 payload 读 frame_prompts 子参数（截帧模式 / 间隔 / 最大帧数 / 每镜头帧数）
-    frame_prompts = payload.get("frame_prompts")
+    # N7: 从 payload 读 frame_prompt 子参数（截帧模式 / 间隔 / 最大帧数 / 每镜头帧数）
+    frame_prompts = payload.get("frame_prompt")
     capture_params = CaptureParams.from_dict(frame_prompts) if frame_prompts is not None else None
     if capture_params is not None:
         runner.append_log(
@@ -944,8 +944,8 @@ def handle_image_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
       - source_type: "url" | "local"（可省略，依赖 source 自动判断）
       - vision_model / text_model / api_key：可选，从 settings 兜底
       - ocr: {enabled, ...} N9 PaddleOCR 开关
-      - association: {enabled, directions: [...]} N9 联想方向
-      - frame_prompts: {enabled, format} N9 提示词格式
+      - assoc: {enabled, directions: [...]} N9 联想方向
+      - prompt: {enabled, format} N9 提示词格式
 
     状态机：FETCH → OCR → VLM → ASSOCIATION → STORE → SUCCESS
     产物：data/workspaces/<pid>/image/<task_id>.json
@@ -966,10 +966,10 @@ def handle_image_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     # N9: 读取 preflight 子参数
     ocr_params = payload.get("ocr") or {}
     ocr_enabled = isinstance(ocr_params, dict) and ocr_params.get("enabled", False)
-    assoc_params = payload.get("association") or {}
+    assoc_params = payload.get("assoc") or {}
     assoc_enabled = isinstance(assoc_params, dict) and assoc_params.get("enabled", False)
     assoc_directions = assoc_params.get("directions", ["usage"]) if assoc_enabled else []
-    fp_params = payload.get("frame_prompts") or {}
+    fp_params = payload.get("prompt") or {}
     prompt_format = fp_params.get("format", "mj") if isinstance(fp_params, dict) else "mj"
 
     log(f"🖼 image_task | source_type={source_type} | source={source[:80]}")
@@ -1218,14 +1218,14 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         return default
 
     asr_params = payload.get("asr") if isinstance(payload.get("asr"), dict) else {}
-    music_params = payload.get("music_analysis") if isinstance(payload.get("music_analysis"), dict) else {}
-    subtitle_params = payload.get("subtitle_file") if isinstance(payload.get("subtitle_file"), dict) else {}
+    music_params = payload.get("music") if isinstance(payload.get("music"), dict) else {}
+    subtitle_params = payload.get("srt") if isinstance(payload.get("srt"), dict) else {}
 
     whisper_lang = str(asr_params.get("whisper_lang") or "auto").strip().lower()
     asr_enabled = bool(asr_params.get("enabled", True)) if isinstance(payload.get("asr"), dict) else True
-    diarization_enabled = _task_enabled("speaker_diarization", False)
-    music_enabled = _task_enabled("music_analysis", False)
-    subtitle_enabled = _task_enabled("subtitle_file", True)
+    diarization_enabled = _task_enabled("voiceprint", False)
+    music_enabled = _task_enabled("music", False)
+    subtitle_enabled = _task_enabled("srt", True)
 
     log(
         f"🎵 audio_task | source_type={source_type} | source={source[:80]} | "

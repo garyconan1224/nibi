@@ -158,36 +158,36 @@ export const DEFAULT_TEXT_TRANSLATE: TextTranslateParams = {
 }
 
 // 每个 task id 的默认 params 表（按"出现位置"区分同名 task id）
-// 注意：image.frame_prompts 与 video.frame_prompts 字段不同
+// 注意：image.prompt 与 video.frame_prompt 字段不同
 const DEFAULTS_BY_TYPE_AND_ID: Record<
   ItemType,
   Record<string, Record<string, unknown>>
 > = {
   video: {
-    frame_prompts: { ...DEFAULT_VIDEO_FRAME_PROMPTS },
-    video_summary: { ...DEFAULT_VIDEO_SUMMARY },
-    subtitle_export: { enabled: true },
-    music_analysis: { ...DEFAULT_MUSIC_ANALYSIS },
+    frame_prompt: { ...DEFAULT_VIDEO_FRAME_PROMPTS },
+    summary: { ...DEFAULT_VIDEO_SUMMARY },
+    srt: { enabled: true },
+    music: { ...DEFAULT_MUSIC_ANALYSIS },
   },
   audio: {
     asr: { ...DEFAULT_AUDIO_ASR },
-    speaker_diarization: { enabled: false },
-    subtitle_file: { enabled: true },
-    music_analysis: { ...DEFAULT_MUSIC_ANALYSIS },
+    voiceprint: { enabled: true },
+    srt: { enabled: true },
+    music: { ...DEFAULT_MUSIC_ANALYSIS },
   },
   image: {
-    content_describe: { enabled: true },
+    describe: { enabled: true },
     ocr: { enabled: false },
-    frame_prompts: { ...DEFAULT_IMAGE_FRAME_PROMPTS },
-    association: { ...DEFAULT_IMAGE_ASSOCIATION },
-    multi_compare: { enabled: false },
+    prompt: { ...DEFAULT_IMAGE_FRAME_PROMPTS },
+    assoc: { ...DEFAULT_IMAGE_ASSOCIATION },
+    compare: { enabled: false },
   },
   text: {
     summary: { ...DEFAULT_TEXT_SUMMARY },
-    association: { ...DEFAULT_TEXT_ASSOCIATION },
+    assoc: { ...DEFAULT_TEXT_ASSOCIATION },
     rewrite: { ...DEFAULT_TEXT_REWRITE },
     translate: { ...DEFAULT_TEXT_TRANSLATE },
-    multi_compare: { enabled: false },
+    multi: { enabled: false },
   },
 }
 
@@ -261,33 +261,33 @@ export function getTopLevelTasks(type: ItemType): TopLevelTask[] {
   switch (type) {
     case 'video':
       return [
-        { id: 'frame_prompts', label: '画面提示词生成', desc: '截帧 → 视觉模型 → 提示词' },
-        { id: 'video_summary', label: '视频文案总结', desc: '三条路径选一' },
-        { id: 'subtitle_export', label: '字幕导出', desc: '转写后导出 .srt' },
-        { id: 'music_analysis', label: '音乐分析', desc: '背景音乐 BPM / Suno-Udio' },
+        { id: 'frame_prompt', label: '画面提示词生成', desc: '截帧 → 视觉模型 → 提示词' },
+        { id: 'summary', label: '视频文案总结', desc: '三条路径选一' },
+        { id: 'srt', label: '字幕导出', desc: '转写后导出 .srt' },
+        { id: 'music', label: '音乐分析', desc: '背景音乐 BPM / Suno-Udio' },
       ]
     case 'audio':
       return [
         { id: 'asr', label: '人声转写 + 内容总结', desc: 'Whisper + LLM' },
-        { id: 'speaker_diarization', label: '说话人音色区分', desc: '配合转写使用' },
-        { id: 'subtitle_file', label: '生成字幕文件', desc: '.srt / .txt' },
-        { id: 'music_analysis', label: '音乐分析', desc: 'BPM / 乐器 / Suno-Udio' },
+        { id: 'voiceprint', label: '说话人音色区分', desc: '配合转写使用' },
+        { id: 'srt', label: '生成字幕文件', desc: '.srt / .txt' },
+        { id: 'music', label: '音乐分析', desc: 'BPM / 乐器 / Suno-Udio' },
       ]
     case 'image':
       return [
-        { id: 'content_describe', label: '内容识别描述', desc: '主体 / 场景 / 色调 / 构图 / 风格' },
+        { id: 'describe', label: '内容识别描述', desc: '主体 / 场景 / 色调 / 构图 / 风格' },
         { id: 'ocr', label: 'OCR 文字提取' },
-        { id: 'frame_prompts', label: '画面提示词生成', desc: 'MJ / SD / JSON' },
-        { id: 'association', label: '内容联想总结', desc: '用途 / 设计 / 竞品 / 情绪' },
-        { id: 'multi_compare', label: '多图对比', desc: '与同任务其他图片对比' },
+        { id: 'prompt', label: '画面提示词生成', desc: 'MJ / SD / JSON' },
+        { id: 'assoc', label: '内容联想总结', desc: '用途 / 设计 / 竞品 / 情绪' },
+        { id: 'compare', label: '多图对比', desc: '与同任务其他图片对比' },
       ]
     case 'text':
       return [
         { id: 'summary', label: '摘要 / 要点 / 金句' },
-        { id: 'association', label: '联想归纳', desc: '4 维方向多选' },
+        { id: 'assoc', label: '联想归纳', desc: '4 维方向多选' },
         { id: 'rewrite', label: '改写 / 润色', desc: '正式 / 口语 / 简洁 / 丰富' },
         { id: 'translate', label: '翻译' },
-        { id: 'multi_compare', label: '多文对比', desc: '与同任务其他文本对比（实际生效待 N10 后端接入）' },
+        { id: 'multi', label: '多文对比', desc: '与同任务其他文本对比' },
       ]
   }
 }

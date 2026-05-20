@@ -44,7 +44,7 @@ export interface TaskDetailsProps {
 
 export function TaskDetails({ type, taskId, params, onChange }: TaskDetailsProps) {
   // 视频
-  if (type === 'video' && taskId === 'frame_prompts') {
+  if (type === 'video' && taskId === 'frame_prompt') {
     return (
       <VideoFramePromptsDetails
         params={params as unknown as VideoFramePromptsParams}
@@ -52,7 +52,7 @@ export function TaskDetails({ type, taskId, params, onChange }: TaskDetailsProps
       />
     )
   }
-  if (type === 'video' && taskId === 'video_summary') {
+  if (type === 'video' && taskId === 'summary') {
     return (
       <VideoSummaryDetails
         params={params as unknown as VideoSummaryParams}
@@ -69,7 +69,7 @@ export function TaskDetails({ type, taskId, params, onChange }: TaskDetailsProps
       />
     )
   }
-  if ((type === 'video' || type === 'audio') && taskId === 'music_analysis') {
+  if ((type === 'video' || type === 'audio') && taskId === 'music') {
     return (
       <MusicAnalysisDetails
         params={params as unknown as MusicAnalysisParams}
@@ -78,7 +78,7 @@ export function TaskDetails({ type, taskId, params, onChange }: TaskDetailsProps
     )
   }
   // 图片
-  if (type === 'image' && taskId === 'frame_prompts') {
+  if (type === 'image' && taskId === 'prompt') {
     return (
       <ImageFramePromptsDetails
         params={params as unknown as ImageFramePromptsParams}
@@ -86,7 +86,7 @@ export function TaskDetails({ type, taskId, params, onChange }: TaskDetailsProps
       />
     )
   }
-  if (type === 'image' && taskId === 'association') {
+  if (type === 'image' && taskId === 'assoc') {
     return (
       <AssociationDetails
         params={params as unknown as ImageAssociationParams}
@@ -103,7 +103,7 @@ export function TaskDetails({ type, taskId, params, onChange }: TaskDetailsProps
       />
     )
   }
-  if (type === 'text' && taskId === 'association') {
+  if (type === 'text' && taskId === 'assoc') {
     return (
       <AssociationDetails
         params={params as unknown as TextAssociationParams}
