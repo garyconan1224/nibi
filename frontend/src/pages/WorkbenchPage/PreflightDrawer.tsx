@@ -1,10 +1,18 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { X, ArrowRight, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useProviderStore } from '@/store/providerStore'
 import { useTaskStore } from '@/store/taskStore'
 import { createPipelineTask } from '@/services/pipeline'
+import type { ComposerDefaults, QualityOption } from './types'
+
+const QUALITY_MAP: Record<QualityOption, string> = {
+  '最高画质': 'best',
+  '1080p': '1080',
+  '720p': '720',
+  '仅音频': 'audio',
+}
 
 const CONTENT_TYPES = ['课程', '会议', '宣传片', 'Vlog', '访谈', '纯音乐', '其他']
 const PURPOSES = ['复刻参考', '竞品分析', '内容学习', '其他']
@@ -15,6 +23,8 @@ interface PreflightDrawerProps {
   platformName: string | null
   /** 当混合内容场景下用户选了多种类型时传入 */
   selectedTypes?: string[]
+  /** Composer 高级参数默认值 */
+  composerDefaults?: ComposerDefaults
   onClose: () => void
   onCreated: () => void
 }
@@ -24,6 +34,7 @@ export function PreflightDrawer({
   url,
   platformName,
   selectedTypes,
+  composerDefaults,
   onClose,
   onCreated,
 }: PreflightDrawerProps) {
@@ -37,6 +48,10 @@ export function PreflightDrawer({
   const [submitting, setSubmitting] = useState(false)
   const navigate = useNavigate()
 
+  // Track which Composer defaults have been applied
+  const appliedDefaultsRef = useRef({ vision: false, text: false, asr: false })
+  const cd = composerDefaults
+
   const { providers, providerModels, fetchProviders, modelsLoading } = useProviderStore()
   const addTask = useTaskStore((s) => s.addTask)
 
@@ -44,17 +59,19 @@ export function PreflightDrawer({
     if (open && providers.length === 0) fetchProviders()
   }, [open, providers.length, fetchProviders])
 
-  // Reset form when opened
+  // Reset form when opened, applying Composer defaults as initial values
   useEffect(() => {
     if (open) {
+      appliedDefaultsRef.current = { vision: false, text: false, asr: false }
       setContentType('')
       setPurpose('')
       setTopic('')
       setVisionProviderId('')
       setTextProviderId('')
-      setVisionModelId('')
-      setTextModelId('')
+      setVisionModelId(cd?.visionModelId ?? '')
+      setTextModelId(cd?.textModelId ?? '')
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   const enabledProviders = providers.filter((p) => p.enabled && p.has_api_key)
@@ -70,6 +87,43 @@ export function PreflightDrawer({
   const visionModels = visionProviderId ? (providerModels[visionProviderId] ?? []) : []
   const textModels = textProviderId ? (providerModels[textProviderId] ?? []) : []
 
+  // Reverse-lookup: find provider from default model ID, then set model when loaded
+  useEffect(() => {
+    if (!open || !cd || appliedDefaultsRef.current.vision) return
+    if (cd.visionModelId && !visionProviderId) {
+      const found = enabledProviders.find(
+        (p) => (providerModels[p.id] ?? []).some((m) => m.id === cd.visionModelId),
+      )
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Two-step provider→model requires cascade
+      if (found) setVisionProviderId(found.id)
+    }
+    if (cd.visionModelId && visionProviderId && !visionModelId && !modelsLoading[visionProviderId]) {
+      if (visionModels.some((m) => m.id === cd.visionModelId)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- Two-step provider→model requires cascade
+        setVisionModelId(cd.visionModelId)
+        appliedDefaultsRef.current.vision = true
+      }
+    }
+  }, [open, cd, visionProviderId, visionModelId, enabledProviders, providerModels, modelsLoading, visionModels])
+
+  useEffect(() => {
+    if (!open || !cd || appliedDefaultsRef.current.text) return
+    if (cd.textModelId && !textProviderId) {
+      const found = enabledProviders.find(
+        (p) => (providerModels[p.id] ?? []).some((m) => m.id === cd.textModelId),
+      )
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Two-step provider→model requires cascade
+      if (found) setTextProviderId(found.id)
+    }
+    if (cd.textModelId && textProviderId && !textModelId && !modelsLoading[textProviderId]) {
+      if (textModels.some((m) => m.id === cd.textModelId)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- Two-step provider→model requires cascade
+        setTextModelId(cd.textModelId)
+        appliedDefaultsRef.current.text = true
+      }
+    }
+  }, [open, cd, textProviderId, textModelId, enabledProviders, providerModels, modelsLoading, textModels])
+
   const handleConfirm = async () => {
     setSubmitting(true)
     try {
@@ -79,6 +133,16 @@ export function PreflightDrawer({
       if (contentType) payload.content_type = contentType
       if (purpose) payload.purpose = purpose
       if (topic) payload.topic = topic
+
+      // IP.1: Composer 高级参数透传
+      if (cd) {
+        payload.quality = QUALITY_MAP[cd.quality] ?? cd.quality
+        payload.frame_mode = cd.frameMode
+        payload.frame_interval_sec = cd.fps
+        payload.max_frames = cd.maxFrames
+        payload.enabled_steps = cd.stepIds
+        payload.prompt_style = cd.promptStyle
+      }
 
       const res = await createPipelineTask({
         project_id: crypto.randomUUID(),

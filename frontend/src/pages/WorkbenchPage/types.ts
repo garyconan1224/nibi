@@ -24,3 +24,16 @@ export interface TaskCard {
   state: 'done' | 'running' | 'error' | 'queued'
   thumb?: string
 }
+
+/** Composer 高级参数打包，透传给 PreflightDrawer */
+export interface ComposerDefaults {
+  quality: QualityOption
+  frameMode: FrameMode
+  fps: number
+  maxFrames: number
+  stepIds: string[]
+  asrModelId: string
+  visionModelId: string
+  textModelId: string
+  promptStyle: string
+}
