@@ -76,12 +76,13 @@
   - [x] H1.3 Composer 接后端（小米）— 3-4h
   - [x] H1.4 平台检测 + 混合内容弹窗 + Preflight 接入（小米）— 2-3h
   - [x] H1.5 路由切换 + 侧边栏图标系统（小米）— 1-2h
-- [ ] **H2** Taskboard 任务中心 1:1 复刻（重做 /workspaces/:id）— `15-20h` P2
-  - [ ] H2.1 骨架 + 头部 + 9 Tab nav（Sonnet 4.6）— 4-5h
-  - [ ] H2.2 Materials Tab 素材网格（Sonnet 4.6）— 4-6h
-  - [ ] H2.3 Queue + Favorites + Versions 整合（小米）— 3-4h
-  - [ ] H2.4 Tags + Chat + Export + 删旧 WorkspaceDetail（Sonnet 4.6）— 4-5h
+- [x] **H2** Taskboard 任务中心 1:1 复刻（重做 /workspaces/:id）— `15-20h` P2
+  - [x] H2.1 骨架 + 头部 + 9 Tab nav（Sonnet 4.6）
+  - [x] H2.2 Materials Tab 素材网格（Sonnet 4.6）
+  - [x] H2.3 Queue + Favorites + Versions 整合（小米）
+  - [x] H2.4 Tags + Chat + Export Tab（Sonnet 4.6）
   - [ ] H2.5+ Style + A/B 对比（押后到 [C] 一起做）
+  - [ ] H2.6 删除旧 WorkspaceDetail.tsx（待确认无回归后）
 
 详细执行计划：[docs/plans/phase-h2-taskboard.md](plans/phase-h2-taskboard.md)
 - [ ] **H3** Processing 处理中页面 1:1 复刻 — TBD
@@ -101,9 +102,8 @@
 
 **N1~N11 主线全部完成**。用户 2026-05-19 决议：先做 H 系列首页复刻，N7b/N8b 后做，[C]/[D] 最后。
 
-H1 工作台已完成（2026-05-20，5 个 commit 全部落地，UI 1:1 复刻设计稿）。
-正在进行：**H2 Taskboard 任务中心 1:1 复刻**（分支 `feat/homepage-h2-taskboard`）
-下一个子任务：H2.1 骨架 + 头部 + 9 Tab nav（Sonnet 4.6 执行）
+H1 工作台 + H2 任务中心已完成（2026-05-20，均合并入 main，UI 1:1 复刻设计稿）。
+下一步候选：**H3 Processing 处理中** / **H4 Results 结果页（4 子页）** / **H5 Storyboard 分镜** — 待用户确认顺序后展开 plan
 
 延后子阶段：
 - **N7b** 视频总结路径 1/3（P2，8-12h）— 依赖字幕抽取 + 视频大模型 API 决策
