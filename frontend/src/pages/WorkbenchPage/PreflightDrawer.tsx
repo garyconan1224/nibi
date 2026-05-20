@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { X, ArrowRight, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useProviderStore } from '@/store/providerStore'
@@ -34,6 +35,7 @@ export function PreflightDrawer({
   const [visionModelId, setVisionModelId] = useState('')
   const [textModelId, setTextModelId] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const navigate = useNavigate()
 
   const { providers, providerModels, fetchProviders, modelsLoading } = useProviderStore()
   const addTask = useTaskStore((s) => s.addTask)
@@ -102,6 +104,7 @@ export function PreflightDrawer({
 
       toast.success('任务已创建', { description: url })
       onCreated()
+      navigate(`/processing/${res.task_id}`, { state: { url } })
     } catch {
       toast.error('创建任务失败')
     } finally {
