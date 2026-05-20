@@ -20,6 +20,35 @@ depends_on: H4 已合并
 2. 设计稿里的"生成卡片"按钮如果要接生成模型 API（Midjourney/Flux/SD），属于 `[C] AI 导演` 范畴
 3. H5 可能只能做"展示已有 storyboard 数据"，**生成功能押后**
 
+---
+
+## H5.1 Spike 决议（2026-05-20，Opus 4.7 完成）
+
+**后端现状摸清**：
+- `shared/storyboard_generator.py` (292 行) 已实现，注册为 `storyboard` 任务类型
+- 输入：product_name + core_features + 8 张参考图 + RAG 知识库 + web 检索
+- 输出：3 个 markdown plan（A / B / C），写到 `runtime_dir/last_storyboard_result.json`
+- 模型流程：vision 分析图片 → text LLM 生成 3 方案 markdown
+
+**设计稿语义对照**：
+- 设计稿要：3 个 tab（方案 A/B/C），每个 tab 是 shot-by-shot 网格（镜号 / 时长 / 视觉提示 / 字幕 / 参考帧）
+- 后端实际：3 个 markdown blob，**无结构化 shot 字段**
+
+**决议**（用现实优先，不为完美设计返工后端）：
+
+- **D1 = 仅展示**（generation 留按钮触发，不在 StoryboardPage 内重建生成 UI；生成入口走现有 Taskboard 的 "添加素材 → storyboard 任务" 或单独按钮）
+- **D2 = 方案 A（markdown 直展）**：3 个 tab 各渲染对应 plan 的 markdown，**不在前端尝试解析成 shot 网格**——markdown 结构无保证，正则解析会脆
+  - 视觉**保留设计稿的 sb-tabs / sb-tab / 头部 hero / 按钮组**布局
+  - 设计稿的 sb-grid + sb-shot 替换为 markdown 渲染区（用 react-markdown）
+  - 用 lede 文字告诉用户"完整结构化分镜图开发中（Phase [C]）"
+- **D3 = 重用现有 storyboard 任务**：「生成预览」按钮可触发新一次 storyboard 任务；「导出 .fcpxml」直接禁用 + tooltip "Phase [C]"
+
+**影响范围**：
+- ✅ 不动后端，零 schema 风险
+- ✅ 前端纯新增，路由 `/storyboard` 启用
+- ✅ 工作量从原估 6-10h 降到 **4-6h**
+- ⚠️ 视觉对设计稿 ~70% 还原（shot 网格替换为 markdown）—— 等 [C] 时再升级
+
 ## 子任务
 
 ### H5.1 后端能力 spike + 决策
