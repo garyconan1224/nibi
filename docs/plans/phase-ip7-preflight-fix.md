@@ -1,12 +1,19 @@
 ---
 phase: IP.7
 title: PreflightDrawer 真接 workspace item 流程 + 自动建空间
-status: ready
+status: done
 branch: feat/ip7-preflight-fix
 created: 2026-05-20
+completed_date: 2026-05-20
 priority: P0（阻塞：当前所有 URL 任务跑不通）
 estimate_hours: 2-3
+actual_hours: 1.5
 depends_on: IP.1~IP.6 已合并
+commits:
+  - 28693b5 feat(IP.7.1): 后端 /workspaces/auto-create 接口（LLM 自动命名）
+  - 2c45989 fix(IP.7.2): PreflightDrawer 改走 workspace item 标准流程
+  - e83a69b feat(IP.7.3): bridge 透传 Composer 高级参数到 download payload
+  - 5bbda50 test(IP.7.4): API 级冒烟测试通过
 ---
 
 # IP.7 修复"任意 URL 任务都失败"的 root cause

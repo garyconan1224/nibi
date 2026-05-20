@@ -4,7 +4,7 @@
 >
 > **维护规则**：每完成一个子任务，在本文件**追加**一段（不删旧记录），格式见下方"记录模板"。
 >
-> Last updated: 2026-05-19 (Phase N1b 完成)
+> Last updated: 2026-05-20 (IP.7 PreflightDrawer 修复完成)
 
 ---
 
@@ -638,3 +638,31 @@ WorkspaceItem.tags = {
 - marker 模型 ~1.5GB，首次运行需下载；后续可考虑模型缓存策略
 - 翻译/改写是单次 LLM 调用，超长文本可能截断；SPEC §7.4 的超长文本分段留到后续
 - PDF 内图片走图片分支分析（SPEC §7.3 第 4 点）未实现，留到后续
+
+---
+
+## IP.7 PreflightDrawer 真接 workspace 流程 + 自动建空间
+
+**完成日期**：2026-05-20
+**分支**：feat/ip7-preflight-fix
+**提交**：
+- `28693b5` feat(IP.7.1): 后端 /workspaces/auto-create 接口（LLM 自动命名）
+- `2c45989` fix(IP.7.2): PreflightDrawer 改走 workspace item 标准流程
+- `e83a69b` feat(IP.7.3): bridge 透传 Composer 高级参数到 download payload
+- `5bbda50` test(IP.7.4): API 级冒烟测试通过
+
+### 问题
+用户粘 B 站 URL → Processing 显示 "no videos found"。Root cause: PreflightDrawer 硬编码 `task_type='analyze'`，绕过后端 bridge（本应 url→download→analyze 链式执行）。
+
+### 关键改动
+- **后端 auto-create**：`POST /workspaces/auto-create`，LLM 生成 4-12 汉字中文名，fallback 到 hostname+时间
+- **前端 3 步流程**：`autoCreateWorkspace` → `addWorkspaceItem` → `savePreflight` → `startItemPipeline`，替代原来的 `createPipelineTask({ task_type: 'analyze' })`
+- **bridge 透传**：`_bridge_to_pipeline_payload` video/url 分支新增从 background_overrides 透传 quality/frame_mode 等 6 个高级参数
+
+### 为什么这么做
+- 标准 3 步流程让后端 bridge 决定 task_type（url→download, local→analyze），不再由前端硬编码
+- 自动建空间降低用户门槛：粘 URL 即可开始，不必先手动创建工作空间
+- Composer 高级参数（画质/截帧模式等）通过 preflight.background_overrides 透传，保持参数链路统一
+
+### 留给后续的影响
+- download handler 暂不消费 quality 等参数（`_resolve_download_kwargs` 只读 format_selector），等 yt-dlp format 映射后再启用
