@@ -29,6 +29,7 @@ const TextResultPage = lazy(() => import('@/pages/result/TextResultPage'))
 const FavoritesPage = lazy(() => import('@/pages/FavoritesPage/FavoritesPage'))
 const SearchPage = lazy(() => import('@/pages/SearchPage/SearchPage'))
 const WorkbenchPage = lazy(() => import('@/pages/WorkbenchPage/index'))
+const ProcessingPage = lazy(() => import('@/pages/result/ProcessingPage/index'))
 
 // 懒加载 fallback：保持极简，避免把额外依赖拉进主 chunk
 const RouteFallback = () => (
@@ -67,6 +68,10 @@ export const router = createBrowserRouter([
       {
         path: 'workspaces/:workspaceId/items/:itemId/text_result',
         element: withSuspense(<TextResultPage />),
+      },
+      {
+        path: 'processing/:taskId',
+        element: withSuspense(<ProcessingPage />),
       },
       {
         path: 'settings',
