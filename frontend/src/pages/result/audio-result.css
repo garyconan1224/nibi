@@ -1,0 +1,272 @@
+/* AudioResultPage 组件样式（tokens 在 tokens.css） */
+
+/* ─── Waveform ─── */
+.vm-audio-scope .ad-waveform {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 48px;
+  cursor: pointer;
+  flex: 1;
+}
+
+.vm-audio-scope .ad-waveform .ad-bar {
+  flex: 1;
+  border-radius: 2px;
+  transition: background 200ms;
+}
+
+.vm-audio-scope .ad-waveform .ad-bar.passed {
+  background: var(--accent);
+  opacity: 1;
+}
+
+.vm-audio-scope .ad-waveform .ad-bar.future {
+  background: var(--line-strong);
+  opacity: 0.5;
+}
+
+/* ─── Player controls ─── */
+.vm-audio-scope .ad-player-area {
+  flex-shrink: 0;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-elev);
+}
+
+.vm-audio-scope .ad-play-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 99px;
+  border: none;
+  cursor: pointer;
+  background: var(--ink);
+  color: var(--bg);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.vm-audio-scope .ad-player-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* ─── Tab nav ─── */
+.vm-audio-scope .ad-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 20px 0;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+  background: var(--bg-elev);
+}
+
+.vm-audio-scope .ad-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px 10px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  color: var(--ink-3);
+  border-bottom: 2px solid transparent;
+}
+
+.vm-audio-scope .ad-tab[data-active='true'] {
+  background: var(--bg);
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+
+.vm-audio-scope .ad-tab[data-disabled='true'] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ─── Content area ─── */
+.vm-audio-scope .ad-content {
+  flex: 1;
+  overflow: hidden;
+  display: grid;
+}
+
+.vm-audio-scope .ad-content[data-tab='transcript'] {
+  grid-template-columns: 1fr 340px;
+}
+
+.vm-audio-scope .ad-content[data-tab='summary'] {
+  grid-template-columns: 1fr;
+}
+
+/* ─── Transcript ─── */
+.vm-audio-scope .ad-transcript-scroll {
+  overflow-y: auto;
+  padding: 14px 20px;
+}
+
+.vm-audio-scope .ad-tr-row {
+  display: grid;
+  grid-template-columns: 60px 28px 1fr;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  margin-bottom: 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  transition: all 140ms;
+}
+
+.vm-audio-scope .ad-tr-row[data-active='true'] {
+  background: var(--bg-elev);
+  border-color: var(--line);
+}
+
+.vm-audio-scope .ad-tr-row .ad-tr-time {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-4);
+  padding-top: 2px;
+}
+
+.vm-audio-scope .ad-tr-row[data-active='true'] .ad-tr-time {
+  color: var(--accent-warm);
+  font-weight: 700;
+}
+
+.vm-audio-scope .ad-tr-row .ad-tr-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 99px;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.vm-audio-scope .ad-tr-row .ad-tr-text {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.vm-audio-scope .ad-tr-row[data-active='true'] .ad-tr-text {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* ─── Speaker sidebar ─── */
+.vm-audio-scope .ad-speaker-side {
+  border-left: 1px solid var(--line);
+  padding: 14px 16px;
+  overflow-y: auto;
+  background: var(--bg-elev);
+}
+
+.vm-audio-scope .ad-speaker-card {
+  margin-bottom: 16px;
+}
+
+.vm-audio-scope .ad-speaker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.vm-audio-scope .ad-speaker-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 99px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.vm-audio-scope .ad-speaker-bar {
+  height: 4px;
+  background: var(--bg-sunken);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.vm-audio-scope .ad-speaker-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+}
+
+/* ─── Summary ─── */
+.vm-audio-scope .ad-summary-scroll {
+  overflow-y: auto;
+  padding: 20px 24px;
+  max-width: 760px;
+}
+
+.vm-audio-scope .ad-summary-abstract {
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--ink-2);
+  background: var(--bg-elev);
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  margin: 0 0 20px;
+}
+
+.vm-audio-scope .ad-key-point {
+  display: flex;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
+.vm-audio-scope .ad-todo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: rgba(255, 184, 76, 0.07);
+  border: 1px solid rgba(255, 184, 76, 0.25);
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.vm-audio-scope .ad-todo-box {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid var(--accent-warm);
+  flex-shrink: 0;
+}
+
+/* ─── Right panel ─── */
+.vm-audio-scope .ad-right {
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elev);
+  overflow: hidden;
+}
+
+.vm-audio-scope .ad-right-header {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+  background: var(--bg-sunken);
+}
