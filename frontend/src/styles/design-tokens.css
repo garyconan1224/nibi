@@ -1,0 +1,247 @@
+/* VidMirror Design Tokens — global layer
+   Source of truth: docs/design/styles.css + docs/design/system_design_v1.1.md
+   Only generic tokens and utility classes live here.
+   Page-level styles (.hero, .composer, .sidebar, etc.) go in their own files. */
+
+/* ─── Color tokens ─── */
+:root {
+  /* Surface */
+  --bg:          #f6f5f0;
+  --bg-elev:     #ffffff;
+  --bg-sunken:   #efede6;
+
+  /* Text */
+  --ink:         #111111;
+  --ink-2:       #3a3a3a;
+  --ink-3:       #6b6b6b;
+  --ink-4:       #a0a0a0;
+
+  /* Border / divider */
+  --line:        rgba(0, 0, 0, 0.08);
+  --line-strong: rgba(0, 0, 0, 0.18);
+
+  /* Accent — semantic aliases per system_design_v1.1.md §1.3 */
+  --accent:       #FF4D7E;  /* coral — input/output, entry buttons */
+  --accent-pink:  #FF4D7E;  /* alias: input/output layer */
+  --accent-2:     #B84CFF;  /* purple — AI analysis layer */
+  --accent-purple:#B84CFF;  /* alias */
+  --accent-3:     #3C77FB;  /* blue — structured layer */
+  --accent-blue:  #3C77FB;  /* alias */
+  --accent-warm:  #FFB84C;  /* amber — storyboard layer */
+  --accent-amber: #FFB84C;  /* alias */
+  --accent-green: #22D39A;  /* completion state */
+
+  /* Pill (inverted chip) */
+  --pill-bg:  #111;
+  --pill-ink: #fff;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 6px 24px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 24px 80px rgba(0, 0, 0, 0.18);
+}
+
+[data-theme="dark"] {
+  --bg:          #0d0c10;
+  --bg-elev:     #16151b;
+  --bg-sunken:   #0a0a0d;
+  --ink:         #f7f6f2;
+  --ink-2:       #d4d3ce;
+  --ink-3:       #8f8d86;
+  --ink-4:       #5b5a55;
+  --line:        rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.2);
+  --pill-bg:     #f7f6f2;
+  --pill-ink:    #0d0c10;
+  --shadow-sm:   0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-md:   0 6px 24px rgba(0, 0, 0, 0.5);
+  --shadow-lg:   0 24px 80px rgba(0, 0, 0, 0.7);
+}
+
+/* ─── Font stacks ─── */
+:root {
+  --mono:    ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  --sans:    'Inter', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  --display: 'Instrument Serif', 'Source Han Serif SC', 'Noto Serif SC', Georgia, serif;
+}
+
+/* ─── Spacing scale ─── */
+:root {
+  --sp-1:  4px;
+  --sp-2:  8px;
+  --sp-3:  12px;
+  --sp-4:  16px;
+  --sp-5:  20px;
+  --sp-6:  24px;
+  --sp-8:  32px;
+}
+
+/* ─── Radius scale ─── */
+:root {
+  --radius:    18px;
+  --radius-sm: 10px;
+  --radius-lg: 28px;
+  --radius-pill: 99px;
+}
+
+/* ─── Typography utilities ─── */
+
+.display {
+  font-family: var(--display);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+}
+
+.mono {
+  font-family: var(--mono);
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.lede {
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+/* ─── Chip ─── */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 99px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
+.chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--accent-green);
+}
+
+.chip-dot.amber { background: var(--accent-warm); }
+.chip-dot.red   { background: var(--accent); }
+
+/* ─── Keyword highlight ─── */
+
+.kw {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--bg-sunken);
+  color: var(--ink-3);
+}
+
+/* ─── Buttons ─── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  transition: all 140ms ease;
+}
+
+.btn:hover {
+  background: var(--bg-sunken);
+  border-color: var(--line-strong);
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.btn-ghost:hover {
+  background: var(--bg-sunken);
+}
+
+.btn-primary {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+
+.btn-primary:hover {
+  background: var(--ink-2);
+}
+
+.btn-run {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 8px 10px 18px;
+  border-radius: 99px;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 160ms ease;
+}
+
+.btn-run:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-run .iconwrap {
+  width: 28px;
+  height: 28px;
+  border-radius: 99px;
+  background: var(--accent);
+  color: #fff;
+  display: grid;
+  place-items: center;
+}
+
+/* ─── Spinner ─── */
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 99px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── KBD ─── */
+
+.kbd-key {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--ink-3);
+}
