@@ -91,7 +91,7 @@
 - [ ] **H4** Results 结果页 1:1 复刻（4 子页）— `10-14h` P2
   - [x] H4.1 VideoResultPage 改造（⭐ 小米）— 3-4h
   - [x] H4.2 AudioResultPage 改造（⭐ 小米）— 3-4h
-  - [ ] H4.3 ImageResultPage 改造（⭐ 小米）— 2-3h
+  - [x] H4.3 ImageResultPage 改造（⭐ 小米）— 2-3h
   - [ ] H4.4 TextResultPage 改造（⭐ 小米）— 2-3h
 
 - [ ] **H5** Storyboard 分镜页 1:1 复刻 — `6-10h` P3（依赖后端能力评估）
