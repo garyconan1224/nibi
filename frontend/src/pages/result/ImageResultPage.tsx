@@ -27,6 +27,7 @@ import {
 import { ASSOCIATION_DIRECTION_LABELS, type AssociationDirection } from '@/lib/preflightTasks'
 
 import './tokens.css'
+import './image-result.css'
 import { ItemTagsPanel } from '@/components/workspace/ItemTagsPanel'
 
 const ACTIVE_LIMIT = 3
@@ -229,7 +230,7 @@ export default function ImageResultPage() {
 
   if (fetchState.kind === 'loading') {
     return (
-      <div className="vm-video-result-scope" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
+      <div className="vm-image-scope" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
         <span className="mono" style={{ color: 'var(--ink-3)' }}>加载图片结果…</span>
       </div>
     )
@@ -237,7 +238,7 @@ export default function ImageResultPage() {
   if (fetchState.kind === 'error' || !result) {
     return (
       <div
-        className="vm-video-result-scope"
+        className="vm-image-scope"
         style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}
       >
         <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
@@ -251,77 +252,20 @@ export default function ImageResultPage() {
   }
 
   return (
-    <div
-      className="vm-video-result-scope"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 380px',
-        height: '100%',
-        overflow: 'hidden',
-      }}
-    >
+    <div className="vm-image-scope im-layout">
       {/* ════════ 左：原图全尺寸 ════════ */}
-      <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="im-left">
         {/* 顶部导航 */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            padding: '10px 20px',
-            borderBottom: '1px solid var(--line)',
-            flexShrink: 0,
-            background: 'var(--bg-elev)',
-          }}
-        >
-          <button
-            className="btn-ghost"
-            onClick={() => navigate(-1)}
-            style={{ height: 28, padding: '0 10px', fontSize: 12 }}
-          >
+        <div className="vd-nav">
+          <button className="btn-ghost" onClick={() => navigate(-1)} style={{ height: 28, padding: '0 10px', fontSize: 12 }}>
             <ArrowLeft size={13} /> 任务中心
           </button>
-          <span style={{ width: 1, height: 16, background: 'var(--line)', flexShrink: 0 }} />
-          <span
-            style={{
-              fontWeight: 600,
-              fontSize: 13,
-              flex: 1,
-              minWidth: 0,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {result.image.title}
-          </span>
+          <span className="vd-sep" />
+          <span className="vd-title">{result.image.title}</span>
           <span className="kw mono" style={{ fontSize: 10, flexShrink: 0 }}>IMAGE</span>
           {result.source === 'demo_fixture' && (
-            <span
-              className="mono"
-              style={{
-                fontSize: 10,
-                padding: '2px 8px',
-                borderRadius: 6,
-                background: 'var(--accent-warm)',
-                color: '#fff',
-                fontWeight: 600,
-              }}
-              title="results 尚未填充，正在使用 demo fixture"
-            >
-              DEMO
-            </span>
+            <span className="mono" style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'var(--accent-warm)', color: '#fff', fontWeight: 600 }} title="demo fixture">DEMO</span>
           )}
-          {/* N11: 导出工作包入口隐藏（代码保留，见 SPEC §8.2）
-          <button
-            className="btn-ghost"
-            onClick={handleExport}
-            title="导出复刻工作包 (.zip)"
-            style={{ height: 28, padding: '0 10px', fontSize: 12, flexShrink: 0 }}
-          >
-            <Download size={13} /> 导出
-          </button>
-          */}
         </div>
 
         {/* 标签展示 */}
@@ -330,173 +274,62 @@ export default function ImageResultPage() {
         </div>
 
         {/* 原图区域 */}
-        <div
-          style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 20,
-            overflow: 'auto',
-            background: 'var(--bg-sunken)',
-          }}
-        >
-          <img
-            src={result.image.image_url}
-            alt={result.image.title}
-            style={{
-              maxWidth: '100%',
-              maxHeight: '80vh',
-              objectFit: 'contain',
-              borderRadius: 12,
-              boxShadow: '0 2px 16px rgba(0,0,0,0.08)',
-            }}
-          />
+        <div className="im-viewer">
+          <img src={result.image.image_url} alt={result.image.title} />
         </div>
       </div>
 
       {/* ════════ 右：信息面板 ════════ */}
-      <div
-        style={{
-          borderLeft: '1px solid var(--line)',
-          display: 'flex',
-          flexDirection: 'column',
-          background: 'var(--bg-elev)',
-          overflow: 'hidden',
-        }}
-      >
+      <div className="im-right">
         {/* 提示词 tabs 标题行 */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            padding: '10px 14px',
-            borderBottom: '1px solid var(--line)',
-            flexShrink: 0,
-            background: 'var(--bg-sunken)',
-          }}
-        >
+        <div className="vd-tabs-bar">
           <span className="eyebrow" style={{ flex: 1 }}>提示词格式</span>
-          <button
-            onClick={openPicker}
-            title="选择 3 个图片类格式作为 tabs（JSON 自动附加）"
-            style={{
-              height: 26,
-              padding: '0 8px',
-              borderRadius: 6,
-              fontSize: 10,
-              fontFamily: 'var(--mono)',
-              border: '1px solid var(--line)',
-              background: 'transparent',
-              color: 'var(--ink-3)',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-            }}
-          >
+          <button className="im-settings-btn" onClick={openPicker} title="选择 3 个图片类格式作为 tabs（JSON 自动附加）">
             <Settings2 size={11} /> 选择
           </button>
         </div>
 
         {/* tabs 按钮行 */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            padding: '6px 14px 8px',
-            borderBottom: '1px solid var(--line)',
-            flexShrink: 0,
-            background: 'var(--bg-sunken)',
-            overflowX: 'auto',
-          }}
-        >
+        <div className="vd-tabs-row">
           {tabs.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setPromptStyle(t.key)}
-              style={{
-                height: 26,
-                padding: '0 10px',
-                borderRadius: 6,
-                fontSize: 11,
-                fontWeight: 700,
-                fontFamily: 'var(--mono)',
-                border: 'none',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                background: promptStyle === t.key ? 'var(--ink)' : 'transparent',
-                color: promptStyle === t.key ? 'var(--bg)' : 'var(--ink-3)',
-              }}
-            >
+            <button key={t.key} className="vd-tab-btn" data-active={promptStyle === t.key} onClick={() => setPromptStyle(t.key)}>
               {t.label}
             </button>
           ))}
           {!tabs.length && (
-            <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>
-              （提示词格式未加载）
-            </span>
+            <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>（提示词格式未加载）</span>
           )}
         </div>
 
         {/* 可滚动内容区 */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
+        <div className="im-content-scroll">
           {/* 提示词文本 */}
-          <div
-            style={{
-              fontFamily: 'var(--mono)',
-              fontSize: 11.5,
-              lineHeight: 1.72,
-              background: 'var(--bg-sunken)',
-              padding: '12px 13px',
-              borderRadius: 12,
-              border: '1px solid var(--line)',
-              color: 'var(--ink)',
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              marginBottom: 14,
-            }}
-          >
+          <div className="im-prompt-text">
             {promptText}
           </div>
 
           {/* 内容识别描述 */}
-          <div style={{ marginBottom: 14 }}>
-            <div className="eyebrow" style={{ marginBottom: 6 }}>内容识别描述</div>
-            <div style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--ink-2)' }}>
+          <div className="im-section">
+            <div className="eyebrow im-section-label">内容识别描述</div>
+            <div className="im-section-body">
               {result.description}
             </div>
           </div>
 
           {/* OCR 提取文字（如有） */}
           {result.ocr_text && (
-            <div style={{ marginBottom: 14 }}>
-              <div className="eyebrow" style={{ marginBottom: 6 }}>OCR 提取文字</div>
-              <div
-                className="mono"
-                style={{
-                  fontSize: 12,
-                  lineHeight: 1.6,
-                  color: 'var(--ink-2)',
-                  background: 'var(--bg-sunken)',
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  border: '1px solid var(--line)',
-                  whiteSpace: 'pre-wrap',
-                }}
-              >
+            <div className="im-section">
+              <div className="eyebrow im-section-label">OCR 提取文字</div>
+              <div className="mono im-ocr-block">
                 {result.ocr_text}
               </div>
             </div>
           )}
 
           {/* 标签 */}
-          <div style={{ marginBottom: 14 }}>
-            <div className="eyebrow" style={{ marginBottom: 6 }}>标签</div>
-            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          <div className="im-section">
+            <div className="eyebrow im-section-label">标签</div>
+            <div className="im-tags-wrap">
               {Object.entries(result.tags).flatMap(([category, values]) =>
                 values.map((v) => (
                   <span key={`${category}-${v}`} className="kw" style={{ fontSize: 10 }}>
@@ -509,15 +342,15 @@ export default function ImageResultPage() {
 
           {/* N9: 联想分析（如有） */}
           {result.associations && Object.keys(result.associations).length > 0 && (
-            <div style={{ marginBottom: 14 }}>
-              <div className="eyebrow" style={{ marginBottom: 6 }}>联想分析</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="im-section">
+              <div className="eyebrow im-section-label">联想分析</div>
+              <div className="im-assoc-list">
                 {Object.entries(result.associations).map(([dir, text]) => (
                   <div key={dir}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-3)', marginBottom: 2 }}>
+                    <div className="im-assoc-dir">
                       {ASSOCIATION_DIRECTION_LABELS[dir as AssociationDirection] ?? dir}
                     </div>
-                    <div style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--ink-2)' }}>
+                    <div className="im-assoc-text">
                       {text}
                     </div>
                   </div>
@@ -528,9 +361,9 @@ export default function ImageResultPage() {
 
           {/* EXIF 信息 */}
           {(result.exif?.time || result.exif?.location) && (
-            <div style={{ marginBottom: 14 }}>
-              <div className="eyebrow" style={{ marginBottom: 6 }}>EXIF 信息</div>
-              <div style={{ fontSize: 12, lineHeight: 1.8, color: 'var(--ink-2)' }}>
+            <div className="im-section">
+              <div className="eyebrow im-section-label">EXIF 信息</div>
+              <div className="im-exif-body">
                 {result.exif?.time && <div>拍摄时间：{result.exif.time}</div>}
                 {result.exif?.location && <div>拍摄地点：{result.exif.location}</div>}
               </div>
@@ -547,54 +380,15 @@ export default function ImageResultPage() {
         </div>
 
         {/* 底部操作按钮 */}
-        <div
-          style={{
-            padding: '10px 14px',
-            borderTop: '1px solid var(--line)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 7,
-            flexShrink: 0,
-          }}
-        >
-          <button
-            onClick={handleCopy}
-            style={{
-              width: '100%',
-              height: 36,
-              borderRadius: 10,
-              fontSize: 13,
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 7,
-              cursor: 'pointer',
-              border: 'none',
-              background: 'var(--ink)',
-              color: 'var(--bg)',
-            }}
-          >
+        <div className="im-actions">
+          <button className="im-btn-main" onClick={handleCopy}>
             {copied ? <Check size={14} /> : <Copy size={14} />}
             {copied ? '已复制！' : '一键复制提示词'}
           </button>
           <button
+            className="im-btn-sub"
+            data-favored={favored}
             onClick={handleFavorite}
-            style={{
-              width: '100%',
-              height: 36,
-              borderRadius: 10,
-              fontSize: 13,
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 7,
-              cursor: 'pointer',
-              border: '1px solid var(--line)',
-              background: favored ? 'rgba(255,184,76,0.12)' : 'var(--bg-sunken)',
-              color: favored ? 'var(--accent-warm)' : 'var(--ink-2)',
-            }}
           >
             <Star
               size={14}
@@ -604,28 +398,15 @@ export default function ImageResultPage() {
             {favored ? '已收藏此图 ★' : '收藏此图'}
           </button>
           <button
+            className="im-btn-sub"
             onClick={handleCompare}
             disabled={compareLoading}
-            style={{
-              width: '100%',
-              height: 36,
-              borderRadius: 10,
-              fontSize: 13,
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 7,
-              cursor: compareLoading ? 'wait' : 'pointer',
-              border: '1px solid var(--line)',
-              background: 'var(--bg-sunken)',
-              color: 'var(--ink-2)',
-            }}
+            style={{ cursor: compareLoading ? 'wait' : 'pointer' }}
           >
             <BarChart2 size={14} />
             {compareLoading ? '对比分析中...' : '多图对比'}
           </button>
-          <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)', textAlign: 'center' }}>
+          <span className="im-shortcut-hint">
             快捷键：C 复制 · F 收藏 · 1/2/3 切格式
           </span>
         </div>
@@ -665,114 +446,47 @@ interface FormatPickerProps {
 
 function FormatPicker({ allFormats, selection, onToggle, onCancel, onSave }: FormatPickerProps) {
   return (
-    <div
-      onClick={onCancel}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.4)',
-        zIndex: 50,
-        display: 'grid',
-        placeItems: 'center',
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'var(--bg-elev)',
-          border: '1px solid var(--line)',
-          borderRadius: 14,
-          padding: 18,
-          width: 420,
-          maxHeight: '80vh',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 12,
-        }}
-      >
+    <div className="vm-image-scope im-picker-overlay" onClick={onCancel}>
+      <div className="im-picker-panel" onClick={(e) => e.stopPropagation()}>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700 }}>选择 3 个图片类格式</div>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+          <div className="im-picker-title">选择 3 个图片类格式</div>
+          <div className="im-picker-hint">
             选中的格式将作为提示词 tabs 显示，JSON 格式始终附加在末尾。
           </div>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto' }}>
+        <div className="im-picker-list">
           {allFormats.map((fmt) => {
             const selected = selection.includes(fmt.id)
             return (
               <button
                 key={fmt.id}
+                className="im-picker-item"
+                data-selected={selected}
                 onClick={() => onToggle(fmt.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  border: selected ? '2px solid var(--accent)' : '1px solid var(--line)',
-                  background: selected ? 'rgba(255,77,126,0.06)' : 'transparent',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                }}
               >
-                <div
-                  style={{
-                    width: 18,
-                    height: 18,
-                    borderRadius: 5,
-                    border: selected ? 'none' : '1.5px solid var(--ink-4)',
-                    background: selected ? 'var(--accent)' : 'transparent',
-                    display: 'grid',
-                    placeItems: 'center',
-                    flexShrink: 0,
-                  }}
-                >
+                <div className="im-picker-check">
                   {selected && <Check size={12} color="#fff" />}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{fmt.name}</div>
+                  <div className="im-picker-fmt-name">{fmt.name}</div>
                   {fmt.description && (
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>{fmt.description}</div>
+                    <div className="im-picker-fmt-desc">{fmt.description}</div>
                   )}
                 </div>
               </button>
             )
           })}
           {!allFormats.length && (
-            <div style={{ fontSize: 12, color: 'var(--ink-4)', textAlign: 'center', padding: 16 }}>
+            <div className="im-compare-empty">
               暂无可用的图片类格式
             </div>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button
-            onClick={onCancel}
-            style={{
-              height: 32,
-              padding: '0 14px',
-              borderRadius: 8,
-              fontSize: 12,
-              border: '1px solid var(--line)',
-              background: 'transparent',
-              cursor: 'pointer',
-            }}
-          >
+        <div className="im-picker-actions">
+          <button className="im-picker-cancel" onClick={onCancel}>
             取消
           </button>
-          <button
-            onClick={onSave}
-            style={{
-              height: 32,
-              padding: '0 14px',
-              borderRadius: 8,
-              fontSize: 12,
-              fontWeight: 600,
-              border: 'none',
-              background: 'var(--ink)',
-              color: 'var(--bg)',
-              cursor: 'pointer',
-            }}
-          >
+          <button className="im-picker-confirm" onClick={onSave}>
             确认（{selection.length}/{ACTIVE_LIMIT}）
           </button>
         </div>
@@ -788,71 +502,34 @@ function ImageCompareDialog({ data, onClose }: { data: ImageCompareResult; onClo
   const others = data.images.filter((img) => !img.is_current && img.has_result)
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.5)',
-        zIndex: 60,
-        display: 'grid',
-        placeItems: 'center',
-        padding: 20,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'var(--bg-elev)',
-          border: '1px solid var(--line)',
-          borderRadius: 14,
-          padding: 20,
-          width: '100%',
-          maxWidth: 720,
-          maxHeight: '80vh',
-          overflow: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 16,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontSize: 15, fontWeight: 700 }}>多图对比</div>
-          <button
-            onClick={onClose}
-            style={{
-              height: 28,
-              padding: '0 10px',
-              borderRadius: 6,
-              fontSize: 11,
-              border: '1px solid var(--line)',
-              background: 'transparent',
-              cursor: 'pointer',
-            }}
-          >
+    <div className="vm-image-scope im-compare-overlay" onClick={onClose}>
+      <div className="im-compare-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="im-compare-header">
+          <div className="im-compare-title">多图对比</div>
+          <button className="im-compare-close" onClick={onClose}>
             关闭
           </button>
         </div>
 
         {others.length === 0 ? (
-          <div style={{ fontSize: 13, color: 'var(--ink-3)', textAlign: 'center', padding: 20 }}>
+          <div className="im-compare-empty">
             同工作空间内暂无其他已完成分析的图片素材，无法对比。
           </div>
         ) : (
           <>
             {/* 结构化对比表 */}
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <table className="im-compare-table">
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--line)' }}>
-                    <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--ink-3)', fontWeight: 600 }}>维度</th>
+                  <tr>
+                    <th>维度</th>
                     {current && (
-                      <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--accent-warm)', fontWeight: 600 }}>
+                      <th className="col-current">
                         {current.name}（当前）
                       </th>
                     )}
                     {others.map((img) => (
-                      <th key={img.item_id} style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--ink-2)', fontWeight: 600 }}>
+                      <th key={img.item_id}>
                         {img.name}
                       </th>
                     ))}
@@ -877,8 +554,8 @@ function ImageCompareDialog({ data, onClose }: { data: ImageCompareResult; onClo
             {/* VLM 总结 */}
             {data.vlm_summary && (
               <div>
-                <div className="eyebrow" style={{ marginBottom: 6 }}>AI 对比总结</div>
-                <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--ink-2)', whiteSpace: 'pre-wrap' }}>
+                <div className="eyebrow im-section-label">AI 对比总结</div>
+                <div className="im-compare-summary">
                   {data.vlm_summary}
                 </div>
               </div>
@@ -892,10 +569,10 @@ function ImageCompareDialog({ data, onClose }: { data: ImageCompareResult; onClo
 
 function CompareRow({ label, values }: { label: string; values: string[] }) {
   return (
-    <tr style={{ borderBottom: '1px solid var(--line)' }}>
-      <td style={{ padding: '6px 8px', fontWeight: 600, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>{label}</td>
+    <tr>
+      <td className="label-cell">{label}</td>
       {values.map((v, i) => (
-        <td key={i} style={{ padding: '6px 8px', color: 'var(--ink-2)' }}>{v}</td>
+        <td key={i}>{v}</td>
       ))}
     </tr>
   )

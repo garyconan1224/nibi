@@ -85,14 +85,14 @@
   - [ ] H2.6 删除旧 WorkspaceDetail.tsx（待确认无回归后）
 
 详细执行计划：[docs/plans/phase-h2-taskboard.md](plans/phase-h2-taskboard.md)
-- [ ] **H3** Processing 处理中页面 1:1 复刻 — `4-6h` P2（方案 A 新路由）
-  - [ ] H3.1 ProcessingPage 骨架 + SSE 接线（⭐ 小米）
+- [x] **H3** Processing 处理中页面 1:1 复刻 — `4-6h` P2（方案 A 新路由）
+  - [x] H3.1 ProcessingPage 骨架 + SSE 接线（⭐ 小米）
 
-- [ ] **H4** Results 结果页 1:1 复刻（4 子页）— `10-14h` P2
-  - [ ] H4.1 VideoResultPage 改造（⭐ 小米）— 3-4h
-  - [ ] H4.2 AudioResultPage 改造（⭐ 小米）— 3-4h
-  - [ ] H4.3 ImageResultPage 改造（⭐ 小米）— 2-3h
-  - [ ] H4.4 TextResultPage 改造（⭐ 小米）— 2-3h
+- [x] **H4** Results 结果页 1:1 复刻（4 子页）— `10-14h` P2
+  - [x] H4.1 VideoResultPage 改造（⭐ 小米）— 3-4h
+  - [x] H4.2 AudioResultPage 改造（⭐ 小米）— 3-4h
+  - [x] H4.3 ImageResultPage 改造（⭐ 小米）— 2-3h
+  - [x] H4.4 TextResultPage 改造（⭐ 小米）— 2-3h
 
 - [ ] **H5** Storyboard 分镜页 1:1 复刻 — `6-10h` P3（依赖后端能力评估）
   - [ ] H5.1 后端 spike + 决议（**Opus 4.7**）— 2-3h
@@ -116,8 +116,9 @@
 
 H1 工作台 + H2 任务中心已完成（2026-05-20，均合并入 main，UI 1:1 复刻设计稿）。
 今天计划做完 H3 + H4 + H5（用户决议）。
-正在进行：**H3 Processing**（分支 `feat/homepage-h3-processing`，⭐ 小米执行）
-后续：H4 Results（4 子页，⭐ 小米）→ H5 Storyboard（**Opus 4.7**，含后端 spike）
+H3 Processing 已完成（2026-05-20，合并入 main）。
+H4 Results 已完成（2026-05-20，4 子页全部改造完毕）。
+下一步：**H5 Storyboard**（**Opus 4.7**，含后端 spike）
 
 延后子阶段：
 - **N7b** 视频总结路径 1/3（P2，8-12h）— 依赖字幕抽取 + 视频大模型 API 决策
