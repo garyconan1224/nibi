@@ -94,10 +94,10 @@
   - [x] H4.3 ImageResultPage 改造（⭐ 小米）— 2-3h
   - [x] H4.4 TextResultPage 改造（⭐ 小米）— 2-3h
 
-- [ ] **H5** Storyboard 分镜页 1:1 复刻 — `6-10h` P3（依赖后端能力评估）
-  - [ ] H5.1 后端 spike + 决议（**Opus 4.7**）— 2-3h
-  - [ ] H5.2 StoryboardPage 骨架（**Opus 4.7**）— 4-7h
-  - [ ] H5.3 生成按钮（**Opus 4.7**，可选押后到 [C]）— 2-3h
+- [x] **H5** Storyboard 分镜页 1:1 复刻 — 实际 ~4h（spike 后大幅简化）
+  - [x] H5.1 后端 spike + D1/D2/D3 决议（Opus 4.7）
+  - [x] H5.2 StoryboardPage 方案 A markdown 直展（Opus 4.7）
+  - [ ] ~~H5.3 生成按钮~~ → 押后到 [C]（按钮已禁用 + PHASE C pill）
 
 详细执行计划：[docs/plans/phase-h3-processing.md](plans/phase-h3-processing.md) / [phase-h4-results.md](plans/phase-h4-results.md) / [phase-h5-storyboard.md](plans/phase-h5-storyboard.md)
 
@@ -114,11 +114,21 @@
 
 **N1~N11 主线全部完成**。用户 2026-05-19 决议：先做 H 系列首页复刻，N7b/N8b 后做，[C]/[D] 最后。
 
-H1 工作台 + H2 任务中心已完成（2026-05-20，均合并入 main，UI 1:1 复刻设计稿）。
-今天计划做完 H3 + H4 + H5（用户决议）。
-H3 Processing 已完成（2026-05-20，合并入 main）。
-H4 Results 已完成（2026-05-20，4 子页全部改造完毕）。
-下一步：**H5 Storyboard**（**Opus 4.7**，含后端 spike）
+**H 系列首页 1:1 复刻全部完成**（2026-05-20）：
+- H1 工作台 ✅
+- H2 任务中心（9 Tab）✅
+- H3 Processing 处理中 ✅
+- H4 Results 结果页 4 子页 ✅
+- H5 Storyboard 分镜页 ✅（方案 A markdown 直展，shot 网格 + 生成留 [C]）
+
+下一步候选（待用户拍板）：
+- **N7b** 视频总结路径 1/3（依赖字幕抽取 + 视频大模型 API 决策）
+- **N8b** 音频前端交互
+- **H2.6** 删除旧 WorkspaceDetail.tsx（确认无回归）
+- **[C] AI 导演模块**（首页全套已就位，可以开始）
+- **[D] 安全 + 开源准备**
+
+发现的待修后端 bug：`'TaskRunner' object has no attribute 'append_log'`（已写日志的失败任务展示触发，独立修复任务）
 
 延后子阶段：
 - **N7b** 视频总结路径 1/3（P2，8-12h）— 依赖字幕抽取 + 视频大模型 API 决策
