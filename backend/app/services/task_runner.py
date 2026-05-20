@@ -26,6 +26,14 @@ class TaskRunner:
         with self._lock:
             self._handlers[task_type] = handler
 
+    def append_log(self, task_id: str, message: str, *, level: str = "info") -> None:
+        """代理到 store.append_log，供 handler 直接通过 runner 写日志。
+
+        pipeline_tasks.py 历史代码大量使用 `runner.append_log(...)`，
+        没有此方法时所有调用方都会抛 AttributeError 让任务失败。
+        """
+        self.store.append_log(task_id, message, level=level)
+
     def register_success_callback(self, task_type: str, callback: SuccessCallback) -> None:
         """注册 task_type 成功后的回调（可注册多个，按顺序调用）。"""
         with self._lock:
