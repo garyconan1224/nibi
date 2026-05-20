@@ -13,6 +13,7 @@ import {
 import { PromptVersionStack } from '@/components/result/PromptVersionStack'
 
 import './tokens.css'
+import './text-result.css'
 import { ItemTagsPanel } from '@/components/workspace/ItemTagsPanel'
 
 export default function TextResultPage() {
@@ -90,7 +91,7 @@ export default function TextResultPage() {
 
   if (fetchState.kind === 'loading') {
     return (
-      <div className="vm-video-result-scope" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
+      <div className="vm-text-scope" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
         <span className="mono" style={{ color: 'var(--ink-3)' }}>加载文本结果…</span>
       </div>
     )
@@ -98,7 +99,7 @@ export default function TextResultPage() {
   if (fetchState.kind === 'error' || !result) {
     return (
       <div
-        className="vm-video-result-scope"
+        className="vm-text-scope"
         style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}
       >
         <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
@@ -116,50 +117,16 @@ export default function TextResultPage() {
   const hasTranslations = result.translations && Object.keys(result.translations).length > 0
 
   return (
-    <div
-      className="vm-video-result-scope"
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 360px',
-        height: '100%',
-        overflow: 'hidden',
-      }}
-    >
+    <div className="vm-text-scope tx-layout">
       {/* ════════ 左：正文 ════════ */}
-      <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="tx-left">
         {/* 顶部导航 */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            padding: '10px 20px',
-            borderBottom: '1px solid var(--line)',
-            flexShrink: 0,
-            background: 'var(--bg-elev)',
-          }}
-        >
-          <button
-            className="btn-ghost"
-            onClick={() => navigate(-1)}
-            style={{ height: 28, padding: '0 10px', fontSize: 12 }}
-          >
+        <div className="vd-nav">
+          <button className="btn-ghost" onClick={() => navigate(-1)} style={{ height: 28, padding: '0 10px', fontSize: 12 }}>
             <ArrowLeft size={13} /> 返回
           </button>
-          <span style={{ width: 1, height: 16, background: 'var(--line)', flexShrink: 0 }} />
-          <span
-            style={{
-              fontWeight: 600,
-              fontSize: 13,
-              flex: 1,
-              minWidth: 0,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {result.title}
-          </span>
+          <span className="vd-sep" />
+          <span className="vd-title">{result.title}</span>
           <span className="kw mono" style={{ fontSize: 10, flexShrink: 0 }}>TEXT</span>
         </div>
 
@@ -169,60 +136,27 @@ export default function TextResultPage() {
         </div>
 
         {/* 正文区域 */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
-          <div style={{ fontSize: 14, lineHeight: 1.8, color: 'var(--ink-2)', whiteSpace: 'pre-wrap' }}>
+        <div className="tx-content-scroll">
+          <div className="tx-content-body">
             {result.content}
           </div>
         </div>
       </div>
 
       {/* ════════ 右：摘要 + 联想 + 改写翻译 + 元信息 + 版本栈 ════════ */}
-      <div
-        style={{
-          borderLeft: '1px solid var(--line)',
-          display: 'flex',
-          flexDirection: 'column',
-          background: 'var(--bg-elev)',
-          overflow: 'hidden',
-        }}
-      >
-        <div
-          style={{
-            padding: '10px 14px',
-            borderBottom: '1px solid var(--line)',
-            flexShrink: 0,
-            background: 'var(--bg-sunken)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
+      <div className="tx-right">
+        <div className="tx-right-header">
           <span className="eyebrow">文本摘要</span>
-          {/* N10: 多文对比按钮 */}
-          <button
-            onClick={handleCompare}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 11,
-              padding: '3px 8px',
-              borderRadius: 6,
-              border: '1px solid var(--line)',
-              background: 'var(--bg-elev)',
-              color: 'var(--ink-2)',
-              cursor: 'pointer',
-            }}
-          >
+          <button className="tx-compare-btn" onClick={handleCompare}>
             <Layers size={12} /> 多文对比
           </button>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
+        <div className="tx-right-scroll">
           {/* 摘要 */}
           {result.summary && (
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--ink-2)' }}>
+            <div className="im-section">
+              <div className="tx-summary-text">
                 {result.summary}
               </div>
             </div>
@@ -230,23 +164,16 @@ export default function TextResultPage() {
 
           {/* N10: 联想归纳 */}
           {hasAssociations && (
-            <div style={{ marginBottom: 14 }}>
-              <button
-                onClick={() => setAssocOpen(!assocOpen)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  padding: 0, marginBottom: 6,
-                }}
-              >
+            <div className="im-section">
+              <button className="tx-collapse-btn" onClick={() => setAssocOpen(!assocOpen)}>
                 {assocOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 <span className="eyebrow">联想归纳</span>
               </button>
               {assocOpen && (
-                <div style={{ fontSize: 12, lineHeight: 1.7, color: 'var(--ink-2)' }}>
+                <div className="tx-section-body">
                   {Object.entries(result.associations!).map(([dir, text]) => (
-                    <div key={dir} style={{ marginBottom: 8 }}>
-                      <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--ink-3)', marginBottom: 2 }}>{dir}</div>
+                    <div key={dir} className="tx-section-item">
+                      <div className="tx-section-item-label">{dir}</div>
                       <div>{text}</div>
                     </div>
                   ))}
@@ -257,24 +184,17 @@ export default function TextResultPage() {
 
           {/* N10: 改写/润色 */}
           {hasRewrites && (
-            <div style={{ marginBottom: 14 }}>
-              <button
-                onClick={() => setRewriteOpen(!rewriteOpen)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  padding: 0, marginBottom: 6,
-                }}
-              >
+            <div className="im-section">
+              <button className="tx-collapse-btn" onClick={() => setRewriteOpen(!rewriteOpen)}>
                 {rewriteOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 <span className="eyebrow">改写 / 润色</span>
               </button>
               {rewriteOpen && (
-                <div style={{ fontSize: 12, lineHeight: 1.7, color: 'var(--ink-2)' }}>
+                <div className="tx-section-body">
                   {Object.entries(result.rewrites!).map(([style, text]) => (
-                    <div key={style} style={{ marginBottom: 8 }}>
-                      <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--ink-3)', marginBottom: 2 }}>{style}</div>
-                      <div style={{ whiteSpace: 'pre-wrap' }}>{text}</div>
+                    <div key={style} className="tx-section-item">
+                      <div className="tx-section-item-label">{style}</div>
+                      <div className="tx-section-item-text">{text}</div>
                     </div>
                   ))}
                 </div>
@@ -284,24 +204,17 @@ export default function TextResultPage() {
 
           {/* N10: 翻译 */}
           {hasTranslations && (
-            <div style={{ marginBottom: 14 }}>
-              <button
-                onClick={() => setTranslateOpen(!translateOpen)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  padding: 0, marginBottom: 6,
-                }}
-              >
+            <div className="im-section">
+              <button className="tx-collapse-btn" onClick={() => setTranslateOpen(!translateOpen)}>
                 {translateOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 <span className="eyebrow">翻译</span>
               </button>
               {translateOpen && (
-                <div style={{ fontSize: 12, lineHeight: 1.7, color: 'var(--ink-2)' }}>
+                <div className="tx-section-body">
                   {Object.entries(result.translations!).map(([lang, text]) => (
-                    <div key={lang} style={{ marginBottom: 8 }}>
-                      <div style={{ fontWeight: 600, fontSize: 11, color: 'var(--ink-3)', marginBottom: 2 }}>{lang}</div>
-                      <div style={{ whiteSpace: 'pre-wrap' }}>{text}</div>
+                    <div key={lang} className="tx-section-item">
+                      <div className="tx-section-item-label">{lang}</div>
+                      <div className="tx-section-item-text">{text}</div>
                     </div>
                   ))}
                 </div>
@@ -310,9 +223,9 @@ export default function TextResultPage() {
           )}
 
           {/* 元信息 */}
-          <div style={{ marginBottom: 14 }}>
+          <div className="im-section">
             <div className="eyebrow" style={{ marginBottom: 6 }}>元信息</div>
-            <div style={{ fontSize: 12, lineHeight: 1.8, color: 'var(--ink-2)' }}>
+            <div className="tx-meta-body">
               <div>来源类型：{result.source_type}</div>
               <div>字符数：{result.char_count.toLocaleString()}</div>
               {result.source_url && <div>来源：{result.source_url}</div>}
@@ -327,33 +240,11 @@ export default function TextResultPage() {
         </div>
 
         {/* 底部操作 */}
-        <div
-          style={{
-            padding: '10px 14px',
-            borderTop: '1px solid var(--line)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 7,
-            flexShrink: 0,
-          }}
-        >
+        <div className="tx-actions">
           <button
+            className="tx-btn-sub"
+            data-favored={favored}
             onClick={handleFavorite}
-            style={{
-              width: '100%',
-              height: 36,
-              borderRadius: 10,
-              fontSize: 13,
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 7,
-              cursor: 'pointer',
-              border: '1px solid var(--line)',
-              background: favored ? 'rgba(255,184,76,0.12)' : 'var(--bg-sunken)',
-              color: favored ? 'var(--accent-warm)' : 'var(--ink-2)',
-            }}
           >
             <Star
               size={14}
@@ -389,31 +280,18 @@ function TextCompareModal({
   onClose: () => void
 }) {
   return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 1000,
-        background: 'rgba(0,0,0,0.5)', display: 'grid', placeItems: 'center',
-      }}
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'var(--bg)', borderRadius: 12, width: '80vw', maxWidth: 900,
-          maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
-          border: '1px solid var(--line)',
-        }}
-      >
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontWeight: 600, fontSize: 14 }}>多文对比</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--ink-3)' }}>×</button>
+    <div className="vm-text-scope tx-compare-overlay" onClick={onClose}>
+      <div className="tx-compare-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="tx-compare-header">
+          <span className="tx-compare-title">多文对比</span>
+          <button className="tx-compare-close" onClick={onClose}>×</button>
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+        <div className="tx-compare-body">
           {state.kind === 'loading' && (
-            <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 40 }}>加载对比数据…</div>
+            <div className="tx-compare-status">加载对比数据…</div>
           )}
           {state.kind === 'error' && (
-            <div style={{ textAlign: 'center', color: 'var(--accent)', padding: 40 }}>{state.message}</div>
+            <div className="tx-compare-status" data-error="true">{state.message}</div>
           )}
           {state.kind === 'ready' && (
             <TextCompareContent data={state.data} />
@@ -427,26 +305,26 @@ function TextCompareModal({
 function TextCompareContent({ data }: { data: TextCompareResult }) {
   const items = data.texts.filter((t) => t.has_result)
   if (items.length === 0) {
-    return <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: 40 }}>没有已完成分析的文字素材</div>
+    return <div className="tx-compare-status">没有已完成分析的文字素材</div>
   }
 
   return (
     <div>
       {/* 对比表格 */}
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 16 }}>
+      <table className="tx-compare-table">
         <thead>
-          <tr style={{ borderBottom: '2px solid var(--line)' }}>
-            <th style={{ textAlign: 'left', padding: '8px 6px', color: 'var(--ink-3)' }}>素材</th>
-            <th style={{ textAlign: 'left', padding: '8px 6px', color: 'var(--ink-3)' }}>字数</th>
-            <th style={{ textAlign: 'left', padding: '8px 6px', color: 'var(--ink-3)' }}>摘要</th>
+          <tr>
+            <th>素材</th>
+            <th>字数</th>
+            <th>摘要</th>
           </tr>
         </thead>
         <tbody>
           {items.map((t) => (
-            <tr key={t.item_id} style={{ borderBottom: '1px solid var(--line)', background: t.is_current ? 'rgba(99,102,241,0.06)' : undefined }}>
-              <td style={{ padding: '8px 6px', fontWeight: t.is_current ? 600 : 400 }}>{t.name}</td>
-              <td style={{ padding: '8px 6px' }}>{t.char_count.toLocaleString()}</td>
-              <td style={{ padding: '8px 6px', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.summary}</td>
+            <tr key={t.item_id} data-current={t.is_current}>
+              <td className="name-cell" data-current={t.is_current}>{t.name}</td>
+              <td>{t.char_count.toLocaleString()}</td>
+              <td className="summary-cell">{t.summary}</td>
             </tr>
           ))}
         </tbody>
@@ -456,7 +334,7 @@ function TextCompareContent({ data }: { data: TextCompareResult }) {
       {data.llm_summary && (
         <div style={{ marginTop: 12 }}>
           <div className="eyebrow" style={{ marginBottom: 6 }}>AI 对比总结</div>
-          <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--ink-2)', whiteSpace: 'pre-wrap' }}>
+          <div className="tx-compare-summary">
             {data.llm_summary}
           </div>
         </div>
