@@ -941,6 +941,12 @@ def _bridge_to_pipeline_payload(
     if item.source == "url":
         # download 任务最小 payload：url 必填，其余从 preflight 透传可选项
         payload: Dict[str, Any] = {"url": item.source_value}
+        # TODO: quality 等高级参数目前 _resolve_download_kwargs 不消费，
+        # 等 download handler 支持 format_selector 映射后再启用。
+        bg = item.preflight.background_overrides or {}
+        for k in ("quality", "frame_mode", "frame_interval_sec", "max_frames", "enabled_steps", "prompt_style"):
+            if k in bg:
+                payload[k] = bg[k]
         return "download", payload
 
     # local：直接走 analyze
