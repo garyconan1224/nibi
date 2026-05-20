@@ -539,6 +539,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
         url={url.trim()}
         platformName={platform?.name ?? null}
         selectedTypes={preflightTypes.length ? preflightTypes : undefined}
+        workspaceId={workspaceSel[0]}
         composerDefaults={{
           quality,
           frameMode,

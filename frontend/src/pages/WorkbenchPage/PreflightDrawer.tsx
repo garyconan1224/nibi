@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { useProviderStore } from '@/store/providerStore'
 import { useTaskStore } from '@/store/taskStore'
 import { createPipelineTask } from '@/services/pipeline'
+import { addWorkspaceItem } from '@/services/workspaces'
 import type { ComposerDefaults, QualityOption } from './types'
 
 const QUALITY_MAP: Record<QualityOption, string> = {
@@ -25,6 +26,8 @@ interface PreflightDrawerProps {
   selectedTypes?: string[]
   /** Composer 高级参数默认值 */
   composerDefaults?: ComposerDefaults
+  /** IP.6: 选中的工作空间 ID（简化方案：只传第一个） */
+  workspaceId?: string
   onClose: () => void
   onCreated: () => void
 }
@@ -35,6 +38,7 @@ export function PreflightDrawer({
   platformName,
   selectedTypes,
   composerDefaults,
+  workspaceId,
   onClose,
   onCreated,
 }: PreflightDrawerProps) {
@@ -149,6 +153,20 @@ export function PreflightDrawer({
         task_type: 'analyze',
         payload,
       })
+
+      // IP.6: 如果选了工作空间，同时创建 workspace item
+      if (workspaceId) {
+        try {
+          await addWorkspaceItem(workspaceId, {
+            type: 'video',
+            source: 'url',
+            source_value: url,
+            name: url.split('/').pop()?.split('?')[0] || url,
+          })
+        } catch {
+          // workspace item 创建失败不阻塞主流程
+        }
+      }
 
       addTask({
         task_id: res.task_id,
