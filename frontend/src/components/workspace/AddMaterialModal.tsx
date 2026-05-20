@@ -52,28 +52,30 @@ interface TaskDef {
 
 const TASKS_BY_TYPE: Record<ItemType, TaskDef[]> = {
   video: [
-    { id: 'frame_prompts', label: '画面提示词生成', defaultChecked: true },
-    { id: 'video_summary', label: '视频文案总结', defaultChecked: true },
-    { id: 'subtitle_export', label: '字幕导出', defaultChecked: true },
-    { id: 'music_analysis', label: '音乐分析', defaultChecked: false },
+    { id: 'frame_prompt', label: '画面提示词生成', defaultChecked: true },
+    { id: 'summary', label: '视频文案总结', defaultChecked: true },
+    { id: 'srt', label: '字幕导出', defaultChecked: true },
+    { id: 'music', label: '音乐分析', defaultChecked: false },
   ],
   audio: [
     { id: 'asr', label: '人声转写 + 内容总结', defaultChecked: true },
-    { id: 'subtitle_file', label: '生成字幕文件', defaultChecked: true },
-    { id: 'speaker_diarization', label: '说话人音色区分', defaultChecked: false },
-    { id: 'music_analysis', label: '音乐分析', defaultChecked: false },
+    { id: 'srt', label: '生成字幕文件', defaultChecked: true },
+    { id: 'voiceprint', label: '说话人音色区分', defaultChecked: true },
+    { id: 'music', label: '音乐分析', defaultChecked: false },
   ],
   image: [
-    { id: 'content_describe', label: '内容识别描述', defaultChecked: true },
-    { id: 'ocr', label: 'OCR 文字提取', defaultChecked: true },
-    { id: 'frame_prompts', label: '画面提示词生成', defaultChecked: true },
-    { id: 'association', label: '内容联想总结', defaultChecked: false },
+    { id: 'describe', label: '内容识别描述', defaultChecked: true },
+    { id: 'ocr', label: 'OCR 文字提取', defaultChecked: false },
+    { id: 'prompt', label: '画面提示词生成', defaultChecked: true },
+    { id: 'assoc', label: '内容联想总结', defaultChecked: false },
+    { id: 'compare', label: '多图对比分析', defaultChecked: false },
   ],
   text: [
     { id: 'summary', label: '摘要 / 要点 / 金句', defaultChecked: true },
-    { id: 'association', label: '联想归纳', defaultChecked: false },
+    { id: 'assoc', label: '联想归纳', defaultChecked: true },
     { id: 'rewrite', label: '改写 / 润色', defaultChecked: false },
     { id: 'translate', label: '翻译', defaultChecked: false },
+    { id: 'multi', label: '多文对比', defaultChecked: false },
   ],
 }
 
