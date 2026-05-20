@@ -114,7 +114,14 @@
 
 **N1~N11 主线全部完成**。用户 2026-05-19 决议：先做 H 系列首页复刻，N7b/N8b 后做，[C]/[D] 最后。
 
-**Integration Pass（IP）**（2026-05-20）：UI ↔ 后端对接补齐，6 个子任务全部 ⭐ 小米执行。详见 [phase-integration-pass.md](plans/phase-integration-pass.md)
+**Integration Pass（IP）已完成**（2026-05-20）：UI ↔ 后端对接补齐，6 个子任务全部合入 main。
+- [x] IP.1 Composer 高级参数透传到 Preflight
+- [x] IP.2 Composer 上传按钮接 AddMaterialModal
+- [x] IP.3 TaskboardHead 编辑背景接 BackgroundEditor
+- [x] IP.4 TagsTab 加编辑能力
+- [x] IP.5 Storyboard 触发入口
+- [x] IP.6 Composer 工作空间选择真传后端
+- 后端 bug 修复：TaskRunner.append_log 缺失（download 任务从此不再 FAILED）
 
 ---
 
