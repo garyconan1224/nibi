@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileVideo, FileAudio, FileImage, FileText, MoreHorizontal, Film } from 'lucide-react'
+import { FileVideo, FileAudio, FileImage, FileText, MoreHorizontal, Film, Subtitles } from 'lucide-react'
 import type { WorkspaceItem, ItemType } from '@/types/workspace'
+import { TranscriptPreviewModal } from '@/components/workspace/TranscriptPreviewModal'
 import { StoryboardLaunchModal } from './StoryboardLaunchModal'
 
 /** 类型 → 图标 */
@@ -67,6 +68,7 @@ export function MaterialCard({ item, workspaceId, progress }: MaterialCardProps)
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [sbOpen, setSbOpen] = useState(false)
+  const [transcriptOpen, setTranscriptOpen] = useState(false)
   const Icon = TYPE_ICON[item.type]
   const tone = TYPE_TONE[item.type]
   const dotColor = STATUS_DOT[item.status] ?? 'var(--ink-4)'
@@ -152,6 +154,28 @@ export function MaterialCard({ item, workspaceId, progress }: MaterialCardProps)
                 <Film size={13} />
                 生成分镜
               </button>
+              {(item.type === 'video' || item.type === 'audio') && (
+                <button
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    width: '100%',
+                    padding: '6px 10px',
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    borderRadius: 4,
+                  }}
+                  onClick={() => { setMenuOpen(false); setTranscriptOpen(true) }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-sunken)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
+                >
+                  <Subtitles size={13} />
+                  快速抽字幕
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -183,6 +207,11 @@ export function MaterialCard({ item, workspaceId, progress }: MaterialCardProps)
         workspaceId={workspaceId}
         framePaths={framePaths}
         onClose={() => setSbOpen(false)}
+      />
+      <TranscriptPreviewModal
+        open={transcriptOpen}
+        sourceUrl={item.source_value}
+        onClose={() => setTranscriptOpen(false)}
       />
     </>
   )

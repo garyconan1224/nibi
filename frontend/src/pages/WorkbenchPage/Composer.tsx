@@ -8,6 +8,8 @@ import type { PipelineStep, QualityOption, FrameMode } from './types'
 import type { WorkspaceRecord } from '@/types/workspace'
 import { detectPlatform } from './platforms'
 import { listWorkspaces, createWorkspace } from '@/services/workspaces'
+import { getPromptFormatsConfig } from '@/services/promptFormats'
+import type { PromptFormat } from '@/services/promptFormats'
 import { useProviderStore } from '@/store/providerStore'
 import { MixedContentModal } from './MixedContentModal'
 import { PreflightDrawer } from './PreflightDrawer'
@@ -51,6 +53,8 @@ export function Composer({ onTaskCreated }: ComposerProps) {
   const [preflightOpen, setPreflightOpen] = useState(false)
   const [preflightTypes, setPreflightTypes] = useState<string[]>([])
   const [uploadOpen, setUploadOpen] = useState(false)
+  const [promptFormats, setPromptFormats] = useState<PromptFormat[]>([])
+  const [promptStyle, setPromptStyle] = useState('')
 
   const [workspaces, setWorkspaces] = useState<WorkspaceRecord[]>([])
   const [workspaceSel, setWorkspaceSel] = useState<string[]>([])
@@ -64,6 +68,17 @@ export function Composer({ onTaskCreated }: ComposerProps) {
   // Fetch workspaces on mount
   useEffect(() => {
     listWorkspaces().then(setWorkspaces).catch(() => {})
+  }, [])
+
+  // Fetch prompt formats on mount
+  useEffect(() => {
+    getPromptFormatsConfig()
+      .then((cfg) => {
+        setPromptFormats(cfg.formats)
+        // 默认选中第一个 active image format
+        if (cfg.active_image_ids.length > 0) setPromptStyle(cfg.active_image_ids[0])
+      })
+      .catch(() => {})
   }, [])
 
   // Fetch providers on mount
@@ -476,7 +491,22 @@ export function Composer({ onTaskCreated }: ComposerProps) {
         <div className="opt-cell">
           <div className="opt-label">提示词风格</div>
           <div className="opt-value">
-            Midjourney · 双语 <ArrowRight size={12} />
+            {promptFormats.filter((f) => f.category === 'image').length > 0 ? (
+              <select
+                value={promptStyle}
+                onChange={(e) => setPromptStyle(e.target.value)}
+              >
+                {promptFormats
+                  .filter((f) => f.category === 'image')
+                  .map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+              </select>
+            ) : (
+              <span style={{ color: 'var(--ink-4)', fontSize: 13 }}>未配置</span>
+            )}
           </div>
         </div>
       </div>
@@ -549,7 +579,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
           asrModelId: asrModel || defaultAsrModel,
           visionModelId: visionModel || defaultVisionModel,
           textModelId: textModel || defaultTextModel,
-          promptStyle: 'midjourney_bilingual',
+          promptStyle: promptStyle || 'midjourney_bilingual',
         }}
         onClose={() => setPreflightOpen(false)}
         onCreated={handlePreflightCreated}

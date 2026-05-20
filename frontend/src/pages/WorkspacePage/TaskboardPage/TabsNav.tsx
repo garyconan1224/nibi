@@ -21,7 +21,7 @@ const TAB_DEFS: TabDef[] = [
   { id: 'chat', label: 'AI 对话', en: 'Task Chat', icon: MessageCircle, count: null },
   { id: 'export', label: '导出', en: 'Export', icon: Archive, count: null },
   { id: 'style', label: '风格报告', en: 'Style Report', icon: Sparkles, count: null, disabled: true, disabledHint: 'Phase [C]' },
-  { id: 'compare', label: '对比', en: 'Compare', icon: ArrowLeftRight, count: null, disabled: true, disabledHint: 'Phase [C]' },
+  { id: 'compare', label: '对比', en: 'Compare', icon: ArrowLeftRight, count: null },
 ]
 
 interface TabsNavProps {

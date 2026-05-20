@@ -8,6 +8,7 @@ import { isTaskTerminal } from '@/types/task'
 import type { WorkspaceRecord } from '@/types/workspace'
 
 import { ChatTab } from './ChatTab'
+import { CompareTab } from './CompareTab'
 import { ExportTab } from './ExportTab'
 import { FavoritesTab } from './FavoritesTab'
 import { MaterialsTab } from './MaterialsTab'
@@ -120,7 +121,10 @@ export default function TaskboardPage() {
         {tab === 'export' && (
           <ExportTab items={workspace.items} workspaceId={workspace.workspace_id} />
         )}
-        {(tab === 'style' || tab === 'compare') && (
+        {tab === 'compare' && (
+          <CompareTab workspace={workspace} />
+        )}
+        {tab === 'style' && (
           <div className="tb-placeholder">Phase [C] 开放</div>
         )}
       </div>
