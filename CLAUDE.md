@@ -23,8 +23,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - 当前主线是 **FastAPI 后端 + React/Vite 前端**。
 - `app.py`、`pages/`、`src/vidmirror/ui/` 属于 Streamlit legacy compatibility path；除非用户明确要求维护旧入口，否则不要往这里加新产品功能。
-- 新会话开始时先读 `AGENTS.md`、`docs/WORKFLOW.md`、`docs/SPEC.md`、`docs/EXECUTION_PLAN.md`、`docs/AI_HANDOFF.md`、`docs/OUTSTANDING_TASKS.md`，再判断任务边界。
-- 当前处于 **N11 后收口决策点**：`[A]` 现状同步与 `[B]` N1~N11 spec-gap landing 均已完成。下一步只能在 `.git` 历史瘦身、拆出子阶段 `N1b / N7b / N8b`、`[C]` AI 导演、`[D]` 开源准备之间选择。
+- 新会话开始时先读 `AGENTS.md`、`docs/WORKFLOW.md`、`docs/SPEC.md`、**`docs/ROADMAP.md`（长期升级路线图，2026-05-21 起的真相源）**、`docs/EXECUTION_PLAN.md`、`docs/AI_HANDOFF.md`、`docs/OUTSTANDING_TASKS.md`，再判断任务边界。
+- 当前处于 **F1（IP.9 流程缺口补齐）**：H1~H5 + IP.1~IP.8 全部已合入 main。用户决议先打磨现有流程 + 落地 5 张流程图，再做 [C] / [D]。具体 track 看 `docs/ROADMAP.md`。
 
 ---
 

@@ -20,8 +20,9 @@ git branch --show-current
 2. `docs/WORKFLOW.md`
 3. `docs/SPEC.md`
 4. `docs/EXECUTION_PLAN.md`
-5. `docs/design/`（如需视觉对照）
-6. 本文件「下一步」段
+5. **`docs/ROADMAP.md`**（2026-05-21 新增——长期升级路线图，6 条 track 全景视图）
+6. `docs/design/`（如需视觉对照）
+7. 本文件「下一步」段
 
 ---
 
@@ -50,6 +51,18 @@ git branch --show-current
 - H2.6：删除旧 WorkspaceDetail.tsx + WorkspaceSearchBar.tsx（-680 行）
 
 **当前 main**：`ff2cab0 Merge cleanup: IP.8.6-fix + H2.6`
+
+---
+
+## 2026-05-21 调整方向
+
+用户决议：**不去 [C] / [D]**，先把现有功能跟流程图 5 张对齐打磨。新长期路线图 `docs/ROADMAP.md` 6 条 track 已落盘。当前活跃任务：
+
+- 分支 `feat/ip9-flow-gaps`（已开 + plan `docs/plans/phase-ip9-flow-gaps.md`）
+- Tier A（UI 层）3 子任务 ⭐ 小米：IP.9.1 总览页 / IP.9.2 音频 6 任务 / IP.9.3 视频 3 路径
+- Tier B（后端层）等 Tier A 验收后再做：路径 1 字幕直接总结（Sonnet）/ 路径 3 Gemini 集成（Opus）/ 字幕清洗（Sonnet）
+
+具体执行索引去 `docs/ROADMAP.md` §3~§8 看对应 track，再去 plan md 看子任务步骤。
 
 ---
 
