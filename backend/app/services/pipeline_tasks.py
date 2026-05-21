@@ -3,7 +3,9 @@ from __future__ import annotations
 """Task handlers for pipeline task center."""
 
 import base64
+import hashlib
 import json
+import subprocess
 import time
 import urllib.request
 from pathlib import Path
@@ -38,6 +40,100 @@ from shared.video_analyzer import (
 from shared.video_download_ytdlp import run_ytdlp_download
 from src.vidmirror.core.providers import ChatRequest
 from src.vidmirror.core.providers.registry import create_default_registry
+
+
+# ── N7b 路径 1：视频字幕直接总结 ──────────────────────────────
+
+_VIDEO_TEMPLATE_PROMPTS: Dict[str, str] = {
+    "教程": (
+        "这是一段教程/课程类视频的转写文本。请按以下结构输出总结：\n"
+        "1. 一句话摘要（30字以内）\n"
+        "2. 知识点列表（编号，每点一句话）\n"
+        "3. 重点概念解释（如有专有术语）\n"
+        "4. 学习建议（1-2 条）\n"
+    ),
+    "Vlog": (
+        "这是一段 Vlog/生活记录类视频的转写文本。请按以下结构输出总结：\n"
+        "1. 一句话摘要（30字以内）\n"
+        "2. 地点与事件亮点（编号列表）\n"
+        "3. 情绪氛围描述（1-2 句）\n"
+        "4. 金句摘录（如有精彩表达）\n"
+    ),
+    "访谈": (
+        "这是一段访谈类视频的转写文本。请按以下结构输出总结：\n"
+        "1. 一句话摘要（30字以内）\n"
+        "2. 受访者核心观点（编号列表）\n"
+        "3. 金句摘录（直接引用）\n"
+        "4. 话题脉络梳理（简要）\n"
+    ),
+    "影视点评": (
+        "这是一段影视点评类视频的转写文本。请按以下结构输出总结：\n"
+        "1. 一句话摘要（30字以内）\n"
+        "2. 点评要点（编号列表）\n"
+        "3. 优缺点分析\n"
+        "4. 推荐指数与理由\n"
+    ),
+    "产品评测": (
+        "这是一段产品评测类视频的转写文本。请按以下结构输出总结：\n"
+        "1. 一句话摘要（30字以内）\n"
+        "2. 产品核心卖点（编号列表）\n"
+        "3. 优缺点分析\n"
+        "4. 适合人群与购买建议\n"
+    ),
+    "其它": (
+        "请将以下视频转写文本总结为结构化输出：\n"
+        "1. 一句话摘要（30字以内）\n"
+        "2. 要点列表（3-5 条，每条一句话）\n"
+        "3. 金句摘录（如有精彩表达）\n"
+    ),
+}
+
+
+def _extract_audio_from_video(
+    video_path: Path,
+    output_path: Path,
+    log_fn: Optional[Any] = None,
+) -> Path:
+    """用 ffmpeg 从视频中提取音频轨道为 WAV。"""
+    cmd = [
+        "ffmpeg", "-y", "-i", str(video_path),
+        "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
+        str(output_path),
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    if result.returncode != 0:
+        raise RuntimeError(f"ffmpeg 音频提取失败: {result.stderr[:500]}")
+    if log_fn:
+        log_fn(f"🎵 音频提取完成: {output_path.name} ({output_path.stat().st_size // 1024} KB)")
+    return output_path
+
+
+def _build_video_summary_prompt(
+    transcript: str,
+    video_template: str = "其它",
+    depth: str = "normal",
+) -> str:
+    """根据视频类型模板构建 LLM 总结 prompt。"""
+    template_instruction = _VIDEO_TEMPLATE_PROMPTS.get(
+        video_template, _VIDEO_TEMPLATE_PROMPTS["其它"]
+    )
+    depth_hint = {
+        "brief": "请简洁输出，总字数控制在 200 字以内。",
+        "normal": "请适度展开，总字数 300-500 字。",
+        "deep": "请详细分析，总字数 500-800 字。",
+    }.get(depth, "请适度展开，总字数 300-500 字。")
+
+    # 超长文本截断（LLM context 保护）
+    max_chars = 12000
+    truncated = transcript[:max_chars] if len(transcript) > max_chars else transcript
+    suffix = "\n\n（注：转写文本过长，已截断前 12000 字符）" if len(transcript) > max_chars else ""
+
+    return (
+        f"{template_instruction}\n"
+        f"{depth_hint}\n\n"
+        f"请用中文输出。\n\n"
+        f"---\n转写文本：\n{truncated}{suffix}"
+    )
 
 
 def _resolve_download_kwargs(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -135,6 +231,125 @@ def handle_download_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, An
     }
 
 
+def _run_subtitle_summary(
+    videos: List[Path],
+    payload: Dict[str, Any],
+    task_id: str,
+    text_model: str,
+    api_key: str,
+    project_video_dir: Path,
+    project_json_dir: Path,
+    runner: TaskRunner,
+) -> Dict[str, Any]:
+    """N7b 路径 1：从视频提取音频 → Whisper 转写 → LLM 字幕直接总结。"""
+    log = lambda msg: runner.append_log(task_id, msg)  # noqa: E731
+
+    # 1. 选第一个视频文件
+    video_path = videos[0]
+    log(f"🔊 路径 1 字幕总结 | 视频: {video_path.name}")
+
+    # 2. 提取音频
+    audio_hash = hashlib.md5(str(video_path).encode()).hexdigest()[:8]
+    audio_path = project_json_dir / f"{video_path.stem}_{audio_hash}.wav"
+    try:
+        runner.set_progress(task_id, 0.955, "提取音频轨道...")
+        _extract_audio_from_video(video_path, audio_path, log_fn=log)
+    except Exception as e:
+        log(f"⚠️  音频提取失败: {e}")
+        return {"summary_path": "subtitle", "summary_error": f"音频提取失败: {e}"}
+
+    # 3. Whisper 转写
+    transcript_text = ""
+    transcript_segments: List[Dict[str, Any]] = []
+    try:
+        from backend.app.services.asr_fast_whisper import (
+            is_fast_whisper_available,
+            transcribe_file_with_fast_whisper,
+        )
+        if not is_fast_whisper_available():
+            log("⚠️  本地 ASR 引擎未就绪，跳过转写")
+            return {"summary_path": "subtitle", "summary_error": "ASR 引擎未就绪"}
+
+        runner.set_progress(task_id, 0.96, "Whisper 转写中...")
+        tcfg = load_settings().transcriber
+        log(f"📄 Whisper 转写 | model={tcfg.whisper_model_size} device={tcfg.device}")
+
+        def _on_progress(ratio: float, msg: str) -> None:
+            mapped = 0.96 + 0.02 * max(0.0, min(1.0, ratio))
+            runner.set_progress(task_id, mapped, msg)
+
+        transcript_text = transcribe_file_with_fast_whisper(
+            str(audio_path),
+            model_name=tcfg.whisper_model_size or "base",
+            device=tcfg.device or "cpu",
+            language=tcfg.language or "",
+            initial_prompt=tcfg.initial_prompt or "",
+            log_callback=log,
+            progress_callback=_on_progress,
+        )
+        log(f"✅ 转写完成 | {len(transcript_text)} 字符")
+    except Exception as e:
+        log(f"⚠️  Whisper 转写失败: {e}")
+        return {"summary_path": "subtitle", "summary_error": f"转写失败: {e}"}
+
+    if not transcript_text.strip():
+        log("⚠️  转写结果为空（可能无人声）")
+        return {
+            "summary_path": "subtitle",
+            "transcript": "",
+            "summary": "（转写结果为空，可能视频无人声内容）",
+        }
+
+    # 4. LLM 总结
+    video_template = str(payload.get("video_template") or "其它").strip()
+    summary_depth = str(payload.get("summary_depth") or "normal").strip()
+    summary = ""
+
+    if api_key:
+        try:
+            runner.set_progress(task_id, 0.98, "LLM 生成摘要...")
+            prompt = _build_video_summary_prompt(transcript_text, video_template, summary_depth)
+            log(f"📝 LLM 总结 | template={video_template} | depth={summary_depth}")
+
+            settings = load_settings()
+            registry = create_default_registry()
+            profile = registry.resolve_default_profile(settings, "chat")
+            provider = registry.build(profile)
+            chat_model = text_model or str(
+                getattr(profile.default_models, "chat", None) or ""
+            ).strip()
+            if chat_model:
+                summary = provider.chat(
+                    ChatRequest(
+                        model=chat_model,
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.3,
+                        max_tokens=1200,
+                    )
+                )
+                log(f"✅ 摘要生成完成 | {len(summary)} 字符")
+            else:
+                log("⚠️  未配置 text_model，跳过 LLM 总结")
+        except Exception as e:
+            log(f"⚠️  LLM 总结失败: {e}")
+    else:
+        log("⚠️  无 API key，跳过 LLM 总结")
+
+    # 清理临时音频文件
+    try:
+        audio_path.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+    return {
+        "summary_path": "subtitle",
+        "transcript": transcript_text,
+        "transcript_segments": transcript_segments,
+        "summary": summary,
+        "video_template": video_template,
+    }
+
+
 def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     payload = record.payload
     task_id = record.task_id
@@ -202,16 +417,34 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
         merged["live_preview"] = {"snapshots": snaps, "recent_frames": tail}
         runner.store.update(record.task_id, result=merged)
         time.sleep(0.2)
-    runner.set_progress(record.task_id, 1.0, "Analysis finished")
+    runner.set_progress(record.task_id, 0.95, "Frame analysis finished")
     json_paths = sorted(project_json_dir.glob("*_视觉数据.json"))
     basenames = [p.name for p in json_paths]
     root = str(project_json_dir.resolve())
-    # 前端应使用 json_output_dir + basename 拼接，避免依赖服务端绝对路径在浏览器侧失效
-    return {
+    result: Dict[str, Any] = {
         "json_outputs": [str(p.resolve()) for p in json_paths],
         "json_output_basenames": basenames,
         "json_output_dir": root,
     }
+
+    # ── N7b 路径 1：字幕直接总结 ──────────────────────────────
+    summary_path = str(payload.get("summary_path") or "").strip()
+    if summary_path == "subtitle":
+        result.update(
+            _run_subtitle_summary(
+                videos=videos,
+                payload=payload,
+                task_id=task_id,
+                text_model=text_model,
+                api_key=api_key,
+                project_video_dir=project_video_dir,
+                project_json_dir=project_json_dir,
+                runner=runner,
+            )
+        )
+
+    runner.set_progress(record.task_id, 1.0, "Analysis finished")
+    return result
 
 
 def handle_create_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:

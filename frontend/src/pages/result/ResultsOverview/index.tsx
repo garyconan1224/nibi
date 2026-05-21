@@ -52,9 +52,9 @@ function formatSec(sec: number): string {
 /** 从 result 中提取摘要文本（按类型取不同字段） */
 function extractSummary(itemType: ItemType, result: ItemResult): string | null {
   if (itemType === 'video') {
-    const r = result as VideoResult
-    // video result 没有直接的 summary 字段，取第一帧 description 作为摘要
-    return r.frames?.[0]?.description ?? null
+    const r = result as VideoResult & { summary?: string }
+    // N7b: 优先用 LLM 字幕总结，回退到第一帧 description
+    return r.summary || (r.frames?.[0]?.description ?? null)
   }
   if (itemType === 'audio') {
     return (result as AudioResult).summary || null

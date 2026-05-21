@@ -1154,7 +1154,8 @@ def _materialize_video_results_from_analyze(
         **results,
         "frames": frames,
         "transcript": results.get("transcript") or [],
-        "summary": visual.get("global_visual_summary", ""),
+        # N7b: LLM 字幕总结优先于视觉全局摘要
+        "summary": results.get("summary") or visual.get("global_visual_summary", ""),
         "video_title": visual.get("video_title", ""),
     }
 
