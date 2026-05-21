@@ -1,6 +1,6 @@
 /* VideoResultPage 组件样式（tokens 在 tokens.css） */
 
-.vm-video-result-scope .vd-layout {
+.vm-video-result-scope.vd-layout {
   display: grid;
   grid-template-columns: 1fr 320px;
   height: 100%;
@@ -329,7 +329,7 @@
 
 /* ─── N7b 路径 1：字幕总结模式 ─── */
 
-.vm-video-result-scope .vd-subtitle-layout {
+.vm-video-result-scope.vd-subtitle-layout {
   display: flex;
   flex-direction: column;
   height: 100%;
