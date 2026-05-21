@@ -4,7 +4,7 @@
 >
 > **维护规则**：每完成一个子任务，在本文件**追加**一段（不删旧记录），格式见下方"记录模板"。
 >
-> Last updated: 2026-05-21 (IP.9 Flow Gaps 补齐)
+> Last updated: 2026-05-21 (N7b 路径 1 后端 + 结果契约修复)
 
 ---
 
@@ -674,6 +674,51 @@ WorkspaceItem.tags = {
 - N7b 路径 1（字幕直接）和路径 3（视频模型直接）的后端 handler 尚未实现，当前选择后会 fallback 到路径 2（镜头分析）
 - N8b 音乐分析 6 维度切分 UI 已就绪，但后端 librosa 分析逻辑需等 N8b 后端 phase 完成
 - Results 总览页的卡片样式为 Tier A（基础版），后续 [C] AI 导演阶段可升级为带预览图/波形图的 Tier B 版本
+
+---
+
+## N7b 路径 1 — 视频字幕直接总结后端 + 结果契约修复
+
+**完成日期**：2026-05-21
+**模型 / 工具**：小米 2.5 Pro
+**分支**：main
+**提交**：
+- `f17c04a` feat(N7b): 视频路径 1 字幕直接总结后端
+- `aac4578` fix(N7b): ResultsOverview 正确返回路径 1 字幕总结结果
+- `待提交` fix(N7b): transcript 数组契约修复 + 前端防御 + 测试
+
+### 影响范围
+- 后端：`backend/app/services/pipeline_tasks.py`（核心实现）、`backend/app/routes/workspaces.py`（API 契约层）
+- 前端：`frontend/src/pages/result/ResultsOverview/index.tsx`（防御性读取）
+- 测试：`tests/backend/test_video_result_n7b.py`（新增 3 个用例）
+- 文档：`docs/EXECUTION_PLAN.md`、`docs/ROADMAP.md`、`docs/AI_HANDOFF.md`、`docs/OUTSTANDING_TASKS.md`、`docs/COMPLETED_WORK.md`
+
+### 关键改动
+- **后端 pipeline_tasks.py**：
+  - 新增 `_VIDEO_TEMPLATE_PROMPTS`（6 种视频类型模板：教程/Vlog/访谈/影视点评/产品评测/其它）
+  - 新增 `_normalize_transcript_to_lines()`：统一将 string/segments 转为 `VideoResultTranscriptLine[]`
+  - 新增 `_extract_audio_from_video()`：ffmpeg 音频提取
+  - 新增 `_build_video_summary_prompt()`：按模板+深度构建 LLM 提示词
+  - 新增 `_run_subtitle_summary()`：完整路径 1 流程编排（提取音频→Whisper 转写→LLM 总结→结构化输出）
+  - 修改 `handle_analyze_task`：`summary_path == 'subtitle'` 时走路径 1
+- **后端 workspaces.py**：
+  - `_video_result_has_real_data()`：识别 `summary_path == 'subtitle'` 为有效结果
+  - `_materialize_video_results_from_analyze()`：路径 1 跳过 JSON 文件处理，直接返回结构化结果
+  - `get_item_result()`：对路径 1 的 transcript 做 string→array 规范化（兼容旧数据）
+- **前端 ResultsOverview**：
+  - `extractSummary`：优先读 `r.summary`（N7b 字幕总结）
+  - `extractTranscriptPreview`：`Array.isArray` 防御，string 回退 slice(0,500)
+
+### 为什么这么做
+- **transcript 数组化**：前端 `VideoResultTranscriptLine[]` 要求 `{t_sec, t_str, text}` 数组，后端原来返回 string 导致 `TypeError: raw.split is not a function`
+- **双层规范化**：后端 return 层 + API 层都做 string→array 转换，确保新数据和旧数据都安全
+- **6 种模板**：流程图 `视频.png` 要求按视频类型（教程/Vlog/访谈等）输出不同结构，硬编码模板是最快落地方式
+- **tracks_meta.transcript_count = 段数**：原来是字符数，前端期望段数（用于"前 N 段"时间轴展示）
+
+### 留给后续的影响
+- 路径 1 依赖 Whisper 模型可用（本地或 API），如不可用会返回空 transcript + error 信息
+- `_VIDEO_TEMPLATE_PROMPTS` 硬编码在代码中，后续 V3 视频模板库阶段可改为数据库/文件存储
+- 路径 3（Gemini/GPT-4o 视频直接分析）尚未实现，选择路径 3 会 fallback 到路径 2
 
 ---
 

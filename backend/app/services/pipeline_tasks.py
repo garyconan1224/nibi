@@ -89,6 +89,35 @@ _VIDEO_TEMPLATE_PROMPTS: Dict[str, str] = {
 }
 
 
+def _normalize_transcript_to_lines(
+    transcript_text: str,
+    transcript_segments: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """将转写文本规范化为 VideoResultTranscriptLine[] 格式。
+
+    优先使用 segments（带时间戳），否则将整段文本包装为单行。
+    """
+    if transcript_segments:
+        return [
+            {
+                "t_sec": float(seg.get("start", 0)),
+                "t_str": _format_sec_short(float(seg.get("start", 0))),
+                "text": str(seg.get("text", "")),
+            }
+            for seg in transcript_segments
+            if seg.get("text")
+        ]
+    if transcript_text and transcript_text.strip():
+        return [{"t_sec": 0, "t_str": "00:00", "text": transcript_text.strip()}]
+    return []
+
+
+def _format_sec_short(sec: float) -> str:
+    """秒数格式化为 MM:SS。"""
+    s = max(0, int(sec))
+    return f"{s // 60:02d}:{s % 60:02d}"
+
+
 def _extract_audio_from_video(
     video_path: Path,
     output_path: Path,
@@ -268,7 +297,7 @@ def _run_subtitle_summary(
         )
         if not is_fast_whisper_available():
             log("⚠️  本地 ASR 引擎未就绪，跳过转写")
-            return {"summary_path": "subtitle", "summary_error": "ASR 引擎未就绪"}
+            return {"summary_path": "subtitle", "transcript": [], "summary_error": "ASR 引擎未就绪"}
 
         runner.set_progress(task_id, 0.96, "Whisper 转写中...")
         tcfg = load_settings().transcriber
@@ -290,13 +319,13 @@ def _run_subtitle_summary(
         log(f"✅ 转写完成 | {len(transcript_text)} 字符")
     except Exception as e:
         log(f"⚠️  Whisper 转写失败: {e}")
-        return {"summary_path": "subtitle", "summary_error": f"转写失败: {e}"}
+        return {"summary_path": "subtitle", "transcript": [], "summary_error": f"转写失败: {e}"}
 
     if not transcript_text.strip():
         log("⚠️  转写结果为空（可能无人声）")
         return {
             "summary_path": "subtitle",
-            "transcript": "",
+            "transcript": [],
             "summary": "（转写结果为空，可能视频无人声内容）",
         }
 
@@ -341,9 +370,13 @@ def _run_subtitle_summary(
     except Exception:
         pass
 
+    # 规范化 transcript 为数组格式（前端 VideoResult.transcript 期望 VideoResultTranscriptLine[]）
+    transcript_lines = _normalize_transcript_to_lines(transcript_text, transcript_segments)
+
     return {
         "summary_path": "subtitle",
-        "transcript": transcript_text,
+        "transcript": transcript_lines,
+        "transcript_text": transcript_text,  # 保留原始文本供备用
         "transcript_segments": transcript_segments,
         "summary": summary,
         "video_template": video_template,

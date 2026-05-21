@@ -64,9 +64,13 @@ git branch --show-current
 - IP.9.3 N7b 视频路径选择 UI（3 路径 + 视频类型模板）
 - IP.9.fix align Tier A UI with pipeline payloads
 
-**N7b/N8b UI 已就绪**，后端 handler 待实现：
-- N7b 路径 1（字幕直接）+ 路径 3（视频模型直接）— 依赖字幕抽取 + 视频大模型 API 决策
-- N8b 音频 librosa 分析（6 维度切分）
+**N7b 路径 1 已完成**（2026-05-21，3 个 commit 合入 main）：
+- `f17c04a` feat(N7b): 视频路径 1 字幕直接总结后端
+- `aac4578` fix(N7b): ResultsOverview 正确返回路径 1 字幕总结结果
+- transcript 数组契约已对齐（string → VideoResultTranscriptLine[]）
+
+**N7b 路径 3 待实现**：视频模型直接分析（依赖 Gemini / GPT-4o / Qwen-VL API 集成决策）
+**N8b 待实现**：音频 librosa 分析（6 维度切分）
 
 具体执行索引去 `docs/ROADMAP.md` §3~§8 看对应 track，再去 plan md 看子任务步骤。
 

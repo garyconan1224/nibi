@@ -72,7 +72,10 @@ function extractSummary(itemType: ItemType, result: ItemResult): string | null {
 function extractTranscriptPreview(itemType: ItemType, result: ItemResult): string {
   let lines: { text: string }[] = []
   if (itemType === 'video') {
-    lines = (result as VideoResult).transcript ?? []
+    // N7b 路径 1: transcript 可能是 string（旧数据兼容），需防御
+    const raw = (result as { transcript?: unknown }).transcript
+    if (Array.isArray(raw)) lines = raw as VideoResult['transcript']
+    else if (typeof raw === 'string') return raw.slice(0, 500)
   } else if (itemType === 'audio') {
     const raw = (result as AudioResult).transcript
     if (Array.isArray(raw)) lines = raw

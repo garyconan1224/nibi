@@ -2,7 +2,7 @@
 
 > 本文件是「下一步该做什么」的快照。写入前必须先 `git log --oneline -20` 对账，避免把已完成阶段当作待办。
 
-Last updated: 2026-05-21（IP.9 Flow Gaps 补齐完成）
+Last updated: 2026-05-21（N7b 路径 1 后端完成 + 结果契约修复）
 
 ---
 
@@ -10,8 +10,9 @@ Last updated: 2026-05-21（IP.9 Flow Gaps 补齐完成）
 
 - 最新基线：N1~N11 主线 + H 系列 + IP 系列全部完成，详见 `docs/EXECUTION_PLAN.md`。
 - **IP.9 Flow Gaps 已完成**（2026-05-21）：Results 总览页 + N7b/N8b UI + payload 对齐，5 个 commit 合入 main。
+- **N7b 路径 1 已完成**（2026-05-21）：视频字幕直接总结后端 + 结果契约修复（transcript 数组化），3 个 commit 合入 main。
 - **N7b/N8b UI 已就绪**，后端 handler 待实现：
-  - N7b 路径 1（字幕直接）+ 路径 3（视频模型直接）— 依赖字幕抽取 + 视频大模型 API 决策
+  - N7b 路径 3（视频模型直接）— 依赖 Gemini / GPT-4o / Qwen-VL API 集成决策
   - N8b 音频 librosa 分析（6 维度切分）
 - 当前工作重点是在以下方向中做选择：
   - 端到端冒烟测试（用户自己跑，~30min）
@@ -36,5 +37,5 @@ Last updated: 2026-05-21（IP.9 Flow Gaps 补齐完成）
 
 - Streamlit 旧入口冻结，除非用户明确要求维护。
 - `N1b` 磁盘布局：`data/projects/` → `data/workspaces/` 仍是高影响待做项。
-- `N7b` 视频路径 1/3 后端 handler（UI 已就绪，依赖字幕抽取 + 视频大模型 API 决策）。
+- `N7b` 路径 3 后端 handler（UI 已就绪，依赖 Gemini / GPT-4o / Qwen-VL API 集成决策）。路径 1 已完成。
 - `N8b` 音频 librosa 分析后端（UI 已就绪，6 维度切分）。

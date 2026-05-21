@@ -1206,6 +1206,20 @@ def get_item_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
         if preferred_basenames:
             break
     v_results = _materialize_video_results_from_analyze(v_results, preferred_basenames=preferred_basenames)
+
+    # N7b 路径 1：规范化 transcript 为数组（前端 VideoResult.transcript 期望 array）
+    if v_results.get("summary_path") == "subtitle":
+        raw_transcript = v_results.get("transcript")
+        if isinstance(raw_transcript, str):
+            v_results["transcript"] = (
+                [{"t_sec": 0, "t_str": "00:00", "text": raw_transcript.strip()}]
+                if raw_transcript.strip()
+                else []
+            )
+        elif not isinstance(raw_transcript, list):
+            v_results["transcript"] = []
+        v_results.setdefault("frames", [])
+
     if _video_result_has_real_data(v_results):
         payload = v_results
         payload.setdefault("source", "item_results")
