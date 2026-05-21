@@ -1,12 +1,15 @@
 ---
 phase: IP.9
 title: Flow Gaps — 补齐流程图与代码的关键缺口
-status: ready
-branch: feat/ip9-flow-gaps
+status: done
+branch: feat/ip9-flow-gaps（已合并入 main）
 created: 2026-05-21
+completed_date: 2026-05-21
 priority: P1
 estimate_hours: 18-25
+actual_hours: ~6（仅 Tier A UI 层）
 depends_on: IP.8 已合并
+commits: 235be39, 9886826, cb27dd5, e618d1a, d9d3836
 ---
 
 # IP.9 流程图缺口补齐

@@ -1,6 +1,6 @@
 # AI Handoff
 
-Last updated: 2026-05-20（H 系列 + IP 全部完工，UI ↔ 后端 100% 接通）
+Last updated: 2026-05-21（IP.9 Flow Gaps 补齐，N7b/N8b UI 就绪）
 
 ---
 
@@ -50,17 +50,23 @@ git branch --show-current
 - IP.8.6-fix：N4 默认勾选 4 处对齐设计稿
 - H2.6：删除旧 WorkspaceDetail.tsx + WorkspaceSearchBar.tsx（-680 行）
 
-**当前 main**：`ff2cab0 Merge cleanup: IP.8.6-fix + H2.6`
+**当前 main**：`f33db14 merge: feat/ip9-flow-gaps into main`
 
 ---
 
 ## 2026-05-21 调整方向
 
-用户决议：**不去 [C] / [D]**，先把现有功能跟流程图 5 张对齐打磨。新长期路线图 `docs/ROADMAP.md` 6 条 track 已落盘。当前活跃任务：
+用户决议：**不去 [C] / [D]**，先把现有功能跟流程图 5 张对齐打磨。新长期路线图 `docs/ROADMAP.md` 6 条 track 已落盘。
 
-- 分支 `feat/ip9-flow-gaps`（已开 + plan `docs/plans/phase-ip9-flow-gaps.md`）
-- Tier A（UI 层）3 子任务 ⭐ 小米：IP.9.1 总览页 / IP.9.2 音频 6 任务 / IP.9.3 视频 3 路径
-- Tier B（后端层）等 Tier A 验收后再做：路径 1 字幕直接总结（Sonnet）/ 路径 3 Gemini 集成（Opus）/ 字幕清洗（Sonnet）
+**IP.9 Flow Gaps 已完成**（5 个 commit 合入 main）：
+- IP.9.1 Results 总览页（s05）+ 修跳转 bug + 路由重命名
+- IP.9.2 N8b 音频前端 6 任务勾选 + 结果页对应区块
+- IP.9.3 N7b 视频路径选择 UI（3 路径 + 视频类型模板）
+- IP.9.fix align Tier A UI with pipeline payloads
+
+**N7b/N8b UI 已就绪**，后端 handler 待实现：
+- N7b 路径 1（字幕直接）+ 路径 3（视频模型直接）— 依赖字幕抽取 + 视频大模型 API 决策
+- N8b 音频 librosa 分析（6 维度切分）
 
 具体执行索引去 `docs/ROADMAP.md` §3~§8 看对应 track，再去 plan md 看子任务步骤。
 

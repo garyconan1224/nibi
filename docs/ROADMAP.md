@@ -98,19 +98,20 @@ git log --oneline -10
 
 ### F1 流程缺口补齐（IP.9）
 
-**索引**：`docs/plans/phase-ip9-flow-gaps.md`（已起草）
+**索引**：`docs/plans/phase-ip9-flow-gaps.md`
 **前置**：IP.8 已合并 ✅
 **模型分配**：UI 层 ⭐ 小米；后端层 Sonnet / Opus
-**分支**：`feat/ip9-flow-gaps`
+**分支**：`feat/ip9-flow-gaps`（已合并入 main）
 **子任务**：
-- F1.1（IP.9.1）Results 总览页 s05 + 修跳转 bug
-- F1.2（IP.9.2）N8b 音频前端 6 任务勾选 *（与 A1 重叠）*
-- F1.3（IP.9.3）N7b 视频路径选择 UI *（与 V1 重叠）*
-- F1.4（IP.9.4）路径 1 后端：字幕直接总结 *（V2 部分）*
-- F1.5（IP.9.5）路径 3 后端：Gemini 集成 *（V3）*
-- F1.6（IP.9.6）字幕清洗（规则 + LLM）
+- [x] F1.1（IP.9.1）Results 总览页 s05 + 修跳转 bug — `9886826`
+- [x] F1.2（IP.9.2）N8b 音频前端 6 任务勾选 *（与 A1 重叠）* — `cb27dd5`
+- [x] F1.3（IP.9.3）N7b 视频路径选择 UI *（与 V1 重叠）* — `e618d1a`
+- [ ] F1.4（IP.9.4）路径 1 后端：字幕直接总结 *（V2 部分）*
+- [ ] F1.5（IP.9.5）路径 3 后端：Gemini 集成 *（V3）*
+- [ ] F1.6（IP.9.6）字幕清洗（规则 + LLM）
 
 **完工验收**：粘 B 站 URL → 完整流程图每个节点都跑通 → Results 总览能正确分流
+**当前状态**：Tier A（UI 层）已完成，Tier B（后端层）待实现
 
 ### F2 真端到端冒烟测试 + Bug 修
 
@@ -141,11 +142,11 @@ git log --oneline -10
 
 **索引**：`视频.png` + `system_design_v3_final.md` §视频 + 现有 `handle_analyze_task`
 **模型**：UI ⭐ 小米；路径 1 Sonnet；路径 3 Opus
-**分支**：`feat/v1-video-paths`
+**分支**：`feat/ip9-flow-gaps`（UI 已合并入 main）
 **子任务**：
-- V1.1 Preflight 加路径单选 + 视频类型模板 select（= F1.3）
-- V1.2 后端路径 1：字幕直接总结（= F1.4）
-- V1.3 后端路径 3：Gemini 1.5 Pro 视频输入集成（= F1.5）
+- [x] V1.1 Preflight 加路径单选 + 视频类型模板 select（= F1.3）— `e618d1a`
+- [ ] V1.2 后端路径 1：字幕直接总结（= F1.4）
+- [ ] V1.3 后端路径 3：Gemini 1.5 Pro 视频输入集成（= F1.5）
 
 **关键决策（待用户拍板）**：
 - 路径 3 模型：Gemini 1.5 Pro（用户已决） / GPT-4o / Qwen-VL 后续扩
@@ -192,11 +193,11 @@ git log --oneline -10
 
 **索引**：`音频.png` + `pipeline_tasks.py::handle_audio_task`
 **模型**：⭐ 小米
-**分支**：`feat/a1-audio-preflight`
+**分支**：`feat/ip9-flow-gaps`（已合并入 main）
 **子任务**：
-- A1.1 Preflight audio 分支补 6 个 checkbox
-- A1.2 AudioResultPage 按勾选展示对应区块
-- A1.3 后端 bridge 透传所有 6 个字段（部分 N8 未做的留 TODO）
+- [x] A1.1 Preflight audio 分支补 6 个 checkbox — `cb27dd5`
+- [x] A1.2 AudioResultPage 按勾选展示对应区块 — `cb27dd5`
+- [x] A1.3 后端 bridge 透传所有 6 个字段（部分 N8 未做的留 TODO）— `d9d3836`
 
 ### A2 说话人编辑修正 UI（N8b 核心）
 
@@ -441,11 +442,13 @@ chore/<cleanup-name>           # 清理 / 文档
 ## 11. 推荐执行顺序
 
 ```
-F1 流程缺口补齐 (IP.9 Tier A UI)        ← 当前在这里 (feat/ip9-flow-gaps)
+F1 流程缺口补齐 (IP.9 Tier A UI)        ← 已完成 (f33db14)
+  ↓
+F1 Tier B 后端（路径 1/3 + 字幕清洗）   ← 当前在这里
   ↓
 F2 端到端冒烟 + bug 修
   ↓
-A1 + V1 + I1（音视图三个 UI 层一起做完，前端可并行）
+A1 + V1 + I1（音视图三个 UI 层一起做完，前端可并行）*N7b/N8b UI 已就绪*
   ↓
 F3 错误体验优化
   ↓
@@ -491,4 +494,4 @@ R1~R5（复刻 / AI 导演 大集成）
 
 ---
 
-**End of ROADMAP. 下一步：F1（IP.9 Tier A UI）由 ⭐ 小米执行，已起草 plan `docs/plans/phase-ip9-flow-gaps.md`。**
+**End of ROADMAP. F1 Tier A UI 已完成（IP.9，5 个 commit 合入 main）。下一步：F1 Tier B 后端（路径 1/3 + 字幕清洗）或 F2 端到端冒烟测试。**

@@ -4,7 +4,7 @@
 >
 > **维护规则**：每完成一个子任务，在本文件**追加**一段（不删旧记录），格式见下方"记录模板"。
 >
-> Last updated: 2026-05-20 (IP.7 PreflightDrawer 修复完成)
+> Last updated: 2026-05-21 (IP.9 Flow Gaps 补齐)
 
 ---
 
@@ -638,6 +638,42 @@ WorkspaceItem.tags = {
 - marker 模型 ~1.5GB，首次运行需下载；后续可考虑模型缓存策略
 - 翻译/改写是单次 LLM 调用，超长文本可能截断；SPEC §7.4 的超长文本分段留到后续
 - PDF 内图片走图片分支分析（SPEC §7.3 第 4 点）未实现，留到后续
+
+---
+
+## IP.9 Flow Gaps 补齐（Results 总览 + N7b/N8b UI + payload 对齐）
+
+**完成日期**：2026-05-21
+**分支**：feat/ip9-flow-gaps
+**提交**：
+- `235be39` docs(IP.9): Flow Gaps 落盘——补流程图与代码 6 处缺口
+- `9886826` feat(IP.9.1): Results 总览页（s05）+ 修跳转 bug + 路由重命名
+- `cb27dd5` feat(IP.9.2): N8b 音频前端 6 任务勾选 + 结果页对应区块
+- `e618d1a` feat(IP.9.3): N7b 视频路径选择 UI（3 路径 + 视频类型模板）
+- `d9d3836` fix(IP.9): align Tier A UI with pipeline payloads
+
+### 影响范围
+- 后端：`backend/app/routes/workspaces.py`、`backend/app/services/pipeline_tasks.py`
+- 前端：`frontend/src/pages/result/ResultsOverview/`、`frontend/src/pages/result/AudioResultPage.tsx`、`frontend/src/pages/result/ProcessingPage/index.tsx`、`frontend/src/router.tsx`、`frontend/src/components/workspace/PreflightTaskDetails.tsx`、`frontend/src/lib/preflightTasks.ts`、`frontend/src/services/workspaces.ts`
+- 测试：`tests/backend/test_pipeline_tasks.py`、`tests/backend/test_workspaces_api.py`
+- 文档：`docs/plans/phase-ip9-flow-gaps.md`
+
+### 关键改动
+- **Results 总览页**（IP.9.1）：新增 `/workspaces/:id/results` 路由，展示所有 item 的分析结果汇总（视频/音频/图片/文字四类卡片），修复从 Taskboard 跳转 Processing 的 bug
+- **N8b 音频前端**（IP.9.2）：AudioResultPage 增加 6 个子任务勾选面板（VAD/说话人/音乐/转写/摘要/联想），结果页对应区块折叠展示
+- **N7b 视频路径选择**（IP.9.3）：PreflightDrawer 增加 3 种视频分析路径选择（字幕直接/镜头分析/视频模型直接），按路径动态显示子参数
+- **Payload 对齐**（fix）：前端 Preflight 参数与后端 pipeline payload 字段名对齐（`video_path_mode` → `analysis_mode`，`audio_tasks` → `enabled_tasks`）
+
+### 为什么这么做
+- **Flow Gaps 文档先行**：先用 `docs/plans/phase-ip9-flow-gaps.md` 落盘 6 处缺口（流程图 + 代码位置），再逐个补齐，避免遗漏
+- **Results 总览页独立路由**：SPEC s05 要求"结果总览"，原 ProcessingPage 只显示进度不展示结果，需要独立页面聚合四类结果
+- **路径选择 vs 全选**：N7b 视频分析 3 条路径互斥（字幕直接 vs 镜头分析 vs 视频模型），用 radio 而非 checkbox 避免用户混淆
+- **字段名对齐**：前端和后端对同一参数用了不同命名（如 `video_path_mode` vs `analysis_mode`），统一为后端命名减少桥接层转换
+
+### 留给后续的影响
+- N7b 路径 1（字幕直接）和路径 3（视频模型直接）的后端 handler 尚未实现，当前选择后会 fallback 到路径 2（镜头分析）
+- N8b 音乐分析 6 维度切分 UI 已就绪，但后端 librosa 分析逻辑需等 N8b 后端 phase 完成
+- Results 总览页的卡片样式为 Tier A（基础版），后续 [C] AI 导演阶段可升级为带预览图/波形图的 Tier B 版本
 
 ---
 

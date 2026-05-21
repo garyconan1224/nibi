@@ -61,9 +61,9 @@
 - [x] **N5** Preflight 抽屉细化（按素材类型展开所有子参数）— `4-6h` P1
 - [x] **N6** 任务级 LLM 对话上下文素材多选 chip + RAG 兜底 — `6-8h` P1
 - [x] **N7** 视频分支补全：PySceneDetect AI 镜头分析（路径 1 & 3 拆出 N7b）— `8-10h` P2
-- [ ] **N7b** 视频总结路径 1（字幕直接）+ 路径 3（视频模型直接）— `8-12h` P2（拆自 N7，依赖：item 字幕抽取 + 视频大模型 API 集成决策）
+- [ ] **N7b** 视频总结路径 1（字幕直接）+ 路径 3（视频模型直接）— `8-12h` P2（拆自 N7，依赖：item 字幕抽取 + 视频大模型 API 集成决策）*UI 已就绪（IP.9.3），后端 handler 待实现*
 - [x] **N8** 音频分支补全：VAD（silero）/ pyannote 说话人 / 音乐分析（librosa + Suno/Udio）— `8-10h` P2
-- [ ] **N8b** 音频前端交互：无人声切音乐模式弹窗 / 说话人标签人工修正 UI / 多段音乐 6 维度切分 — `6-8h` P3
+- [ ] **N8b** 音频前端交互：无人声切音乐模式弹窗 / 说话人标签人工修正 UI / 多段音乐 6 维度切分 — `6-8h` P3 *UI 已就绪（IP.9.2），后端 librosa 分析待实现*
 - [x] **N9** 图片分支补全：PaddleOCR / 4 联想方向 / 多图对比 — `6-8h` P2
 - [x] **N10** 文字分支补全：marker/docling PDF / 改写翻译并排对照 / 多文对比 — `6-8h` P2
 - [x] **N11** 砍掉的 UI 清理（仅入口隐藏，代码留备份）— `1-2h` P3
@@ -124,6 +124,12 @@
 - [x] IP.7 PreflightDrawer 真接 workspace 流程 + 自动建空间（修 URL 任务跑不通）
 - 后端 bug 修复：TaskRunner.append_log 缺失（download 任务从此不再 FAILED）
 
+**IP.9 Flow Gaps 补齐**（2026-05-21）：Results 总览 + N7b/N8b UI + payload 对齐，5 个 commit 合入 main。
+- [x] IP.9.1 Results 总览页（s05）+ 修跳转 bug + 路由重命名
+- [x] IP.9.2 N8b 音频前端 6 任务勾选 + 结果页对应区块
+- [x] IP.9.3 N7b 视频路径选择 UI（3 路径 + 视频类型模板）
+- [x] IP.9.fix align Tier A UI with pipeline payloads
+
 ---
 
 **H 系列 + IP 系列全部完工**（2026-05-20，一日产出 ~30 个 commit）：
@@ -132,18 +138,18 @@
 - 阻塞 bug 修复：TaskRunner.append_log / PreflightDrawer 绕过桥接 ✅
 - 清理：H2.6 删旧 WorkspaceDetail（-680 行）✅
 
-**当前 main**：`ff2cab0` — UI ↔ 后端 100% 接通
+**当前 main**：`f33db14` — UI ↔ 后端 100% 接通 + Flow Gaps 补齐
 
 下一步候选（按 ROI 排序）：
 1. 🥇 **端到端冒烟测试**（用户自己跑，~30min）—— IP.7 修了阻塞 bug 但没真正粘 URL 走完链路
 2. 🥈 **[C] AI 导演模块**（4-7 天 Opus）—— 需先补设计稿 + 拍板生成模型 API
 3. 🥈 **[D] 开源准备**（2-3 天）—— 加密 / CI / push / 仓库整理
-4. 🥉 **N7b** 视频总结路径 1/3（依赖字幕抽取 + 视频大模型 API 决策）
-5. 🥉 **N8b** 音频前端交互
+4. 🥉 **N7b 后端** 视频总结路径 1/3 handler（UI 已就绪，依赖字幕抽取 + 视频大模型 API 决策）
+5. 🥉 **N8b 后端** 音频 librosa 分析（UI 已就绪）
 
 延后子阶段：
-- **N7b** 视频总结路径 1/3（P2，8-12h）— 依赖字幕抽取 + 视频大模型 API 决策
-- **N8b** 音频前端交互（P3，6-8h）— 无人声弹窗 / 说话人修正 / 音乐切分
+- **N7b 后端**（P2，8-12h）— UI 已就绪（IP.9.3），后端 handler 待实现
+- **N8b 后端**（P3，6-8h）— UI 已就绪（IP.9.2），后端 librosa 分析待实现
 - **[C] AI 导演模块**（需先补设计稿）
 - **[D] 安全 + 开源准备**
 
