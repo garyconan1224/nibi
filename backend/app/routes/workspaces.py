@@ -65,6 +65,42 @@ router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 _store = WorkspaceStore()
 
 
+def _task_config_value(tasks: Dict[str, Any], *keys: str) -> Any:
+    """Return the first present task config, preserving False boolean values."""
+    for key in keys:
+        if key in tasks:
+            value = tasks.get(key)
+            if isinstance(value, (dict, bool)):
+                return value
+    return None
+
+
+def _copy_task_config(
+    payload: Dict[str, Any],
+    payload_key: str,
+    tasks: Dict[str, Any],
+    *task_keys: str,
+) -> None:
+    value = _task_config_value(tasks, *task_keys)
+    if value is not None:
+        payload[payload_key] = value
+
+
+def _augment_video_analyze_payload(payload: Dict[str, Any], item: WorkspaceItem) -> None:
+    """Copy video preflight params used by the current analyze pipeline."""
+    tasks = item.preflight.tasks or {}
+    frame_prompts_params = tasks.get("frame_prompt")
+    if isinstance(frame_prompts_params, dict):
+        payload["frame_prompt"] = frame_prompts_params
+
+    summary_params = tasks.get("summary")
+    if isinstance(summary_params, dict):
+        if summary_params.get("path"):
+            payload["summary_path"] = summary_params["path"]
+        if summary_params.get("video_template"):
+            payload["video_template"] = summary_params["video_template"]
+
+
 def _on_download_success(completed_task: TaskRecord, runner) -> None:  # type: ignore[type-arg]
     """X.5 任务链：download 成功后自动 enqueue analyze，并把 analyze task_id 写回 item。
 
@@ -80,23 +116,28 @@ def _on_download_success(completed_task: TaskRecord, runner) -> None:  # type: i
 
     video_basename = Path(save_path).name
     project_id = completed_task.project_id
+    refs: list[tuple[WorkspaceRecord, WorkspaceItem]] = []
+    for ws in _store.list_all():
+        for item in ws.items:
+            if completed_task.task_id in item.related_task_ids:
+                refs.append((ws, item))
+
+    analyze_payload: Dict[str, Any] = {"video_basenames": [video_basename]}
+    if refs:
+        _augment_video_analyze_payload(analyze_payload, refs[0][1])
 
     try:
-        analyze_task = runner.create_task(project_id, "analyze", {
-            "video_basenames": [video_basename],
-        })
+        analyze_task = runner.create_task(project_id, "analyze", analyze_payload)
     except Exception:
         return  # analyze enqueue 失败不影响 download 本身
 
     # 把 analyze task_id 写入引用了此 download task 的所有 workspace items
-    for ws in _store.list_all():
-        for item in ws.items:
-            if completed_task.task_id in item.related_task_ids:
-                new_ids = list(item.related_task_ids) + [analyze_task.task_id]
-                try:
-                    _store.update_item(ws.workspace_id, item.item_id, related_task_ids=new_ids)
-                except Exception:
-                    pass  # 写失败不阻断（X.1 桥仍能通过 download task 显示最终状态）
+    for ws, item in refs:
+        new_ids = list(item.related_task_ids) + [analyze_task.task_id]
+        try:
+            _store.update_item(ws.workspace_id, item.item_id, related_task_ids=new_ids)
+        except Exception:
+            pass  # 写失败不阻断（X.1 桥仍能通过 download task 显示最终状态）
 
 
 _pipeline_runner.register_success_callback("download", _on_download_success)
@@ -918,18 +959,19 @@ def _bridge_to_pipeline_payload(
             "source_type": item.source,  # "url" or "local"
         }
         # N8: 透传 audio 子参数 + 全局模型/key（与 video analyze 路径对齐）
+        # IP.9.2: 前端 6 任务 ID → 后端 bridge 兼容映射
         models = item.preflight.models or {}
         if models.get("text"):
             payload["text_model"] = models["text"]
         tasks = item.preflight.tasks or {}
-        if isinstance(tasks.get("asr"), dict):
-            payload["asr"] = tasks["asr"]
-        if isinstance(tasks.get("voiceprint"), dict):
-            payload["voiceprint"] = tasks["voiceprint"]
-        if isinstance(tasks.get("srt"), dict):
-            payload["srt"] = tasks["srt"]
-        if isinstance(tasks.get("music"), dict):
-            payload["music"] = tasks["music"]
+        _copy_task_config(payload, "asr", tasks, "asr_summary", "asr")
+        _copy_task_config(payload, "voiceprint", tasks, "voiceprint")
+        _copy_task_config(payload, "srt", tasks, "subtitle_file", "srt")
+        _copy_task_config(payload, "music", tasks, "music_analysis", "music")
+        # 以下三个前端任务 ID 透传到 payload，Tier B 后端未实现
+        _copy_task_config(payload, "vocal_separation", tasks, "vocal_separation")
+        _copy_task_config(payload, "music_transcribe", tasks, "music_transcribe")
+        _copy_task_config(payload, "prompt_generation", tasks, "prompt_generation")
         return "audio", payload
 
     if item.type not in (ItemType.VIDEO.value,):
@@ -961,11 +1003,8 @@ def _bridge_to_pipeline_payload(
         payload["vision_model"] = models["vision"]
     if models.get("text"):
         payload["text_model"] = models["text"]
-    # N7: 透传截帧子参数（capture_mode / interval / max_frames / frames_per_shot）
-    tasks = item.preflight.tasks or {}
-    frame_prompts_params = tasks.get("frame_prompt")
-    if isinstance(frame_prompts_params, dict):
-        payload["frame_prompt"] = frame_prompts_params
+    # N7/IP.9.3: 透传截帧子参数、视频文案总结路径和视频类型模板
+    _augment_video_analyze_payload(payload, item)
     return "analyze", payload
 
 

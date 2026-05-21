@@ -359,6 +359,7 @@ export interface AudioResult {
     duration_str: string
   }
   transcript: VideoResultTranscriptLine[] | string
+  transcript_segments?: VideoResultTranscriptLine[]
   summary: string
   tracks_meta: {
     total_sec: number
@@ -370,6 +371,8 @@ export interface AudioResult {
   vocal_path?: string
   /** IP.9.2: 音乐分析结果（Markdown） */
   music_analysis?: string
+  /** 后端 pipeline 真实返回的 music 字段（兼容） */
+  music?: string | Record<string, unknown>
   /** IP.9.2: 音乐转写结果（Markdown） */
   music_transcription?: string
   /** IP.9.2: 提示词输出（Markdown） */

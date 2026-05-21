@@ -40,6 +40,8 @@ type PageState =
   | { kind: 'ready'; workspace: WorkspaceRecord; item: WorkspaceItem; result: ItemResult }
   | { kind: 'error'; message: string }
 
+type TimelineLine = { t_sec?: number; t_str?: string; text: string }
+
 function formatSec(sec: number): string {
   const s = Math.max(0, Math.floor(sec))
   const m = Math.floor(s / 60)
@@ -79,6 +81,12 @@ function extractTranscriptPreview(itemType: ItemType, result: ItemResult): strin
   if (!lines.length) return ''
   const full = lines.map((l) => l.text).join('\n')
   return full.slice(0, 500)
+}
+
+function extractAudioTimelineLines(result: AudioResult): TimelineLine[] {
+  if (Array.isArray(result.transcript)) return result.transcript
+  if (Array.isArray(result.transcript_segments)) return result.transcript_segments
+  return []
 }
 
 /** 转录总段数 */
@@ -258,7 +266,7 @@ export default function ResultsOverview() {
           </div>
         )}
 
-        {/* Timeline card (video / audio) */}
+        {/* Timeline card (video) */}
         {showTimeline && itemType === 'video' && (result as VideoResult).frames?.length > 0 && (
           <div className="ov-card">
             <div className="ov-card-head">
@@ -277,6 +285,30 @@ export default function ResultsOverview() {
             </div>
           </div>
         )}
+
+        {/* Timeline card (audio) — transcript 前 10 段 */}
+        {showTimeline && itemType === 'audio' && (() => {
+          const lines = extractAudioTimelineLines(result as AudioResult)
+          if (lines.length === 0) return null
+          return (
+            <div className="ov-card">
+              <div className="ov-card-head">
+                <h2>时间轴</h2>
+                <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>
+                  前 {Math.min(10, lines.length)} 段
+                </span>
+              </div>
+              <div className="ov-timeline-strip">
+                {lines.slice(0, 10).map((l, idx) => (
+                  <div key={idx} className="ov-tl-frame">
+                    <div className="ov-tl-thumb">{l.t_str || formatSec(l.t_sec ?? 0)}</div>
+                    <div className="ov-tl-ts">{l.text?.slice(0, 20)}{l.text && l.text.length > 20 ? '…' : ''}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Transcript preview */}
         {transcriptPreview && (

@@ -62,6 +62,41 @@ function Waveform({ progress, height = 48, bars = 100, onClick }: WaveformProps)
   )
 }
 
+function formatList(value: unknown): string {
+  return Array.isArray(value) ? value.map((v) => String(v)).filter(Boolean).join(', ') : ''
+}
+
+function formatMusicAnalysis(result: AudioResult): string {
+  if (typeof result.music_analysis === 'string' && result.music_analysis.trim()) {
+    return result.music_analysis
+  }
+  if (typeof result.music === 'string') return result.music
+  if (!result.music || typeof result.music !== 'object') return ''
+
+  const music = result.music
+  const lines: string[] = ['### 音乐分析']
+  const fields: Array<[string, unknown]> = [
+    ['时长', music.duration],
+    ['BPM', music.bpm],
+    ['调性', music.key],
+    ['能量均值', music.energy_mean],
+    ['频谱中心', music.spectral_centroid_mean],
+  ]
+  for (const [label, value] of fields) {
+    if (value !== undefined && value !== null && value !== '') {
+      lines.push(`- ${label}: ${String(value)}`)
+    }
+  }
+  if (typeof music.music_prompt === 'string' && music.music_prompt.trim()) {
+    lines.push('', '### 生成提示词', music.music_prompt)
+  }
+  const references = formatList(music.similar_references)
+  if (references) lines.push('', `相似参考: ${references}`)
+  const scenarios = formatList(music.scenarios)
+  if (scenarios) lines.push(`适用场景: ${scenarios}`)
+  return lines.join('\n')
+}
+
 export default function AudioResultPage() {
   const { workspaceId = '', itemId = '' } = useParams<{ workspaceId: string; itemId: string }>()
   const navigate = useNavigate()
@@ -104,6 +139,10 @@ export default function AudioResultPage() {
 
   const totalSec = result?.tracks_meta?.total_sec ?? result?.audio?.duration_sec ?? 0
   const progress = totalSec > 0 ? Math.min(1, currentSec / totalSec) : 0
+  const musicAnalysisText = useMemo(
+    () => (result ? formatMusicAnalysis(result) : ''),
+    [result],
+  )
 
   const handleTimeUpdate = useCallback(() => {
     if (audioRef.current) setCurrentSec(audioRef.current.currentTime)
@@ -343,12 +382,12 @@ export default function AudioResultPage() {
 
         {activeTab === 'music' && (
           <div className="ad-summary-scroll">
-            {result.music_analysis ? (
+            {musicAnalysisText ? (
               <>
                 <div className="eyebrow" style={{ marginBottom: 8 }}>音乐分析</div>
                 <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--ink-2)' }}>
                   <ReactMarkdown remarkPlugins={remarkPlugins}>
-                    {result.music_analysis}
+                    {musicAnalysisText}
                   </ReactMarkdown>
                 </div>
               </>
