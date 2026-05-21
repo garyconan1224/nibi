@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/radio-group'
 import {
   ASSOCIATION_DIRECTION_LABELS,
+  VIDEO_TEMPLATE_OPTIONS,
   type AssociationDirection,
   type AudioAsrParams,
   type ImageAssociationParams,
@@ -266,13 +267,13 @@ function VideoSummaryDetails({
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
-        <Label className="text-xs">总结路径</Label>
+        <Label className="text-xs">摘要路径</Label>
         <RadioGroup
           value={params.path}
           onValueChange={(v) =>
             onChange({
               ...params,
-              path: v as 'subtitle' | 'merged' | 'video_model',
+              path: v as 'subtitle' | 'detailed' | 'video_model',
             })
           }
           className="space-y-1"
@@ -280,26 +281,49 @@ function VideoSummaryDetails({
           <label className="flex cursor-pointer items-start gap-2 rounded-md border p-2 text-xs">
             <RadioGroupItem value="subtitle" className="mt-0.5" />
             <div>
-              <div className="font-medium">字幕直接总结</div>
-              <div className="text-muted-foreground">最快最便宜，适合纯语音</div>
+              <div className="font-medium">路径 1：字幕直接总结</div>
+              <div className="text-muted-foreground">便宜快，适合口播/访谈</div>
             </div>
           </label>
           <label className="flex cursor-pointer items-start gap-2 rounded-md border p-2 text-xs">
-            <RadioGroupItem value="merged" className="mt-0.5" />
+            <RadioGroupItem value="detailed" className="mt-0.5" />
             <div>
-              <div className="font-medium">音视频合并总结（默认 / 最详细）</div>
-              <div className="text-muted-foreground">字幕 + 截帧画面对齐合并</div>
+              <div className="font-medium">路径 2：详细总结（套视频类型模板）</div>
+              <div className="text-muted-foreground">推荐 · 字幕 + 截帧画面合并分析</div>
             </div>
           </label>
           <label className="flex cursor-pointer items-start gap-2 rounded-md border p-2 text-xs">
             <RadioGroupItem value="video_model" className="mt-0.5" />
             <div>
-              <div className="font-medium">视频模型直接分析（最轻量）</div>
-              <div className="text-muted-foreground">整段视频送视频大模型</div>
+              <div className="font-medium">路径 3：视频大模型直传（Gemini）</div>
+              <div className="text-muted-foreground">~$0.05/min，整段视频送大模型</div>
             </div>
           </label>
         </RadioGroup>
       </div>
+
+      {/* 路径 2 时显示视频类型模板 */}
+      {params.path === 'detailed' && (
+        <div className="space-y-1">
+          <Label className="text-xs">视频类型模板</Label>
+          <Select
+            value={params.video_template}
+            onValueChange={(v) =>
+              onChange({ ...params, video_template: v as VideoSummaryParams['video_template'] })
+            }
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {VIDEO_TEMPLATE_OPTIONS.map((t) => (
+                <SelectItem key={t} value={t}>{t}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       <div className="space-y-1">
         <Label className="text-xs">总结深度</Label>
         <Select

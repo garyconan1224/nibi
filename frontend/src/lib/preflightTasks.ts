@@ -22,13 +22,18 @@ export interface VideoFramePromptsParams {
   lang: PromptLang
 }
 
-export type VideoSummaryPath = 'subtitle' | 'merged' | 'video_model'
+export type VideoSummaryPath = 'subtitle' | 'detailed' | 'video_model'
 export type SummaryDepth = 'brief' | 'normal' | 'deep'
+export type VideoTemplate = '教程' | 'Vlog' | '访谈' | '影视点评' | '产品评测' | '其它'
+
+export const VIDEO_TEMPLATE_OPTIONS: VideoTemplate[] = ['教程', 'Vlog', '访谈', '影视点评', '产品评测', '其它']
 
 export interface VideoSummaryParams {
   enabled: boolean
   path: VideoSummaryPath
   depth: SummaryDepth
+  /** IP.9.3: 路径 2 时选择的视频类型模板 */
+  video_template: VideoTemplate
 }
 
 // ── 音频 ────────────────────────────────────────────────
@@ -112,8 +117,9 @@ export const DEFAULT_VIDEO_FRAME_PROMPTS: VideoFramePromptsParams = {
 
 export const DEFAULT_VIDEO_SUMMARY: VideoSummaryParams = {
   enabled: true,
-  path: 'merged',
+  path: 'detailed',
   depth: 'normal',
+  video_template: '其它',
 }
 
 export const DEFAULT_AUDIO_ASR: AudioAsrParams = {
