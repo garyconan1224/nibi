@@ -326,3 +326,75 @@
 .vm-video-result-scope .vd-frame-nav-btn:hover {
   background: var(--bg-sunken);
 }
+
+/* ─── N7b 路径 1：字幕总结模式 ─── */
+
+.vm-video-result-scope .vd-subtitle-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.vm-video-result-scope .vd-subtitle-content {
+  flex: 1;
+  overflow: auto;
+  padding: 16px 20px;
+}
+
+.vm-video-result-scope .vd-card {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.vm-video-result-scope .vd-card:last-child {
+  margin-bottom: 0;
+}
+
+.vm-video-result-scope .vd-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.vm-video-result-scope .vd-card-head h2 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.vm-video-result-scope .vd-summary-text {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.vm-video-result-scope .vd-transcript-line {
+  display: flex;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.vm-video-result-scope .vd-transcript-line:last-child {
+  border-bottom: none;
+}
+
+.vm-video-result-scope .vd-transcript-ts {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-4);
+  flex-shrink: 0;
+  min-width: 40px;
+}
+
+.vm-video-result-scope .vd-transcript-text {
+  font-size: 13px;
+  line-height: 1.6;
+}

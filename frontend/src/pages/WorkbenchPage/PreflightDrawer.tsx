@@ -175,8 +175,9 @@ export function PreflightDrawer({
         preflightPayload.prompt_style = cd.promptStyle
       }
       // 构建 tasks：视频类型包含 summary 路径选择
+      // 未传 selectedTypes 时按 video 处理（当前 drawer 创建 item 时固定 type: 'video'）
       const tasks: Record<string, unknown> = {}
-      const isVideo = selectedTypes?.some((t) => t === '视频' || t === 'video')
+      const isVideo = !selectedTypes?.length || selectedTypes.some((t) => t === '视频' || t === 'video')
       if (isVideo) {
         tasks.summary = {
           enabled: true,
@@ -282,8 +283,8 @@ export function PreflightDrawer({
             </div>
           </section>
 
-          {/* Section 2: Video summary path (only for video) */}
-          {selectedTypes?.some((t) => t === '视频' || t === 'video') && (
+          {/* Section 2: Video summary path (only for video; no selectedTypes = single video URL) */}
+          {(!selectedTypes?.length || selectedTypes.some((t) => t === '视频' || t === 'video')) && (
             <section className="pf-section">
               <h4 className="pf-section-title">视频分析路径</h4>
               <div className="pf-field">

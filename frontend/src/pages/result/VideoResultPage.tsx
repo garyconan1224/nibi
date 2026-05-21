@@ -384,14 +384,14 @@ export default function VideoResultPage() {
   const isSubtitlePath = result.summary_path === 'subtitle'
   if (isSubtitlePath) {
     return (
-      <div className="vm-video-result-scope" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+      <div className="vm-video-result-scope vd-subtitle-layout">
         {/* Nav bar */}
-        <div className="ov-nav" style={{ padding: '8px 20px', borderBottom: '1px solid var(--border)' }}>
-          <button className="btn-ghost" onClick={() => navigate(-1)}>
+        <div className="vd-nav">
+          <button className="btn-ghost" onClick={() => navigate(-1)} style={{ height: 28, padding: '0 10px', fontSize: 12 }}>
             <ArrowLeft size={13} /> 任务中心
           </button>
-          <span className="ov-sep" />
-          <span className="ov-title">{result.video.title || '视频'}</span>
+          <span className="vd-sep" />
+          <span className="vd-title">{result.video.title || '视频'}</span>
           <span className="kw mono" style={{ fontSize: 10, flexShrink: 0 }}>
             VIDEO · 字幕总结模式
           </span>
@@ -406,24 +406,24 @@ export default function VideoResultPage() {
         </div>
 
         {/* Main content */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px' }}>
+        <div className="vd-subtitle-content">
           {/* Summary card */}
           {result.summary && (
-            <div className="ov-card" style={{ marginBottom: 16 }}>
-              <div className="ov-card-head">
+            <div className="vd-card">
+              <div className="vd-card-head">
                 <h2>内容摘要</h2>
                 <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>
                   {result.video_template || '其它'} · {transcript.length} 段转录
                 </span>
               </div>
-              <div className="ov-summary-text">{result.summary}</div>
+              <div className="vd-summary-text">{result.summary}</div>
             </div>
           )}
 
           {/* Transcript card */}
           {transcript.length > 0 && (
-            <div className="ov-card">
-              <div className="ov-card-head">
+            <div className="vd-card">
+              <div className="vd-card-head">
                 <h2>转录内容</h2>
                 <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>
                   {transcript.length} 段
@@ -431,11 +431,9 @@ export default function VideoResultPage() {
               </div>
               <div style={{ maxHeight: 400, overflow: 'auto' }}>
                 {transcript.map((line, idx) => (
-                  <div key={idx} style={{ display: 'flex', gap: 12, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-                    <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)', flexShrink: 0, minWidth: 40 }}>
-                      {line.t_str}
-                    </span>
-                    <span style={{ fontSize: 13 }}>{line.text}</span>
+                  <div key={idx} className="vd-transcript-line">
+                    <span className="vd-transcript-ts">{line.t_str}</span>
+                    <span className="vd-transcript-text">{line.text}</span>
                   </div>
                 ))}
               </div>
