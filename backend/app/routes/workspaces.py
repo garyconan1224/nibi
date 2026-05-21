@@ -1056,9 +1056,18 @@ def start_item_pipeline(workspace_id: str, item_id: str) -> Dict[str, Any]:
 
 
 def _video_result_has_real_data(results: Dict[str, Any]) -> bool:
-    """判断 item.results 里是否已经有可用的 frames + transcript。"""
+    """判断 item.results 里是否已经有可用的数据。
+
+    两种情况视为有真数据：
+    1. 路径 2（detailed）：frames list + transcript list 都存在
+    2. N7b 路径 1（subtitle）：summary_path='subtitle' 且 summary 非空
+    """
     if not isinstance(results, dict):
         return False
+    # N7b 路径 1：字幕直接总结
+    if results.get("summary_path") == "subtitle" and results.get("summary"):
+        return True
+    # 路径 2：帧分析 + 转写
     frames = results.get("frames")
     transcript = results.get("transcript")
     return bool(frames) and isinstance(frames, list) and isinstance(transcript, list)
@@ -1082,6 +1091,11 @@ def _materialize_video_results_from_analyze(
         return results
     if results.get("frames"):
         return results  # 已是目标格式
+    # N7b 路径 1：字幕直接总结结果，无需从 JSON 文件物化
+    if results.get("summary_path") == "subtitle" and results.get("summary"):
+        results.setdefault("frames", [])
+        results.setdefault("transcript", results.get("transcript") or [])
+        return results
     json_outputs = results.get("json_outputs") or []
     if not json_outputs:
         return results
