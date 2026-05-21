@@ -234,6 +234,12 @@ export interface VideoResult {
     frame_count: number
     transcript_count: number
   }
+  /** N7b 路径 1: 摘要路径标识 */
+  summary_path?: string
+  /** N7b 路径 1: LLM 生成的摘要 */
+  summary?: string
+  /** N7b 路径 1: 视频类型模板 */
+  video_template?: string
 }
 
 /** GET /workspaces/{id}/items/{itemId}/result — 视频三轨聚合数据 */

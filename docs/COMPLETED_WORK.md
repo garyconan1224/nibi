@@ -685,7 +685,7 @@ WorkspaceItem.tags = {
 **提交**：
 - `f17c04a` feat(N7b): 视频路径 1 字幕直接总结后端
 - `aac4578` fix(N7b): ResultsOverview 正确返回路径 1 字幕总结结果
-- `待提交` fix(N7b): transcript 数组契约修复 + 前端防御 + 测试
+- `9e8667e` fix(N7b): transcript 数组契约修复 + 前端防御 + 测试
 
 ### 影响范围
 - 后端：`backend/app/services/pipeline_tasks.py`（核心实现）、`backend/app/routes/workspaces.py`（API 契约层）

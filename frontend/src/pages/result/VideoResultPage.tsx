@@ -364,7 +364,7 @@ export default function VideoResultPage() {
       </div>
     )
   }
-  if (fetchState.kind === 'error' || !result || !frame) {
+  if (fetchState.kind === 'error' || !result) {
     return (
       <div
         className="vm-video-result-scope"
@@ -373,6 +373,94 @@ export default function VideoResultPage() {
         <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
           {fetchState.kind === 'error' ? fetchState.message : '没有可显示的视频结果'}
         </span>
+        <button className="btn-ghost" style={{ padding: '6px 12px' }} onClick={() => navigate(-1)}>
+          <ArrowLeft size={14} /> 返回
+        </button>
+      </div>
+    )
+  }
+
+  // N7b 路径 1：字幕直接总结模式（无帧，展示 summary + transcript）
+  const isSubtitlePath = result.summary_path === 'subtitle'
+  if (isSubtitlePath) {
+    return (
+      <div className="vm-video-result-scope" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+        {/* Nav bar */}
+        <div className="ov-nav" style={{ padding: '8px 20px', borderBottom: '1px solid var(--border)' }}>
+          <button className="btn-ghost" onClick={() => navigate(-1)}>
+            <ArrowLeft size={13} /> 任务中心
+          </button>
+          <span className="ov-sep" />
+          <span className="ov-title">{result.video.title || '视频'}</span>
+          <span className="kw mono" style={{ fontSize: 10, flexShrink: 0 }}>
+            VIDEO · 字幕总结模式
+          </span>
+          <span className="kw" style={{ fontSize: 10, background: 'var(--accent-green)', color: '#fff', padding: '2px 8px', borderRadius: 6 }}>
+            {result.video_template || '其它'}
+          </span>
+        </div>
+
+        {/* Tags */}
+        <div style={{ padding: '10px 20px 0', flexShrink: 0 }}>
+          <ItemTagsPanel workspaceId={workspaceId} itemId={itemId} />
+        </div>
+
+        {/* Main content */}
+        <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px' }}>
+          {/* Summary card */}
+          {result.summary && (
+            <div className="ov-card" style={{ marginBottom: 16 }}>
+              <div className="ov-card-head">
+                <h2>内容摘要</h2>
+                <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>
+                  {result.video_template || '其它'} · {transcript.length} 段转录
+                </span>
+              </div>
+              <div className="ov-summary-text">{result.summary}</div>
+            </div>
+          )}
+
+          {/* Transcript card */}
+          {transcript.length > 0 && (
+            <div className="ov-card">
+              <div className="ov-card-head">
+                <h2>转录内容</h2>
+                <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>
+                  {transcript.length} 段
+                </span>
+              </div>
+              <div style={{ maxHeight: 400, overflow: 'auto' }}>
+                {transcript.map((line, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: 12, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                    <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)', flexShrink: 0, minWidth: 40 }}>
+                      {line.t_str}
+                    </span>
+                    <span style={{ fontSize: 13 }}>{line.text}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!result.summary && transcript.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--ink-4)' }}>
+              暂无摘要和转录内容
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // 路径 2/3：帧分析模式（需要 frames）
+  if (!frame) {
+    return (
+      <div
+        className="vm-video-result-scope"
+        style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}
+      >
+        <span style={{ color: 'var(--accent)', fontWeight: 600 }}>没有可显示的视频结果</span>
         <button className="btn-ghost" style={{ padding: '6px 12px' }} onClick={() => navigate(-1)}>
           <ArrowLeft size={14} /> 返回
         </button>

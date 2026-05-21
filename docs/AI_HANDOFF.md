@@ -67,7 +67,14 @@ git branch --show-current
 **N7b 路径 1 已完成**（2026-05-21，3 个 commit 合入 main）：
 - `f17c04a` feat(N7b): 视频路径 1 字幕直接总结后端
 - `aac4578` fix(N7b): ResultsOverview 正确返回路径 1 字幕总结结果
+- `9e8667e` fix(N7b): transcript 数组契约修复 + 前端防御 + 测试
 - transcript 数组契约已对齐（string → VideoResultTranscriptLine[]）
+
+**N7b 路径 1 UI 收口**（2026-05-21）：
+- PreflightDrawer 加摘要路径选择（tasks.summary.path = "subtitle"）
+- VideoResultPage 路径 1 空态修复（字幕总结模式：summary + transcript 展示）
+- VideoResult 类型扩展（summary_path / summary / video_template）
+- 文档残留修复（待提交 → 9e8667e）
 
 **N7b 路径 3 待实现**：视频模型直接分析（依赖 Gemini / GPT-4o / Qwen-VL API 集成决策）
 **N8b 待实现**：音频 librosa 分析（6 维度切分）
@@ -78,9 +85,17 @@ git branch --show-current
 
 ## 下一步（按 ROI 排序，明天接力会话直接选）
 
-### 🥇 端到端冒烟测试（30min，用户自己跑）
+### 🥇 F1.6 字幕清洗基础版（4-6h，小米）
 
-IP.7 修了所有 URL 任务跑不通的阻塞 bug，但**没有真正粘 B 站 URL 端到端跑过一次**。建议明天第一件事：
+路径 1 已经能转写和总结，字幕清洗马上能增强它，ROI 比 Gemini 路径 3 更高。
+
+- `shared/transcript_cleaner.py`：规则去填充词 + LLM 润色
+- 输出格式 UI（摘要 / 要点 / 金句 / 段落改写）单选
+- 输出格式 → 后端不同提示词模板
+
+### 🥈 端到端冒烟测试（30min，用户自己跑）
+
+IP.7 修了所有 URL 任务跑不通的阻塞 bug，但**没有真正粘 B 站 URL 端到端跑过一次**。建议：
 
 1. `./start.sh` 启动
 2. 打开 `/` → 不选工作空间 → 粘真实短 B 站 URL（< 5 分钟）
@@ -94,7 +109,7 @@ IP.7 修了所有 URL 任务跑不通的阻塞 bug，但**没有真正粘 B 站 
 
 卡壳处 = IP.9 的输入。
 
-### 🥈 路线选择（冒烟后定）
+### 🥉 路线选择（冒烟后定）
 
 **路线 A：[C] AI 导演**（4-7 天，Opus 体力活）
 - 需先补设计稿（system_design v1.1 这块语焉不详）
@@ -106,9 +121,9 @@ IP.7 修了所有 URL 任务跑不通的阻塞 bug，但**没有真正粘 B 站 
 - 让项目能被外人 clone 跑起来
 - 是 v1.0.0 发布的前置
 
-### 🥉 独立小活（任意穿插）
+### 🏅 独立小活（任意穿插）
 
-- **N7b** 视频总结路径 1/3（8-12h，需先决策字幕来源 + 视频大模型选型）
+- **N7b 路径 3** 视频模型直接分析（8-12h，依赖 Gemini / GPT-4o / Qwen-VL API 集成决策）
 - **N8b** 音频前端交互（6-8h，无人声切音乐弹窗 / 说话人修正 / 6 维度切分）
 
 ---

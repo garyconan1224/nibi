@@ -61,7 +61,7 @@
 - [x] **N5** Preflight 抽屉细化（按素材类型展开所有子参数）— `4-6h` P1
 - [x] **N6** 任务级 LLM 对话上下文素材多选 chip + RAG 兜底 — `6-8h` P1
 - [x] **N7** 视频分支补全：PySceneDetect AI 镜头分析（路径 1 & 3 拆出 N7b）— `8-10h` P2
-- [x] **N7b 路径 1** 视频字幕直接总结 — `4h` P2（`f17c04a` `aac4578` `待提交`）。音频提取 → Whisper 转写 → 6 种模板 LLM 总结，transcript 数组契约已对齐。
+- [x] **N7b 路径 1** 视频字幕直接总结 — `4h` P2（`f17c04a` `aac4578` `9e8667e`）。音频提取 → Whisper 转写 → 6 种模板 LLM 总结，transcript 数组契约已对齐。
 - [ ] **N7b 路径 3** 视频模型直接分析 — `8-12h` P2（依赖视频大模型 API 集成决策：Gemini / GPT-4o / Qwen-VL-Max）。*UI 已就绪（IP.9.3），后端 handler 待实现*
 - [x] **N8** 音频分支补全：VAD（silero）/ pyannote 说话人 / 音乐分析（librosa + Suno/Udio）— `8-10h` P2
 - [ ] **N8b** 音频前端交互：无人声切音乐模式弹窗 / 说话人标签人工修正 UI / 多段音乐 6 维度切分 — `6-8h` P3 *UI 已就绪（IP.9.2），后端 librosa 分析待实现*

@@ -21,6 +21,8 @@ const QUALITY_MAP: Record<QualityOption, string> = {
 
 const CONTENT_TYPES = ['课程', '会议', '宣传片', 'Vlog', '访谈', '纯音乐', '其他']
 const PURPOSES = ['复刻参考', '竞品分析', '内容学习', '其他']
+const VIDEO_TEMPLATES = ['教程', 'Vlog', '访谈', '影视点评', '产品评测', '其它']
+type SummaryPath = 'subtitle' | 'detailed' | 'video_model'
 
 interface PreflightDrawerProps {
   open: boolean
@@ -54,6 +56,8 @@ export function PreflightDrawer({
   const [visionModelId, setVisionModelId] = useState('')
   const [textModelId, setTextModelId] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [summaryPath, setSummaryPath] = useState<SummaryPath>('detailed')
+  const [videoTemplate, setVideoTemplate] = useState('其它')
   const navigate = useNavigate()
 
   // Track which Composer defaults have been applied
@@ -78,6 +82,8 @@ export function PreflightDrawer({
       setTextProviderId('')
       setVisionModelId(cd?.visionModelId ?? '')
       setTextModelId(cd?.textModelId ?? '')
+      setSummaryPath('detailed')
+      setVideoTemplate('其它')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -168,13 +174,24 @@ export function PreflightDrawer({
         preflightPayload.enabled_steps = cd.stepIds
         preflightPayload.prompt_style = cd.promptStyle
       }
+      // 构建 tasks：视频类型包含 summary 路径选择
+      const tasks: Record<string, unknown> = {}
+      const isVideo = selectedTypes?.some((t) => t === '视频' || t === 'video')
+      if (isVideo) {
+        tasks.summary = {
+          enabled: true,
+          path: summaryPath,
+          depth: 'normal',
+          video_template: videoTemplate,
+        }
+      }
       await savePreflight(wsId, itemId, {
         background_overrides: preflightPayload,
         models: {
           ...(visionModelId && { vision: visionModelId }),
           ...(textModelId && { text: textModelId }),
         },
-        tasks: {},
+        tasks,
       })
 
       // 4. 触发 start
@@ -265,7 +282,47 @@ export function PreflightDrawer({
             </div>
           </section>
 
-          {/* Section 2: Model selection */}
+          {/* Section 2: Video summary path (only for video) */}
+          {selectedTypes?.some((t) => t === '视频' || t === 'video') && (
+            <section className="pf-section">
+              <h4 className="pf-section-title">视频分析路径</h4>
+              <div className="pf-field">
+                <label>摘要方式</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {([
+                    { value: 'subtitle', label: '路径 1：字幕直接总结', desc: '便宜快，适合口播/访谈' },
+                    { value: 'detailed', label: '路径 2：详细总结（套模板）', desc: '推荐 · 字幕 + 截帧画面合并分析' },
+                    { value: 'video_model', label: '路径 3：视频大模型直传', desc: '~$0.05/min，整段视频送大模型' },
+                  ] as const).map((opt) => (
+                    <label key={opt.value} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 12px', border: `1px solid ${summaryPath === opt.value ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 8, cursor: 'pointer', background: summaryPath === opt.value ? 'var(--accent-bg)' : 'transparent' }}>
+                      <input
+                        type="radio"
+                        name="summaryPath"
+                        value={opt.value}
+                        checked={summaryPath === opt.value}
+                        onChange={() => setSummaryPath(opt.value)}
+                        style={{ marginTop: 2 }}
+                      />
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 500 }}>{opt.label}</div>
+                        <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{opt.desc}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              {summaryPath === 'subtitle' && (
+                <div className="pf-field">
+                  <label>视频类型模板</label>
+                  <select value={videoTemplate} onChange={(e) => setVideoTemplate(e.target.value)}>
+                    {VIDEO_TEMPLATES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Section 3: Model selection */}
           <section className="pf-section">
             <h4 className="pf-section-title">模型选择</h4>
             {enabledProviders.length === 0 ? (
