@@ -197,7 +197,9 @@ export function PreflightDrawer({
 
       toast.success('任务已创建', { description: url })
       onCreated()
-      navigate(`/processing/${startRes.task_id}`, { state: { url } })
+      navigate(`/processing/${startRes.task_id}`, {
+        state: { url, workspaceId: wsId, itemId },
+      })
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '提交失败')
     } finally {
