@@ -329,6 +329,42 @@ def _run_subtitle_summary(
             "summary": "（转写结果为空，可能视频无人声内容）",
         }
 
+    # 3.5 字幕清洗（F1.6）
+    from shared.transcript_cleaner import clean_transcript
+
+    glossary = payload.get("glossary") or []
+    if api_key:
+        def _llm_polish(prompt: str) -> str:
+            settings = load_settings()
+            registry = create_default_registry()
+            profile = registry.resolve_default_profile(settings, "chat")
+            provider = registry.build(profile)
+            chat_model = text_model or str(
+                getattr(profile.default_models, "chat", None) or ""
+            ).strip()
+            if not chat_model:
+                return ""
+            return provider.chat(ChatRequest(
+                model=chat_model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                max_tokens=4000,
+            ))
+
+        try:
+            runner.set_progress(task_id, 0.975, "字幕清洗中...")
+            raw_len = len(transcript_text)
+            transcript_text = clean_transcript(
+                transcript_text, glossary=glossary, llm_fn=_llm_polish,
+            )
+            log(f"🧹 字幕清洗完成 | {raw_len} → {len(transcript_text)} 字符")
+        except Exception as e:
+            log(f"⚠️  字幕清洗失败（保留原始转写）: {e}")
+    else:
+        # 无 API key 时只做规则层清洗
+        transcript_text = clean_transcript(transcript_text)
+        log("🧹 字幕清洗完成（仅规则层，无 API key）")
+
     # 4. LLM 总结
     video_template = str(payload.get("video_template") or "其它").strip()
     summary_depth = str(payload.get("summary_depth") or "normal").strip()

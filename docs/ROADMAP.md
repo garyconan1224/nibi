@@ -108,7 +108,7 @@ git log --oneline -10
 - [x] F1.3（IP.9.3）N7b 视频路径选择 UI *（与 V1 重叠）* — `e618d1a`
 - [x] F1.4（IP.9.4）路径 1 后端：字幕直接总结 *（V2 部分）* — `f17c04a` `aac4578` `9e8667e` `92fbdb9` `bf995d7`
 - [ ] F1.5（IP.9.5）路径 3 后端：Gemini 集成 *（V3）*
-- [ ] F1.6（IP.9.6）字幕清洗（规则 + LLM）
+- [x] F1.6（IP.9.6）字幕清洗（规则 + LLM）— `shared/transcript_cleaner.py`
 
 **完工验收**：粘 B 站 URL → 完整流程图每个节点都跑通 → Results 总览能正确分流
 **当前状态**：Tier A（UI 层）已完成，Tier B（后端层）待实现
@@ -159,7 +159,7 @@ git log --oneline -10
 **模型**：Sonnet
 **分支**：`feat/v2-subtitle-polish`
 **子任务**：
-- V2.1 `shared/transcript_cleaner.py`（规则去填充词 + LLM 润色）（= F1.6）
+- [x] V2.1 `shared/transcript_cleaner.py`（规则去填充词 + LLM 润色）（= F1.6）
 - V2.2 输出格式 UI（摘要 / 要点 / 金句 / 段落改写）单选
 - V2.3 输出格式 → 后端不同提示词模板
 
