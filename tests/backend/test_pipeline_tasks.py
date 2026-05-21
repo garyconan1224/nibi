@@ -16,6 +16,7 @@ import pytest
 from backend.app.models.tasks import TERMINAL_STATUS_VALUES, TaskRecord, TaskStatus
 from backend.app.services.task_runner import TaskRunner
 from backend.app.services.task_store import TaskStore
+from shared.audio_analyzer import VadResult
 
 
 # ── 公共辅助 ──────────────────────────────────────────────────────────────
@@ -256,6 +257,41 @@ class TestScenarioC:
         # analysis 为空时，markdown 应使用 transcript 内容
         assert result["analysis"] == ""
         assert result["markdown"] == "降级转录内容"
+
+
+def test_audio_task_boolean_false_disables_asr(tmp_path: Path) -> None:
+    """IP.9 audio boolean payloads should be honored by the audio pipeline."""
+    from backend.app.services.pipeline_tasks import handle_audio_task
+
+    audio_file = tmp_path / "sample.mp3"
+    audio_file.write_bytes(b"fake-audio")
+    runner = MagicMock()
+    record = TaskRecord(
+        task_id="audio-bool",
+        project_id="default_project",
+        task_type="audio",
+        payload={
+            "source": str(audio_file),
+            "source_type": "local",
+            "asr": False,
+            "srt": False,
+            "music": False,
+        },
+    )
+
+    with (
+        patch("backend.app.services.pipeline_tasks.run_vad",
+              return_value=VadResult(has_speech=True, total_speech_duration=1.0, total_duration=1.0)),
+        patch("backend.app.services.pipeline_tasks.load_settings",
+              return_value=MagicMock(openai_api_key="sk-test", openai_base_url="https://example.com/v1")),
+        patch("shared.config.get_workspace_root", return_value=tmp_path / "workspace"),
+        patch("urllib.request.urlopen") as urlopen,
+    ):
+        result = handle_audio_task(record, runner)
+
+    urlopen.assert_not_called()
+    assert result["transcript"] == ""
+    runner.append_log.assert_any_call("audio-bool", "⏭️  跳过 ASR（无人声或未启用）")
 
 
 # ── Phase 1F：验证 PROBE / STORE 框架级阶段被触发 ────────────────────────────

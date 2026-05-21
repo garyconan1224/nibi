@@ -1222,7 +1222,7 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     subtitle_params = payload.get("srt") if isinstance(payload.get("srt"), dict) else {}
 
     whisper_lang = str(asr_params.get("whisper_lang") or "auto").strip().lower()
-    asr_enabled = bool(asr_params.get("enabled", True)) if isinstance(payload.get("asr"), dict) else True
+    asr_enabled = _task_enabled("asr", True)
     diarization_enabled = _task_enabled("voiceprint", False)
     music_enabled = _task_enabled("music", False)
     subtitle_enabled = _task_enabled("srt", True)

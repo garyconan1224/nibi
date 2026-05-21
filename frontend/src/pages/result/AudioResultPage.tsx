@@ -3,7 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
-import { ArrowLeft, FileText, Music, Pause, Play } from 'lucide-react'
+// remarkGfm 类型与 react-markdown 不完全兼容，统一 cast 一次
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const remarkPlugins: any[] = [remarkGfm]
+
+import { ArrowLeft, FileText, Mic, Music, Pause, Play, Wand2 } from 'lucide-react'
 
 import {
   type AudioResult,
@@ -58,6 +62,41 @@ function Waveform({ progress, height = 48, bars = 100, onClick }: WaveformProps)
   )
 }
 
+function formatList(value: unknown): string {
+  return Array.isArray(value) ? value.map((v) => String(v)).filter(Boolean).join(', ') : ''
+}
+
+function formatMusicAnalysis(result: AudioResult): string {
+  if (typeof result.music_analysis === 'string' && result.music_analysis.trim()) {
+    return result.music_analysis
+  }
+  if (typeof result.music === 'string') return result.music
+  if (!result.music || typeof result.music !== 'object') return ''
+
+  const music = result.music
+  const lines: string[] = ['### 音乐分析']
+  const fields: Array<[string, unknown]> = [
+    ['时长', music.duration],
+    ['BPM', music.bpm],
+    ['调性', music.key],
+    ['能量均值', music.energy_mean],
+    ['频谱中心', music.spectral_centroid_mean],
+  ]
+  for (const [label, value] of fields) {
+    if (value !== undefined && value !== null && value !== '') {
+      lines.push(`- ${label}: ${String(value)}`)
+    }
+  }
+  if (typeof music.music_prompt === 'string' && music.music_prompt.trim()) {
+    lines.push('', '### 生成提示词', music.music_prompt)
+  }
+  const references = formatList(music.similar_references)
+  if (references) lines.push('', `相似参考: ${references}`)
+  const scenarios = formatList(music.scenarios)
+  if (scenarios) lines.push(`适用场景: ${scenarios}`)
+  return lines.join('\n')
+}
+
 export default function AudioResultPage() {
   const { workspaceId = '', itemId = '' } = useParams<{ workspaceId: string; itemId: string }>()
   const navigate = useNavigate()
@@ -70,7 +109,7 @@ export default function AudioResultPage() {
 
   const [currentSec, setCurrentSec] = useState(0)
   const [playing, setPlaying] = useState(false)
-  const [activeTab, setActiveTab] = useState<'transcript' | 'music' | 'summary'>('transcript')
+  const [activeTab, setActiveTab] = useState<'transcript' | 'music' | 'summary' | 'vocal' | 'music_transcribe' | 'prompts'>('transcript')
 
   const audioRef = useRef<HTMLAudioElement>(null)
 
@@ -100,6 +139,10 @@ export default function AudioResultPage() {
 
   const totalSec = result?.tracks_meta?.total_sec ?? result?.audio?.duration_sec ?? 0
   const progress = totalSec > 0 ? Math.min(1, currentSec / totalSec) : 0
+  const musicAnalysisText = useMemo(
+    () => (result ? formatMusicAnalysis(result) : ''),
+    [result],
+  )
 
   const handleTimeUpdate = useCallback(() => {
     if (audioRef.current) setCurrentSec(audioRef.current.currentTime)
@@ -215,16 +258,17 @@ export default function AudioResultPage() {
           { id: 'transcript' as const, label: '转录', icon: FileText },
           { id: 'music' as const, label: '音乐分析', icon: Music },
           { id: 'summary' as const, label: '总结', icon: FileText },
+          { id: 'vocal' as const, label: '人声分离', icon: Mic },
+          { id: 'music_transcribe' as const, label: '音乐转写', icon: Music },
+          { id: 'prompts' as const, label: '提示词', icon: Wand2 },
         ]).map((tab) => {
           const Icon = tab.icon
-          const disabled = tab.id === 'music'
           return (
             <button
               key={tab.id}
               className="ad-tab"
               data-active={activeTab === tab.id}
-              data-disabled={disabled}
-              onClick={() => { if (!disabled) setActiveTab(tab.id) }}
+              onClick={() => setActiveTab(tab.id)}
             >
               <Icon size={14} /> {tab.label}
             </button>
@@ -283,7 +327,7 @@ export default function AudioResultPage() {
                 <div className="eyebrow" style={{ marginBottom: 8 }}>摘要</div>
                 <div style={{ marginBottom: 20, fontSize: 13, lineHeight: 1.7, color: 'var(--ink-2)' }}>
                   <ReactMarkdown
-                    remarkPlugins={[remarkGfm as any]}
+                    remarkPlugins={remarkPlugins}
                     components={{
                       h1: ({ children }) => <h1 style={{ fontSize: 18, fontWeight: 700, margin: '12px 0 8px' }}>{children}</h1>,
                       h2: ({ children }) => <h2 style={{ fontSize: 15, fontWeight: 600, margin: '10px 0 6px' }}>{children}</h2>,
@@ -312,6 +356,83 @@ export default function AudioResultPage() {
               </>
             ) : (
               <span className="mono" style={{ fontSize: 12, color: 'var(--ink-4)' }}>暂无摘要数据</span>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'vocal' && (
+          <div className="ad-summary-scroll">
+            {result.vocal_url ? (
+              <>
+                <div className="eyebrow" style={{ marginBottom: 8 }}>人声音频</div>
+                <audio controls src={result.vocal_url} style={{ width: '100%', marginTop: 8 }} />
+                {result.vocal_path && (
+                  <div style={{ marginTop: 12, fontSize: 12, color: 'var(--ink-4)' }}>
+                    文件：{result.vocal_path}
+                  </div>
+                )}
+              </>
+            ) : (
+              <span className="mono" style={{ fontSize: 12, color: 'var(--ink-4)' }}>
+                未勾选「输出人声音频」或后端能力开发中
+              </span>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'music' && (
+          <div className="ad-summary-scroll">
+            {musicAnalysisText ? (
+              <>
+                <div className="eyebrow" style={{ marginBottom: 8 }}>音乐分析</div>
+                <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--ink-2)' }}>
+                  <ReactMarkdown remarkPlugins={remarkPlugins}>
+                    {musicAnalysisText}
+                  </ReactMarkdown>
+                </div>
+              </>
+            ) : (
+              <span className="mono" style={{ fontSize: 12, color: 'var(--ink-4)' }}>
+                未勾选「音乐分析」或暂无数据
+              </span>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'music_transcribe' && (
+          <div className="ad-summary-scroll">
+            {result.music_transcription ? (
+              <>
+                <div className="eyebrow" style={{ marginBottom: 8 }}>音乐转写</div>
+                <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--ink-2)' }}>
+                  <ReactMarkdown remarkPlugins={remarkPlugins}>
+                    {result.music_transcription}
+                  </ReactMarkdown>
+                </div>
+              </>
+            ) : (
+              <span className="mono" style={{ fontSize: 12, color: 'var(--ink-4)' }}>
+                未勾选「音乐转写」或后端能力开发中
+              </span>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'prompts' && (
+          <div className="ad-summary-scroll">
+            {result.prompt_output ? (
+              <>
+                <div className="eyebrow" style={{ marginBottom: 8 }}>提示词输出</div>
+                <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--ink-2)' }}>
+                  <ReactMarkdown remarkPlugins={remarkPlugins}>
+                    {result.prompt_output}
+                  </ReactMarkdown>
+                </div>
+              </>
+            ) : (
+              <span className="mono" style={{ fontSize: 12, color: 'var(--ink-4)' }}>
+                未勾选「提示词输出」或后端能力开发中
+              </span>
             )}
           </div>
         )}

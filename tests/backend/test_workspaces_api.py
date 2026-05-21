@@ -21,6 +21,8 @@ from fastapi import FastAPI
 from unittest.mock import MagicMock, patch
 
 from backend.app.routes import workspaces as ws_module
+from backend.app.models.tasks import TaskRecord
+from backend.app.models.workspace import PreflightConfig, WorkspaceItem, WorkspaceRecord
 from backend.app.services.workspace_store import WorkspaceStore
 
 
@@ -247,6 +249,92 @@ def test_add_url_item_rejects_invalid_url(
     # 错误请求不应留下任何 item
     ws = client.get(f"/workspaces/{ws_id}").json()
     assert ws["items"] == []
+
+
+def test_bridge_audio_accepts_ip9_boolean_task_ids() -> None:
+    """IP.9 audio task IDs from AddMaterialModal are booleans and must map through."""
+    workspace = WorkspaceRecord(workspace_id="ws-audio", name="audio")
+    item = WorkspaceItem(
+        item_id="audio-1",
+        type="audio",
+        source="url",
+        source_value="https://example.com/podcast.mp3",
+        preflight=PreflightConfig(
+            models={"text": "chat-model"},
+            tasks={
+                "asr_summary": True,
+                "subtitle_file": True,
+                "music_analysis": False,
+                "vocal_separation": True,
+                "music_transcribe": False,
+                "prompt_generation": True,
+            },
+        ),
+    )
+
+    task_type, payload = ws_module._bridge_to_pipeline_payload(item, workspace)
+
+    assert task_type == "audio"
+    assert payload["text_model"] == "chat-model"
+    assert payload["asr"] is True
+    assert payload["srt"] is True
+    assert payload["music"] is False
+    assert payload["vocal_separation"] is True
+    assert payload["music_transcribe"] is False
+    assert payload["prompt_generation"] is True
+
+
+def test_download_success_inherits_video_summary_preflight(tmp_path: Path) -> None:
+    """URL video download -> analyze should carry IP.9 summary path settings."""
+    isolated_store = WorkspaceStore(root=tmp_path / "workspaces")
+    item = WorkspaceItem(
+        item_id="video-1",
+        type="video",
+        source="url",
+        source_value="https://example.com/video",
+        name="video",
+        related_task_ids=["download-1"],
+        preflight=PreflightConfig(
+            tasks={
+                "summary": {
+                    "enabled": True,
+                    "path": "video_model",
+                    "video_template": "访谈",
+                },
+            },
+        ),
+    )
+    isolated_store.create(
+        WorkspaceRecord(workspace_id="ws-video", name="video", items=[item])
+    )
+    completed = TaskRecord(
+        task_id="download-1",
+        project_id="default_project",
+        task_type="download",
+        payload={},
+        status="SUCCESS",
+        result={"save_path": "/tmp/downloaded-video.mp4"},
+    )
+    runner = MagicMock()
+    runner.create_task.return_value = TaskRecord(
+        task_id="analyze-1",
+        project_id="default_project",
+        task_type="analyze",
+        payload={},
+    )
+
+    with patch.object(ws_module, "_store", isolated_store):
+        ws_module._on_download_success(completed, runner)
+
+    runner.create_task.assert_called_once()
+    payload = runner.create_task.call_args.args[2]
+    assert payload["video_basenames"] == ["downloaded-video.mp4"]
+    assert payload["summary_path"] == "video_model"
+    assert payload["video_template"] == "访谈"
+    assert isolated_store.get("ws-video").items[0].related_task_ids == [
+        "download-1",
+        "analyze-1",
+    ]
 
 
 # ── Error path ────────────────────────────────────────────────────────────────

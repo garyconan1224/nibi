@@ -1,0 +1,276 @@
+/* ResultsOverview — 总览页 s05 局部 token */
+.vm-overview-scope {
+  --accent:       #FF4D7E;
+  --accent-2:     #B84CFF;
+  --accent-3:     #3C77FB;
+  --accent-warm:  #FFB84C;
+  --accent-green: #22D39A;
+
+  --bg:        #f6f5f0;
+  --bg-elev:   #ffffff;
+  --bg-sunken: #efede6;
+  --ink:    #111111;
+  --ink-2:  #3a3a3a;
+  --ink-3:  #6b6b6b;
+  --ink-4:  #a0a0a0;
+  --line:        rgba(0, 0, 0, 0.08);
+  --line-strong: rgba(0, 0, 0, 0.18);
+
+  --mono:    ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  --display: 'Instrument Serif', 'Source Han Serif SC', 'Noto Serif SC', Georgia, serif;
+
+  color: var(--ink);
+  background: var(--bg);
+  font-family: 'Inter', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+}
+
+/* Nav bar */
+.vm-overview-scope .ov-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-elev);
+  flex-shrink: 0;
+}
+.vm-overview-scope .ov-nav .btn-ghost {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+.vm-overview-scope .ov-nav .btn-ghost:hover {
+  background: var(--bg-sunken);
+}
+.vm-overview-scope .ov-nav .ov-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--line-strong);
+}
+.vm-overview-scope .ov-nav .ov-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 400px;
+}
+.vm-overview-scope .ov-nav .kw {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--bg-sunken);
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+.vm-overview-scope .ov-nav .mono {
+  font-family: var(--mono);
+}
+
+/* Eyebrow */
+.vm-overview-scope .eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* Main content */
+.vm-overview-scope .ov-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 28px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Summary card */
+.vm-overview-scope .ov-card {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px 24px;
+}
+.vm-overview-scope .ov-card .ov-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.vm-overview-scope .ov-card .ov-card-head h2 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+.vm-overview-scope .ov-card .ov-summary-text {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Stat row */
+.vm-overview-scope .ov-stat-row {
+  display: flex;
+  gap: 24px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.vm-overview-scope .ov-stat-cell .label {
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--ink-4);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 2px;
+}
+.vm-overview-scope .ov-stat-cell .value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* Timeline card */
+.vm-overview-scope .ov-timeline-strip {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 0;
+}
+.vm-overview-scope .ov-tl-frame {
+  flex-shrink: 0;
+  width: 80px;
+  cursor: pointer;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  transition: border-color 120ms;
+}
+.vm-overview-scope .ov-tl-frame:hover {
+  border-color: var(--line-strong);
+}
+.vm-overview-scope .ov-tl-frame .ov-tl-thumb {
+  width: 80px;
+  height: 48px;
+  background: var(--bg-sunken);
+  display: grid;
+  place-items: center;
+  font-size: 9px;
+  color: var(--ink-4);
+  font-family: var(--mono);
+}
+.vm-overview-scope .ov-tl-frame .ov-tl-ts {
+  font-size: 9px;
+  font-family: var(--mono);
+  color: var(--ink-4);
+  text-align: center;
+  padding: 2px 0;
+}
+
+/* Transcript preview */
+.vm-overview-scope .ov-transcript-preview {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink-2);
+  max-height: 200px;
+  overflow: hidden;
+  position: relative;
+}
+.vm-overview-scope .ov-transcript-preview::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  background: linear-gradient(transparent, var(--bg-elev));
+}
+.vm-overview-scope .ov-transcript-line {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+}
+.vm-overview-scope .ov-transcript-line .ts {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-4);
+  flex-shrink: 0;
+  min-width: 36px;
+}
+.vm-overview-scope .ov-view-all {
+  margin-top: 10px;
+}
+
+/* Action cards */
+.vm-overview-scope .ov-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.vm-overview-scope .ov-action-card {
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: border-color 120ms, box-shadow 120ms;
+}
+.vm-overview-scope .ov-action-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+.vm-overview-scope .ov-action-card .ov-action-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--bg-sunken);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--ink-2);
+}
+.vm-overview-scope .ov-action-card .ov-action-text .title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.vm-overview-scope .ov-action-card .ov-action-text .desc {
+  font-size: 11px;
+  color: var(--ink-4);
+  margin-top: 2px;
+}
+
+/* Status chip */
+.vm-overview-scope .ov-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--mono);
+}
+.vm-overview-scope .ov-status-chip .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}

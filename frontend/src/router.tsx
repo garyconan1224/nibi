@@ -26,6 +26,7 @@ const VideoResultPage = lazy(() => import('@/pages/result/VideoResultPage'))
 const ImageResultPage = lazy(() => import('@/pages/result/ImageResultPage'))
 const AudioResultPage = lazy(() => import('@/pages/result/AudioResultPage'))
 const TextResultPage = lazy(() => import('@/pages/result/TextResultPage'))
+const ResultsOverview = lazy(() => import('@/pages/result/ResultsOverview/index'))
 const FavoritesPage = lazy(() => import('@/pages/FavoritesPage/FavoritesPage'))
 const SearchPage = lazy(() => import('@/pages/SearchPage/SearchPage'))
 const WorkbenchPage = lazy(() => import('@/pages/WorkbenchPage/index'))
@@ -55,20 +56,41 @@ export const router = createBrowserRouter([
       { path: 'search', element: withSuspense(<SearchPage />) },
       { path: 'workspaces/:id', element: withSuspense(<TaskboardPage />) },
       {
-        path: 'workspaces/:workspaceId/items/:itemId/result',
+        path: 'workspaces/:workspaceId/items/:itemId/overview',
+        element: withSuspense(<ResultsOverview />),
+      },
+      {
+        path: 'workspaces/:workspaceId/items/:itemId/video_detail',
         element: withSuspense(<VideoResultPage />),
       },
       {
-        path: 'workspaces/:workspaceId/items/:itemId/image_result',
+        path: 'workspaces/:workspaceId/items/:itemId/image_detail',
         element: withSuspense(<ImageResultPage />),
       },
       {
-        path: 'workspaces/:workspaceId/items/:itemId/audio_result',
+        path: 'workspaces/:workspaceId/items/:itemId/audio_detail',
         element: withSuspense(<AudioResultPage />),
       },
       {
-        path: 'workspaces/:workspaceId/items/:itemId/text_result',
+        path: 'workspaces/:workspaceId/items/:itemId/text_detail',
         element: withSuspense(<TextResultPage />),
+      },
+      // 旧路由兼容（保留一个 release，redirect 到新路径）
+      {
+        path: 'workspaces/:workspaceId/items/:itemId/result',
+        element: <Navigate to="../video_detail" replace />,
+      },
+      {
+        path: 'workspaces/:workspaceId/items/:itemId/image_result',
+        element: <Navigate to="../image_detail" replace />,
+      },
+      {
+        path: 'workspaces/:workspaceId/items/:itemId/audio_result',
+        element: <Navigate to="../audio_detail" replace />,
+      },
+      {
+        path: 'workspaces/:workspaceId/items/:itemId/text_result',
+        element: <Navigate to="../text_detail" replace />,
       },
       {
         path: 'processing/:taskId',

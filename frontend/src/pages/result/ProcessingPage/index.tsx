@@ -12,6 +12,7 @@ import './processing.css'
 
 interface LocationState {
   workspaceId?: string
+  itemId?: string
   url?: string
 }
 
@@ -21,6 +22,7 @@ export default function ProcessingPage() {
   const location = useLocation()
   const state = location.state as LocationState | null
   const workspaceId = state?.workspaceId
+  const itemId = state?.itemId
 
   const task = useTaskStore((s) => s.getTask(taskId))
   const cancelTask = useTaskStore((s) => s.cancelTask)
@@ -36,15 +38,16 @@ export default function ProcessingPage() {
   const isCancelled = status === 'CANCELLED'
   const isSuccess = status === 'SUCCESS'
 
-  // 任务完成后自动跳转结果页
+  // 任务完成后自动跳转结果总览页
   useEffect(() => {
     if (!isSuccess) return
+    if (!itemId) return // 没有 itemId 时不跳转（旧链接兼容）
     const timer = setTimeout(() => {
       const wid = workspaceId ?? 'default'
-      navigate(`/workspaces/${wid}/items/${taskId}/result`, { replace: true })
+      navigate(`/workspaces/${wid}/items/${itemId}/overview`, { replace: true })
     }, 1500)
     return () => clearTimeout(timer)
-  }, [isSuccess, workspaceId, taskId, navigate])
+  }, [isSuccess, workspaceId, itemId, navigate])
 
   const handleCancel = () => {
     if (taskId) cancelTask(taskId)
@@ -99,9 +102,9 @@ export default function ProcessingPage() {
                 <button
                   className="btn btn-primary"
                   onClick={() => {
-                    if (isSuccess) {
+                    if (isSuccess && itemId) {
                       const wid = workspaceId ?? 'default'
-                      navigate(`/workspaces/${wid}/items/${taskId}/result`)
+                      navigate(`/workspaces/${wid}/items/${itemId}/overview`)
                     }
                   }}
                   style={{
