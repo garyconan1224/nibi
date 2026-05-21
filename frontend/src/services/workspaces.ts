@@ -364,6 +364,16 @@ export interface AudioResult {
     total_sec: number
     transcript_count: number
   }
+  /** IP.9.2: 人声分离结果 URL */
+  vocal_url?: string
+  /** IP.9.2: 人声文件路径 */
+  vocal_path?: string
+  /** IP.9.2: 音乐分析结果（Markdown） */
+  music_analysis?: string
+  /** IP.9.2: 音乐转写结果（Markdown） */
+  music_transcription?: string
+  /** IP.9.2: 提示词输出（Markdown） */
+  prompt_output?: string
 }
 
 /** GET /workspaces/{id}/items/{itemId}/audio_result — 音频结果页聚合数据 */

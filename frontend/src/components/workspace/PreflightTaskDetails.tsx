@@ -61,7 +61,7 @@ export function TaskDetails({ type, taskId, params, onChange }: TaskDetailsProps
     )
   }
   // 音频
-  if (type === 'audio' && taskId === 'asr') {
+  if (type === 'audio' && taskId === 'asr_summary') {
     return (
       <AudioAsrDetails
         params={params as unknown as AudioAsrParams}
@@ -69,7 +69,7 @@ export function TaskDetails({ type, taskId, params, onChange }: TaskDetailsProps
       />
     )
   }
-  if ((type === 'video' || type === 'audio') && taskId === 'music') {
+  if ((type === 'video' || type === 'audio') && taskId === 'music_analysis') {
     return (
       <MusicAnalysisDetails
         params={params as unknown as MusicAnalysisParams}

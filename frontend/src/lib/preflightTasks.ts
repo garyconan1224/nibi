@@ -167,13 +167,15 @@ const DEFAULTS_BY_TYPE_AND_ID: Record<
     frame_prompt: { ...DEFAULT_VIDEO_FRAME_PROMPTS },
     summary: { ...DEFAULT_VIDEO_SUMMARY },
     srt: { enabled: true },
-    music: { ...DEFAULT_MUSIC_ANALYSIS },
+    music_analysis: { ...DEFAULT_MUSIC_ANALYSIS },
   },
   audio: {
-    asr: { ...DEFAULT_AUDIO_ASR },
-    voiceprint: { enabled: true },
-    srt: { enabled: true },
-    music: { ...DEFAULT_MUSIC_ANALYSIS },
+    asr_summary: { ...DEFAULT_AUDIO_ASR },
+    vocal_separation: { enabled: false },
+    subtitle_file: { enabled: true },
+    music_analysis: { ...DEFAULT_MUSIC_ANALYSIS },
+    music_transcribe: { enabled: false },
+    prompt_generation: { enabled: false },
   },
   image: {
     describe: { enabled: true },
@@ -264,14 +266,16 @@ export function getTopLevelTasks(type: ItemType): TopLevelTask[] {
         { id: 'frame_prompt', label: '画面提示词生成', desc: '截帧 → 视觉模型 → 提示词' },
         { id: 'summary', label: '视频文案总结', desc: '三条路径选一' },
         { id: 'srt', label: '字幕导出', desc: '转写后导出 .srt' },
-        { id: 'music', label: '音乐分析', desc: '背景音乐 BPM / Suno-Udio' },
+        { id: 'music_analysis', label: '音乐分析', desc: '背景音乐 BPM / Suno-Udio' },
       ]
     case 'audio':
       return [
-        { id: 'asr', label: '人声转写 + 内容总结', desc: 'Whisper + LLM' },
-        { id: 'voiceprint', label: '说话人音色区分', desc: '配合转写使用' },
-        { id: 'srt', label: '生成字幕文件', desc: '.srt / .txt' },
-        { id: 'music', label: '音乐分析', desc: 'BPM / 乐器 / Suno-Udio' },
+        { id: 'asr_summary', label: '人声内容总结', desc: 'Whisper 转写 + LLM 总结' },
+        { id: 'vocal_separation', label: '输出人声音频', desc: '分离人声与伴奏' },
+        { id: 'subtitle_file', label: '生成字幕文件', desc: '.srt / .txt 导出' },
+        { id: 'music_analysis', label: '音乐分析', desc: 'BPM / 乐器 / Suno-Udio 提示词' },
+        { id: 'music_transcribe', label: '音乐转写', desc: '背景音乐旋律转 MIDI/乐谱' },
+        { id: 'prompt_generation', label: '提示词输出', desc: '基于内容生成创作提示词' },
       ]
     case 'image':
       return [
