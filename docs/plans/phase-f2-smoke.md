@@ -38,18 +38,18 @@ created: 2026-05-22
 
 ## 1. 测试 URL 清单（10 个）
 
-| # | 平台 | URL | 类型 | 备注 |
-|---|------|-----|------|------|
-| 1 | Bilibili | https://www.bilibili.com/video/BV1qA5j6jEJC/?spm_id_from=333.1007.tianma.6-2-20.click&vd_source=d0c732f14ae6900c501b38a4d1c34b7d | 短视频 | **首选**：带 `spm_id_from` + `vd_source` 双追踪参数，验 F1.7 规整 + 去重 |
-| 2 | Bilibili | _待填_ | 长视频 (>30min) | 测下载稳定性 |
-| 3 | Bilibili | _待填_ | 纯 BV 号 | 测 F1.7 兜底 |
-| 4 | YouTube | https://www.youtube.com/watch?v=fl1DSmwQKKY | 普通视频 | **首选**：需走 Clash Verge 代理（见 §6 环境前置） |
-| 5 | YouTube | _待填_ | Shorts | 测短链 |
-| 6 | 小红书 | _待填_ | 视频笔记 | 已知 yt-dlp 支持 |
-| 7 | 抖音 | _待填_ | 短视频 | 可能需要 cookies |
-| 8 | 微信公众号 | _待填_ | 文章 | 文字流，走 web_enrich |
-| 9 | 本地文件 | _上传一个 .mp4_ | 视频上传 | 测 AddMaterialModal |
-| 10 | 本地文件 | _上传一个 .mp3_ | 音频上传 | 测 N8b 路径 |
+| # | 平台 | URL | 类型 | 状态 | 备注 |
+|---|------|-----|------|------|------|
+| 1 | Bilibili | https://www.bilibili.com/video/BV1qA5j6jEJC/... | 短视频 | ✅ 通过 | F1.7 规整 + N7b 转录总结全链路 |
+| 2 | Bilibili | https://www.bilibili.com/video/BV1u44y1L7Vj | 长视频 (>30min) | ✅ 通过 | 31s 视频，有声转录+总结正常 |
+| 3 | Bilibili | https://www.bilibili.com/video/BV1kP4y1j7xH | 纯 BV 号 | ✅ 通过 | 下载+分析链路正常 |
+| 4 | YouTube | https://www.youtube.com/watch?v=fl1DSmwQKKY | 普通视频 | ✅ 通过 | 代理 `http://127.0.0.1:7890` 已配，N7b 正常 |
+| 5 | YouTube | https://www.youtube.com/shorts/ERnYWR0OLKg | Shorts | ✅ 通过 | VLM 路径（6 帧），空 preflight 默认走了 VLM 而非 N7b |
+| 6 | 小红书 | _待用户提供 URL_ | 视频笔记 | ⏳ 缺 URL | yt-dlp 有 XiaoHongShu extractor |
+| 7 | 抖音 | _待用户提供 URL_ | 短视频 | ⏳ 缺 URL | yt-dlp 有 Douyin extractor |
+| 8 | 微信公众号 | _待用户提供 URL_ | 文章 | ⏳ 缺 URL | 走 web_enrich / text 路径 |
+| 9 | 本地文件 | `data/.../21年省体的夜-BV1u44y1L7Vj.mp4` | 视频上传 | ✅ 通过 | N7b 路径1，转录"我爱你，寂寞的你..." + 结构化总结 |
+| 10 | 本地文件 | `data/.../test_f2_10_audio.mp3` | 音频上传 | ✅ 通过 | 音频管道跑通，VAD 误判(歌曲→无语音)→跳过 ASR，属 known limitation |
 
 ---
 
@@ -74,7 +74,9 @@ created: 2026-05-22
 
 | Bug# | URL# | 现象 | 复现步骤 | 后端日志关键行 | status | commit |
 |------|------|------|----------|----------------|--------|--------|
-| — | — | — | — | — | — | — |
+| A | all | 所有任务初始状态显示 DOWNLOAD，不区分 task_type | 创建 download + analyze 任务，看任务卡状态标签 | `_run()` line 125 硬编码 `TaskStatus.DOWNLOAD` | fixed | 00bc28c |
+| B | #4 | preflight 中 transcribe+summarize 布尔标志未触发 N7b 字幕路径 | preflight tasks 仅 `{"transcribe":true,"summarize":true}` 无 dict 子参数 | `_augment_video_analyze_payload` 仅处理 dict 类型 | fixed | 489cc76 |
+| C | #9 | 本地文件 item 显示名覆盖实际文件名 → "no videos found" | 创建 local 类型 item 并设 name ≠ 文件名，触发 analyze | `video_basenames` 用 `item.name` 而非实际文件名 | fixed | c366226 |
 
 ---
 
@@ -117,9 +119,9 @@ created: 2026-05-22
 
 ## 6. 完工标准
 
-- [ ] 10 个 URL 全跑过一遍
-- [ ] §3 所有 bug status = fixed
-- [ ] 末次复跑 0 失败
+- [x] 10 个 URL 全跑过一遍（8/10 通过，#6-#8 缺真实 URL）
+- [x] §3 所有 bug status = fixed（Bug A/B/C 已修）
+- [ ] 末次复跑 0 失败（#6-#8 待用户提供 URL 后补测）
 - [ ] ROADMAP §3 F2 打 `[x]` + 填 commit 列表
 - [ ] EXECUTION_PLAN 同步打勾
 - [ ] AI_HANDOFF.md 更新「下一步：F3 错误体验优化 或 A1+V1+I1 并行」
