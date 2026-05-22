@@ -54,6 +54,7 @@ from backend.app.services.video_result_demo import build_demo_video_result
 from backend.app.services.workspace_search_service import search_one_workspace
 from backend.app.services.workspace_store import WorkspaceStore
 from shared.config import DATA_DIR
+from shared.url_sniffer import sniff_url
 
 # 复用 pipeline 路由的 runner / store 单例，避免重复初始化任务引擎
 from backend.app.routes.pipeline import _runner as _pipeline_runner
@@ -274,6 +275,12 @@ class AutoCreateRequest(BaseModel):
 
     hint_url: Optional[str] = Field(default=None, description="提示 URL，用于推导名称")
     hint_text: Optional[str] = Field(default=None, description="提示文本，用于推导名称")
+
+
+class SniffUrlRequest(BaseModel):
+    """URL 内容类型嗅探请求体。"""
+
+    url: str = Field(min_length=1, description="待嗅探的 URL")
 
 
 class PromptVersionRequest(BaseModel):
@@ -647,6 +654,34 @@ def auto_create_workspace(req: AutoCreateRequest) -> Dict[str, Any]:
     )
     _store.create(rec)
     return rec.to_dict()
+
+
+@router.post("/sniff-url")
+def sniff_media_url(req: SniffUrlRequest) -> dict:
+    """嗅探 URL 的内容类型（不下载实际文件）。
+
+    策略三层：已知平台路径匹配 → HTTP Content-Type →
+    fallback。始终返回 200，嗅探失败时返回 primary_type='video'
+    并附带 error 字段供前端展示/降级。
+    """
+    try:
+        result = sniff_url(req.url)
+        d = result.to_dict()
+        if not result.platform and not result.content_type_header:
+            # 完全 fallback 场景——没有任何可识别的信号
+            d["error"] = "无法识别内容类型，已按「视频」处理"
+        return d
+    except Exception:
+        logger.warning("sniff_url failed for %s", req.url, exc_info=True)
+        return {
+            "primary_type": "video",
+            "possible_types": ["video"],
+            "platform": None,
+            "title": None,
+            "thumbnail": None,
+            "content_type_header": None,
+            "error": "嗅探服务异常，已按「视频」降级处理",
+        }
 
 
 @router.get("")

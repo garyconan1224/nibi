@@ -85,6 +85,22 @@ export async function emptyWorkspaceTrash(): Promise<{ deleted: string[]; count:
   return res.data
 }
 
+/** POST /workspaces/sniff-url — 嗅探 URL 的内容类型（不下载实际文件） */
+export interface SniffResult {
+  primary_type: 'video' | 'audio' | 'image' | 'text'
+  possible_types: string[]
+  platform: string | null
+  title: string | null
+  thumbnail: string | null
+  content_type_header: string | null
+  error?: string
+}
+
+export async function sniffUrl(url: string): Promise<SniffResult> {
+  const res = await http.post<SniffResult>(`${BASE}/sniff-url`, { url })
+  return res.data
+}
+
 /** POST /workspaces/{id}/items — 添加素材 */
 export async function addWorkspaceItem(
   workspaceId: string,
