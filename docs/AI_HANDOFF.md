@@ -1,6 +1,6 @@
 # AI Handoff
 
-Last updated: 2026-05-21（IP.9 Flow Gaps 补齐，N7b/N8b UI 就绪）
+Last updated: 2026-05-22（F1.6 字幕清洗完成，端到端冒烟测试待跑）
 
 ---
 
@@ -85,16 +85,16 @@ git branch --show-current
 
 ## 下一步（按 ROI 排序，明天接力会话直接选）
 
-### ✅ F1.6 字幕清洗基础版（已完成）
+### ✅ F1.6 字幕清洗基础版（2026-05-22 已完成）
 
 - `shared/transcript_cleaner.py`：规则去填充词 + 去重复行 + 合并短句 + LLM 润色（修错字/标点/专有名词）
 - 已集成到 `_run_subtitle_summary()` 路径 1 流程：ASR → 清洗 → 总结
 - 26 个单测全绿，163 个后端测试无回归
-- 未做：输出格式 UI 单选 / 输出格式 → 后端不同提示词模板（V2.2 / V2.3）
+- Commit：`629fe60 fix(F1.6): allow subtitle path without API key`
 
-### 🥇 端到端冒烟测试（30min，用户自己跑）
+### 🥇 端到端冒烟测试（30min，**下一个会话推荐**）
 
-IP.7 修了所有 URL 任务跑不通的阻塞 bug，但**没有真正粘 B 站 URL 端到端跑过一次**。建议：
+F1.6 完成后，现有功能链路已大致就绪。建议先粘一个真实 B 站 URL 走一遍完整流程，验证：
 
 1. `./start.sh` 启动
 2. 打开 `/` → 不选工作空间 → 粘真实短 B 站 URL（< 5 分钟）
@@ -106,12 +106,12 @@ IP.7 修了所有 URL 任务跑不通的阻塞 bug，但**没有真正粘 B 站 
 8. 回 Taskboard 试：Compare Tab / Tags 增删 / 快速抽字幕 / 「生成分镜」
 9. 顶栏看 CPU/MEM 实时跳
 
-卡壳处 = IP.9 的输入。
+**预期**：所有 Tier A 功能点都能走通，没有挂 toast 或 console error。若卡壳，对标 docs/ROADMAP.md 找对应 track。
 
-### 🥉 路线选择（冒烟后定）
+### 🥈 路线选择（冒烟验证后定）
 
 **路线 A：[C] AI 导演**（4-7 天，Opus 体力活）
-- 需先补设计稿（system_design v1.1 这块语焉不详）
+- 需先补完整 director 设计（当前 system_design v1.1 缺交互细节）
 - 拍板生成模型 API 选型（Midjourney / Flux / SD / Sora）
 - 内容：Style 报告 + Storyboard shot 网格升级 + 生成预览 + .fcpxml 导出 + A/B Compare 视频版
 
@@ -120,7 +120,7 @@ IP.7 修了所有 URL 任务跑不通的阻塞 bug，但**没有真正粘 B 站 
 - 让项目能被外人 clone 跑起来
 - 是 v1.0.0 发布的前置
 
-### 🏅 独立小活（任意穿插）
+### 🥉 独立小活（任意穿插，不影响冒烟路线）
 
 - **N7b 路径 3** 视频模型直接分析（8-12h，依赖 Gemini / GPT-4o / Qwen-VL API 集成决策）
 - **N8b** 音频前端交互（6-8h，无人声切音乐弹窗 / 说话人修正 / 6 维度切分）
