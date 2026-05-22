@@ -100,7 +100,7 @@ git log --oneline -10
 
 **索引**：`docs/plans/phase-ip9-flow-gaps.md`
 **前置**：IP.8 已合并 ✅
-**模型分配**：UI 层 ⭐ 小米；后端层 Sonnet / Opus
+**模型分配**：UI 层 ⭐ DS v4-pro；后端层 Sonnet / Opus
 **分支**：`feat/ip9-flow-gaps`（已合并入 main）
 **子任务**：
 - [x] F1.1（IP.9.1）Results 总览页 s05 + 修跳转 bug — `9886826`
@@ -116,7 +116,7 @@ git log --oneline -10
 ### F2 真端到端冒烟测试 + Bug 修
 
 **前置**：F1 完成
-**模型**：用户自己跑 + ⭐ 小米修小 bug
+**模型**：用户自己跑 + ⭐ DS v4-pro 修小 bug
 **目标**：列出 10 个真实 URL（含 B 站 / YouTube / 小红书 / 抖音 / 微信公众号），逐个走流程
 - 记录每个失败点
 - 开 `docs/plans/phase-f2-smoke.md` 补丁清单
@@ -129,7 +129,7 @@ git log --oneline -10
 - 网络失败 / 配额超限 / 模型未配置 时的友好提示
 - 任务卡住 > N 分钟自动检测并提示
 - 历史失败任务一键重试
-**模型**：⭐ 小米
+**模型**：⭐ DS v4-pro
 **改动**：Processing / TaskCard / 错误 toast 文案统一
 
 ---
@@ -141,7 +141,7 @@ git log --oneline -10
 ### V1 视频路径选择 UI + 路径 1/3 后端
 
 **索引**：`视频.png` + `system_design_v3_final.md` §视频 + 现有 `handle_analyze_task`
-**模型**：UI ⭐ 小米；路径 1 Sonnet；路径 3 Opus
+**模型**：UI ⭐ DS v4-pro；路径 1 Sonnet；路径 3 Opus
 **分支**：`feat/ip9-flow-gaps`（UI 已合并入 main）
 **子任务**：
 - [x] V1.1 Preflight 加路径单选 + 视频类型模板 select（= F1.3）— `e618d1a`
@@ -192,7 +192,7 @@ git log --oneline -10
 ### A1 音频前端 6 任务勾选（= F1.2 = IP.9.2）
 
 **索引**：`音频.png` + `pipeline_tasks.py::handle_audio_task`
-**模型**：⭐ 小米
+**模型**：⭐ DS v4-pro
 **分支**：`feat/ip9-flow-gaps`（已合并入 main）
 **子任务**：
 - [x] A1.1 Preflight audio 分支补 6 个 checkbox — `cb27dd5`
@@ -212,7 +212,7 @@ git log --oneline -10
 ### A3 无人声切音乐模式（N8b 第 2 部分）
 
 **索引**：`音频.png` 中"无人声 → 音乐分析"分支
-**模型**：⭐ 小米
+**模型**：⭐ DS v4-pro
 **分支**：`feat/a3-music-mode`
 **子任务**：
 - A3.1 VAD 完毕后检测「无人声占比 > 80%」→ 弹模态「切到音乐模式吗」
@@ -222,7 +222,7 @@ git log --oneline -10
 ### A4 字幕导出 + .srt/.ass/.vtt 格式
 
 **索引**：`音频.png` 中"字幕导出"分支
-**模型**：⭐ 小米
+**模型**：⭐ DS v4-pro
 **分支**：`feat/a4-subtitle-export`
 **子任务**：
 - A4.1 后端字幕生成支持多格式
@@ -272,7 +272,8 @@ git log --oneline -10
 ### I1 EXIF 提取 + 基本信息卡
 
 **索引**：`图片.png` 中"基本信息（分辨率 / 拍摄设备 / EXIF）"
-**模型**：⭐ 小米（前端展示 + 后端 PIL 一行）
+**模型**：⭐ DS v4-pro（前端展示 + 后端 PIL 一行）
+
 **分支**：`feat/i1-image-exif`
 **子任务**：
 - I1.1 后端 image handler 输出 EXIF 字典
@@ -364,10 +365,12 @@ git log --oneline -10
 |---|---|---|
 | 1 | **Opus 4.7**（桌面）| 跨 5+ 文件 / 状态机 / 加密 / 外部 API 集成 |
 | 2 | **Sonnet 4.6**（桌面）| 多文件 CRUD / 组件级前端 / 后端 handler 改写 |
-| 3 | ⭐ **小米 2.5 Pro**（终端，免费）| 模板代码 / git / 单文件改 / CSS / 测试模板 / 文档 |
-| 4 | **Haiku 4.5**（桌面）| 单行 typo / 小米暂时不可用时的兜底 |
+| 3 | ⭐ **DS v4-pro**（终端 cc switch，比 Claude 便宜）| 模板代码 / git / 单文件改 / CSS / 测试模板 / 文档 |
+| 4 | **DS v4-flash / Haiku 4.5**（终端 Haiku 别名 / 桌面）| 单行 typo / 极简兜底；优先 v4-flash |
 
-⭐ **日常默认走小米**，能用就用。
+⭐ **日常默认走 DS v4-pro**，能用就用。⚠️ 不要让 v4-flash 当默认——它对应 Haiku 档，能力弱，多文件 CRUD 会翻车。
+
+> **2026-05-22 通道变更**：小米 2.5 Pro 套餐用完，终端 Claude Code（cc switch）换接 DeepSeek。cc switch 配置：Sonnet/Opus 别名 → `deepseek-v4-pro`，Haiku 别名 → `deepseek-v4-flash`。
 
 ### 分支命名
 
@@ -394,7 +397,7 @@ chore/<cleanup-name>           # 清理 / 文档
 
 ## 10. AI 协作规则（再次强化）
 
-> 这一节是给所有 AI 工具（Claude / 小米 / Codex / Cursor）的纪律。
+> 这一节是给所有 AI 工具（桌面 Claude / 终端 DS / Codex / Cursor 等）的纪律。
 
 ### 10.1 沟通
 
