@@ -4,7 +4,7 @@
 > **不是**：不是详细执行计划。详细计划在 `docs/plans/phase-XXX.md`（进入对应 phase 时由 AI 展开）。
 > **遵循**：[CLAUDE.md](../CLAUDE.md) 工作流 + 全局规则 + 模型选择策略 + 长期记忆（`~/.claude/projects/-Users-conan-Desktop-nibi/memory/MEMORY.md`）。
 >
-> Last updated: 2026-05-21
+> Last updated: 2026-05-22（F2 冒烟 8/10 通过，3 Bug 已修）
 
 ---
 
@@ -81,7 +81,7 @@ git log --oneline -10
 
 | Track | 主题 | 当前进度 | 目标 |
 |---|---|---|---|
-| **F** | 全流程（Flow）| 75%（H 系列 + IP.1~8 + F1.4/F1.6/F1.7；仅 F1.5 Gemini 待做）| 端到端打通，每个节点不掉链 |
+| **F** | 全流程（Flow）| 80%（H 系列 + IP.1~8 + F1.4/F1.6/F1.7 + F2 冒烟 8/10；3 bug 已修）| 端到端打通，每个节点不掉链 |
 | **V** | 视频（Video）| 60%（路径 1+2 已通，路径 3 待做）| 3 路径全通 + 字幕清洗 + 类型模板 |
 | **A** | 音频（Audio）| 60%（N8 后端 + UI 部分）| 6 任务前端勾选 + 后端补全 + 编辑修正 |
 | **T** | 文字（Text）| 70%（N10 已做大部分）| 多文对比 UI + 网页抓取扩展 |
@@ -130,10 +130,13 @@ git log --oneline -10
 
 **前置**：F1 完成
 **模型**：用户自己跑 + ⭐ DS v4-pro 修小 bug
-**目标**：列出 10 个真实 URL（含 B 站 / YouTube / 小红书 / 抖音 / 微信公众号），逐个走流程
-- 记录每个失败点
-- 开 `docs/plans/phase-f2-smoke.md` 补丁清单
-- 修完再跑一次
+**状态**：✅ 8/10 URL 通过，3 Bug 已修（2026-05-22）
+**索引**：`docs/plans/phase-f2-smoke.md`
+**已修 Bug**：
+- `00bc28c` Bug A：task_runner 所有任务硬编码 DOWNLOAD，改为按 task_type 映射
+- `489cc76` Bug B：preflight 布尔型 transcribe+summarize 未触发 N7b 字幕路径
+- `c366226` Bug C：本地文件 item 显示名覆盖实际文件名，analyze 找不到视频
+**待补**：#6 小红书 / #7 抖音 / #8 微信公众号需用户提供真实 URL
 
 ### F3 错误体验优化
 

@@ -1,6 +1,6 @@
 # AI Handoff
 
-Last updated: 2026-05-22（F1.7 URL 规整 + 前端冒烟完成）
+Last updated: 2026-05-22（F2 冒烟 8/10 通过，3 Bug 已修）
 
 ---
 
@@ -126,21 +126,31 @@ git branch --show-current
 - 新增 15 个单测（前端 6 + 后端 9），全量 183 通过
 - **Commit**：`170ec0b` feat(F1.7): URL 规整——前后端双端清洗追踪参数 + 去重标准化
 
-### 🥇 端到端冒烟测试（30min，**下一个会话推荐**）
+### ✅ F2 真端到端冒烟测试（2026-05-22 已完成 8/10）
 
-F1.6 + F2 Bug2 + F2 Bug3 修复完成后，路径 1 全链路已就绪（ASR → 清洗 → 总结 → duration 透传）且 yt-dlp 下载有格式降级保护。建议先粘一个真实 B 站 URL 走一遍完整流程，验证：
+**结果**：8/10 URL 通过，3 个 Bug 已修。详细记录在 `docs/plans/phase-f2-smoke.md`。
 
-1. `./start.sh` 启动
-2. 打开 `/` → 不选工作空间 → 粘真实短 B 站 URL（< 5 分钟）
-3. 调画质 720p / 抽帧 A / fps 2
-4. 「开始解析」→ Preflight 确认 → 提交
-5. 看 toast「已自动创建工作空间「XXX」」
-6. 跳 Processing → 看 yt-dlp 下载日志
-7. download 完成 → 自动 analyze → 完成跳 Result
-8. 回 Taskboard 试：Compare Tab / Tags 增删 / 快速抽字幕 / 「生成分镜」
-9. 顶栏看 CPU/MEM 实时跳
+**已修 Bug**：
+- `00bc28c` Bug A：task_runner 硬编码 DOWNLOAD → 按 task_type 映射初始状态
+- `489cc76` Bug B：preflight 布尔型标志未触发 N7b 路径 → 兜底 `summary_path="subtitle"`
+- `c366226` Bug C：本地文件显示名覆盖实际文件名 → local source 始终用 source_value 取文件名
 
-**预期**：所有 Tier A 功能点都能走通，没有挂 toast 或 console error。若卡壳，对标 docs/ROADMAP.md 找对应 track。
+**URL 验证结果**：
+| # | 平台 | 状态 |
+|---|------|------|
+| 1-3 | B站 x3 | ✅ 全链路通 |
+| 4 | YouTube | ✅ 代理已配，N7b 通 |
+| 5 | YouTube Shorts | ✅ VLM 路径（空 preflight 默认 VLM 非 N7b，已知行为） |
+| 6-8 | 小红书/抖音/微信 | ⏳ 缺真实 URL |
+| 9 | 本地 .mp4 | ✅ N7b 路径1，转录+总结正确 |
+| 10 | 本地 .mp3 | ✅ 音频管道通，VAD 对歌曲误判（known limitation） |
+
+### 🥇 下一步：补 #6~#8 URL + 收口 F2（**下一个会话推荐**）
+
+用户提供小红书、抖音、微信公众号各一个真实 URL，跑完 F2 剩余 3 个，然后：
+1. 更新 `phase-f2-smoke.md` 完工标准全打勾
+2. ROADMAP §3 F2 打 `[x]`
+3. 决策下一步：F3 错误体验优化 或 A1/V1/I1 并行
 
 ### 🥈 路线选择（冒烟验证后定）
 
