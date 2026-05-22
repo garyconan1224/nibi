@@ -269,6 +269,14 @@ def _build_attempts(
     return attempts
 
 
+# 格式降级链：首选格式不可用时按此顺序回退
+_FORMAT_FALLBACK_CHAIN = [
+    "bv*+ba/b",                  # B站 DASH：最佳视频 + 最佳音频合并
+    "bestvideo+bestaudio/best",  # YouTube DASH：分离流合并
+    "worst",                     # 绝对兜底
+]
+
+
 def run_ytdlp_download(
     *,
     url: str,
@@ -358,70 +366,84 @@ def run_ytdlp_download(
             task_state["save_path"] = abs_path
             task_state["file_name"] = os.path.basename(abs_path)
 
-    attempts = _build_attempts(
-        url=url,
-        browser=browser,
-        proxy=proxy,
-        po_token=po_token,
-        visitor_data=visitor_data,
-        format_selector=format_selector,
-        output_dir=output_dir,
-        cookie_base_dirs_list=dirs,
-        progress_hook=_hook,
-        filename_template=filename_template,
-        retry_count=retry_count,
-        socket_timeout=socket_timeout,
-        concurrent_fragment_downloads=concurrent_fragment_downloads,
-    )
-    # 注入 postprocessor_hooks 以捕获合并/转码后的最终文件路径（_build_attempts 未感知此 hook）
-    for opts in attempts:
-        opts["postprocessor_hooks"] = [_pp_hook]
+    # 构建格式降级链：首选 → fallback1 → fallback2 → ... → worst
+    _format_chain = [format_selector]
+    for f in _FORMAT_FALLBACK_CHAIN:
+        if f != format_selector:
+            _format_chain.append(f)
 
     last_exc: Exception | None = None
-    for i, opts in enumerate(attempts):
-        if log:
-            log(f"尝试策略 {i + 1}/{len(attempts)}…")
-        try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                ydl.download([url])
-            final_path = task_state.get("save_path", "")
-            # 磁盘兜底：若 hook 记录的路径不存在（多流合并后中间文件被清理），扫描 output_dir 取最新产出
-            if not final_path or not os.path.isfile(final_path):
-                fallback = _find_latest_final_media(output_dir)
-                if fallback:
-                    if log:
-                        log(f"路径兜底：hook 路径 {final_path!r} 失效，扫描到 {os.path.basename(fallback)}")
-                    final_path = fallback
-            converted = _transcode_to_mp4_if_needed(final_path)
-            task_state["save_path"] = converted
-            task_state["file_name"] = os.path.basename(converted) if converted else ""
-            if log:
-                log(f"下载成功：{task_state['file_name']}")
-            return {
-                "ok": True,
-                "save_path": converted,
-                "file_name": task_state.get("file_name", ""),
-                "error": "",
-                "error_full": "",
-                "percent": 100.0,
-            }
-        except Exception as err:  # noqa: BLE001
-            last_exc = err
-            low = str(err).lower()
-            if log:
-                log(f"策略失败：{str(err)[:200]}")
-            if "requested format is not available" in low:
-                continue
-            if _retryable_download_error(err):
-                continue
-            break
+    format_errors: list[str] = []
 
-    full = _clean_ansi(str(last_exc if last_exc else "未知错误"))
+    for fmt_idx, fmt in enumerate(_format_chain):
+        if fmt_idx > 0:
+            if log:
+                log(f"⬇️ 格式降级重试：{_format_chain[0]} → {fmt}")
+
+        attempts = _build_attempts(
+            url=url,
+            browser=browser,
+            proxy=proxy,
+            po_token=po_token,
+            visitor_data=visitor_data,
+            format_selector=fmt,
+            output_dir=output_dir,
+            cookie_base_dirs_list=dirs,
+            progress_hook=_hook,
+            filename_template=filename_template,
+            retry_count=retry_count,
+            socket_timeout=socket_timeout,
+            concurrent_fragment_downloads=concurrent_fragment_downloads,
+        )
+        for opts in attempts:
+            opts["postprocessor_hooks"] = [_pp_hook]
+
+        for i, opts in enumerate(attempts):
+            if log:
+                log(f"尝试策略 {i + 1}/{len(attempts)}（格式: {fmt}）…")
+            try:
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    ydl.download([url])
+                final_path = task_state.get("save_path", "")
+                if not final_path or not os.path.isfile(final_path):
+                    fallback = _find_latest_final_media(output_dir)
+                    if fallback:
+                        if log:
+                            log(f"路径兜底：hook 路径 {final_path!r} 失效，扫描到 {os.path.basename(fallback)}")
+                        final_path = fallback
+                converted = _transcode_to_mp4_if_needed(final_path)
+                task_state["save_path"] = converted
+                task_state["file_name"] = os.path.basename(converted) if converted else ""
+                if log:
+                    log(f"下载成功：{task_state['file_name']}")
+                return {
+                    "ok": True,
+                    "save_path": converted,
+                    "file_name": task_state.get("file_name", ""),
+                    "error": "",
+                    "error_full": "",
+                    "percent": 100.0,
+                }
+            except Exception as err:  # noqa: BLE001
+                last_exc = err
+                low = str(err).lower()
+                if log:
+                    log(f"策略失败：{str(err)[:200]}")
+                if "requested format is not available" in low:
+                    continue
+                if _retryable_download_error(err):
+                    continue
+                break  # 退出当前格式的尝试循环，尝试下一个格式
+
+        # 当前格式所有尝试均失败，记录错误
+        format_errors.append(f"{fmt}: {str(last_exc)[:200]}" if last_exc else f"{fmt}: unknown")
+
+    full = _clean_ansi(" | ".join(format_errors) if format_errors else str(last_exc if last_exc else "未知错误"))
     return {
         "ok": False,
         "save_path": "",
         "file_name": "",
-        "error": full.split("\n")[0],
+        "error": full.split("\n")[0][:400],
         "error_full": full,
         "percent": float(task_state.get("percent") or 0.0),
     }
