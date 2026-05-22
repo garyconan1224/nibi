@@ -1,5 +1,6 @@
-// L3 chip 筛选状态 + L4 排序/视图预留扩展
+// L3 chip 筛选 + L4 排序 + 视图切换 + localStorage 持久化
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
 export type FilterKey = 'all' | 'video' | 'audio' | 'image' | 'text' | 'workspace'
 
@@ -12,33 +13,63 @@ export const FILTER_OPTIONS: { key: FilterKey; label: string }[] = [
   { key: 'workspace', label: '工作空间' },
 ]
 
+export type SortBy =
+  | 'created_desc'
+  | 'created_asc'
+  | 'completed_desc'
+  | 'duration_desc'
+  | 'duration_asc'
+  | 'status'
+
+export const SORT_OPTIONS: { value: SortBy; label: string }[] = [
+  { value: 'created_desc', label: '创建时间（新 → 旧）' },
+  { value: 'created_asc', label: '创建时间（旧 → 新）' },
+  { value: 'completed_desc', label: '完成时间（最近在前）' },
+  { value: 'duration_desc', label: '时长（长 → 短）' },
+  { value: 'duration_asc', label: '时长（短 → 长）' },
+  { value: 'status', label: '状态（错误优先）' },
+]
+
+export type ViewMode = 'grid' | 'list'
+
 interface LibraryStore {
   selectedFilters: FilterKey[]
   toggleFilter: (key: FilterKey) => void
+  sortBy: SortBy
+  setSortBy: (sort: SortBy) => void
+  viewMode: ViewMode
+  setViewMode: (mode: ViewMode) => void
 }
 
-export const useLibraryStore = create<LibraryStore>((set) => ({
-  selectedFilters: ['all'],
+export const useLibraryStore = create<LibraryStore>()(
+  persist(
+    (set) => ({
+      selectedFilters: ['all'],
 
-  toggleFilter: (key) =>
-    set((s) => {
-      const prev = s.selectedFilters
-      const has = prev.includes(key)
+      toggleFilter: (key) =>
+        set((s) => {
+          const prev = s.selectedFilters
+          const has = prev.includes(key)
 
-      if (key === 'all') {
-        // 「全部」与其它互斥：点击「全部」→ 清空其它，只留全部
-        return { selectedFilters: ['all'] }
-      }
+          if (key === 'all') {
+            return { selectedFilters: ['all'] }
+          }
 
-      if (has) {
-        // 移除当前 chip
-        const next = prev.filter((k) => k !== key)
-        // 如果全没了，自动回「全部」
-        return { selectedFilters: next.length > 0 ? next : ['all'] }
-      }
+          if (has) {
+            const next = prev.filter((k) => k !== key)
+            return { selectedFilters: next.length > 0 ? next : ['all'] }
+          }
 
-      // 添加当前 chip，同时移除「全部」
-      const next = prev.filter((k) => k !== 'all').concat(key)
-      return { selectedFilters: next }
+          const next = prev.filter((k) => k !== 'all').concat(key)
+          return { selectedFilters: next }
+        }),
+
+      sortBy: 'created_desc',
+      setSortBy: (sortBy) => set({ sortBy }),
+
+      viewMode: 'grid',
+      setViewMode: (viewMode) => set({ viewMode }),
     }),
-}))
+    { name: 'nibi-library' },
+  ),
+)
