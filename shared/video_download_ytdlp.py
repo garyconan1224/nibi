@@ -70,6 +70,11 @@ def _is_bilibili_url(url: str) -> bool:
     return "bilibili.com" in u or "b23.tv" in u
 
 
+def _is_douyin_url(url: str) -> bool:
+    u = (url or "").lower()
+    return any(d in u for d in ("douyin.com", "iesdouyin.com", "v.douyin", "dy.com"))
+
+
 def _bilibili_yt_dlp_extras() -> dict[str, Any]:
     ua = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -313,6 +318,29 @@ def run_ytdlp_download(
             "error_full": "",
             "percent": 0.0,
         }
+
+    # ── 抖音 no-cookie 优先路径 ──
+    if _is_douyin_url(url):
+        if log:
+            log("🎵 检测到抖音链接，尝试无 cookie 移动端路径…")
+        try:
+            from shared.douyin_mobile_share import run_douyin_mobile_download
+
+            dy_result = run_douyin_mobile_download(
+                url_or_text=url,
+                output_dir=output_dir,
+                log=log,
+            )
+            if dy_result.get("ok"):
+                return dy_result
+            if log:
+                log(f"⚠️ 抖音移动端路径失败: {dy_result.get('error', '未知')}，回落 yt-dlp…")
+        except ImportError as e:
+            if log:
+                log(f"⚠️ 无法导入 douyin_mobile_share 模块: {e}，回落 yt-dlp…")
+        except Exception as e:
+            if log:
+                log(f"⚠️ 抖音移动端路径异常: {e}，回落 yt-dlp…")
 
     dirs = cookie_base_dirs_list if cookie_base_dirs_list is not None else cookie_base_dirs()
     task_state: dict[str, Any] = {

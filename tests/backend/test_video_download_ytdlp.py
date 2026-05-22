@@ -7,10 +7,17 @@
 """
 from __future__ import annotations
 
+import builtins
+import os
 import sys
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+
+# ── 模块级夹具：记录原始 __import__ ────────────────────────────────
+_orig_import = builtins.__import__
 
 
 # ── Mock 辅助 ──────────────────────────────────────────────────────────
@@ -200,3 +207,140 @@ class TestFormatFallback:
         assert result["ok"] is True
         fallback_logs = [m for m in logs if "格式降级" in m]
         assert len(fallback_logs) >= 1
+
+
+# ── 抖音 no-cookie fallback 集成测试 ─────────────────────────────
+
+class TestDouyinFallback:
+    """抖音 URL 时优先走 douyin_mobile_share，失败再回落 yt-dlp。"""
+
+    def test_douyin_url_triggers_fallback_and_succeeds(self, tmp_path):
+        """抖音 URL 时 mobile share 成功，yt-dlp 不被调用。"""
+        from shared.video_download_ytdlp import run_ytdlp_download
+
+        output_dir = str(tmp_path)
+        logs: list[str] = []
+        fake_ytdlp = _make_ydl_mock()
+        fake_dy_result = {
+            "ok": True,
+            "save_path": os.path.join(output_dir, "test.mp4"),
+            "file_name": "test.mp4",
+            "error": "",
+            "error_full": "",
+            "percent": 100.0,
+        }
+
+        # 创建一个空的 mp4 文件让 save_path 校验通过
+        Path(fake_dy_result["save_path"]).write_bytes(b"fake_mp4_data")
+
+        with patch.dict(sys.modules, {"yt_dlp": fake_ytdlp}):
+            with patch(
+                "shared.douyin_mobile_share.run_douyin_mobile_download",
+                return_value=fake_dy_result,
+            ):
+                result = run_ytdlp_download(
+                    url="https://v.douyin.com/iJvcK8CLC_o/",
+                    output_dir=output_dir,
+                    log=logs.append,
+                )
+
+        assert result["ok"] is True
+        assert "检测到抖音链接" in " ".join(logs)
+        # yt-dlp 的 YoutubeDL 没有被调用
+        fake_ytdlp.YoutubeDL.assert_not_called()
+
+    def test_douyin_fallback_fails_then_ytdlp(self, tmp_path):
+        """抖音 mobile share 失败时，继续走 yt-dlp。"""
+        from shared.video_download_ytdlp import run_ytdlp_download
+
+        output_dir = str(tmp_path)
+        logs: list[str] = []
+        fake_ytdlp = _make_ydl_mock()
+        fake_dy_result = {
+            "ok": False,
+            "save_path": "",
+            "file_name": "",
+            "error": "解析失败",
+            "error_full": "解析失败",
+            "percent": 0.0,
+        }
+
+        with patch.dict(sys.modules, {"yt_dlp": fake_ytdlp}):
+            with patch(
+                "shared.douyin_mobile_share.run_douyin_mobile_download",
+                return_value=fake_dy_result,
+            ):
+                result = run_ytdlp_download(
+                    url="https://v.douyin.com/iJvcK8CLC_o/",
+                    output_dir=output_dir,
+                    log=logs.append,
+                )
+
+        assert result["ok"] is True
+        assert any("回落" in m or "yt-dlp" in m.lower() for m in logs)
+        fake_ytdlp.YoutubeDL.assert_called()
+
+    def test_bilibili_url_not_affected(self, tmp_path):
+        """B站 URL 不触发抖音路径。"""
+        from shared.video_download_ytdlp import run_ytdlp_download
+
+        output_dir = str(tmp_path)
+        logs: list[str] = []
+        fake_ytdlp = _make_ydl_mock()
+
+        with patch.dict(sys.modules, {"yt_dlp": fake_ytdlp}):
+            result = run_ytdlp_download(
+                url="https://www.bilibili.com/video/BV1xx",
+                output_dir=output_dir,
+                log=logs.append,
+            )
+
+        assert result["ok"] is True
+        assert not any("抖音" in m for m in logs)
+        fake_ytdlp.YoutubeDL.assert_called()
+
+    def test_youtube_url_not_affected(self, tmp_path):
+        """YouTube URL 不触发抖音路径。"""
+        from shared.video_download_ytdlp import run_ytdlp_download
+
+        output_dir = str(tmp_path)
+        logs: list[str] = []
+        fake_ytdlp = _make_ydl_mock()
+
+        with patch.dict(sys.modules, {"yt_dlp": fake_ytdlp}):
+            result = run_ytdlp_download(
+                url="https://www.youtube.com/watch?v=abc123",
+                output_dir=output_dir,
+                log=logs.append,
+            )
+
+        assert result["ok"] is True
+        assert not any("抖音" in m for m in logs)
+
+    def test_douyin_fallback_import_error_graceful(self, tmp_path):
+        """douyin_mobile_share 模块导入失败时静默回落 yt-dlp。"""
+        from shared.video_download_ytdlp import run_ytdlp_download
+
+        output_dir = str(tmp_path)
+        logs: list[str] = []
+        fake_ytdlp = _make_ydl_mock()
+
+        # 让 lazy import 的 from shared.douyin_mobile_share import ... 失败
+        sys.modules.pop("shared.douyin_mobile_share", None)
+
+        def _block_import(name, *a, **kw):
+            if name == "shared.douyin_mobile_share":
+                raise ImportError("test: no such module")
+            return _orig_import(name, *a, **kw)
+
+        with patch.dict(sys.modules, {"yt_dlp": fake_ytdlp}):
+            with patch("builtins.__import__", side_effect=_block_import):
+                result = run_ytdlp_download(
+                    url="https://v.douyin.com/iJvcK8CLC_o/",
+                    output_dir=output_dir,
+                    log=logs.append,
+                )
+
+        assert result["ok"] is True
+        assert any("无法导入" in m or "douyin_mobile_share" in m for m in logs)
+        fake_ytdlp.YoutubeDL.assert_called()
