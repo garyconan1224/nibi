@@ -11,6 +11,7 @@ import {
   startItemPipeline,
 } from '@/services/workspaces'
 import type { SniffResult } from '@/services/workspaces'
+import type { ItemType } from '@/types/workspace'
 import type { ComposerDefaults, QualityOption } from './types'
 
 const QUALITY_MAP: Record<QualityOption, string> = {
@@ -145,10 +146,46 @@ export function PreflightDrawer({
     }
   }, [open, cd, textProviderId, textModelId, enabledProviders, providerModels, modelsLoading, textModels])
 
+  // F4.3: platform types（可能含 'article' 等非 ItemType 值）→ 规范 ItemType
+  const _norm = (t: string) => ({ article: 'text' } as Record<string, string>)[t] ?? t
+
+  // F4.3: typesToCreate——嗅探多类型 > selectedTypes > 单 resolvedType
+  const typesToCreate: string[] = (() => {
+    if (sniffResult?.possible_types && sniffResult.possible_types.length > 1) {
+      return sniffResult.possible_types
+    }
+    if (selectedTypes?.length) {
+      return selectedTypes.map(_norm)
+    }
+    return [resolvedType]
+  })()
+
+  const _typeLabel = (t: string) => ({ video: '视频', audio: '音频', image: '图片', text: '文字' } as Record<string, string>)[t] ?? t
+
   const handleConfirm = async () => {
     setSubmitting(true)
+    // shared across all items
+    const sharedPayload: Record<string, unknown> = {
+      content_type: contentType,
+      topic,
+      purpose,
+    }
+    if (cd) {
+      sharedPayload.quality = QUALITY_MAP[cd.quality] ?? cd.quality
+      sharedPayload.frame_mode = cd.frameMode
+      sharedPayload.frame_interval_sec = cd.fps
+      sharedPayload.max_frames = cd.maxFrames
+      sharedPayload.enabled_steps = cd.stepIds
+      sharedPayload.prompt_style = cd.promptStyle
+    }
+    const sharedModels = {
+      ...(visionModelId && { vision: visionModelId }),
+      ...(textModelId && { text: textModelId }),
+    }
+    const baseName = url.split('/').pop()?.split('?')[0] || url
+
     try {
-      // 1. 工作空间决定（如果没选，自动建）
+      // 1. workspace
       let wsId = workspaceId
       if (!wsId) {
         const ws = await autoCreateWorkspace({ hint_url: url })
@@ -156,76 +193,87 @@ export function PreflightDrawer({
         toast.info(`已自动创建工作空间「${ws.name}」`)
       }
 
-      // 2. 创建 item（F4.2: 类型由嗅探结果决定，嗅探失败退化为 video）
-      const itemRes = await addWorkspaceItem(wsId, {
-        type: resolvedType,
-        source: 'url',
-        source_value: url,
-        name: url.split('/').pop()?.split('?')[0] || url,
-      })
-      const newItem = itemRes.items.find((it) => it.source_value === url)
-      const itemId = newItem?.item_id ?? itemRes.items[itemRes.items.length - 1]?.item_id
-      if (!itemId) throw new Error('创建素材失败')
+      // 2. for each type: create item → save preflight → start pipeline
+      let firstTaskId: string | null = null
+      let firstItemId: string | null = null
+      let successCount = 0
+      const errors: string[] = []
 
-      // 3. 保存 preflight
-      const preflightPayload: Record<string, unknown> = {
-        content_type: contentType,
-        topic,
-        purpose,
-      }
-      if (cd) {
-        preflightPayload.quality = QUALITY_MAP[cd.quality] ?? cd.quality
-        preflightPayload.frame_mode = cd.frameMode
-        preflightPayload.frame_interval_sec = cd.fps
-        preflightPayload.max_frames = cd.maxFrames
-        preflightPayload.enabled_steps = cd.stepIds
-        preflightPayload.prompt_style = cd.promptStyle
-      }
-      // 构建 tasks：按 item type 分支构建（F4.2: 用解析后的类型替代硬编码 video）
-      const tasks: Record<string, unknown> = {}
-      const isVideo = selectedTypes?.length
-        ? selectedTypes.some((t) => t === '视频' || t === 'video')
-        : resolvedType === 'video'
-      if (isVideo) {
-        tasks.summary = {
-          enabled: true,
-          path: summaryPath,
-          depth: 'normal',
-          video_template: videoTemplate,
+      for (const itemType of typesToCreate) {
+        try {
+          const itemName = typesToCreate.length > 1
+            ? `${baseName} (${_typeLabel(itemType)})`
+            : baseName
+          const itemRes = await addWorkspaceItem(wsId, {
+            type: itemType as ItemType,
+            source: 'url',
+            source_value: url,
+            name: itemName,
+          })
+          const newItem = itemRes.items.find((it) => it.source_value === url)
+          const itemId = newItem?.item_id ?? itemRes.items[itemRes.items.length - 1]?.item_id
+          if (!itemId) throw new Error('创建素材失败')
+
+          // type-specific tasks
+          const tasks: Record<string, unknown> = {}
+          if (itemType === 'video') {
+            tasks.summary = {
+              enabled: true,
+              path: summaryPath,
+              depth: 'normal',
+              video_template: videoTemplate,
+            }
+          }
+
+          await savePreflight(wsId, itemId, {
+            background_overrides: sharedPayload,
+            models: sharedModels,
+            tasks,
+          })
+
+          const startRes = await startItemPipeline(wsId, itemId)
+          addTask({
+            task_id: startRes.task_id,
+            project_id: '',
+            task_type: startRes.task_type,
+            payload: {},
+            status: 'PENDING',
+            progress: 0,
+            log: [],
+            result: {},
+            error: '',
+            retry_of: '',
+            cancel_requested: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+
+          if (!firstTaskId) { firstTaskId = startRes.task_id; firstItemId = itemId }
+          successCount++
+        } catch (e) {
+          errors.push(`${_typeLabel(itemType)}: ${e instanceof Error ? e.message : '创建失败'}`)
         }
       }
-      await savePreflight(wsId, itemId, {
-        background_overrides: preflightPayload,
-        models: {
-          ...(visionModelId && { vision: visionModelId }),
-          ...(textModelId && { text: textModelId }),
-        },
-        tasks,
-      })
 
-      // 4. 触发 start
-      const startRes = await startItemPipeline(wsId, itemId)
-      addTask({
-        task_id: startRes.task_id,
-        project_id: '',
-        task_type: startRes.task_type,
-        payload: {},
-        status: 'PENDING',
-        progress: 0,
-        log: [],
-        result: {},
-        error: '',
-        retry_of: '',
-        cancel_requested: false,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      if (successCount === 0) throw new Error('所有素材创建失败')
 
-      toast.success('任务已创建', { description: url })
+      if (errors.length > 0) {
+        toast.warning(`已创建 ${successCount}/${typesToCreate.length} 个素材`, {
+          description: errors.join('；'),
+        })
+      } else {
+        toast.success(
+          typesToCreate.length > 1 ? `已创建 ${successCount} 个素材` : '任务已创建',
+          { description: url },
+        )
+      }
+
       onCreated()
-      navigate(`/processing/${startRes.task_id}`, {
-        state: { url, workspaceId: wsId, itemId },
-      })
+      if (firstTaskId) {
+        navigate(`/processing/${firstTaskId}`, {
+          state: { url, workspaceId: wsId, itemId: firstItemId },
+        })
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '提交失败')
     } finally {

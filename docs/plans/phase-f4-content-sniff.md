@@ -375,16 +375,18 @@ async function sniffUrl(url: string): Promise<SniffResult>
 - [x] **收口修复 3**：`resolvedType` 提为组件级变量，UI 可见性判断和 handleConfirm 共用同一来源
 
 ### F4.3 验收
-- [ ] sniff 返回 2 possible_types → PreflightDrawer 创建 2 个 item
-- [ ] 每个 item 的 preflight tasks 按各自 type 正确构建
-- [ ] 部分创建失败时 toast 显示成功数/失败数
-- [ ] sniff 返回 1 type 时行为与 F4.2 一致（不创建多余 item）
+- [x] sniff 返回 2 possible_types → PreflightDrawer 创建 2 个 item
+- [x] 每个 item 的 preflight tasks 按各自 type 正确构建（video→summary 路径；audio/text/image→空 tasks 由后端 bridge 兜底）
+- [x] 部分创建失败时 toast 显示成功数/失败数
+- [x] sniff 返回 1 type 时行为与 F4.2 一致（不创建多余 item）
+- [x] `typesToCreate` 逻辑：嗅探多类型 > selectedTypes > 单 resolvedType；platform type `article` → `text` 映射
 
 ### F4.4 验收
-- [ ] 后端 pytest 全通过（含新增 sniff case）
-- [ ] 前端 vitest 全通过（含新增 sniff mock case）
-- [ ] `pnpm build` 无类型错误
-- [ ] 手动冒烟 3 条 URL（视频 / 文章 / 图片）全部走通
+- [x] 后端 pytest 全通过（含新增 sniff case）
+- [x] 前端 vitest 全通过
+- [x] `pnpm build` 无类型错误
+- [x] 手动冒烟 3 条 URL（视频 / 文章 / 图片）全部走通
+- [ ] 前端 vitest 新增 F4.3 多 item 创建 mock case（后续会话补）
 
 ---
 
