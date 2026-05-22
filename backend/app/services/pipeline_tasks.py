@@ -44,6 +44,13 @@ from src.vidmirror.core.providers.registry import create_default_registry
 
 # ── N7b 路径 1：视频字幕直接总结 ──────────────────────────────
 
+_OUTPUT_FORMAT_PROMPTS: Dict[str, str] = {
+    "summary": "请将以下视频转写文本总结为一段通顺的摘要，涵盖核心内容和关键信息。",
+    "key_points": "请从以下视频转写文本中提取要点，以编号列表形式输出，每条要点一句话。",
+    "golden_quotes": "请从以下视频转写文本中摘录最精彩、最有价值的金句，逐条列出，并简要标注每条金句的语境。",
+    "paragraph_rewrite": "请将以下视频转写文本重新组织为通顺的叙事段落，保留原意但优化表达，去掉口语填充词和冗余重复。",
+}
+
 _VIDEO_TEMPLATE_PROMPTS: Dict[str, str] = {
     "教程": (
         "这是一段教程/课程类视频的转写文本。请按以下结构输出总结：\n"
@@ -174,8 +181,16 @@ def _build_video_summary_prompt(
     transcript: str,
     video_template: str = "其它",
     depth: str = "normal",
+    output_format: str = "summary",
 ) -> str:
-    """根据视频类型模板构建 LLM 总结 prompt。"""
+    """根据视频类型模板和输出格式构建 LLM 总结 prompt。
+
+    V2.2/V2.3: output_format 决定主要输出形式（摘要/要点/金句/段落改写），
+    video_template 会在 format instruction 之后拼接领域上下文提示。
+    """
+    format_instruction = _OUTPUT_FORMAT_PROMPTS.get(
+        output_format, _OUTPUT_FORMAT_PROMPTS["summary"]
+    )
     template_instruction = _VIDEO_TEMPLATE_PROMPTS.get(
         video_template, _VIDEO_TEMPLATE_PROMPTS["其它"]
     )
@@ -191,6 +206,7 @@ def _build_video_summary_prompt(
     suffix = "\n\n（注：转写文本过长，已截断前 12000 字符）" if len(transcript) > max_chars else ""
 
     return (
+        f"{format_instruction}\n\n"
         f"{template_instruction}\n"
         f"{depth_hint}\n\n"
         f"请用中文输出。\n\n"
@@ -407,13 +423,16 @@ def _run_subtitle_summary(
     # 4. LLM 总结
     video_template = str(payload.get("video_template") or "其它").strip()
     summary_depth = str(payload.get("summary_depth") or "normal").strip()
+    output_format = str(payload.get("output_format") or "summary").strip()
     summary = ""
 
     if api_key:
         try:
             runner.set_progress(task_id, 0.98, "LLM 生成摘要...")
-            prompt = _build_video_summary_prompt(transcript_text, video_template, summary_depth)
-            log(f"📝 LLM 总结 | template={video_template} | depth={summary_depth}")
+            prompt = _build_video_summary_prompt(
+                transcript_text, video_template, summary_depth, output_format,
+            )
+            log(f"📝 LLM 总结 | template={video_template} | depth={summary_depth} | format={output_format}")
 
             settings = load_settings()
             registry = create_default_registry()
@@ -455,6 +474,7 @@ def _run_subtitle_summary(
         "transcript_segments": transcript_segments,
         "summary": summary,
         "video_template": video_template,
+        "output_format": output_format,
         "duration_sec": whisper_duration,
     }
 

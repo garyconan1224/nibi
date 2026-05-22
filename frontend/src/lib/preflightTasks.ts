@@ -25,8 +25,15 @@ export interface VideoFramePromptsParams {
 export type VideoSummaryPath = 'subtitle' | 'detailed' | 'video_model'
 export type SummaryDepth = 'brief' | 'normal' | 'deep'
 export type VideoTemplate = '教程' | 'Vlog' | '访谈' | '影视点评' | '产品评测' | '其它'
+export type VideoOutputFormat = 'summary' | 'key_points' | 'golden_quotes' | 'paragraph_rewrite'
 
 export const VIDEO_TEMPLATE_OPTIONS: VideoTemplate[] = ['教程', 'Vlog', '访谈', '影视点评', '产品评测', '其它']
+export const OUTPUT_FORMAT_OPTIONS: { value: VideoOutputFormat; label: string; desc: string }[] = [
+  { value: 'summary', label: '摘要', desc: '全文结构化摘要' },
+  { value: 'key_points', label: '要点', desc: '编号要点列表' },
+  { value: 'golden_quotes', label: '金句', desc: '精彩语句摘录' },
+  { value: 'paragraph_rewrite', label: '段落改写', desc: '保留信息，重新组织语言' },
+]
 
 export interface VideoSummaryParams {
   enabled: boolean
@@ -34,6 +41,8 @@ export interface VideoSummaryParams {
   depth: SummaryDepth
   /** IP.9.3: 路径 2 时选择的视频类型模板 */
   video_template: VideoTemplate
+  /** V2.2: 路径 1 输出格式（摘要/要点/金句/段落改写） */
+  output_format: VideoOutputFormat
 }
 
 // ── 音频 ────────────────────────────────────────────────
@@ -120,6 +129,7 @@ export const DEFAULT_VIDEO_SUMMARY: VideoSummaryParams = {
   path: 'detailed',
   depth: 'normal',
   video_template: '其它',
+  output_format: 'summary',
 }
 
 export const DEFAULT_AUDIO_ASR: AudioAsrParams = {

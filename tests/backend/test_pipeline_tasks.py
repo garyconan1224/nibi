@@ -445,3 +445,102 @@ class TestPhase1FStageTransitions:
         assert "归档任务结果" in log_messages, (
             f"STORE 阶段消息缺失，日志：{log_messages}"
         )
+
+
+# ── V2.2/V2.3：输出格式 prompt 模板 ──────────────────────────────────────────
+
+class TestVideoSummaryOutputFormat:
+    """V2.2/V2.3：4 种输出格式对应 4 套不同的 prompt 模板。"""
+
+    def test_four_output_formats_produce_different_prompts(self) -> None:
+        from backend.app.services.pipeline_tasks import _build_video_summary_prompt
+
+        transcript = "今天聊一聊 AI 的未来。"
+        prompts = {}
+        for fmt in ("summary", "key_points", "golden_quotes", "paragraph_rewrite"):
+            prompts[fmt] = _build_video_summary_prompt(
+                transcript, video_template="其它", depth="normal", output_format=fmt,
+            )
+
+        for fmt_a, fmt_b in [
+            ("summary", "key_points"),
+            ("summary", "golden_quotes"),
+            ("key_points", "paragraph_rewrite"),
+        ]:
+            assert prompts[fmt_a] != prompts[fmt_b], (
+                f"{fmt_a} 和 {fmt_b} 的 prompt 应不同"
+            )
+
+        for fmt, prompt in prompts.items():
+            assert transcript in prompt, f"{fmt} 的 prompt 应包含转写文本"
+
+    def test_default_output_format_is_summary(self) -> None:
+        """旧数据未传 output_format 时默认走摘要逻辑。"""
+        from backend.app.services.pipeline_tasks import _build_video_summary_prompt
+
+        transcript = "测试文本。"
+        with_default = _build_video_summary_prompt(transcript)
+        with_explicit = _build_video_summary_prompt(
+            transcript, output_format="summary",
+        )
+        assert with_default == with_explicit
+
+    def test_unknown_output_format_falls_back_to_summary(self) -> None:
+        """未知 output_format 值兜底到摘要模板。"""
+        from backend.app.services.pipeline_tasks import _build_video_summary_prompt
+
+        transcript = "测试文本。"
+        unknown = _build_video_summary_prompt(
+            transcript, output_format="not_a_real_format",
+        )
+        explicit = _build_video_summary_prompt(
+            transcript, output_format="summary",
+        )
+        assert unknown == explicit
+
+    def test_subtitle_summary_with_output_format_key_points(self, tmp_path: Path) -> None:
+        """路径 1 携带 output_format='key_points' 应被正确传给 prompt 构建。"""
+        from backend.app.services.pipeline_tasks import handle_analyze_task
+
+        fake_video = tmp_path / "videos" / "sample.mp4"
+        fake_video.parent.mkdir(parents=True, exist_ok=True)
+        fake_video.touch()
+        json_dir = tmp_path / "json"
+
+        runner = MagicMock()
+        record = TaskRecord(
+            task_id="subtitle-key-points",
+            project_id="default_project",
+            task_type="analyze",
+            payload={
+                "summary_path": "subtitle",
+                "video_basenames": [fake_video.name],
+                "output_format": "key_points",
+            },
+        )
+
+        with (
+            patch("backend.app.services.pipeline_tasks.load_settings", return_value=_mock_settings("")),
+            patch("backend.app.services.pipeline_tasks.get_workspace_videos_dir",
+                  return_value=fake_video.parent),
+            patch("backend.app.services.pipeline_tasks.get_workspace_json_dir",
+                  return_value=json_dir),
+            patch("backend.app.services.pipeline_tasks.find_videos",
+                  return_value=[fake_video]),
+            patch("backend.app.services.pipeline_tasks.run_batch_analysis") as run_batch,
+            patch("backend.app.services.pipeline_tasks._extract_audio_from_video",
+                  return_value=json_dir / "sample.wav"),
+            patch("backend.app.services.asr_fast_whisper.is_fast_whisper_available",
+                  return_value=True),
+            patch("backend.app.services.asr_fast_whisper.transcribe_file_with_fast_whisper",
+                  return_value=(
+                      "今天天气不错适合出门散步",
+                      [{"start": 0.0, "end": 5.0, "text": "今天天气不错适合出门散步"}],
+                      5.0,
+                  )),
+        ):
+            result = handle_analyze_task(record, runner)
+
+        run_batch.assert_not_called()
+        assert result["summary_path"] == "subtitle"
+        assert result["output_format"] == "key_points"

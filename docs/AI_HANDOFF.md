@@ -1,6 +1,6 @@
 # AI Handoff
 
-Last updated: 2026-05-22（Phase L 资料库聚合页完成 + build/test/browser QA 通过）
+Last updated: 2026-05-23（V2.2/V2.3 视频输出格式选择 + 提示词模板完成）
 
 ---
 
@@ -155,14 +155,19 @@ git branch --show-current
 | 9 | 本地 .mp4 | ✅ N7b 路径1，转录+总结正确 |
 | 10 | 本地 .mp3 | ✅ 音频管道通，VAD 对歌曲误判（known limitation） |
 
-### 🥇 下一步：V2.2/V2.3 视频输出格式选择 + 提示词模板（**下一个会话推荐**）
+### ✅ V2.2/V2.3 视频输出格式选择 + 提示词模板（2026-05-23 已完成）
 
-Phase L 资料库聚合页已收口。
+- V2.2 输出格式 UI：PreflightDrawer 路径 1 增加 4 种格式 radio（摘要/要点/金句/段落改写）
+- V2.3 后端 4 套 prompt 模板：`_OUTPUT_FORMAT_PROMPTS` dict，`_build_video_summary_prompt` 按 `output_format` 切换
+- `output_format` 通过 preflight → `_augment_video_analyze_payload` → `_run_subtitle_summary` 全链路透传
+- 旧数据兼容：未传 `output_format` 默认 `summary`（原摘要逻辑）
+- 新增 5 个测试，全量 239 后端 test + 15 前端 test + build 通过
 
-用户推荐下一步做 **V2.2/V2.3**：
-- V2.2 视频输出格式选择（前端 UI + 后端参数映射）
-- V2.3 后端提示词模板接入（前端选模板 → 后端拼 prompt）
-- **优势**：不依赖 Gemini API，比 V1.3 路径 3 风险低，直接增强已跑通的"字幕总结路径 1"
+### 🥇 下一步：补 #6~#8 URL + 收口 F2 或 V3 视频类型模板库
+
+V2.2/V2.3 已完成。可选下一步（按 ROI）：
+- **补 F2 剩余 3 个 URL**（小红书/抖音/微信），用户提供真实 URL 即可跑完 F2
+- **V3 视频类型模板库**（后端模板库扩充 + 用户自定义模板 + 自动选模板）——增强路径 1 的内容质量
 
 ### 🥈 补 #6~#8 URL + 收口 F2
 

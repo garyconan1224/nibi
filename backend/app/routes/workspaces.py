@@ -100,6 +100,8 @@ def _augment_video_analyze_payload(payload: Dict[str, Any], item: WorkspaceItem)
             payload["summary_path"] = summary_params["path"]
         if summary_params.get("video_template"):
             payload["video_template"] = summary_params["video_template"]
+        if summary_params.get("output_format"):
+            payload["output_format"] = summary_params["output_format"]
 
     # 布尔标志兜底：preflight 中 transcribe + summarize 都为 true 时，
     # 默认走 N7b 路径 1（字幕直接总结），不触发 VLM 逐帧分析

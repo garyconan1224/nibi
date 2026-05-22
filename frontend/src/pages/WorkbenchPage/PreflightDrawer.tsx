@@ -13,6 +13,8 @@ import {
 import type { SniffResult } from '@/services/workspaces'
 import type { ItemType } from '@/types/workspace'
 import type { ComposerDefaults, QualityOption } from './types'
+import { OUTPUT_FORMAT_OPTIONS } from '@/lib/preflightTasks'
+import type { VideoOutputFormat } from '@/lib/preflightTasks'
 
 const QUALITY_MAP: Record<QualityOption, string> = {
   '最高画质': 'best',
@@ -76,6 +78,7 @@ export function PreflightDrawer({
   const [submitting, setSubmitting] = useState(false)
   const [summaryPath, setSummaryPath] = useState<SummaryPath>('detailed')
   const [videoTemplate, setVideoTemplate] = useState('其它')
+  const [outputFormat, setOutputFormat] = useState<VideoOutputFormat>('summary')
   const navigate = useNavigate()
 
   // Track which Composer defaults have been applied
@@ -105,6 +108,7 @@ export function PreflightDrawer({
       setTextModelId(cd?.textModelId ?? '')
       setSummaryPath('detailed')
       setVideoTemplate('其它')
+      setOutputFormat('summary')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -238,6 +242,7 @@ export function PreflightDrawer({
               path: summaryPath,
               depth: 'normal',
               video_template: videoTemplate,
+              output_format: outputFormat,
             }
           }
 
@@ -387,12 +392,46 @@ export function PreflightDrawer({
                 </div>
               </div>
               {summaryPath === 'subtitle' && (
-                <div className="pf-field">
-                  <label>视频类型模板</label>
-                  <select value={videoTemplate} onChange={(e) => setVideoTemplate(e.target.value)}>
-                    {VIDEO_TEMPLATES.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
+                <>
+                  <div className="pf-field">
+                    <label>视频类型模板</label>
+                    <select value={videoTemplate} onChange={(e) => setVideoTemplate(e.target.value)}>
+                      {VIDEO_TEMPLATES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div className="pf-field">
+                    <label>输出格式</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {OUTPUT_FORMAT_OPTIONS.map((opt) => (
+                        <label
+                          key={opt.value}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: 8,
+                            padding: '6px 10px',
+                            border: `1px solid ${outputFormat === opt.value ? 'var(--accent)' : 'var(--border)'}`,
+                            borderRadius: 6,
+                            cursor: 'pointer',
+                            background: outputFormat === opt.value ? 'var(--accent-bg)' : 'transparent',
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="outputFormat"
+                            value={opt.value}
+                            checked={outputFormat === opt.value}
+                            onChange={() => setOutputFormat(opt.value)}
+                          />
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 500 }}>{opt.label}</div>
+                            <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{opt.desc}</div>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
             </section>
           )}
