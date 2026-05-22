@@ -112,6 +112,39 @@ def _normalize_transcript_to_lines(
     return []
 
 
+def _build_display_transcript_lines(
+    cleaned_transcript_text: str,
+    transcript_segments: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Build display lines that preserve timestamps while preferring cleaned text."""
+    if not transcript_segments:
+        return _normalize_transcript_to_lines(cleaned_transcript_text, transcript_segments)
+
+    from shared.transcript_cleaner import clean_transcript_rules
+
+    base_lines = [
+        {
+            "t_sec": float(seg.get("start", 0)),
+            "t_str": _format_sec_short(float(seg.get("start", 0))),
+            "text": clean_transcript_rules(str(seg.get("text", ""))).strip(),
+        }
+        for seg in transcript_segments
+        if str(seg.get("text", "")).strip()
+    ]
+    base_lines = [line for line in base_lines if line["text"]]
+
+    cleaned_lines = [
+        line.strip()
+        for line in cleaned_transcript_text.splitlines()
+        if line.strip()
+    ]
+    if cleaned_lines and len(cleaned_lines) == len(base_lines):
+        for line, cleaned in zip(base_lines, cleaned_lines):
+            line["text"] = cleaned
+
+    return base_lines
+
+
 def _format_sec_short(sec: float) -> str:
     """秒数格式化为 MM:SS。"""
     s = max(0, int(sec))
@@ -409,7 +442,7 @@ def _run_subtitle_summary(
         pass
 
     # 规范化 transcript 为数组格式（前端 VideoResult.transcript 期望 VideoResultTranscriptLine[]）
-    transcript_lines = _normalize_transcript_to_lines(transcript_text, transcript_segments)
+    transcript_lines = _build_display_transcript_lines(transcript_text, transcript_segments)
 
     return {
         "summary_path": "subtitle",

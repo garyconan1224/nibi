@@ -348,6 +348,59 @@ def test_subtitle_summary_without_api_key_runs_rules_only(tmp_path: Path) -> Non
     assert result["transcript"][0]["t_str"] == "00:00"
     assert result["transcript"][1]["t_sec"] == 2.5
     assert result["transcript"][1]["t_str"] == "00:02"
+    assert "嗯" not in result["transcript"][0]["text"]
+    assert "啊" not in result["transcript"][0]["text"]
+
+
+def test_subtitle_summary_prefers_cleaned_lines_for_display(tmp_path: Path) -> None:
+    """字幕展示应优先用清洗后的逐行文本，而不是原始 ASR segment 文本。"""
+    from backend.app.services.pipeline_tasks import handle_analyze_task
+
+    fake_video = tmp_path / "videos" / "sample.mp4"
+    fake_video.parent.mkdir(parents=True, exist_ok=True)
+    fake_video.touch()
+    json_dir = tmp_path / "json"
+
+    runner = MagicMock()
+    record = TaskRecord(
+        task_id="subtitle-cleaned-lines",
+        project_id="default_project",
+        task_type="analyze",
+        payload={
+            "summary_path": "subtitle",
+            "video_basenames": [fake_video.name],
+        },
+    )
+
+    with (
+        patch("backend.app.services.pipeline_tasks.load_settings", return_value=_mock_settings("")),
+        patch("backend.app.services.pipeline_tasks.get_workspace_videos_dir",
+              return_value=fake_video.parent),
+        patch("backend.app.services.pipeline_tasks.get_workspace_json_dir",
+              return_value=json_dir),
+        patch("backend.app.services.pipeline_tasks.find_videos",
+              return_value=[fake_video]),
+        patch("backend.app.services.pipeline_tasks.run_batch_analysis") as run_batch,
+        patch("backend.app.services.pipeline_tasks._extract_audio_from_video",
+              return_value=json_dir / "sample.wav"),
+        patch("backend.app.services.asr_fast_whisper.is_fast_whisper_available",
+              return_value=True),
+        patch("backend.app.services.asr_fast_whisper.transcribe_file_with_fast_whisper",
+              return_value=(
+                  "原始第一段\n原始第二段",
+                  [{"start": 0.0, "end": 2.5, "text": "嗯 原始第一段"},
+                   {"start": 2.5, "end": 5.0, "text": "啊 原始第二段"}],
+              )),
+        patch("shared.transcript_cleaner.clean_transcript",
+              return_value="清洗后第一段\n清洗后第二段"),
+    ):
+        result = handle_analyze_task(record, runner)
+
+    run_batch.assert_not_called()
+    assert [line["text"] for line in result["transcript"]] == [
+        "清洗后第一段",
+        "清洗后第二段",
+    ]
 
 
 # ── Phase 1F：验证 PROBE / STORE 框架级阶段被触发 ────────────────────────────
