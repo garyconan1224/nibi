@@ -350,8 +350,8 @@ def _run_subtitle_summary(
             progress_callback=_on_progress,
             return_segments=True,
         )
-        transcript_text, transcript_segments = whisper_result
-        log(f"✅ 转写完成 | {len(transcript_text)} 字符 / {len(transcript_segments)} 段")
+        transcript_text, transcript_segments, whisper_duration = whisper_result
+        log(f"✅ 转写完成 | {len(transcript_text)} 字符 / {len(transcript_segments)} 段 / {whisper_duration:.1f}s")
     except Exception as e:
         log(f"⚠️  Whisper 转写失败: {e}")
         return {"summary_path": "subtitle", "transcript": [], "summary_error": f"转写失败: {e}"}
@@ -444,11 +444,6 @@ def _run_subtitle_summary(
     # 规范化 transcript 为数组格式（前端 VideoResult.transcript 期望 VideoResultTranscriptLine[]）
     transcript_lines = _build_display_transcript_lines(transcript_text, transcript_segments)
 
-    # 计算 duration：从 segments 最后一段的 end 时间推导，避免改 transcribe 函数签名
-    duration_sec = 0.0
-    if transcript_segments:
-        duration_sec = max(float(seg.get("end", 0.0)) for seg in transcript_segments)
-
     return {
         "summary_path": "subtitle",
         "transcript": transcript_lines,
@@ -456,7 +451,7 @@ def _run_subtitle_summary(
         "transcript_segments": transcript_segments,
         "summary": summary,
         "video_template": video_template,
-        "duration_sec": duration_sec,
+        "duration_sec": whisper_duration,
     }
 
 

@@ -332,6 +332,7 @@ def test_subtitle_summary_without_api_key_runs_rules_only(tmp_path: Path) -> Non
                   "嗯 今天天气不错 啊\n今天天气不错",
                   [{"start": 0.0, "end": 2.5, "text": "嗯 今天天气不错 啊"},
                    {"start": 2.5, "end": 5.0, "text": "今天天气不错"}],
+                  15.0,
               )),
     ):
         result = handle_analyze_task(record, runner)
@@ -390,6 +391,7 @@ def test_subtitle_summary_prefers_cleaned_lines_for_display(tmp_path: Path) -> N
                   "原始第一段\n原始第二段",
                   [{"start": 0.0, "end": 2.5, "text": "嗯 原始第一段"},
                    {"start": 2.5, "end": 5.0, "text": "啊 原始第二段"}],
+                  15.0,
               )),
         patch("shared.transcript_cleaner.clean_transcript",
               return_value="清洗后第一段\n清洗后第二段"),

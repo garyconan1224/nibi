@@ -337,7 +337,7 @@ def transcribe_file_with_fast_whisper(
     log_callback: Optional[Callable[[str], None]] = None,
     progress_callback: Optional[Callable[[float, str], None]] = None,
     return_segments: bool = False,
-) -> "str | tuple[str, list[dict[str, Any]]]":
+) -> "str | tuple[str, list[dict[str, Any]], float]":
     """转录本地音/视频文件（直接交给 ffmpeg 解码，免去读整段二进制进内存）。
 
     参数：
@@ -350,7 +350,7 @@ def transcribe_file_with_fast_whisper(
         log_callback：可选日志回调，会在模型加载/首段落/每 5 秒进度点回推 message
         progress_callback：可选进度回调 (ratio, message)，ratio ∈ [0, 1]
 
-    返回：拼接后的转录文本（段落以 \\n 连接）
+    返回：拼接后的转录文本（段落以 \\n 连接）；return_segments=True 时返回 (text, segments, duration_sec)
     """
     def _emit_log(msg: str) -> None:
         if log_callback is not None:
@@ -421,7 +421,7 @@ def transcribe_file_with_fast_whisper(
     _emit_progress(1.0, "转录完成")
     text_out = "\n".join(parts).strip()
     if return_segments:
-        return text_out, seg_dicts
+        return text_out, seg_dicts, total
     return text_out
 
 
