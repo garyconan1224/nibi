@@ -22,6 +22,8 @@ runtime.log
 .local/
 data/projects/
 data/chats/
+output/
+frontend/.playwright-cli/
 
 # Frontend (Vite + React)
 frontend/node_modules/

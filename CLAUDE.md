@@ -184,9 +184,9 @@ cd frontend && pnpm build       # tsc -b && vite build
 > - **当前阶段：N11 后收口决策点**。`[A]` 现状同步与 `[B]` N1~N11 落地差异已完成。
 > - **可选下一步**：`.git` 历史瘦身（需用户明确授权）/ `N1b` / `N7b` / `N8b` / `[C] AI 导演` / `[D] 开源准备`。
 > - **[C] AI 导演**：需先补完整 director 设计，再进入实现。
-> - **简单阶段**（N1 / N2 / N3 / N11 等纯前后端 CRUD）：⭐ DS v4-pro（终端 cc switch，便宜）/ Sonnet 4.6，不开 worktree
+> - **简单阶段**（N1 / N2 / N3 / N11 等纯前后端 CRUD）：⭐ DS v4-pro（Claude Code + ccswitch，便宜）/ Sonnet 4.6，不开 worktree
 > - **复杂阶段**（N5 Preflight 抽屉子参数细化 / N6 任务级 LLM 对话 + RAG / N7 视频镜头分析）：Opus 4.7 + 新 worktree（`feat/phase<N>-<短名>` 分支）
-> - **决策速查**：复杂/SSE/状态机/加密 → Opus；中等多文件 CRUD → Sonnet；git/测试/文档/模板 → DS v4-pro；单行 typo → DS v4-flash / Haiku
+> - **决策速查**：复杂/SSE/状态机/加密 → Opus；中等多文件 CRUD → Sonnet；git/测试/文档/模板 → DS v4-pro（ccswitch）；单行 typo → DS v4-flash（ccswitch）/ Haiku
 
 > ⚠️ **重要**：本文档与历史 `docs/archive/plan-v1.md` / `docs/archive/spec-v2.md` 已不再一致——以本文档为准。
 > - 当历史文件与现实代码冲突时，**以代码 + 合并 spec + WORKFLOW.md 为准**。
@@ -279,7 +279,7 @@ cd frontend && pnpm build       # tsc -b && vite build
 
 ## 模型选择策略（四档决策树）
 
-用户同时使用 **桌面 Claude Code**（按额度计费的 Opus / Sonnet / Haiku）和 **终端 Claude Code 接 DeepSeek**（DS，按量计费但比 Claude 便宜；cc switch 配置：Sonnet/Opus 别名 → `deepseek-v4-pro`，Haiku 别名 → `deepseek-v4-flash`）。按以下顺序判断，命中即停：
+用户同时使用 **桌面 Claude Code**（按额度计费的 Opus / Sonnet / Haiku）和 **Claude Code + ccswitch 接 DeepSeek**（DS，按量计费但比 Claude 便宜）。ccswitch 是透明中转代理：在 Claude Code 里选 Sonnet/Opus 角色 → ccswitch 自动路由到 `deepseek-v4-pro`；选 Haiku 角色 → 路由到 `deepseek-v4-flash`。按以下顺序判断，命中即停：
 
 ### 档 1 — Opus 4.7（桌面，付费）：复杂阶段 + 升级触发
 任一命中即用：
@@ -297,8 +297,8 @@ cd frontend && pnpm build       # tsc -b && vite build
 - 需要严谨业务理解但不烧脑的任务
 - Phase 1B / 1C / 1E 的前端部分
 
-### 档 3 — DS v4-pro（终端 cc switch，⭐便宜优先）：简单任务默认
-**这一档是日常默认**。在 cc switch 里把 Sonnet 或 Opus 别名指到 `deepseek-v4-pro` 即可。能用就用，不要因为"DS 可能不够强"而升到桌面 Sonnet 浪费 Claude 付费额度。
+### 档 3 — DS v4-pro（Claude Code + ccswitch，⭐便宜优先）：简单任务默认
+**这一档是日常默认**。在 Claude Code 里选 Sonnet 或 Opus 角色，ccswitch 自动路由到 `deepseek-v4-pro`。能用就用，不要因为"DS 可能不够强"而升到桌面 Sonnet 浪费 Claude 付费额度。
 - git 操作（add / commit / merge / branch / push / 清理 worktree）
 - 跑终端命令验证（pytest happy path、pnpm build、curl 测接口、启动 dev server）
 - 文档改写（README / docs/*.md / 注释润色 / CLAUDE.md 维护）
@@ -315,7 +315,7 @@ DS 的工具能力：Bash / Read / Write / Edit / Grep / Glob 全套都能用，
 ### 档 4 — DS v4-flash / Haiku 4.5：极简兜底
 - 单行修改 / typo
 - 短得不值得用 pro 的任务（< 2 分钟）
-- 优先 **DS v4-flash**（终端 cc switch 切到 Haiku 别名，比桌面 Haiku 更便宜）；DS 不可用时再用桌面 Haiku 4.5
+- 优先 **DS v4-flash**（Claude Code 里选 Haiku 角色，ccswitch 中转到 `deepseek-v4-flash`，比桌面 Haiku 更便宜）；DS 不可用时再用桌面 Haiku 4.5
 
 > ⚠️ **不要让 v4-flash 当日常默认**：它对应原 Haiku 档，能力弱，多文件 CRUD / 组件级前端会翻车。日常默认必须 v4-pro。
 
