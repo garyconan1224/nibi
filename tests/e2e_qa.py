@@ -78,11 +78,10 @@ def setup_tmp_env() -> tuple[Path, Path]:
 
     try:
         # 动态 patch 模块常量（导入后 patch）。
-        from shared import project_context, settings_store, config
+        from shared import settings_store, config
 
         settings_store.SETTINGS_DIR = tmp_local
         settings_store.SETTINGS_PATH = tmp_local / "settings.json"
-        project_context.CURRENT_PROJECT_PATH = tmp_local / "current_project.json"
         config.WORKSPACES_DATA_DIR = tmp_projects
 
         yield tmp_local, tmp_projects
@@ -104,17 +103,19 @@ def run_check(idx: int, name: str, fn: Callable[[], str]) -> CheckResult:
 
 
 def check_01_app_syntax() -> str:
-    py_compile.compile(str(_repo_root() / "app.py"), doraise=True)
-    return "app.py 编译通过"
+    main_py = _repo_root() / "backend" / "app" / "main.py"
+    _assert(main_py.is_file(), f"backend/app/main.py 不存在: {main_py}")
+    py_compile.compile(str(main_py), doraise=True)
+    return "backend/app/main.py 编译通过"
 
 
 def check_02_pages_syntax() -> str:
-    pages_dir = _repo_root() / "pages"
-    files = sorted(pages_dir.glob("*.py"))
-    _assert(bool(files), "pages 下未找到 .py 文件")
+    routes_dir = _repo_root() / "backend" / "app" / "routes"
+    files = sorted(routes_dir.glob("*.py"))
+    _assert(bool(files), "backend/app/routes 下未找到 .py 文件")
     for f in files:
         py_compile.compile(str(f), doraise=True)
-    return f"{len(files)} 个页面文件编译通过"
+    return f"{len(files)} 个路由文件编译通过"
 
 
 def check_03_shared_syntax() -> str:
@@ -176,17 +177,18 @@ def check_06_project_dirs() -> str:
     return "项目三类目录已创建"
 
 
-def check_07_current_project_persist() -> str:
-    from shared import project_context
+def check_07_workspace_persist() -> str:
+    from backend.app.services.workspace_store import WorkspaceStore
+    from backend.app.models.workspace import WorkspaceRecord
+    from shared.config import WORKSPACES_DATA_DIR
 
-    pid = "qa_project_002"
-    pname = "QA 项目二"
-    project_context.set_current_project(pid, pname)
-    raw = project_context.CURRENT_PROJECT_PATH.read_text(encoding="utf-8")
-    data = json.loads(raw)
-    _assert(data.get("project_id") == pid, "持久化 project_id 不一致")
-    _assert(data.get("project_name") == pname, "持久化 project_name 不一致")
-    return "current_project 持久化一致"
+    store = WorkspaceStore(root=WORKSPACES_DATA_DIR)
+    rec = WorkspaceRecord(workspace_id="qa-ws-002", name="QA 工作区二")
+    store.create(rec)
+    loaded = store.get("qa-ws-002")
+    _assert(loaded is not None, "workspace 未持久化")
+    _assert(loaded.name == "QA 工作区二", "workspace name 不一致")
+    return "workspace 持久化一致"
 
 
 def _create_dummy_video(path: Path, frame_count: int = 5) -> None:
@@ -302,13 +304,13 @@ def check_12_api_resolver_priority() -> str:
 def main() -> int:
     results: list[CheckResult] = []
     checks: list[tuple[str, Callable[[], str]]] = [
-        ("app.py 语法检查", check_01_app_syntax),
-        ("pages/*.py 语法检查", check_02_pages_syntax),
+        ("backend/app/main.py 语法检查", check_01_app_syntax),
+        ("backend/app/routes/*.py 语法检查", check_02_pages_syntax),
         ("shared/*.py 语法检查", check_03_shared_syntax),
         ("设置保存与重新加载一致", check_04_settings_roundtrip),
         ("清空设置后返回默认值", check_05_settings_clear),
         ("新建项目目录结构正确", check_06_project_dirs),
-        ("切换项目持久化一致", check_07_current_project_persist),
+        ("切换项目持久化一致", check_07_workspace_persist),
         ("视频分析 mock 运行", check_08_video_analyzer_mock_and_09_json_sync),
         ("JSON 同步到项目目录", lambda: "由 #08 联合覆盖"),
         ("知识库从项目 JSON 加载", check_10_knowledge_load_and_11_split),
