@@ -24,6 +24,19 @@ const QUALITY_MAP: Record<QualityOption, string> = {
 const CONTENT_TYPES = ['课程', '会议', '宣传片', 'Vlog', '访谈', '纯音乐', '其他']
 const PURPOSES = ['复刻参考', '竞品分析', '内容学习', '其他']
 const VIDEO_TEMPLATES = ['教程', 'Vlog', '访谈', '影视点评', '产品评测', '其它']
+const ITEM_TYPE_ALIASES: Record<string, ItemType> = {
+  article: 'text',
+  audio: 'audio',
+  image: 'image',
+  text: 'text',
+  video: 'video',
+}
+const ITEM_TYPE_LABELS: Record<ItemType, string> = {
+  video: '视频',
+  audio: '音频',
+  image: '图片',
+  text: '文字',
+}
 type SummaryPath = 'subtitle' | 'detailed' | 'video_model'
 
 interface PreflightDrawerProps {
@@ -146,21 +159,19 @@ export function PreflightDrawer({
     }
   }, [open, cd, textProviderId, textModelId, enabledProviders, providerModels, modelsLoading, textModels])
 
-  // F4.3: platform types（可能含 'article' 等非 ItemType 值）→ 规范 ItemType
-  const _norm = (t: string) => ({ article: 'text' } as Record<string, string>)[t] ?? t
+  const normalizeItemType = (type: string): ItemType => ITEM_TYPE_ALIASES[type] ?? (type as ItemType)
 
-  // F4.3: typesToCreate——嗅探多类型 > selectedTypes > 单 resolvedType
-  const typesToCreate: string[] = (() => {
-    if (sniffResult?.possible_types && sniffResult.possible_types.length > 1) {
-      return sniffResult.possible_types
-    }
-    if (selectedTypes?.length) {
-      return selectedTypes.map(_norm)
-    }
-    return [resolvedType]
+  // 用户在 mixed modal 的显式选择应当优先于嗅探建议。
+  const typesToCreate: ItemType[] = (() => {
+    const rawTypes = selectedTypes?.length
+      ? selectedTypes
+      : sniffResult?.possible_types?.length
+        ? sniffResult.possible_types
+        : [resolvedType]
+    return Array.from(new Set(rawTypes.map(normalizeItemType)))
   })()
 
-  const _typeLabel = (t: string) => ({ video: '视频', audio: '音频', image: '图片', text: '文字' } as Record<string, string>)[t] ?? t
+  const typeLabel = (type: ItemType): string => ITEM_TYPE_LABELS[type]
 
   const handleConfirm = async () => {
     setSubmitting(true)
@@ -202,15 +213,20 @@ export function PreflightDrawer({
       for (const itemType of typesToCreate) {
         try {
           const itemName = typesToCreate.length > 1
-            ? `${baseName} (${_typeLabel(itemType)})`
+            ? `${baseName} (${typeLabel(itemType)})`
             : baseName
           const itemRes = await addWorkspaceItem(wsId, {
-            type: itemType as ItemType,
+            type: itemType,
             source: 'url',
             source_value: url,
             name: itemName,
           })
-          const newItem = itemRes.items.find((it) => it.source_value === url)
+          const matchingItems = [...itemRes.items].reverse()
+          const newItem = matchingItems.find((it) =>
+            it.source_value === url && it.type === itemType && it.name === itemName,
+          ) ?? matchingItems.find((it) =>
+            it.source_value === url && it.type === itemType,
+          )
           const itemId = newItem?.item_id ?? itemRes.items[itemRes.items.length - 1]?.item_id
           if (!itemId) throw new Error('创建素材失败')
 
@@ -251,7 +267,7 @@ export function PreflightDrawer({
           if (!firstTaskId) { firstTaskId = startRes.task_id; firstItemId = itemId }
           successCount++
         } catch (e) {
-          errors.push(`${_typeLabel(itemType)}: ${e instanceof Error ? e.message : '创建失败'}`)
+          errors.push(`${typeLabel(itemType)}: ${e instanceof Error ? e.message : '创建失败'}`)
         }
       }
 

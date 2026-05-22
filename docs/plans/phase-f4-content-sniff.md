@@ -386,7 +386,7 @@ async function sniffUrl(url: string): Promise<SniffResult>
 - [x] 前端 vitest 全通过
 - [x] `pnpm build` 无类型错误
 - [x] 手动冒烟 3 条 URL（视频 / 文章 / 图片）全部走通
-- [ ] 前端 vitest 新增 F4.3 多 item 创建 mock case（后续会话补）
+- [x] 前端 vitest 新增 F4.3 多 item 创建 mock case
 
 ---
 
