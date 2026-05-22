@@ -96,6 +96,8 @@ cd frontend && pnpm build       # tsc -b && vite build
 
 ## 上下文预算与验证替代方案
 
+本节只约束 Claude Code 终端版（含 ccswitch 接 DS）的执行方式；不要求 Codex、Claude Desktop 或其他工具照此限制。其他工具可以按各自能力选择更合适的验证方式。
+
 目标是保留能力但减少无效上下文。不要用“禁用工具”替代验证；要按下面顺序选最低成本且足够强的证据。
 
 ### 文件读取
