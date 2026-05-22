@@ -54,12 +54,8 @@ export default function ProcessingPage() {
     if (taskId) cancelTask(taskId)
   }
 
-  const handleRetry = async () => {
-    try {
-      await retryTask(taskId)
-    } catch {
-      // retryTask 内部已 toast
-    }
+  const handleRetry = () => {
+    retryTask(taskId)
   }
 
   const categorized = categorizeError(task?.error)

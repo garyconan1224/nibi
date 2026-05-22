@@ -96,9 +96,10 @@ export const useTaskStore = create<TaskStoreState>()(
             tasks: [newTask, ...state.tasks],
             currentTaskId: newTask.task_id, // 自动切换到新重试任务
           }))
+          toast.success('任务已重新提交')
         } catch (err) {
           console.error(`[taskStore] retryTask ${taskId} failed:`, err)
-          throw err
+          toast.error('重试失败，请稍后再试')
         }
       },
 
