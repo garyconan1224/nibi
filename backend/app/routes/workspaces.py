@@ -1056,8 +1056,10 @@ def _bridge_to_pipeline_payload(
     # local：直接走 analyze
     # analyze 需要：api_key（后端从 settings 拿）、vision_model、text_model、
     # video_basenames（限定要分析的本地视频）
+    # 本地文件必须用实际文件名，不能使用 item 显示名（显示名≠文件名会找不到视频）
+    _local_fname = item.source_value.split("/")[-1]
     payload = {
-        "video_basenames": [item.name or item.source_value.split("/")[-1]],
+        "video_basenames": [_local_fname or item.name],
     }
     # 把 preflight 选的模型作为字符串透传——后端 handler 会做兜底
     models = item.preflight.models or {}
