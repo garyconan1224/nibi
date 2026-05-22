@@ -138,15 +138,24 @@ git log --oneline -10
 - `c366226` Bug C：本地文件 item 显示名覆盖实际文件名，analyze 找不到视频
 **待补**：#6 小红书 / #7 抖音 / #8 微信公众号需用户提供真实 URL
 
-### F3 错误体验优化
+### F3 错误体验优化 ✅
 
 **前置**：F2 完成
-**目标**：用户视角的错误处理
-- 网络失败 / 配额超限 / 模型未配置 时的友好提示
-- 任务卡住 > N 分钟自动检测并提示
-- 历史失败任务一键重试
-**模型**：⭐ DS v4-pro
-**改动**：Processing / TaskCard / 错误 toast 文案统一
+**状态**：✅ 全部完成（2026-05-22，5 commits）
+**子任务**：
+- [x] F3.1 错误分类 + 友好文案映射 — `aff4c2a`
+  - 新增 `frontend/src/lib/errorCategories.ts`：关键词匹配 4 类错误（network/quota/model_not_configured/unsupported）
+  - ProcessingPage 失败态展示友好提示 + 操作建议 + 可折叠原始错误
+- [x] F3.2 静默错误补 toast — `b3146c4`
+  - Composer workspace 加载 / usePipelineTasks 列表拉取 / useTaskSse SSE 断连 / taskStore 取消失败 → 全部 toast
+  - 轮询类错误用 ref 防刷屏
+- [x] F3.3 失败/取消视觉区分 — `7a04b38`
+  - RecentTasks：FAILED (pink) ≠ CANCELLED (ink-3 gray)
+- [x] F3.4 重试流程修复 — `763a3f8`
+  - taskStore.retryTask 补 toast.success / toast.error，不再向调用者 throw
+  - ProcessingPage handleRetry 简化为直接调用
+- [x] F3.5 任务卡住前端检测 — `622c4c7`
+  - ProcessingPage 每 30s 检查 `updated_at`，超过 10 分钟无变化 → toast.warning
 
 ### F4 URL 内容类型嗅探
 
