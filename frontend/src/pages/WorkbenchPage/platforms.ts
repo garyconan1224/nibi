@@ -11,8 +11,12 @@ export const PLATFORMS: Record<string, PlatformInfo> = {
 }
 
 export function detectPlatform(url: string): PlatformInfo | null {
+  let s = (url || "").trim();
+  if (!s) return null;
+  // 缺 scheme 时 new URL() 会抛异常，先补齐
+  if (!s.includes('://')) s = `https://${s}`;
   try {
-    const host = new URL(url).hostname.replace('www.', '')
+    const host = new URL(s).hostname.replace('www.', '')
     const entry = Object.entries(PLATFORMS).find(([k]) => host.includes(k))
     return entry ? entry[1] : null
   } catch {

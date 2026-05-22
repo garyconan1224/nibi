@@ -227,7 +227,6 @@ def test_add_url_item_happy_path(client: TestClient) -> None:
 @pytest.mark.parametrize(
     "bad_url,expected_keyword",
     [
-        ("not a url", "http"),
         ("ftp://example.com/a.mp4", "http"),
         ("https://", "host"),
         ("   ", "empty"),
@@ -236,7 +235,11 @@ def test_add_url_item_happy_path(client: TestClient) -> None:
 def test_add_url_item_rejects_invalid_url(
     client: TestClient, bad_url: str, expected_keyword: str
 ) -> None:
-    """非 http(s) / 缺 host / 空白 URL 一律返回 400。"""
+    """非 http(s) / 缺 host / 空白 URL 一律返回 400。
+
+    F1.7 note: 缺 scheme 的纯文本（如 "not a url"）会被 _normalize_media_url
+    自动补 https:// → 通过入口校验 → 下游 yt-dlp 报更具体的格式错误。
+    """
     ws_id = client.post("/workspaces", json={"name": "URL 错误测试"}).json()[
         "workspace_id"
     ]

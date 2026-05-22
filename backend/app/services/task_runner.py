@@ -39,11 +39,44 @@ class TaskRunner:
         with self._lock:
             self._success_callbacks.setdefault(task_type, []).append(callback)
 
+    @staticmethod
+    def _normalize_url_for_dedup(raw: str) -> str:
+        """轻量 URL 规整，仅用于去重比较。
+
+        去掉追踪参数 + 尾斜杠，让同一视频的不同粘入变体落地为相同 key。
+        """
+        from urllib.parse import urlparse
+
+        s = raw.strip().lower()
+        if not s:
+            return s
+        try:
+            u = urlparse(s)
+            tracking = frozenset({
+                "spm_id_from", "vd_source", "share_source", "share_medium",
+                "bbid", "ts", "unique_k", "p", "vd_source_2",
+            })
+            if u.query:
+                qs_parts = [
+                    f"{k}={v}"
+                    for k, v in (p.split("=", 1) for p in u.query.split("&") if "=" in p)
+                    if k not in tracking
+                ]
+                qs = "&".join(qs_parts)
+            else:
+                qs = ""
+            clean = u.scheme + "://" + u.netloc + u.path.rstrip("/")
+            if qs:
+                clean += "?" + qs
+            return clean
+        except Exception:
+            return s.rstrip("/")
+
     def _has_active_duplicate(self, project_id: str, task_type: str, payload: Dict[str, Any]) -> Optional[str]:
         """检查是否已有同 project + 同 URL 的 running/queued 下载任务。返回 task_id 或 None。"""
         if task_type != "download":
             return None
-        new_url = str(payload.get("url") or "").strip().lower()
+        new_url = self._normalize_url_for_dedup(str(payload.get("url") or ""))
         if not new_url:
             return None
         for rec in self.store.list_all():
@@ -52,7 +85,7 @@ class TaskRunner:
             # 非终结态（含 PENDING 与各运行阶段）均视为活跃
             if rec.status in TERMINAL_STATUS_VALUES:
                 continue
-            existing_url = str(rec.payload.get("url") or "").strip().lower()
+            existing_url = self._normalize_url_for_dedup(str(rec.payload.get("url") or ""))
             if existing_url == new_url:
                 return rec.task_id
         return None

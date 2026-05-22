@@ -294,13 +294,62 @@ def _ensure_valid_status(s: Optional[str]) -> None:
         ) from err
 
 
+# ── URL 规整（F1.7）──────────────────────────────────────────────────
+
+_BILIBILI_BV_RE = re.compile(r"^BV[a-zA-Z0-9]+$")
+
+_TRACKING_PARAMS = frozenset({
+    "spm_id_from", "vd_source", "share_source", "share_medium",
+    "bbid", "ts", "unique_k", "p", "vd_source_2",
+})
+
+
+def _normalize_media_url(raw: str) -> str:
+    """规整用户粘入的 URL，确保同一视频的不同变体收敛为同一字符串。
+
+    处理：
+    ① 纯 BV 号 → 拼完整 B 站 URL
+    ② 缺 scheme → 补 https://
+    ③ 去掉追踪参数（spm_id_from / vd_source 等）
+    ④ 去掉尾斜杠
+    """
+    s = raw.strip()
+
+    # ① 纯 BV 号
+    if _BILIBILI_BV_RE.match(s):
+        s = f"https://www.bilibili.com/video/{s}"
+
+    # ② 缺 scheme（没有任何 :// 的才补 https://）
+    if "://" not in s:
+        s = f"https://{s}"
+
+    # ③④ 解析并清理
+    try:
+        u = urlparse(s)
+        if u.query:
+            qs_parts = [
+                f"{k}={v}"
+                for k, v in (p.split("=", 1) for p in u.query.split("&") if "=" in p)
+                if k not in _TRACKING_PARAMS
+            ]
+            qs = "&".join(qs_parts)
+        else:
+            qs = ""
+        clean = u.scheme + "://" + u.netloc + u.path.rstrip("/")
+        if qs:
+            clean += "?" + qs
+        return clean
+    except Exception:
+        return s.rstrip("/")
+
+
 def _validate_network_url(raw: str) -> str:
-    """校验网络链接：必须是 http/https 且 host 非空。
+    """校验并规整网络链接。
 
     Why: source=url 直接交给下游 yt-dlp / 下载器，空白或畸形字符串会在
     pipeline 深处才报错，对用户不友好。这里在入口阻断。
     """
-    value = raw.strip()
+    value = _normalize_media_url(raw)
     if not value:
         raise HTTPException(status_code=400, detail="URL cannot be empty")
     try:

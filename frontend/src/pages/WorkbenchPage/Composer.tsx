@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import type { PipelineStep, QualityOption, FrameMode } from './types'
 import type { WorkspaceRecord } from '@/types/workspace'
 import { detectPlatform } from './platforms'
+import { normalizeMediaUrl } from '@/lib/url'
 import { listWorkspaces, createWorkspace } from '@/services/workspaces'
 import { getPromptFormatsConfig } from '@/services/promptFormats'
 import type { PromptFormat } from '@/services/promptFormats'
@@ -148,7 +149,8 @@ export function Composer({ onTaskCreated }: ComposerProps) {
     }
   }, [wsQuery])
 
-  const platform = detectPlatform(url)
+  const normalizedUrl = useMemo(() => normalizeMediaUrl(url), [url])
+  const platform = detectPlatform(normalizedUrl || url)
   const isMixed = platform !== null && platform.types.length > 1
   const showQualityRow = !platform || platform.types.includes('video')
 
@@ -566,7 +568,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
       {/* Preflight drawer */}
       <PreflightDrawer
         open={preflightOpen}
-        url={url.trim()}
+        url={normalizedUrl || url.trim()}
         platformName={platform?.name ?? null}
         selectedTypes={preflightTypes.length ? preflightTypes : undefined}
         workspaceId={workspaceSel[0]}
