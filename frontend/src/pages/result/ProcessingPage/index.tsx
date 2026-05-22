@@ -5,6 +5,7 @@ import { ArrowRight, RotateCcw, X } from 'lucide-react'
 import { useTaskStore } from '@/store/taskStore'
 import { useTaskSse } from '@/hooks/useTaskSse'
 import { isTaskTerminal, getStatusText } from '@/types/task'
+import { categorizeError } from '@/lib/errorCategories'
 import { StepProgress } from './StepProgress'
 import { LiveLog } from './LiveLog'
 
@@ -60,6 +61,8 @@ export default function ProcessingPage() {
       // retryTask 内部已 toast
     }
   }
+
+  const categorized = categorizeError(task?.error)
 
   const url = task?.payload?.url ?? state?.url ?? ''
   const title = task?.payload?.title ?? (url ? new URL(url).hostname : '任务')
@@ -138,9 +141,19 @@ export default function ProcessingPage() {
           {isFailed && (
             <div className="proc-error">
               <h3>任务失败</h3>
-              <p>{task?.error || '处理过程中发生未知错误'}</p>
+              <p style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>
+                {categorized.friendlyMessage}
+              </p>
+              <p style={{ color: 'var(--ink-3)', fontSize: 13, marginBottom: 12 }}>
+                {categorized.suggestion}
+              </p>
               {task?.error && (
-                <div className="error-log">{task.error}</div>
+                <details style={{ marginBottom: 16, fontSize: 12, color: 'var(--ink-4)' }}>
+                  <summary style={{ cursor: 'pointer', fontFamily: 'var(--mono)' }}>
+                    查看原始错误信息
+                  </summary>
+                  <div className="error-log" style={{ marginTop: 8 }}>{task.error}</div>
+                </details>
               )}
               <button className="btn btn-primary" onClick={handleRetry}>
                 <RotateCcw size={14} />
