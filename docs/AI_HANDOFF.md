@@ -1,6 +1,6 @@
 # AI Handoff
 
-Last updated: 2026-05-22（F1.6 字幕清洗完成，端到端冒烟测试待跑）
+Last updated: 2026-05-22（F2 Bug2 duration 修复 + e2e_qa 适配，冒烟测试下一步）
 
 ---
 
@@ -92,9 +92,21 @@ git branch --show-current
 - 26 个单测全绿，163 个后端测试无回归
 - Commit：`629fe60 fix(F1.6): allow subtitle path without API key`
 
+### ✅ F2 路径 1 时间戳 + duration 修复（2026-05-22 已完成）
+
+- `2700349` fix(F2): 路径 1 transcript 时间戳丢失——Whisper segments 保留并透传
+- `b9eab81` fix(F2): align cleaned transcript text with segments
+- `653c286` fix(F2): propagate subtitle path duration to result
+  - `_run_subtitle_summary` 返回 `duration_sec`（从 segments 最大 end 推导）
+  - `get_item_result` 透传到 `video.duration_sec` 和 `tracks_meta.total_sec`
+  - 旧数据（无 duration_sec）fallback 到 0
+- `7efd459` fix(test): e2e_qa.py 适配当前 FastAPI 架构（移除 Streamlit 遗留引用）
+- `6502b3a` docs: AGENTS.md 补充项目指令 section header
+- 169 个后端测试全绿，e2e_qa 12/12 全通过
+
 ### 🥇 端到端冒烟测试（30min，**下一个会话推荐**）
 
-F1.6 完成后，现有功能链路已大致就绪。建议先粘一个真实 B 站 URL 走一遍完整流程，验证：
+F1.6 + F2 Bug2 修复完成后，路径 1 全链路已就绪（ASR → 清洗 → 总结 → duration 透传）。建议先粘一个真实 B 站 URL 走一遍完整流程，验证：
 
 1. `./start.sh` 启动
 2. 打开 `/` → 不选工作空间 → 粘真实短 B 站 URL（< 5 分钟）
