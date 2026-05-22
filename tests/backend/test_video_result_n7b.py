@@ -195,3 +195,54 @@ def test_video_result_subtitle_transcript_without_summary_is_real_data(client: T
     assert body["source"] == "item_results"
     assert body["summary_path"] == "subtitle"
     assert body["transcript"][0]["text"] == "清洗后转写"
+
+
+def test_video_result_subtitle_duration_propagated(client: TestClient) -> None:
+    """N7b 路径 1: duration_sec 从 task result 透传到 video.duration_sec 和 tracks_meta.total_sec。"""
+    ws_id, item_id = _create_video_workspace(client)
+
+    ws_module._store.update_item(
+        ws_id, item_id,
+        results={
+            "summary_path": "subtitle",
+            "transcript": [
+                {"t_sec": 0.0, "t_str": "00:00", "text": "开头"},
+                {"t_sec": 30.5, "t_str": "00:30", "text": "中间"},
+                {"t_sec": 58.0, "t_str": "00:58", "text": "结尾"},
+            ],
+            "summary": "测试摘要",
+            "duration_sec": 62.5,
+            "json_outputs": [],
+        },
+        status="done",
+    )
+
+    resp = client.get(f"/workspaces/{ws_id}/items/{item_id}/result")
+    assert resp.status_code == 200
+    body = resp.json()
+
+    assert body["video"]["duration_sec"] == 62.5
+    assert body["tracks_meta"]["total_sec"] == 62.5
+
+
+def test_video_result_subtitle_no_duration_fallback(client: TestClient) -> None:
+    """N7b 路径 1: 旧数据无 duration_sec 时 video.duration_sec 和 tracks_meta.total_sec 均为 0。"""
+    ws_id, item_id = _create_video_workspace(client)
+
+    ws_module._store.update_item(
+        ws_id, item_id,
+        results={
+            "summary_path": "subtitle",
+            "transcript": [{"t_sec": 0, "t_str": "00:00", "text": "旧数据"}],
+            "summary": "旧摘要",
+            "json_outputs": [],
+        },
+        status="done",
+    )
+
+    resp = client.get(f"/workspaces/{ws_id}/items/{item_id}/result")
+    assert resp.status_code == 200
+    body = resp.json()
+
+    assert body["video"]["duration_sec"] == 0
+    assert body["tracks_meta"]["total_sec"] == 0

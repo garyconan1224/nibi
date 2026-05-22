@@ -1229,20 +1229,21 @@ def get_item_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
     if _video_result_has_real_data(v_results):
         payload = v_results
         payload.setdefault("source", "item_results")
+        duration = float(payload.get("duration_sec") or 0)
         payload.setdefault(
             "video",
             {
                 "item_id": item.item_id,
                 "title": item.name,
                 "url": item.source_value if item.source == "url" else "",
-                "duration_sec": payload.get("tracks_meta", {}).get("total_sec", 0),
+                "duration_sec": duration,
                 "duration_str": "",
             },
         )
         payload.setdefault(
             "tracks_meta",
             {
-                "total_sec": 0,
+                "total_sec": duration,
                 "frame_count": len(payload.get("frames", [])),
                 "transcript_count": len(payload.get("transcript", [])),
             },
