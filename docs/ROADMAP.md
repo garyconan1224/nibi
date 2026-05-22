@@ -81,7 +81,7 @@ git log --oneline -10
 
 | Track | 主题 | 当前进度 | 目标 |
 |---|---|---|---|
-| **F** | 全流程（Flow）| 70%（H 系列 + IP.1~8）| 端到端打通，每个节点不掉链 |
+| **F** | 全流程（Flow）| 75%（H 系列 + IP.1~8 + F1.4/F1.6/F1.7；仅 F1.5 Gemini 待做）| 端到端打通，每个节点不掉链 |
 | **V** | 视频（Video）| 60%（路径 1+2 已通，路径 3 待做）| 3 路径全通 + 字幕清洗 + 类型模板 |
 | **A** | 音频（Audio）| 60%（N8 后端 + UI 部分）| 6 任务前端勾选 + 后端补全 + 编辑修正 |
 | **T** | 文字（Text）| 70%（N10 已做大部分）| 多文对比 UI + 网页抓取扩展 |
@@ -109,9 +109,22 @@ git log --oneline -10
 - [x] F1.4（IP.9.4）路径 1 后端：字幕直接总结 *（V2 部分）* — `f17c04a` `aac4578` `9e8667e` `92fbdb9` `bf995d7`
 - [ ] F1.5（IP.9.5）路径 3 后端：Gemini 集成 *（V3）*
 - [x] F1.6（IP.9.6）字幕清洗（规则 + LLM）— `shared/transcript_cleaner.py`
+- [x] **F1.7 URL 规整 + 真实前端冒烟**（2026-05-22 用户决议加入，F2 前置）— `170ec0b`
+  - **背景**：F2 Bug3 的"冒烟通过"实际是 DS 用 `.venv/bin/python -c` 直调 `run_ytdlp_download` 跑的纯 BV 号，**没走前端 Composer → 后端 pipeline 真实链路**。真用户从浏览器复制的 URL 会带 `?spm_id_from=xxx&vd_source=yyy` 等追踪参数，`platforms.ts::detectPlatform()` 用 `new URL()` 要求 scheme，而后端 `task_runner` 的"同 project + 同 URL 幂等去重"会被追踪参数随机化破坏（同一个视频被识别成两个任务，重复下载）。
+  - **改动文件**（< 5 个，DS v4-pro cover）：
+    - 新增 `frontend/src/lib/url.ts`：`normalizeMediaUrl(raw)` 处理①纯 BV 号 → 拼完整 URL ②缺 scheme 补 `https://` ③去追踪参数白名单（`spm_id_from / vd_source / share_source / share_medium / bbid / ts / unique_k`）④去尾斜杠便于 dedup
+    - 改 `frontend/src/pages/WorkbenchPage/Composer.tsx`：提交前调用 `normalizeMediaUrl()`，让 `detectPlatform` 和后端拿到的都是同一个干净 URL
+    - 改 `frontend/src/pages/WorkbenchPage/platforms.ts`：`detectPlatform` 内部也先补 scheme 兜底
+    - 改 `backend/app/routes/pipeline.py` 或 `task_runner.py`：后端再做一次幂等规整（前端可能被绕过，比如 curl 直调 / 测试脚本）
+    - 新增 `tests/frontend/url.test.ts` 或 vitest 单测：5 个 case（纯 BV / 缺 scheme / 带追踪参数 / 已规整 / 不规范末尾斜杠）
+    - 新增后端单测：同一视频带不同追踪参数应去重成一个任务
+  - **真实冒烟（必跑）**：`./start.sh` 起前后端 → 浏览器打开 `/` → 粘完整带追踪参数的 B 站 URL（用户提供：`https://www.bilibili.com/video/BV1qA5j6jEJC/?spm_id_from=333.1007.tianma.6-2-20.click&vd_source=...`）→ Preflight → 提交 → 看 yt-dlp 日志 → 到 Results。**全链路通才算完工**，不准再用 `python -c` 直调代替。
+  - **模型**：⭐ DS v4-pro（Claude Code + ccswitch）
+  - **分支**：`feat/f1.7-url-normalize`（或直接 main 也行，<5 文件改动）
+  - **完工验收**：用户粘的 4 种 URL 变体都能正常跑出结果，且任务去重正确
 
-**完工验收**：粘 B 站 URL → 完整流程图每个节点都跑通 → Results 总览能正确分流
-**当前状态**：Tier A（UI 层）已完成，Tier B（后端层）待实现
+**完工验收（F1 整体）**：粘 B 站 URL → 完整流程图每个节点都跑通 → Results 总览能正确分流 → URL 规整与去重正确
+**当前状态**：Tier A（UI 层）已完成，Tier B 后端路径 1 + 字幕清洗 + URL 规整已完成，仅剩 F1.5 Gemini（待用户拍板 API key 来源）
 
 ### F2 真端到端冒烟测试 + Bug 修
 
@@ -365,12 +378,12 @@ git log --oneline -10
 |---|---|---|
 | 1 | **Opus 4.7**（桌面）| 跨 5+ 文件 / 状态机 / 加密 / 外部 API 集成 |
 | 2 | **Sonnet 4.6**（桌面）| 多文件 CRUD / 组件级前端 / 后端 handler 改写 |
-| 3 | ⭐ **DS v4-pro**（终端 cc switch，比 Claude 便宜）| 模板代码 / git / 单文件改 / CSS / 测试模板 / 文档 |
-| 4 | **DS v4-flash / Haiku 4.5**（终端 Haiku 别名 / 桌面）| 单行 typo / 极简兜底；优先 v4-flash |
+| 3 | ⭐ **DS v4-pro**（Claude Code + ccswitch，比 Claude 便宜）| 模板代码 / git / 单文件改 / CSS / 测试模板 / 文档 |
+| 4 | **DS v4-flash / Haiku 4.5**（ccswitch Haiku 角色 / 桌面）| 单行 typo / 极简兜底；优先 v4-flash |
 
 ⭐ **日常默认走 DS v4-pro**，能用就用。⚠️ 不要让 v4-flash 当默认——它对应 Haiku 档，能力弱，多文件 CRUD 会翻车。
 
-> **2026-05-22 通道变更**：小米 2.5 Pro 套餐用完，终端 Claude Code（cc switch）换接 DeepSeek。cc switch 配置：Sonnet/Opus 别名 → `deepseek-v4-pro`，Haiku 别名 → `deepseek-v4-flash`。
+> **2026-05-22 通道变更**：小米 2.5 Pro 套餐用完，改用 ccswitch 中转 DeepSeek API。ccswitch 是透明代理，在 Claude Code 里选 Sonnet/Opus 角色 → 路由到 `deepseek-v4-pro`；选 Haiku 角色 → 路由到 `deepseek-v4-flash`。
 
 ### 分支命名
 
@@ -447,7 +460,9 @@ chore/<cleanup-name>           # 清理 / 文档
 ```
 F1 流程缺口补齐 (IP.9 Tier A UI)        ← 已完成 (f33db14)
   ↓
-F1 Tier B 后端（路径 1/3 + 字幕清洗）   ← 当前在这里
+F1 Tier B 后端（路径 1 + 字幕清洗已完成；路径 3 Gemini 待用户拍板）
+  ↓
+F1.7 URL 规整 + 真实前端冒烟          ← 已完成 (170ec0b)
   ↓
 F2 端到端冒烟 + bug 修
   ↓

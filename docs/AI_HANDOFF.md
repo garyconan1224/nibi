@@ -1,6 +1,6 @@
 # AI Handoff
 
-Last updated: 2026-05-22（F2 Bug3 yt-dlp 格式降级 + 冒烟测试通过）
+Last updated: 2026-05-22（F1.7 URL 规整 + 前端冒烟完成）
 
 ---
 
@@ -117,6 +117,15 @@ git branch --show-current
   - 175 个后端测试全绿（+6 new），e2e_qa 12/12 全通过
 - **Commit**：`53620b9` fix(F2): yt-dlp format fallback retry chain
 
+### ✅ F1.7 URL 规整 + 真实前端冒烟（2026-05-22 已完成）
+
+- 前端 `frontend/src/lib/url.ts`：`normalizeMediaUrl()` 处理纯 BV 号/缺 scheme/追踪参数/尾斜杠
+- 后端 `_normalize_media_url()` + `_normalize_url_for_dedup()` 兜底
+- `platforms.ts::detectPlatform()` scheme 容错
+- 冒烟验证：后端 curl 确认追踪参数被剥离；前端平台检测 Bilibili 正确
+- 新增 15 个单测（前端 6 + 后端 9），全量 183 通过
+- **Commit**：`170ec0b` feat(F1.7): URL 规整——前后端双端清洗追踪参数 + 去重标准化
+
 ### 🥇 端到端冒烟测试（30min，**下一个会话推荐**）
 
 F1.6 + F2 Bug2 + F2 Bug3 修复完成后，路径 1 全链路已就绪（ASR → 清洗 → 总结 → duration 透传）且 yt-dlp 下载有格式降级保护。建议先粘一个真实 B 站 URL 走一遍完整流程，验证：
@@ -158,7 +167,7 @@ F1.6 + F2 Bug2 + F2 Bug3 修复完成后，路径 1 全链路已就绪（ASR →
 - **Phase merge 默认**：完工默认 merge 进 main，开新 phase 默认上一个已 merge
 - **Tag 策略**：不按 SemVer 自动打，等"功能都差不多"统一打（那时就是开源时刻）
 - **模型分配**：
-  - 简单/模板/git/CSS → ⭐ 终端 DS v4-pro（cc switch，便宜优先；v4-flash 太弱别当默认）
+  - 简单/模板/git/CSS → ⭐ DS v4-pro（Claude Code + ccswitch，便宜优先；v4-flash 太弱别当默认）
   - 中等多文件 React → Sonnet 4.6
   - 跨 5+ 文件 / 状态机 / 加密 → Opus 4.7
 - **设计稿源**：`docs/design/components/*.jsx` + `styles.css` + `VidMirror.html`（Taskboard CSS 大部分在 HTML 不在 styles.css）
