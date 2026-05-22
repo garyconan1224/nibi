@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useTaskStore } from '@/store/taskStore'
 import { isTaskTerminal } from '@/types/task'
 import type { TaskRecord } from '@/types/task'
+import { toast } from 'sonner'
 
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URL ?? 'http://127.0.0.1:8000'
 
@@ -37,6 +38,7 @@ interface SseTaskEvent {
 export function useTaskSse(taskId: string | undefined, active: boolean): void {
   const updateTask = useTaskStore((s) => s.updateTask)
   const sourceRef = useRef<EventSource | null>(null)
+  const connErrorToastedRef = useRef(false)
 
   useEffect(() => {
     // 清理上一轮订阅
@@ -77,7 +79,11 @@ export function useTaskSse(taskId: string | undefined, active: boolean): void {
     })
 
     es.addEventListener('error', () => {
-      // EventSource 会自动重连，仅日志，不主动 close
+      // EventSource 会自动重连，只在首次断连时 toast 一次（防刷屏）
+      if (!connErrorToastedRef.current) {
+        toast.error('任务进度连接中断，正在自动重连...')
+        connErrorToastedRef.current = true
+      }
       console.warn(`[useTaskSse] connection error for ${taskId}, auto-reconnecting`)
     })
 

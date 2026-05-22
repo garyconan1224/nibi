@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { TaskRecord } from '@/types/task'
 import { isTaskTerminal } from '@/types/task'
 import { cancelPipelineTask, retryPipelineTask } from '@/services/pipeline'
+import { toast } from 'sonner'
 
 interface TaskStoreState {
   // 状态
@@ -82,6 +83,7 @@ export const useTaskStore = create<TaskStoreState>()(
           }))
         } catch (err) {
           console.error(`[taskStore] cancelTask ${taskId} failed:`, err)
+          toast.error('取消任务失败，请稍后重试')
         }
       },
 

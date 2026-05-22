@@ -3,6 +3,7 @@ import { useTaskStore } from '@/store/taskStore'
 import { http } from '@/services/client'
 import { isTaskTerminal } from '@/types/task'
 import type { TaskRecord } from '@/types/task'
+import { toast } from 'sonner'
 
 interface UsePipelineTasksOptions {
   projectId?: string
@@ -31,6 +32,7 @@ export const usePipelineTasks = (options: UsePipelineTasksOptions = {}) => {
   // 用 ref 保存最新 tasks，避免 setInterval 闭包过时引用
   const tasksRef = useRef<TaskRecord[]>(tasks)
   const isFirstRunRef = useRef(true)
+  const fetchFailedRef = useRef(false)
 
   // 同步最新 tasks 到 ref，避免 setInterval 捕获过时闭包
   useEffect(() => {
@@ -56,8 +58,14 @@ export const usePipelineTasks = (options: UsePipelineTasksOptions = {}) => {
       console.log('[usePipelineTasks] 拉取的任务数据:', taskList)
       setTasks(taskList)
       isFirstRunRef.current = false
+      fetchFailedRef.current = false
     } catch (error) {
       console.error('Failed to fetch pipeline tasks:', error)
+      // 仅在首次加载失败或错误状态切换时 toast（轮询每 3s 一次，不能刷屏）
+      if (isFirstRunRef.current || !fetchFailedRef.current) {
+        toast.error('加载任务列表失败，请检查网络或后端状态')
+        fetchFailedRef.current = true
+      }
       isFirstRunRef.current = false
     }
   }, [projectId, setTasks])

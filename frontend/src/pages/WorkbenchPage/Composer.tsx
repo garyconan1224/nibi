@@ -72,7 +72,9 @@ export function Composer({ onTaskCreated }: ComposerProps) {
 
   // Fetch workspaces on mount
   useEffect(() => {
-    listWorkspaces().then(setWorkspaces).catch(() => {})
+    listWorkspaces().then(setWorkspaces).catch(() => {
+      toast.error('加载工作空间列表失败，请检查后端是否已启动')
+    })
   }, [])
 
   // Fetch prompt formats on mount
@@ -83,7 +85,9 @@ export function Composer({ onTaskCreated }: ComposerProps) {
         // 默认选中第一个 active image format
         if (cfg.active_image_ids.length > 0) setPromptStyle(cfg.active_image_ids[0])
       })
-      .catch(() => {})
+      .catch(() => {
+        toast.error('加载提示词格式配置失败')
+      })
   }, [])
 
   // Fetch providers on mount
@@ -220,7 +224,9 @@ export function Composer({ onTaskCreated }: ComposerProps) {
 
   const handleUploadAdded = () => {
     setUploadOpen(false)
-    listWorkspaces().then(setWorkspaces).catch(() => {})
+    listWorkspaces().then(setWorkspaces).catch(() => {
+      toast.error('刷新工作空间列表失败')
+    })
     onTaskCreated?.()
   }
 
