@@ -248,7 +248,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
       <div className="composer-projects">
         <span className="pp-label">归入工作空间</span>
 
-        {workspaceSel.length === 0 && <span className="pp-none">不归入 · 可选</span>}
+        {workspaceSel.length === 0 && <span className="pp-none">未选空间 · 提交时自动创建</span>}
 
         {workspaceSel.map((id) => {
           const ws = wsById[id]
