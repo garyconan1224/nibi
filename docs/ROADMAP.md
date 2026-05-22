@@ -81,7 +81,7 @@ git log --oneline -10
 
 | Track | 主题 | 当前进度 | 目标 |
 |---|---|---|---|
-| **F** | 全流程（Flow）| 80%（H 系列 + IP.1~8 + F1.4/F1.6/F1.7 + F2 冒烟 8/10；3 bug 已修）| 端到端打通，每个节点不掉链 |
+| **F** | 全流程（Flow）| 85%（H 系列 + IP.1~8 + F1.4/F1.6/F1.7 + F2 冒烟 8/10 + F4 URL 嗅探 + L 资料库聚合页）| 端到端打通，每个节点不掉链 |
 | **V** | 视频（Video）| 60%（路径 1+2 已通，路径 3 待做）| 3 路径全通 + 字幕清洗 + 类型模板 |
 | **A** | 音频（Audio）| 60%（N8 后端 + UI 部分）| 6 任务前端勾选 + 后端补全 + 编辑修正 |
 | **T** | 文字（Text）| 70%（N10 已做大部分）| 多文对比 UI + 网页抓取扩展 |
@@ -183,6 +183,35 @@ git log --oneline -10
 
 **完工验收**：粘任意平台 URL → 自动识别类型 → 混合内容自动拆分 → 每种类型走对应 pipeline
 **当前状态**：✅ 全部完成（4 commits）
+
+### L 资料库聚合页 ✅
+
+**前置**：F3 已完成
+**目标**：统一的资料库汇总视图——跨 workspace 浏览所有已分析内容，按类型/工作空间筛选，多维度排序，点卡片下钻 Results
+**模型**：⭐ DS v4-pro（4 子任务均 <5 文件）
+**分支**：直接打 main
+**索引**：`docs/plans/phase-l-library.md`
+
+**子任务**：
+- [x] L1 后端聚合端点 `GET /workspaces/library` — `826c311`
+  - 摊平所有 workspace items + 反向带 workspace 信息
+  - `duration_seconds` / `primary_task_status` 从 results overlay 推导
+  - 默认过滤 `trashed=True` 的工作空间
+- [x] L2 前端 LibraryPage 骨架 + ItemCard/WorkspaceCard 组件 + 路由 — `249e2f0`
+  - 侧边栏「资料库」从 `/search` 改为 `/library`
+  - 卡片视觉对齐设计稿（ex-grid / ex-card / ex-thumb / ex-meta）
+  - ItemCard → `/workspaces/{ws}/items/{id}/overview`，WorkspaceCard → `/workspaces/{ws}`
+- [x] L3 多选 chip 筛选 + workspace 视图切换 — `d5e5a7e`
+  - [全部] [视频] [音频] [图片] [文字] [工作空间] 多选
+  - 选中「工作空间」时渲染 WorkspaceCard 网格
+- [x] L4 排序下拉 + grid/list 切换 + 状态 localStorage 持久化 — `cd41720`
+  - 6 种排序：创建时间 / 完成时间 / 时长 / 状态
+  - grid/list 视图切换 + zustand persist
+- [x] 扩展：卡片缩略图（yt-dlp writethumbnail → cover_thumbnail 优先级链）
+- [x] 扩展：批量删除 + 单项删除 + 选择模式 UI（勾选框仅在选择模式出现，点卡片任意位置切换选中）
+
+**完工验收**：QA 通过——筛选/排序/视图切换/ItemCard 跳 Results/WorkspaceCard 跳 Taskboard/选择+删除
+**当前状态**：✅ 全部完成（L1~L4 + 收口扩展）
 
 ---
 

@@ -44,6 +44,8 @@ git log --oneline -20            # 对账铁律：phase 文档不是事实来源
 8. `docs/OUTSTANDING_TASKS.md`（散落 TODO 速查）
 9. `AGENTS.md`（如适用，给其他 AI 工具的协议）
 
+> **读取方式**：启动必读不等于整文件全量 `Read`。优先用 `rg -n "^#|关键词"`、目录索引和小片段读取定位当前任务需要的段落；`docs/SPEC.md`、`docs/ROADMAP.md`、`docs/AI_HANDOFF.md` 这类大文件只读相关章节。需要全局判断下一步时，至少检查 ROADMAP §2 和推荐顺序；需要产品仲裁时，再读 SPEC 对应模块。
+
 > ⚠️ **不要只看 AI_HANDOFF.md 拍脑袋给"下一步建议"**——它是局部视角。任何"做什么 / 选哪个路线"的判断必须先打开 ROADMAP.md §2（6-track 进度 F/V/A/T/I/R）+ §11（推荐顺序）。漏读 ROADMAP 是 2026-05-22 之前几次会话犯过的错。
 
 ---
@@ -83,9 +85,42 @@ cd frontend && pnpm build       # tsc -b && vite build
 
 # 端到端验收
 .venv/bin/python tests/e2e_qa.py
+
+# 浏览器结构化冒烟（优先于读取截图）
+.venv/bin/python scripts/browser_smoke.py --url http://localhost:${VITE_PORT:-5175}/library --library --screenshot /tmp/nibi-library.png
 ```
 
 > 注：本仓库使用项目内 `.venv` 作为标准 Python 入口。新增后端测试时遵循「每个端点 1 个 happy path + 1 个错误路径」。
+
+---
+
+## 上下文预算与验证替代方案
+
+目标是保留能力但减少无效上下文。不要用“禁用工具”替代验证；要按下面顺序选最低成本且足够强的证据。
+
+### 文件读取
+
+1. 先用 `rg -n` / heading 搜索定位，再读必要片段。
+2. `docs/SPEC.md`、`docs/ROADMAP.md`、`docs/AI_HANDOFF.md`、大 TSX 文件不要默认整文件读取；只有结构未知或需要全局重写时才全读。
+3. compact/resume 后不要重复读 unchanged 文件；先看 `git diff -- <file>` 或用 `rg` 找刚改过的函数/组件。
+
+### 浏览器验证
+
+默认证据链：
+
+1. API/curl 数据检查。
+2. `scripts/browser_smoke.py` 输出 JSON：当前 URL、页面标题、卡片数、按钮文本、console error、可选截图文件路径。
+3. Playwright DOM 断言：点击、URL 跳转、元素数量、文本变化。
+4. 截图只作为产物保存路径，不要 `Read /tmp/*.png`。
+5. 只有用户要求视觉判断，或 DOM 断言无法说明布局/重叠/颜色问题时，才读取图片；读取前先截 viewport 或具体元素，避免 full-page 大图。
+
+### Skill 使用
+
+Skill 是能力入口，不是默认流程。需要浏览器、测试、设计、PDF 等专门流程时可以用 skill，但每个任务只调用一个最相关的 skill。Nibi 本地页面 QA 优先使用 `scripts/browser_smoke.py`；脚本覆盖不了的真实交互，再调用 `webapp-testing` 或 `playwright`。不要同时加载两个重叠 skill。
+
+### 会话边界
+
+一个会话只做一个明确子任务。完成子任务后先测试、总结、commit 或等用户确认，再开新会话继续下一项。不要把 L1/L2/L3、临时 debug、视觉 QA、文档同步连续塞进同一个上下文。
 
 ---
 
@@ -326,10 +361,11 @@ DS 的工具能力：Bash / Read / Write / Edit / Grep / Glob 全套都能用，
 - 每个 API 端点必须有至少 1 个 pytest 测试：
   - happy path 测一次
   - 一个常见错误情况（404 / 422）测一次
-- 前端组件不强制写单测，但**关键交互必须手动跑一遍并截图给用户**：
+- 前端组件不强制写单测，但**关键交互必须手动跑一遍并给出结构化证据**：
   - 删除/重置等不可逆操作
   - 表单校验
   - 异步状态切换（loading / 成功 / 失败）
+  - 优先输出 Playwright/`scripts/browser_smoke.py` 的 JSON 结果（URL、DOM 数量、console error、按钮/状态文本）。截图可以保存并报告路径；只有视觉问题才读取截图内容。
 - **手动冒烟测试 URL 清单**：`docs/test-urls.md`——覆盖 Bilibili / YouTube / 小红书 / 抖音 / 微信公众号 / 本地文件，共 10 条，验证 pipeline 和结果展示时直接用
 
 ---

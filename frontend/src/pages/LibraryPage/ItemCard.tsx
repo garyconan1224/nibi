@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Film, Music, ImageIcon, FileText } from 'lucide-react'
+import { Film, Music, ImageIcon, FileText, Trash2, CheckCircle, Circle } from 'lucide-react'
 import type { LibraryItem } from '@/services/library'
 
 const TYPE_ICON: Record<string, typeof Film> = {
@@ -57,9 +57,13 @@ function formatDuration(sec: number | null): string | null {
 
 interface ItemCardProps {
   item: LibraryItem
+  selected?: boolean
+  selectMode?: boolean
+  onToggleSelect?: (itemId: string, workspaceId: string) => void
+  onDelete?: (item: LibraryItem) => void
 }
 
-export function ItemCard({ item }: ItemCardProps) {
+export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete }: ItemCardProps) {
   const navigate = useNavigate()
   const state = primaryStatusToState(item.primary_task_status)
   const stateColor = STATE_COLOR[state] || STATE_COLOR.queued
@@ -67,13 +71,21 @@ export function ItemCard({ item }: ItemCardProps) {
   const Icon = TYPE_ICON[item.type] || FileText
   const dur = formatDuration(item.duration_seconds)
   const srcLabel = extractDomain(item.source_value)
+  const showOverlay = selectMode
+
+  const handleCardClick = () => {
+    if (selectMode && onToggleSelect) {
+      onToggleSelect(item.item_id, item.workspace_id)
+    } else {
+      navigate(`/workspaces/${item.workspace_id}/items/${item.item_id}/overview`)
+    }
+  }
 
   return (
     <div
       className="ex-card"
-      onClick={() =>
-        navigate(`/workspaces/${item.workspace_id}/items/${item.item_id}/overview`)
-      }
+      style={{ position: 'relative' }}
+      onClick={handleCardClick}
     >
       <div className="ex-thumb">
         {item.thumbnail ? (
@@ -108,24 +120,69 @@ export function ItemCard({ item }: ItemCardProps) {
           />
           {stateLabel}
         </div>
-        {/* 时长角标 */}
-        {dur && (
-          <div
-            style={{
-              position: 'absolute',
-              top: 8,
-              right: 8,
-              padding: '2px 6px',
-              borderRadius: 6,
-              background: 'rgba(0,0,0,0.55)',
-              fontSize: 10,
-              color: 'rgba(255,255,255,0.8)',
-              fontFamily: 'var(--mono)',
-            }}
-          >
-            {dur}
-          </div>
-        )}
+        {/* 右上角操作区 */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            display: 'flex',
+            gap: 6,
+            alignItems: 'center',
+          }}
+        >
+          {/* 勾选框 */}
+          {showOverlay && (
+            <span
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleSelect?.(item.item_id, item.workspace_id)
+              }}
+              style={{ cursor: 'pointer', display: 'flex', color: '#fff' }}
+            >
+              {selected ? <CheckCircle size={18} /> : <Circle size={18} style={{ opacity: 0.5 }} />}
+            </span>
+          )}
+          {/* 删除按钮 */}
+          {onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete(item)
+              }}
+              style={{
+                background: 'rgba(0,0,0,0.45)',
+                border: 'none',
+                borderRadius: 6,
+                padding: '4px 6px',
+                cursor: 'pointer',
+                color: 'rgba(255,255,255,0.7)',
+                display: 'flex',
+                opacity: 0,
+                transition: 'opacity 120ms',
+              }}
+              className="ex-delete-btn"
+              title="删除"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+          {/* 时长角标 */}
+          {dur && !showOverlay && (
+            <span
+              style={{
+                padding: '2px 6px',
+                borderRadius: 6,
+                background: 'rgba(0,0,0,0.55)',
+                fontSize: 10,
+                color: 'rgba(255,255,255,0.8)',
+                fontFamily: 'var(--mono)',
+              }}
+            >
+              {dur}
+            </span>
+          )}
+        </div>
       </div>
       <div className="ex-meta">
         <div className="ex-title" title={item.name}>

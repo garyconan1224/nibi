@@ -286,11 +286,15 @@ def handle_download_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, An
         err = (out.get("error_full") or out.get("error") or "download failed").strip()
         raise RuntimeError(err)
     runner.set_progress(record.task_id, 1.0, "Download finished")
-    return {
+    result: Dict[str, Any] = {
         "downloaded_files": [out.get("save_path") or ""],
         "file_name": out.get("file_name") or "",
         "save_path": out.get("save_path") or "",
     }
+    thumb = out.get("thumbnail_path") or ""
+    if thumb:
+        result["cover_thumbnail"] = thumb
+    return result
 
 
 def _run_subtitle_summary(
@@ -552,11 +556,31 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
     json_paths = sorted(project_json_dir.glob("*_视觉数据.json"))
     basenames = [p.name for p in json_paths]
     root = str(project_json_dir.resolve())
+
+    # 收集每个视频的第一帧，供资料库卡片缩略图使用
+    frames: List[Dict[str, str]] = []
+    first_frame_path: Optional[str] = None
+    for vp in videos:
+        output_dir = get_output_dir(vp)
+        frames_dir = output_dir / "frames"
+        if frames_dir.is_dir():
+            jpgs = sorted(frames_dir.glob("*.jpg"))
+            if jpgs:
+                abs_path = str(jpgs[0].resolve())
+                if first_frame_path is None:
+                    first_frame_path = abs_path
+                frames.append({
+                    "frame_image": jpgs[0].name,
+                    "frame_image_path": abs_path,
+                })
+
     result: Dict[str, Any] = {
         "json_outputs": [str(p.resolve()) for p in json_paths],
         "json_output_basenames": basenames,
         "json_output_dir": root,
     }
+    if frames:
+        result["frames"] = frames
 
     runner.set_progress(record.task_id, 1.0, "Analysis finished")
     return result
@@ -1523,6 +1547,9 @@ def handle_image_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     }
     if associations:
         result["associations"] = associations
+    # URL 图片可直接用源地址做缩略图
+    if source_type == "url":
+        result["cover_thumbnail"] = source
     json_path = image_dir / f"{task_id}.json"
     json_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
 

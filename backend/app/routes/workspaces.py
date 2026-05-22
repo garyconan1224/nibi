@@ -549,7 +549,19 @@ def _sync_item_with_tasks(item: WorkspaceItem) -> Optional[Dict[str, Any]]:
         overlay["status"] = ItemStatus.PROCESSING.value
 
     if latest_success is not None and latest_success.result and not item.results:
-        overlay["results"] = dict(latest_success.result)
+        merged = dict(latest_success.result)
+        # 若最新 task 没提供 cover_thumbnail，从更早的 SUCCESS task 补（下载封面优先）
+        if "cover_thumbnail" not in merged:
+            for tid in item.related_task_ids:
+                task = _pipeline_runner.store.get(tid)
+                if task is None or task is latest_success:
+                    continue
+                if task.status == TaskStatus.SUCCESS.value and task.result:
+                    ct = task.result.get("cover_thumbnail")
+                    if ct:
+                        merged["cover_thumbnail"] = ct
+                        break
+        overlay["results"] = merged
 
     return overlay
 
@@ -704,9 +716,12 @@ def list_workspaces(
 # ── Phase L1：资料库聚合端点 ──────────────────────────────
 
 
-def _item_duration_seconds(item: WorkspaceItem) -> Optional[float]:
-    """从 item.results 提取时长（秒），video/audio 有，image/text 返回 None。"""
-    results = item.results or {}
+def _item_duration_seconds(
+    item: WorkspaceItem,
+    results: Optional[Dict[str, Any]] = None,
+) -> Optional[float]:
+    """从 item.results（或传入的 merged results）提取时长。"""
+    results = results or item.results or {}
     dur = results.get("duration_sec")
     if dur is None:
         dur = (results.get("tracks_meta") or {}).get("total_sec")
@@ -718,16 +733,31 @@ def _item_duration_seconds(item: WorkspaceItem) -> Optional[float]:
     return None
 
 
-def _item_thumbnail(item: WorkspaceItem) -> Optional[str]:
-    """从 item.results 提取缩略图路径。"""
-    results = item.results or {}
+def _item_thumbnail(item: WorkspaceItem, results: dict = None) -> Optional[str]:
+    """从 item.results（或传入的 merged results）提取缩略图路径，转为 /static/ URL。"""
+    results = results or item.results or {}
+    path = None
     if results.get("cover_thumbnail"):
-        return str(results["cover_thumbnail"])
-    frames = results.get("frames") or []
-    if frames and isinstance(frames[0], dict):
-        for key in ("thumbnail", "frame_image_path", "frame_image"):
-            if frames[0].get(key):
-                return str(frames[0][key])
+        path = str(results["cover_thumbnail"])
+    else:
+        frames = results.get("frames") or []
+        if frames and isinstance(frames[0], dict):
+            for key in ("thumbnail", "frame_image_path", "frame_image"):
+                if frames[0].get(key):
+                    path = str(frames[0][key])
+                    break
+    if path:
+        # HTTP URL 直接返回（如图片源地址）
+        if path.startswith(("http://", "https://")):
+            return path
+        try:
+            data_root = (_ROOT_DIR / "data").resolve()
+            abs_path = Path(path).resolve()
+            if abs_path.is_relative_to(data_root):
+                return "/static/" + str(abs_path.relative_to(data_root))
+            return path
+        except (ValueError, OSError):
+            return path
     return None
 
 
@@ -775,7 +805,7 @@ def get_library(include_trashed: bool = False) -> Dict[str, Any]:
             if overlay and "status" in overlay:
                 item_status = overlay["status"]
 
-            results = item.results or {}
+            results = (overlay.get("results") if overlay else None) or item.results or {}
             items_out.append({
                 "item_id": item.item_id,
                 "workspace_id": rec.workspace_id,
@@ -787,8 +817,8 @@ def get_library(include_trashed: bool = False) -> Dict[str, Any]:
                 "status": item_status,
                 "created_at": item.created_at,
                 "updated_at": item.updated_at,
-                "duration_seconds": _item_duration_seconds(item),
-                "thumbnail": _item_thumbnail(item),
+                "duration_seconds": _item_duration_seconds(item, results),
+                "thumbnail": _item_thumbnail(item, results),
                 "results_summary": {
                     "has_summary": bool(results.get("summary")),
                     "has_transcript": bool(results.get("transcript")),
@@ -797,6 +827,29 @@ def get_library(include_trashed: bool = False) -> Dict[str, Any]:
             })
 
     return {"items": items_out, "workspaces": workspaces_out}
+
+
+class BatchDeleteRequest(BaseModel):
+    items: list[dict]  # [{"workspace_id": "...", "item_id": "..."}, ...]
+
+
+@router.post("/items/batch-delete")
+def batch_delete_items(req: BatchDeleteRequest) -> Dict[str, Any]:
+    """批量删除素材。"""
+    removed: list[str] = []
+    failed: list[dict] = []
+    for entry in req.items:
+        ws_id = str(entry.get("workspace_id") or "")
+        item_id = str(entry.get("item_id") or "")
+        if not ws_id or not item_id:
+            failed.append({**entry, "reason": "missing workspace_id or item_id"})
+            continue
+        try:
+            _store.remove_item(ws_id, item_id)
+            removed.append(item_id)
+        except KeyError as err:
+            failed.append({"workspace_id": ws_id, "item_id": item_id, "reason": str(err)})
+    return {"removed": len(removed), "failed": len(failed), "removed_ids": removed, "failures": failed}
 
 
 @router.get("/{workspace_id}")

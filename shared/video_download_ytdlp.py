@@ -209,6 +209,7 @@ def _build_attempts(
         "no_warnings": True,
         "nocheckcertificate": True,
         "ignoreconfig": True,
+        "writethumbnail": True,
         "concurrent_fragment_downloads": (
             concurrent_fragment_downloads if concurrent_fragment_downloads is not None else 5
         ),
@@ -280,6 +281,24 @@ _FORMAT_FALLBACK_CHAIN = [
     "bestvideo+bestaudio/best",  # YouTube DASH：分离流合并
     "worst",                     # 绝对兜底
 ]
+
+
+def _find_thumbnail(output_dir: str, video_path: str) -> str:
+    """在视频同目录下查找 yt-dlp 下载的封面图。"""
+    if not video_path:
+        return ""
+    stem = os.path.splitext(os.path.basename(video_path))[0]
+    for ext in (".jpg", ".webp", ".png"):
+        candidate = os.path.join(output_dir, stem + ext)
+        if os.path.isfile(candidate):
+            return candidate
+    # 封面可能被 yt-dlp embedthumbnail 合并，或文件名不匹配；扫描通配
+    for ext in ("*.jpg", "*.webp", "*.png"):
+        import glob as _glob
+        matches = sorted(_glob.glob(os.path.join(output_dir, ext)))
+        if matches:
+            return matches[0]
+    return ""
 
 
 def run_ytdlp_download(
@@ -446,10 +465,14 @@ def run_ytdlp_download(
                 task_state["file_name"] = os.path.basename(converted) if converted else ""
                 if log:
                     log(f"下载成功：{task_state['file_name']}")
+                thumbnail_path = _find_thumbnail(output_dir, converted)
+                if thumbnail_path and log:
+                    log(f"封面图：{os.path.basename(thumbnail_path)}")
                 return {
                     "ok": True,
                     "save_path": converted,
                     "file_name": task_state.get("file_name", ""),
+                    "thumbnail_path": thumbnail_path,
                     "error": "",
                     "error_full": "",
                     "percent": 100.0,

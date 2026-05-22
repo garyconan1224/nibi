@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Upload, Film, Music, ImageIcon, FileText } from 'lucide-react'
-import { fetchLibrary, type LibraryItem, type LibraryResponse } from '@/services/library'
+import { Upload, Film, Music, ImageIcon, FileText, Trash2, CheckCircle, Circle } from 'lucide-react'
+import { fetchLibrary, deleteItem, batchDeleteItems, type LibraryItem, type LibraryResponse } from '@/services/library'
 import { useLibraryStore, type SortBy } from '@/store/libraryStore'
 import { FilterChips } from './FilterChips'
 import { SortMenu } from './SortMenu'
@@ -114,11 +114,37 @@ export default function LibraryPage() {
   const [data, setData] = useState<LibraryResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selecting, setSelecting] = useState(false)
+  const [selectedSet, setSelectedSet] = useState<Set<string>>(new Set())
+  const [deleting, setDeleting] = useState(false)
 
   const selectedFilters = useLibraryStore((s) => s.selectedFilters)
   const sortBy = useLibraryStore((s) => s.sortBy)
   const viewMode = useLibraryStore((s) => s.viewMode)
   const setViewMode = useLibraryStore((s) => s.setViewMode)
+
+  const selectionKey = (wsId: string, itemId: string) => `${wsId}:${itemId}`
+
+  const toggleSelect = useCallback((itemId: string, wsId: string) => {
+    setSelectedSet((prev) => {
+      const next = new Set(prev)
+      const key = `${wsId}:${itemId}`
+      if (next.has(key)) next.delete(key); else next.add(key)
+      return next
+    })
+  }, [])
+
+  const clearSelection = useCallback(() => {
+    setSelectedSet(new Set())
+    setSelecting(false)
+  }, [])
+
+  const enterSelectMode = useCallback(() => {
+    setSelectedSet(new Set())
+    setSelecting(true)
+  }, [])
+
+  const selectMode = selecting
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -134,6 +160,7 @@ export default function LibraryPage() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
   }, [load])
 
@@ -156,6 +183,41 @@ export default function LibraryPage() {
     return sortItems(items, sortBy)
   }, [data, showAll, typeFilters, sortBy])
 
+  const selectAll = useCallback(() => {
+    setSelectedSet(new Set(filteredItems.map((it) => selectionKey(it.workspace_id, it.item_id))))
+  }, [filteredItems])
+
+  const handleDeleteOne = useCallback(async (item: LibraryItem) => {
+    const ok = window.confirm(`确定删除「${item.name || '未命名'}」？`)
+    if (!ok) return
+    try {
+      await deleteItem(item.workspace_id, item.item_id)
+      load()
+    } catch {
+      alert('删除失败，请重试')
+    }
+  }, [load])
+
+  const handleBatchDelete = useCallback(async () => {
+    if (selectedSet.size === 0) return
+    const ok = window.confirm(`确定删除选中的 ${selectedSet.size} 个素材？此操作不可撤销。`)
+    if (!ok) return
+    setDeleting(true)
+    try {
+      const items = Array.from(selectedSet).map((key) => {
+        const [ws, ...rest] = key.split(':')
+        return { workspace_id: ws, item_id: rest.join(':') }
+      })
+      await batchDeleteItems(items)
+      setSelectedSet(new Set())
+      load()
+    } catch {
+      alert('批量删除失败，请重试')
+    } finally {
+      setDeleting(false)
+    }
+  }, [selectedSet, load])
+
   const filteredWorkspaces = useMemo(() => {
     if (!data || !showWorkspace) return null
     return data.workspaces
@@ -169,7 +231,14 @@ export default function LibraryPage() {
   const renderGridView = (items: LibraryItem[]) => (
     <div className="ex-grid">
       {items.map((item) => (
-        <ItemCard key={item.item_id} item={item} />
+        <ItemCard
+          key={item.item_id}
+          item={item}
+          selected={selectedSet.has(selectionKey(item.workspace_id, item.item_id))}
+          selectMode={selectMode}
+          onToggleSelect={toggleSelect}
+          onDelete={handleDeleteOne}
+        />
       ))}
     </div>
   )
@@ -194,11 +263,15 @@ export default function LibraryPage() {
               textTransform: 'uppercase',
             }}
           >
+            {selectMode && (
+              <th style={{ padding: '8px 14px', textAlign: 'left', fontWeight: 500, width: 36 }}></th>
+            )}
             <th style={{ padding: '8px 14px', textAlign: 'left', fontWeight: 500 }}>名称</th>
             <th style={{ padding: '8px 14px', textAlign: 'left', fontWeight: 500 }}>类型</th>
             <th style={{ padding: '8px 14px', textAlign: 'left', fontWeight: 500 }}>状态</th>
             <th style={{ padding: '8px 14px', textAlign: 'left', fontWeight: 500 }}>时长</th>
             <th style={{ padding: '8px 14px', textAlign: 'left', fontWeight: 500 }}>创建时间</th>
+            <th style={{ padding: '8px 14px', textAlign: 'left', fontWeight: 500, width: 36 }}></th>
           </tr>
         </thead>
         <tbody>
@@ -210,9 +283,13 @@ export default function LibraryPage() {
             return (
               <tr
                 key={item.item_id}
-                onClick={() =>
-                  navigate(`/workspaces/${item.workspace_id}/items/${item.item_id}/overview`)
-                }
+                onClick={() => {
+                  if (selectMode) {
+                    toggleSelect(item.item_id, item.workspace_id)
+                  } else {
+                    navigate(`/workspaces/${item.workspace_id}/items/${item.item_id}/overview`)
+                  }
+                }}
                 style={{
                   cursor: 'pointer',
                   borderTop: '1px solid var(--line)',
@@ -225,6 +302,18 @@ export default function LibraryPage() {
                   (e.currentTarget as HTMLElement).style.background = ''
                 }}
               >
+                {selectMode && (
+                  <td style={{ padding: '10px 14px' }} onClick={(e) => e.stopPropagation()}>
+                    <span
+                      onClick={() => toggleSelect(item.item_id, item.workspace_id)}
+                      style={{ cursor: 'pointer', display: 'flex', color: 'var(--ink-3)' }}
+                    >
+                      {selectedSet.has(selectionKey(item.workspace_id, item.item_id))
+                        ? <CheckCircle size={16} style={{ color: 'var(--ink)' }} />
+                        : <Circle size={16} />}
+                    </span>
+                  </td>
+                )}
                 <td style={{ padding: '10px 14px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <Icon size={16} strokeWidth={1.3} style={{ color: 'var(--ink-3)', flexShrink: 0 }} />
@@ -264,6 +353,22 @@ export default function LibraryPage() {
                 <td style={{ padding: '10px 14px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-3)' }}>
                   {formatDate(item.created_at)}
                 </td>
+                <td style={{ padding: '10px 14px' }} onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => handleDeleteOne(item)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--ink-4)',
+                      display: 'flex',
+                      padding: 2,
+                    }}
+                    title="删除"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </td>
               </tr>
             )
           })}
@@ -290,6 +395,43 @@ export default function LibraryPage() {
           </h1>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* 选择控制 */}
+          {filteredItems.length > 0 && (
+            <>
+              {selectMode ? (
+                <>
+                  <button className="btn" style={{ fontSize: 12, height: 32 }} onClick={selectAll}>
+                    全选
+                  </button>
+                  <button className="btn" style={{ fontSize: 12, height: 32 }} onClick={clearSelection}>
+                    取消
+                  </button>
+                  {selectedSet.size > 0 && (
+                    <button
+                      className="btn"
+                      style={{
+                        fontSize: 12,
+                        height: 32,
+                        color: 'var(--accent)',
+                        borderColor: 'var(--accent)',
+                        opacity: deleting ? 0.5 : 1,
+                      }}
+                      onClick={handleBatchDelete}
+                      disabled={deleting}
+                    >
+                      <Trash2 size={13} />
+                      删除 ({selectedSet.size})
+                    </button>
+                  )}
+                </>
+              ) : (
+                <button className="btn" style={{ fontSize: 12, height: 32 }} onClick={enterSelectMode}>
+                  选择
+                </button>
+              )}
+            </>
+          )}
+
           {/* 排序下拉 */}
           <SortMenu />
 

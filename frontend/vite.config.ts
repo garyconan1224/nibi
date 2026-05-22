@@ -37,6 +37,10 @@ export default defineConfig(({ mode }) => {
           target: apiBaseUrl,
           changeOrigin: true,
         },
+        '/static': {
+          target: apiBaseUrl,
+          changeOrigin: true,
+        },
       },
     },
     // 构建配置：按厂商拆分 vendor chunk，配合路由级 React.lazy 实现细粒度代码分割

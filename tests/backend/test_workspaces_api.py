@@ -21,7 +21,7 @@ from fastapi import FastAPI
 from unittest.mock import MagicMock, patch
 
 from backend.app.routes import workspaces as ws_module
-from backend.app.models.tasks import TaskRecord
+from backend.app.models.tasks import TaskRecord, TaskStatus
 from backend.app.models.workspace import PreflightConfig, WorkspaceItem, WorkspaceRecord
 from backend.app.services.workspace_store import WorkspaceStore
 
@@ -600,3 +600,97 @@ def test_library_trashed_filter(client: TestClient) -> None:
     ws_ids = {w["workspace_id"] for w in body["workspaces"]}
     assert ws_ids == {ws1_id, ws2_id}
     assert len(body["items"]) == 2
+
+
+def test_library_uses_task_overlay_for_duration_and_thumbnail(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Library should surface merged task results for card duration and thumbnail."""
+    data_root = tmp_path / "data"
+    thumb = data_root / "videos" / "cover.jpg"
+    thumb.parent.mkdir(parents=True)
+    thumb.write_bytes(b"fake-thumbnail")
+    monkeypatch.setattr(ws_module, "_ROOT_DIR", tmp_path)
+
+    ws = client.post("/workspaces", json={"name": "结果叠加"}).json()
+    ws_id = ws["workspace_id"]
+    item = client.post(
+        f"/workspaces/{ws_id}/items",
+        json={
+            "type": "video",
+            "source": "url",
+            "source_value": "https://example.com/v.mp4",
+            "name": "视频",
+        },
+    ).json()["items"][0]
+    item_id = item["item_id"]
+
+    ws_module._store.update_item(
+        ws_id,
+        item_id,
+        related_task_ids=["download-task", "analyze-task"],
+    )
+    tasks = {
+        "download-task": TaskRecord(
+            task_id="download-task",
+            project_id=ws_id,
+            task_type="download",
+            payload={},
+            status=TaskStatus.SUCCESS.value,
+            result={"cover_thumbnail": str(thumb)},
+            updated_at="2026-01-01T00:00:00+00:00",
+        ),
+        "analyze-task": TaskRecord(
+            task_id="analyze-task",
+            project_id=ws_id,
+            task_type="analyze",
+            payload={},
+            status=TaskStatus.SUCCESS.value,
+            result={"duration_sec": 42.5, "summary": "ok"},
+            updated_at="2026-01-02T00:00:00+00:00",
+        ),
+    }
+    ws_module._pipeline_runner.store.get.side_effect = lambda task_id: tasks.get(task_id)
+
+    resp = client.get("/workspaces/library")
+    assert resp.status_code == 200
+    item_out = resp.json()["items"][0]
+    assert item_out["duration_seconds"] == 42.5
+    assert item_out["thumbnail"] == "/static/videos/cover.jpg"
+    assert item_out["results_summary"]["has_summary"] is True
+    assert item_out["primary_task_status"] == TaskStatus.SUCCESS.value
+
+
+def test_batch_delete_items_removes_valid_items_and_reports_failures(client: TestClient) -> None:
+    """批量删除应删除合法 item，并返回失败条目供前端提示。"""
+    ws = client.post("/workspaces", json={"name": "批量删除"}).json()
+    ws_id = ws["workspace_id"]
+    first = client.post(
+        f"/workspaces/{ws_id}/items",
+        json={"type": "video", "source": "url", "source_value": "https://example.com/a.mp4"},
+    ).json()["items"][0]
+    second = client.post(
+        f"/workspaces/{ws_id}/items",
+        json={"type": "audio", "source": "url", "source_value": "https://example.com/b.mp3"},
+    ).json()["items"][1]
+
+    resp = client.post(
+        "/workspaces/items/batch-delete",
+        json={
+            "items": [
+                {"workspace_id": ws_id, "item_id": first["item_id"]},
+                {"workspace_id": ws_id, "item_id": "missing"},
+                {"workspace_id": ws_id},
+            ],
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["removed"] == 1
+    assert body["failed"] == 2
+    assert body["removed_ids"] == [first["item_id"]]
+
+    remaining = client.get(f"/workspaces/{ws_id}").json()["items"]
+    assert [it["item_id"] for it in remaining] == [second["item_id"]]

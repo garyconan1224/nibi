@@ -59,3 +59,12 @@
   color: var(--ink-3);
   letter-spacing: 0.08em;
 }
+
+/* 卡片悬停时显示删除按钮 */
+.ex-card:hover .ex-delete-btn {
+  opacity: 1 !important;
+}
+.ex-delete-btn:hover {
+  color: var(--accent) !important;
+  background: rgba(0,0,0,0.65) !important;
+}

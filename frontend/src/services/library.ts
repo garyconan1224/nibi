@@ -41,3 +41,17 @@ export async function fetchLibrary(
   })
   return res.data
 }
+
+export async function deleteItem(
+  workspaceId: string,
+  itemId: string,
+): Promise<void> {
+  await http.delete(`/workspaces/${workspaceId}/items/${itemId}`)
+}
+
+export async function batchDeleteItems(
+  items: { workspace_id: string; item_id: string }[],
+): Promise<{ removed: number; failed: number; removed_ids: string[] }> {
+  const res = await http.post('/workspaces/items/batch-delete', { items })
+  return res.data
+}

@@ -1,6 +1,6 @@
 ---
 name: phase-l-library
-status: ready
+status: done
 phase: L (Library aggregation page)
 track: F (Flow) / 落地汇总视图
 prerequisite: F3 已完成
@@ -250,16 +250,38 @@ GET /workspaces/library?include_trashed=false
 
 ## 完工标准（Phase L 整体）
 
-- [ ] `GET /workspaces/library` 端点 + 测试 OK
-- [ ] 侧边栏「资料库」按钮指向 `/library`（不再是 `/search`）
-- [ ] 进 `/library` 看到设计稿一致的卡片网格
-- [ ] chip 筛选 / 排序 / 视图切换全部生效
-- [ ] 点 ItemCard → 跳对应 Results 详情页
-- [ ] 点 WorkspaceCard → 跳 `/workspaces/{id}` Taskboard
-- [ ] `pnpm build` + `pnpm lint` + `pnpm test` 全通
-- [ ] 后端 pytest 全通
-- [ ] ROADMAP §3 追加 §L 章节 + commit hash
-- [ ] AI_HANDOFF.md 更新「下一步」
+- [x] `GET /workspaces/library` 端点 + 测试 OK（`826c311`）
+- [x] 侧边栏「资料库」按钮指向 `/library`（不再是 `/search`）（`249e2f0`）
+- [x] 进 `/library` 看到设计稿一致的卡片网格（`249e2f0`）
+- [x] chip 筛选 / 排序 / 视图切换全部生效（`d5e5a7e` + `cd41720`）
+- [x] 点 ItemCard → 跳对应 Results 详情页
+- [x] 点 WorkspaceCard → 跳 `/workspaces/{id}` Taskboard
+- [x] 卡片缩略图覆盖（下载封面 > 视频首帧 > 类型图标，`shared/video_download_ytdlp.py` writethumbnail）
+- [x] 批量删除 + 单项删除 + 选择模式（勾选框仅在进入选择模式后出现，点卡片任意位置切换选中）
+- [x] `pnpm build` + `pnpm test` 全通；`pnpm lint` 已跑，失败项为项目存量规则噪音，本次未新增
+- [x] 后端 pytest 全通（235 passed, 2 skipped）
+- [x] ROADMAP §3 追加 §L 章节 + commit hash
+- [x] AI_HANDOFF.md 更新「下一步」
+
+### 超出设计稿范围的扩展
+
+| 功能 | 子任务 |
+|---|---|
+| 缩略图/封面 | yt-dlp `writethumbnail` → `cover_thumbnail` 优先级链（下载封面 > 分析首帧 > 图标占位） |
+| 删除 | 后端 `POST /items/batch-delete` + 前端选择模式 + 单项/批量删除 UI |
+| 选择交互 | 独立 `selecting` state → 进入选择模式不自动全选，点卡片任意位置切换选中 |
+
+### L phase commits
+
+```
+fa1602d docs(L): 新增 Phase L 资料库聚合页完整落地计划
+c10898b docs(L): 补充 Library 设计稿源头 + 字段映射 + L2 复刻指引
+826c311 feat(L1): 新增 /workspaces/library 聚合端点 + 测试
+249e2f0 feat(L2): LibraryPage 骨架 + ItemCard/WorkspaceCard 组件 + 路由接线
+d5e5a7e feat(L3): Library 顶部多选 chip 筛选 + workspace/item 视图切换
+cd41720 feat(L4): Library 排序下拉 + 网格/列表视图切换 + 状态持久化
+收口扩展 commit 见 git log 最新：缩略图 / 删除 / 选择模式 / 浏览器冒烟脚本 / 文档同步
+```
 
 ---
 
