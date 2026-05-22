@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { ArrowRight, RotateCcw, X } from 'lucide-react'
+import { toast } from 'sonner'
 
 import { useTaskStore } from '@/store/taskStore'
 import { useTaskSse } from '@/hooks/useTaskSse'
@@ -38,6 +39,32 @@ export default function ProcessingPage() {
   const isFailed = status === 'FAILED'
   const isCancelled = status === 'CANCELLED'
   const isSuccess = status === 'SUCCESS'
+
+  // F3.5: 任务卡住检测（非终结态 > 10 分钟无 updated_at 变化 → 警告）
+  const STUCK_MS = 10 * 60 * 1000
+  const lastActivityRef = useRef(Date.now())
+  const stuckToastedRef = useRef(false)
+
+  useEffect(() => {
+    if (!task?.updated_at) return
+    lastActivityRef.current = Math.max(
+      lastActivityRef.current,
+      new Date(task.updated_at).getTime(),
+    )
+    // 有新活动时重置 toast 标记，以便下次卡住能再次提醒
+    stuckToastedRef.current = false
+  }, [task?.updated_at])
+
+  useEffect(() => {
+    if (!isActive) return
+    const timer = setInterval(() => {
+      if (Date.now() - lastActivityRef.current > STUCK_MS && !stuckToastedRef.current) {
+        toast.warning('任务已超过 10 分钟无进度更新，可能已卡住。建议取消后重试。')
+        stuckToastedRef.current = true
+      }
+    }, 30_000)
+    return () => clearInterval(timer)
+  }, [isActive])
 
   // 任务完成后自动跳转结果总览页
   useEffect(() => {
