@@ -10,6 +10,7 @@ import {
   savePreflight,
   startItemPipeline,
 } from '@/services/workspaces'
+import type { SniffResult } from '@/services/workspaces'
 import type { ComposerDefaults, QualityOption } from './types'
 
 const QUALITY_MAP: Record<QualityOption, string> = {
@@ -32,6 +33,8 @@ interface PreflightDrawerProps {
   selectedTypes?: string[]
   /** Composer 高级参数默认值 */
   composerDefaults?: ComposerDefaults
+  /** F4.2: URL 嗅探结果——用于自动确定 item type */
+  sniffResult?: SniffResult | null
   /** IP.6: 选中的工作空间 ID（简化方案：只传第一个） */
   workspaceId?: string
   onClose: () => void
@@ -44,6 +47,7 @@ export function PreflightDrawer({
   platformName,
   selectedTypes,
   composerDefaults,
+  sniffResult,
   workspaceId,
   onClose,
   onCreated,
@@ -63,6 +67,9 @@ export function PreflightDrawer({
   // Track which Composer defaults have been applied
   const appliedDefaultsRef = useRef({ vision: false, text: false, asr: false })
   const cd = composerDefaults
+
+  // F4.2: 组件级素材类型——嗅探结果优先，失败退化为 video
+  const resolvedType = sniffResult?.primary_type ?? 'video'
 
   const { providers, providerModels, fetchProviders, modelsLoading } = useProviderStore()
   const addTask = useTaskStore((s) => s.addTask)
@@ -149,9 +156,9 @@ export function PreflightDrawer({
         toast.info(`已自动创建工作空间「${ws.name}」`)
       }
 
-      // 2. 创建 item
+      // 2. 创建 item（F4.2: 类型由嗅探结果决定，嗅探失败退化为 video）
       const itemRes = await addWorkspaceItem(wsId, {
-        type: 'video',
+        type: resolvedType,
         source: 'url',
         source_value: url,
         name: url.split('/').pop()?.split('?')[0] || url,
@@ -174,10 +181,11 @@ export function PreflightDrawer({
         preflightPayload.enabled_steps = cd.stepIds
         preflightPayload.prompt_style = cd.promptStyle
       }
-      // 构建 tasks：视频类型包含 summary 路径选择
-      // 未传 selectedTypes 时按 video 处理（当前 drawer 创建 item 时固定 type: 'video'）
+      // 构建 tasks：按 item type 分支构建（F4.2: 用解析后的类型替代硬编码 video）
       const tasks: Record<string, unknown> = {}
-      const isVideo = !selectedTypes?.length || selectedTypes.some((t) => t === '视频' || t === 'video')
+      const isVideo = selectedTypes?.length
+        ? selectedTypes.some((t) => t === '视频' || t === 'video')
+        : resolvedType === 'video'
       if (isVideo) {
         tasks.summary = {
           enabled: true,
@@ -283,8 +291,10 @@ export function PreflightDrawer({
             </div>
           </section>
 
-          {/* Section 2: Video summary path (only for video; no selectedTypes = single video URL) */}
-          {(!selectedTypes?.length || selectedTypes.some((t) => t === '视频' || t === 'video')) && (
+          {/* Section 2: Video summary path (F4.2: 用 resolvedType 替代 selectedTypes 的宽松判空) */}
+          {(selectedTypes?.length
+            ? selectedTypes.some((t) => t === '视频' || t === 'video')
+            : resolvedType === 'video') && (
             <section className="pf-section">
               <h4 className="pf-section-title">视频分析路径</h4>
               <div className="pf-field">

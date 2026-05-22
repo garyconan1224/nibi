@@ -365,11 +365,14 @@ async function sniffUrl(url: string): Promise<SniffResult>
 - [ ] 嗅探失败（网络超时 / DNS 失败）不抛 500，返回 200 + `{"error": "..."}`
 
 ### F4.2 验收
-- [ ] 粘贴 URL 后 500ms debounce 自动调 sniffUrl
-- [ ] PreflightDrawer 的 `addWorkspaceItem` type 不再硬编码 `'video'`
-- [ ] sniff 失败时退化到 `type: 'video'`（旧行为不破坏）
-- [ ] 手动在 Composer 里输入 URL + 点"开始解析"→流程完整可走通
-- [ ] `./start.sh` + 浏览器验证：粘贴 B站视频 → 自动 video type → pipeline 正常
+- [x] 粘贴 URL 后 500ms debounce 自动调 sniffUrl
+- [x] PreflightDrawer 的 `addWorkspaceItem` type 不再硬编码 `'video'`
+- [x] sniff 失败时退化到 `type: 'video'`（旧行为不破坏）
+- [x] 手动在 Composer 里输入 URL + 点"开始解析"→流程完整可走通
+- [x] `./start.sh` + 浏览器验证：粘贴 B站视频 → 自动 video type → pipeline 正常
+- [x] **收口修复 1**：PreflightDrawer 视频分析路径 UI 用 `resolvedType` 替代 `selectedTypes` 宽松判空，非视频 URL 不再显示视频路径
+- [x] **收口修复 2**：Composer 嗅探 useEffect 在 `normalizedUrl` 变化时立即 `setSniffResult(null)`，旧 URL 嗅探结果不污染新 URL
+- [x] **收口修复 3**：`resolvedType` 提为组件级变量，UI 可见性判断和 handleConfirm 共用同一来源
 
 ### F4.3 验收
 - [ ] sniff 返回 2 possible_types → PreflightDrawer 创建 2 个 item

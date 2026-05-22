@@ -8,7 +8,8 @@ import type { PipelineStep, QualityOption, FrameMode } from './types'
 import type { WorkspaceRecord } from '@/types/workspace'
 import { detectPlatform } from './platforms'
 import { normalizeMediaUrl } from '@/lib/url'
-import { listWorkspaces, createWorkspace } from '@/services/workspaces'
+import { listWorkspaces, createWorkspace, sniffUrl } from '@/services/workspaces'
+import type { SniffResult } from '@/services/workspaces'
 import { getPromptFormatsConfig } from '@/services/promptFormats'
 import type { PromptFormat } from '@/services/promptFormats'
 import { useProviderStore } from '@/store/providerStore'
@@ -56,6 +57,9 @@ export function Composer({ onTaskCreated }: ComposerProps) {
   const [uploadOpen, setUploadOpen] = useState(false)
   const [promptFormats, setPromptFormats] = useState<PromptFormat[]>([])
   const [promptStyle, setPromptStyle] = useState('')
+
+  // F4.2: URL 内容类型嗅探结果
+  const [sniffResult, setSniffResult] = useState<SniffResult | null>(null)
 
   const [workspaces, setWorkspaces] = useState<WorkspaceRecord[]>([])
   const [workspaceSel, setWorkspaceSel] = useState<string[]>([])
@@ -153,6 +157,26 @@ export function Composer({ onTaskCreated }: ComposerProps) {
   const platform = detectPlatform(normalizedUrl || url)
   const isMixed = platform !== null && platform.types.length > 1
   const showQualityRow = !platform || platform.types.includes('video')
+
+  // F4.2: debounce 500ms 后嗅探 URL 内容类型
+  useEffect(() => {
+    if (!normalizedUrl) {
+      setSniffResult(null)
+      return
+    }
+    // URL 变化时立即清空旧结果，避免旧 URL 的嗅探污染新 URL
+    setSniffResult(null)
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      try {
+        const result = await sniffUrl(normalizedUrl)
+        if (!cancelled) setSniffResult(result)
+      } catch {
+        if (!cancelled) setSniffResult(null)
+      }
+    }, 500)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [normalizedUrl])
 
   const toggle = (i: number) =>
     setSteps((ss) => ss.map((v, j) => (j === i ? !v : v)))
@@ -572,6 +596,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
         platformName={platform?.name ?? null}
         selectedTypes={preflightTypes.length ? preflightTypes : undefined}
         workspaceId={workspaceSel[0]}
+        sniffResult={sniffResult}
         composerDefaults={{
           quality,
           frameMode,
