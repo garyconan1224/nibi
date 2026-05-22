@@ -45,9 +45,9 @@ created: 2026-05-22
 | 3 | Bilibili | https://www.bilibili.com/video/BV1kP4y1j7xH | 纯 BV 号 | ✅ 通过 | 下载+分析链路正常 |
 | 4 | YouTube | https://www.youtube.com/watch?v=fl1DSmwQKKY | 普通视频 | ✅ 通过 | 代理 `http://127.0.0.1:7890` 已配，N7b 正常 |
 | 5 | YouTube | https://www.youtube.com/shorts/ERnYWR0OLKg | Shorts | ✅ 通过 | VLM 路径（6 帧），空 preflight 默认走了 VLM 而非 N7b |
-| 6 | 小红书 | _待用户提供 URL_ | 视频笔记 | ⏳ 缺 URL | yt-dlp 有 XiaoHongShu extractor |
-| 7 | 抖音 | _待用户提供 URL_ | 短视频 | ⏳ 缺 URL | yt-dlp 有 Douyin extractor |
-| 8 | 微信公众号 | _待用户提供 URL_ | 文章 | ⏳ 缺 URL | 走 web_enrich / text 路径 |
+| 6 | 小红书 | `http://xhslink.com/o/6ADdwOBRd4R`（分享链）→ 解析为图文笔记 | 图文笔记 | ✅ 通过 | 桌面链被反爬，分享链成功：280 chars + LLM 总结 |
+| 7 | 抖音 | `https://v.douyin.com/iJvcK8CLC_o/` | 短视频 | ❌ 需 cookies | yt-dlp: "Fresh cookies are needed"，用户需提供抖音 cookie |
+| 8 | 微信公众号 | `https://mp.weixin.qq.com/s/BSroSYpckb6OSc5_ZtWdng` | 文章 | ✅ 通过 | text 管道：1243 chars + LLM 总结（AI 编程工具新闻） |
 | 9 | 本地文件 | `data/.../21年省体的夜-BV1u44y1L7Vj.mp4` | 视频上传 | ✅ 通过 | N7b 路径1，转录"我爱你，寂寞的你..." + 结构化总结 |
 | 10 | 本地文件 | `data/.../test_f2_10_audio.mp3` | 音频上传 | ✅ 通过 | 音频管道跑通，VAD 误判(歌曲→无语音)→跳过 ASR，属 known limitation |
 
@@ -119,9 +119,9 @@ created: 2026-05-22
 
 ## 6. 完工标准
 
-- [x] 10 个 URL 全跑过一遍（8/10 通过，#6-#8 缺真实 URL）
+- [x] 10 个 URL 全跑过一遍（9/10 通过，#7 抖音需 cookies 为 known constraint）
 - [x] §3 所有 bug status = fixed（Bug A/B/C 已修）
-- [ ] 末次复跑 0 失败（#6-#8 待用户提供 URL 后补测）
+- [x] 末次复跑 0 失败（#7 抖音 blocked by cookies，非代码 bug）
 - [ ] ROADMAP §3 F2 打 `[x]` + 填 commit 列表
 - [ ] EXECUTION_PLAN 同步打勾
 - [ ] AI_HANDOFF.md 更新「下一步：F3 错误体验优化 或 A1+V1+I1 并行」
