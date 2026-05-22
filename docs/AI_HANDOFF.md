@@ -1,6 +1,6 @@
 # AI Handoff
 
-Last updated: 2026-05-22（F2 Bug3 yt-dlp 格式降级重试完成，冒烟测试下一步）
+Last updated: 2026-05-22（F2 Bug3 yt-dlp 格式降级 + 冒烟测试通过）
 
 ---
 
@@ -111,8 +111,11 @@ git branch --show-current
   - 每个格式尝试完整的 cookie/proxy/browser 组合后再降级
   - 所有格式失败时 `error_full` 包含完整降级链路信息
 - `tests/backend/test_video_download_ytdlp.py`：6 个单测覆盖首选成功、fallback 成功、全失败保留错误、去重、非可重试错误触发降级
-- 175 个后端测试全绿（+6 new），e2e_qa 12/12 全通过
-- **冒烟测试**：真实 B 站 URL 下载验证待做（见下方 🥇）
+- **冒烟测试**：真实 B站 URL `BV1qA5j6jEJC` 下载成功
+  - `best` 格式在 B站不可用（6 次 attempt 均 "format not available"）
+  - B站 format-stripping 自动降级成功 → 产出 AV1 852×480 / 2.4 MB / 70.8s
+  - 175 个后端测试全绿（+6 new），e2e_qa 12/12 全通过
+- **Commit**：`53620b9` fix(F2): yt-dlp format fallback retry chain
 
 ### 🥇 端到端冒烟测试（30min，**下一个会话推荐**）
 
