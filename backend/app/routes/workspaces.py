@@ -701,6 +701,104 @@ def list_workspaces(
     return [_enrich_workspace(r) for r in recs]
 
 
+# ── Phase L1：资料库聚合端点 ──────────────────────────────
+
+
+def _item_duration_seconds(item: WorkspaceItem) -> Optional[float]:
+    """从 item.results 提取时长（秒），video/audio 有，image/text 返回 None。"""
+    results = item.results or {}
+    dur = results.get("duration_sec")
+    if dur is None:
+        dur = (results.get("tracks_meta") or {}).get("total_sec")
+    if dur is not None:
+        try:
+            return float(dur)
+        except (ValueError, TypeError):
+            return None
+    return None
+
+
+def _item_thumbnail(item: WorkspaceItem) -> Optional[str]:
+    """从 item.results 提取缩略图路径。"""
+    results = item.results or {}
+    if results.get("cover_thumbnail"):
+        return str(results["cover_thumbnail"])
+    frames = results.get("frames") or []
+    if frames and isinstance(frames[0], dict):
+        for key in ("thumbnail", "frame_image_path", "frame_image"):
+            if frames[0].get(key):
+                return str(frames[0][key])
+    return None
+
+
+def _item_primary_task_status(item: WorkspaceItem) -> Optional[str]:
+    """返回 item.related_task_ids 里最新 task 的 status。"""
+    if not item.related_task_ids:
+        return None
+    latest = None
+    for tid in item.related_task_ids:
+        task = _pipeline_runner.store.get(tid)
+        if task is None:
+            continue
+        if latest is None or task.updated_at > latest.updated_at:
+            latest = task
+    return latest.status if latest else None
+
+
+@router.get("/library")
+def get_library(include_trashed: bool = False) -> Dict[str, Any]:
+    """聚合端点：摊平所有 workspace items + workspace 摘要，供「资料库」页使用。"""
+    recs = _store.list_all(
+        include_trashed=include_trashed,
+        trashed_only=False,
+    )
+
+    items_out: List[Dict[str, Any]] = []
+    workspaces_out: List[Dict[str, Any]] = []
+
+    for rec in recs:
+        # workspace 摘要卡片
+        workspaces_out.append({
+            "workspace_id": rec.workspace_id,
+            "name": rec.name,
+            "items_count": len(rec.items),
+            "items_count_by_type": _items_count_by_type(rec),
+            "cover_thumbnail": _cover_thumbnail(rec),
+            "updated_at": rec.updated_at,
+            "status": rec.status,
+        })
+
+        for item in rec.items:
+            # X.1 bridge：用 task 状态覆盖 item status
+            item_status = item.status
+            overlay = _sync_item_with_tasks(item)
+            if overlay and "status" in overlay:
+                item_status = overlay["status"]
+
+            results = item.results or {}
+            items_out.append({
+                "item_id": item.item_id,
+                "workspace_id": rec.workspace_id,
+                "workspace_name": rec.name,
+                "type": item.type,
+                "source": item.source,
+                "source_value": item.source_value,
+                "name": item.name,
+                "status": item_status,
+                "created_at": item.created_at,
+                "updated_at": item.updated_at,
+                "duration_seconds": _item_duration_seconds(item),
+                "thumbnail": _item_thumbnail(item),
+                "results_summary": {
+                    "has_summary": bool(results.get("summary")),
+                    "has_transcript": bool(results.get("transcript")),
+                },
+                "primary_task_status": _item_primary_task_status(item),
+            })
+
+    return {"items": items_out, "workspaces": workspaces_out}
+
+
 @router.get("/{workspace_id}")
 def get_workspace(workspace_id: str) -> Dict[str, Any]:
     rec = _store.get(workspace_id)

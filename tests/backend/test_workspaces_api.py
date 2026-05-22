@@ -478,3 +478,125 @@ def test_sync_item_with_tasks_failed_maps_to_failed(tmp_path: Path) -> None:
             isolated_store.get(ws_id).items[0].related_task_ids = ["t1"]
             body = c.get(f"/workspaces/{ws_id}").json()
             assert body["items"][0]["status"] == "failed"
+
+
+# ── Phase L1：资料库聚合端点 ──────────────────────────────────────────────
+
+
+def test_library_empty(client: TestClient) -> None:
+    """空库时 GET /workspaces/library 返回 200 + 空列表。"""
+    resp = client.get("/workspaces/library")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body == {"items": [], "workspaces": []}
+
+
+def test_library_with_data(client: TestClient) -> None:
+    """2 workspace × 各含 items → 字段齐全 + 数量正确。"""
+    # ws1: 2 items (video + audio)
+    ws1 = client.post("/workspaces", json={"name": "空间A"}).json()
+    ws1_id = ws1["workspace_id"]
+    client.post(
+        f"/workspaces/{ws1_id}/items",
+        json={"type": "video", "source": "url", "source_value": "https://example.com/v.mp4", "name": "视频1"},
+    )
+    client.post(
+        f"/workspaces/{ws1_id}/items",
+        json={"type": "audio", "source": "url", "source_value": "https://example.com/a.mp3", "name": "音频1"},
+    )
+
+    # ws2: 2 items (image + text)
+    ws2 = client.post("/workspaces", json={"name": "空间B"}).json()
+    ws2_id = ws2["workspace_id"]
+    client.post(
+        f"/workspaces/{ws2_id}/items",
+        json={"type": "image", "source": "local", "source_value": "/tmp/img.jpg", "name": "图片1"},
+    )
+    client.post(
+        f"/workspaces/{ws2_id}/items",
+        json={"type": "text", "source": "url", "source_value": "https://example.com/article", "name": "文章1"},
+    )
+
+    resp = client.get("/workspaces/library")
+    assert resp.status_code == 200
+    body = resp.json()
+
+    # 2 workspaces
+    assert len(body["workspaces"]) == 2
+    ws_out = {w["workspace_id"]: w for w in body["workspaces"]}
+    assert ws_out[ws1_id]["name"] == "空间A"
+    assert ws_out[ws1_id]["items_count"] == 2
+    assert ws_out[ws1_id]["items_count_by_type"] == {"video": 1, "audio": 1, "image": 0, "text": 0}
+    assert ws_out[ws2_id]["name"] == "空间B"
+    assert ws_out[ws2_id]["items_count"] == 2
+    assert ws_out[ws2_id]["items_count_by_type"] == {"video": 0, "audio": 0, "image": 1, "text": 1}
+    for w in body["workspaces"]:
+        assert "cover_thumbnail" in w
+        assert "updated_at" in w
+        assert "status" in w
+
+    # 4 items 摊平
+    assert len(body["items"]) == 4
+
+    # 验证每个 item 的必需字段
+    required_keys = {
+        "item_id", "workspace_id", "workspace_name", "type", "source",
+        "source_value", "name", "status", "created_at", "updated_at",
+        "duration_seconds", "thumbnail", "results_summary", "primary_task_status",
+    }
+    for it in body["items"]:
+        assert required_keys.issubset(it.keys()), f"缺字段: {required_keys - set(it.keys())}"
+        assert "has_summary" in it["results_summary"]
+        assert "has_transcript" in it["results_summary"]
+        # image/text 无 duration
+        if it["type"] in ("image", "text"):
+            assert it["duration_seconds"] is None
+
+    # workspace_name 正确反向带出
+    by_ws = {}
+    for it in body["items"]:
+        by_ws.setdefault(it["workspace_id"], []).append(it)
+    assert len(by_ws[ws1_id]) == 2
+    for it in by_ws[ws1_id]:
+        assert it["workspace_name"] == "空间A"
+    assert len(by_ws[ws2_id]) == 2
+    for it in by_ws[ws2_id]:
+        assert it["workspace_name"] == "空间B"
+
+
+def test_library_trashed_filter(client: TestClient) -> None:
+    """默认排除 trashed workspace；include_trashed=true 时包含。"""
+    # 正常 workspace
+    ws1 = client.post("/workspaces", json={"name": "正常空间"}).json()
+    ws1_id = ws1["workspace_id"]
+    client.post(
+        f"/workspaces/{ws1_id}/items",
+        json={"type": "video", "source": "url", "source_value": "https://example.com/v.mp4"},
+    )
+
+    # trashed workspace
+    ws2 = client.post("/workspaces", json={"name": "垃圾桶空间"}).json()
+    ws2_id = ws2["workspace_id"]
+    client.post(
+        f"/workspaces/{ws2_id}/items",
+        json={"type": "audio", "source": "url", "source_value": "https://example.com/a.mp3"},
+    )
+    client.delete(f"/workspaces/{ws2_id}")  # 软删除
+
+    # 默认排除 trashed
+    resp = client.get("/workspaces/library")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["workspaces"]) == 1
+    assert body["workspaces"][0]["workspace_id"] == ws1_id
+    assert len(body["items"]) == 1
+    assert body["items"][0]["workspace_id"] == ws1_id
+
+    # include_trashed=true
+    resp = client.get("/workspaces/library?include_trashed=true")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert len(body["workspaces"]) == 2
+    ws_ids = {w["workspace_id"] for w in body["workspaces"]}
+    assert ws_ids == {ws1_id, ws2_id}
+    assert len(body["items"]) == 2
