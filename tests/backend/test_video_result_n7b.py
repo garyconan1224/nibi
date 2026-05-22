@@ -137,3 +137,27 @@ def test_video_result_subtitle_string_transcript_normalized(client: TestClient) 
     assert len(body["transcript"]) == 1
     assert body["transcript"][0]["text"] == "旧格式转写文本"
     assert body["transcript"][0]["t_sec"] == 0
+
+
+def test_video_result_subtitle_transcript_without_summary_is_real_data(client: TestClient) -> None:
+    """N7b 路径 1: 无 API key 时只有清洗后 transcript，也应返回 item_results。"""
+    ws_id, item_id = _create_video_workspace(client)
+
+    ws_module._store.update_item(
+        ws_id, item_id,
+        results={
+            "summary_path": "subtitle",
+            "transcript": [{"t_sec": 0, "t_str": "00:00", "text": "清洗后转写"}],
+            "summary": "",
+            "json_outputs": [],
+        },
+        status="done",
+    )
+
+    resp = client.get(f"/workspaces/{ws_id}/items/{item_id}/result")
+    assert resp.status_code == 200
+    body = resp.json()
+
+    assert body["source"] == "item_results"
+    assert body["summary_path"] == "subtitle"
+    assert body["transcript"][0]["text"] == "清洗后转写"

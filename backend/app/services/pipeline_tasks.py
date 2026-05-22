@@ -422,11 +422,13 @@ def _run_subtitle_summary(
 def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     payload = record.payload
     task_id = record.task_id
-    api_key = str(payload.get("api_key") or "").strip() or load_settings().openai_api_key.strip()
-    if not api_key:
+    settings = load_settings()
+    api_key = str(payload.get("api_key") or "").strip() or settings.openai_api_key.strip()
+    summary_path = str(payload.get("summary_path") or "").strip()
+    if not api_key and summary_path != "subtitle":
         raise ValueError("analyze requires api_key in payload or settings")
-    vision_model = str(payload.get("vision_model") or "").strip() or load_settings().vision_model
-    text_model = str(payload.get("text_model") or "").strip() or load_settings().text_model
+    vision_model = str(payload.get("vision_model") or "").strip() or settings.vision_model
+    text_model = str(payload.get("text_model") or "").strip() or settings.text_model
     proxy = str(payload.get("proxy") or "").strip()
 
     # 日志：记录收到的模型和代理配置
@@ -449,6 +451,30 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
         videos = [v for v in videos if v.name in allowed]
     if not videos:
         raise ValueError(f"no videos found in {project_video_dir}")
+
+    # N7b path 1 is ASR/text-only. It must not require vision analysis or an API key
+    # when only rule-based transcript cleanup is available.
+    if summary_path == "subtitle":
+        runner.set_progress(record.task_id, 0.1, f"Found {len(videos)} videos")
+        result: Dict[str, Any] = {
+            "json_outputs": [],
+            "json_output_basenames": [],
+            "json_output_dir": str(project_json_dir.resolve()),
+        }
+        result.update(
+            _run_subtitle_summary(
+                videos=videos,
+                payload=payload,
+                task_id=task_id,
+                text_model=text_model,
+                api_key=api_key,
+                project_video_dir=project_video_dir,
+                project_json_dir=project_json_dir,
+                runner=runner,
+            )
+        )
+        runner.set_progress(record.task_id, 1.0, "Analysis finished")
+        return result
 
     # N7: 从 payload 读 frame_prompt 子参数（截帧模式 / 间隔 / 最大帧数 / 每镜头帧数）
     frame_prompts = payload.get("frame_prompt")
@@ -495,22 +521,6 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
         "json_output_basenames": basenames,
         "json_output_dir": root,
     }
-
-    # ── N7b 路径 1：字幕直接总结 ──────────────────────────────
-    summary_path = str(payload.get("summary_path") or "").strip()
-    if summary_path == "subtitle":
-        result.update(
-            _run_subtitle_summary(
-                videos=videos,
-                payload=payload,
-                task_id=task_id,
-                text_model=text_model,
-                api_key=api_key,
-                project_video_dir=project_video_dir,
-                project_json_dir=project_json_dir,
-                runner=runner,
-            )
-        )
 
     runner.set_progress(record.task_id, 1.0, "Analysis finished")
     return result

@@ -294,6 +294,51 @@ def test_audio_task_boolean_false_disables_asr(tmp_path: Path) -> None:
     runner.append_log.assert_any_call("audio-bool", "⏭️  跳过 ASR（无人声或未启用）")
 
 
+def test_subtitle_summary_without_api_key_runs_rules_only(tmp_path: Path) -> None:
+    """N7b path 1 should run ASR + rules cleanup without requiring vision/API."""
+    from backend.app.services.pipeline_tasks import handle_analyze_task
+
+    fake_video = tmp_path / "videos" / "sample.mp4"
+    fake_video.parent.mkdir(parents=True, exist_ok=True)
+    fake_video.touch()
+    json_dir = tmp_path / "json"
+
+    runner = MagicMock()
+    record = TaskRecord(
+        task_id="subtitle-no-key",
+        project_id="default_project",
+        task_type="analyze",
+        payload={
+            "summary_path": "subtitle",
+            "video_basenames": [fake_video.name],
+        },
+    )
+
+    with (
+        patch("backend.app.services.pipeline_tasks.load_settings", return_value=_mock_settings("")),
+        patch("backend.app.services.pipeline_tasks.get_workspace_videos_dir",
+              return_value=fake_video.parent),
+        patch("backend.app.services.pipeline_tasks.get_workspace_json_dir",
+              return_value=json_dir),
+        patch("backend.app.services.pipeline_tasks.find_videos",
+              return_value=[fake_video]),
+        patch("backend.app.services.pipeline_tasks.run_batch_analysis") as run_batch,
+        patch("backend.app.services.pipeline_tasks._extract_audio_from_video",
+              return_value=json_dir / "sample.wav"),
+        patch("backend.app.services.asr_fast_whisper.is_fast_whisper_available",
+              return_value=True),
+        patch("backend.app.services.asr_fast_whisper.transcribe_file_with_fast_whisper",
+              return_value="嗯 今天天气不错 啊\n今天天气不错"),
+    ):
+        result = handle_analyze_task(record, runner)
+
+    run_batch.assert_not_called()
+    assert result["summary_path"] == "subtitle"
+    assert "嗯" not in result["transcript_text"]
+    assert "天气不错" in result["transcript_text"]
+    assert result["summary"] == ""
+
+
 # ── Phase 1F：验证 PROBE / STORE 框架级阶段被触发 ────────────────────────────
 
 class TestPhase1FStageTransitions:

@@ -1060,13 +1060,19 @@ def _video_result_has_real_data(results: Dict[str, Any]) -> bool:
 
     两种情况视为有真数据：
     1. 路径 2（detailed）：frames list + transcript list 都存在
-    2. N7b 路径 1（subtitle）：summary_path='subtitle' 且 summary 非空
+    2. N7b 路径 1（subtitle）：summary_path='subtitle' 且 summary 或 transcript 非空
     """
     if not isinstance(results, dict):
         return False
     # N7b 路径 1：字幕直接总结
-    if results.get("summary_path") == "subtitle" and results.get("summary"):
-        return True
+    if results.get("summary_path") == "subtitle":
+        transcript = results.get("transcript")
+        has_transcript = (
+            bool(transcript.strip()) if isinstance(transcript, str) else bool(transcript)
+        )
+        if results.get("summary") or has_transcript:
+            return True
+        return False
     # 路径 2：帧分析 + 转写
     frames = results.get("frames")
     transcript = results.get("transcript")
@@ -1092,7 +1098,7 @@ def _materialize_video_results_from_analyze(
     if results.get("frames"):
         return results  # 已是目标格式
     # N7b 路径 1：字幕直接总结结果，无需从 JSON 文件物化
-    if results.get("summary_path") == "subtitle" and results.get("summary"):
+    if results.get("summary_path") == "subtitle":
         results.setdefault("frames", [])
         results.setdefault("transcript", results.get("transcript") or [])
         return results

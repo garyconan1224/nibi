@@ -33,6 +33,9 @@ frontend/.env.local
 __pycache__/
 .claude/worktrees/
 
+# Local agent/tool instructions
+GEMINI.md
+
 # Design source archives (already extracted to docs/design/)
 *.zip
 .DS_Store
