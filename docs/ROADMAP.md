@@ -148,6 +148,33 @@ git log --oneline -10
 **模型**：⭐ DS v4-pro
 **改动**：Processing / TaskCard / 错误 toast 文案统一
 
+### F4 URL 内容类型嗅探
+
+**前置**：F3 之前独立完成（用户决议提前做，2026-05-22）
+**目标**：用户粘 URL 后自动识别内容类型（video/audio/image/text），不再强制手动选类型
+**模型**：Opus 4.7（3 层策略 + 混合内容拆分逻辑复杂）
+**分支**：`feat/f4-content-sniff`（已合并入 main）
+**索引**：`docs/plans/phase-f4-content-sniff.md`
+
+**子任务**：
+- [x] F4.1 URL 内容类型嗅探端点 — `ff1d593`
+  - 新增 `shared/url_sniffer.py`：策略 1 已知平台路径匹配 → 策略 2 HTTP Content-Type + `og:` 元标签 → 策略 3 fallback
+  - 后端挂载为 `POST /workspaces/sniff-url`，前端 `services/workspaces.ts` 同步接入 `sniffUrl()`
+  - 零 schema 改动，嗅探失败优雅降级为 video
+- [x] F4.2 前端接入 URL 嗅探自动类型 — `e0719c3`
+  - Composer 增加 debounce 500ms 嗅探 `useEffect`，结果传给 PreflightDrawer
+  - PreflightDrawer 用 `sniffResult.primary_type` 替代硬编码 `'video'` 创建 item
+  - 收口修复：视频分析路径 UI 改用 `resolvedType` 判可见性；URL 变化时立即清空旧 sniffResult 防污染
+- [x] F4.3 混合内容自动拆多 item — `d53d583` `6bd40c6`
+  - `handleConfirm` 重构为循环模式：嗅探 `possible_types > 1` 时逐一创建 item → savePreflight → start pipeline
+  - 每个 item 按自身 type 构建独立 tasks（video 含 summary 路径，其余由后端 bridge 兜底）
+  - 共享背景信息 + 模型选择，部分失败 toast warning 显示 N/M 成功数
+  - platform type `article` 自动映射为 `text`
+  - fix `6bd40c6`：honor selected types and bind created items（补单测 `PreflightDrawer.test.tsx` 265 行）
+
+**完工验收**：粘任意平台 URL → 自动识别类型 → 混合内容自动拆分 → 每种类型走对应 pipeline
+**当前状态**：✅ 全部完成（4 commits）
+
 ---
 
 ## 4. Track V：视频（Video）
