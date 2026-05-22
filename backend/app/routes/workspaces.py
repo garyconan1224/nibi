@@ -100,6 +100,12 @@ def _augment_video_analyze_payload(payload: Dict[str, Any], item: WorkspaceItem)
         if summary_params.get("video_template"):
             payload["video_template"] = summary_params["video_template"]
 
+    # 布尔标志兜底：preflight 中 transcribe + summarize 都为 true 时，
+    # 默认走 N7b 路径 1（字幕直接总结），不触发 VLM 逐帧分析
+    if tasks.get("transcribe") and tasks.get("summarize"):
+        if "summary_path" not in payload:
+            payload["summary_path"] = "subtitle"
+
 
 def _on_download_success(completed_task: TaskRecord, runner) -> None:  # type: ignore[type-arg]
     """X.5 任务链：download 成功后自动 enqueue analyze，并把 analyze task_id 写回 item。
