@@ -20,7 +20,12 @@ F1~F4 跑完后已经有一堆真实分析结果散落在各个 workspace 里，
 - 多维度排序，方便复盘测试结果
 - 点卡片下钻到现有 Results 子页（不重复造详情页）
 
-视觉真相源：`docs/design/VidMirror.html` 的「资料库 LIBRARY · 7 ITEMS」页面（用户截图给过）。
+视觉真相源（**优先级从高到低**）：
+1. **`/Users/conan/Downloads/vidmirror (Remix)/components/storyboard.jsx::Library`**（行 91~131）—— jsx 组件源码，最精确
+2. **`/Users/conan/Downloads/vidmirror (Remix)/styles.css`** 行 459~486 —— `.ex-grid` / `.ex-card` / `.ex-thumb` / `.ex-meta` CSS
+3. `docs/design/VidMirror.html` 渲染版（备用对照）
+
+> ⚠️ **设计稿覆盖范围有限**：只画了基础视觉（grid/list 切换 + 「导入」按钮 + 卡片网格），**没画 chip 筛选、没画排序下拉、没画 workspace 卡片视图**。L3/L4 是基于用户决议对设计稿的**功能扩展**，视觉风格必须**沿用设计稿同一套 design tokens**（var(--ink) / var(--bg-elev) / var(--line) / var(--accent) / var(--accent-green) / var(--mono) 字体 / var(--radius) / var(--shadow-md)）。
 
 ---
 
@@ -147,11 +152,27 @@ GET /workspaces/library?include_trashed=false
 - 改 `frontend/src/layouts/AppShell.tsx:34`：`path: '/search'` → `path: '/library'`
 - 新增 `frontend/src/services/library.ts`：调 `GET /workspaces/library`
 
-**视觉对照**：`docs/design/VidMirror.html`「资料库」页面 + 用户截图。
-重点元素：
-- 顶部条：`资料库 · LIBRARY · 7 ITEMS`
-- 右上角：网格/列表视图切换 + 「导入」按钮（导入按钮 L2 先放占位，不接逻辑）
-- 卡片：状态徽标（running 黄 / queued 灰 / done 绿 / error 红）、时长 mm:ss、缩略图占位区、标题、副标题、`来源.com/路径 · 类型` 尾标
+**视觉对照（必读）**：`/Users/conan/Downloads/vidmirror (Remix)/components/storyboard.jsx` 行 91~131 的 `Library` 组件。**直接照抄它的 JSX 结构与 className**，仅把数据源从 `VM_DATA.TASKS` 换成 `library.items`。
+
+**CSS 复用策略**：
+- 设计稿用的 `.ex-grid` / `.ex-card` / `.ex-thumb` / `.ex-meta` / `.ex-title` / `.ex-sub` / `.eyebrow` / `.btn-primary` —— **检查 `frontend/src/index.css` 或 `frontend/src/styles/` 里是否已有同名 class**，没有就从 `/Users/conan/Downloads/vidmirror (Remix)/styles.css:459-486` 复制 + 复制对应的 `:root` 变量（var(--bg-elev) / var(--ink-3) / var(--mono) / var(--radius) / var(--shadow-md) / var(--accent-green) / var(--ink-4)）。优先级：用 Tailwind 写不出来的就抄过去，写得出来的用 Tailwind。
+
+**重点元素（对照设计稿 JSX）**：
+- 顶部：`<div className="eyebrow">LIBRARY · {N} ITEMS</div>` + `<h1 style={{fontFamily:'var(--display)', fontSize:48, letterSpacing:'-0.02em'}}>资料库</h1>`
+- 右上：grid/list segmented control（设计稿是 inline style `tw-segm`，3px padding, radius 10, 选中态 box-shadow）+ `<button className="btn btn-primary">导入</button>`
+- 卡片状态徽标：左上角圆点 + 状态文字（设计稿是 `position:absolute, top:8, left:8, bg:rgba(0,0,0,0.6), font-mono, 10px white`）
+- 卡片缩略图：`aspect-ratio: 16/9, bg:#111`，没有 thumbnail 时显示一个居中占位（设计稿用 frame_*.svg，我们后端无 thumbnail 时给 type 图标）
+- 卡片 meta：title 13px medium + sub 是 `{src} · {type}`，mono font，10.5px，letter-spacing 0.08em，颜色 `var(--ink-3)`
+
+**字段映射**（后端 → 卡片）：
+| 卡片字段 | 来源 |
+|---|---|
+| state 徽标 | `item.primary_task_status` |
+| 时长 mm:ss | `item.duration_seconds`（设计稿截图右上角，正式 jsx 里没画——可在 thumb 右上角小标） |
+| title | `item.name` |
+| sub.src | 从 `item.source_value` 提取域名+路径片段（B 站 → `bilibili.com/BV1abc`） |
+| sub.type | `item.type` |
+| thumbnail | item.results 里若有缩略图字段则用，否则按 type 显示占位图标 |
 
 **点击下钻**：
 - ItemCard 点击 → 跳 `/workspaces/{workspace_id}/items/{item_id}/overview`
@@ -252,6 +273,14 @@ GET /workspaces/library?include_trashed=false
 完成后跑 .venv/bin/python -m pytest tests/backend -q，全绿再 commit。
 做完停下，等我开 L2 会话。
 ```
+
+### 开 L2 前必读（设计稿位置）
+
+L2 的 DS 必须在动手前读这两份外部文件：
+- `/Users/conan/Downloads/vidmirror (Remix)/components/storyboard.jsx` 行 91~131（Library 组件）
+- `/Users/conan/Downloads/vidmirror (Remix)/styles.css` 行 459~486（卡片 CSS）
+
+如果该 Mac 上路径不存在，停下问用户拿设计稿，不要凭"截图记忆"瞎写。
 
 ### 开 L2 时
 
