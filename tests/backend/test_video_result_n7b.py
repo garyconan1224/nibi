@@ -139,6 +139,40 @@ def test_video_result_subtitle_string_transcript_normalized(client: TestClient) 
     assert body["transcript"][0]["t_sec"] == 0
 
 
+def test_video_result_subtitle_multi_segment_transcript(client: TestClient) -> None:
+    """N7b 路径 1: 多段 transcript 应逐行返回，每行带时间戳。"""
+    ws_id, item_id = _create_video_workspace(client)
+
+    ws_module._store.update_item(
+        ws_id, item_id,
+        results={
+            "summary_path": "subtitle",
+            "transcript": [
+                {"t_sec": 0.0, "t_str": "00:00", "text": "第一段转写"},
+                {"t_sec": 5.2, "t_str": "00:05", "text": "第二段转写"},
+                {"t_sec": 12.8, "t_str": "00:12", "text": "第三段转写"},
+            ],
+            "summary": "测试摘要",
+            "json_outputs": [],
+        },
+        status="done",
+    )
+
+    resp = client.get(f"/workspaces/{ws_id}/items/{item_id}/result")
+    assert resp.status_code == 200
+    body = resp.json()
+
+    assert isinstance(body["transcript"], list)
+    assert len(body["transcript"]) == 3
+    assert body["transcript"][0]["t_sec"] == 0.0
+    assert body["transcript"][0]["t_str"] == "00:00"
+    assert body["transcript"][1]["t_sec"] == 5.2
+    assert body["transcript"][1]["t_str"] == "00:05"
+    assert body["transcript"][2]["t_sec"] == 12.8
+    assert body["transcript"][2]["t_str"] == "00:12"
+    assert body["tracks_meta"]["transcript_count"] == 3
+
+
 def test_video_result_subtitle_transcript_without_summary_is_real_data(client: TestClient) -> None:
     """N7b 路径 1: 无 API key 时只有清洗后 transcript，也应返回 item_results。"""
     ws_id, item_id = _create_video_workspace(client)

@@ -336,7 +336,8 @@ def transcribe_file_with_fast_whisper(
     initial_prompt: str = "",
     log_callback: Optional[Callable[[str], None]] = None,
     progress_callback: Optional[Callable[[float, str], None]] = None,
-) -> str:
+    return_segments: bool = False,
+) -> "str | tuple[str, list[dict[str, Any]]]":
     """转录本地音/视频文件（直接交给 ffmpeg 解码，免去读整段二进制进内存）。
 
     参数：
@@ -396,11 +397,18 @@ def transcribe_file_with_fast_whisper(
     _emit_log(f"🎙️ 开始解码 | duration={total:.1f}s language={detected_lang or 'auto'}")
 
     parts: List[str] = []
+    seg_dicts: List[Dict[str, Any]] = [] if return_segments else []
     last_log_ts = 0.0
     for idx, seg in enumerate(segments):
         text = str(getattr(seg, "text", "")).strip()
         if text:
             parts.append(text)
+            if return_segments:
+                seg_dicts.append({
+                    "start": float(getattr(seg, "start", 0.0) or 0.0),
+                    "end": float(getattr(seg, "end", 0.0) or 0.0),
+                    "text": text,
+                })
         end = float(getattr(seg, "end", 0.0) or 0.0)
         # 节流：每 5 秒 wall-clock 最多推一次进度/日志，避免刷爆 task.log
         now = time.perf_counter()
@@ -411,7 +419,10 @@ def transcribe_file_with_fast_whisper(
             last_log_ts = now
 
     _emit_progress(1.0, "转录完成")
-    return "\n".join(parts).strip()
+    text_out = "\n".join(parts).strip()
+    if return_segments:
+        return text_out, seg_dicts
+    return text_out
 
 
 def transcribe_with_fast_whisper(

@@ -307,7 +307,7 @@ def _run_subtitle_summary(
             mapped = 0.96 + 0.02 * max(0.0, min(1.0, ratio))
             runner.set_progress(task_id, mapped, msg)
 
-        transcript_text = transcribe_file_with_fast_whisper(
+        whisper_result = transcribe_file_with_fast_whisper(
             str(audio_path),
             model_name=tcfg.whisper_model_size or "base",
             device=tcfg.device or "cpu",
@@ -315,8 +315,10 @@ def _run_subtitle_summary(
             initial_prompt=tcfg.initial_prompt or "",
             log_callback=log,
             progress_callback=_on_progress,
+            return_segments=True,
         )
-        log(f"✅ 转写完成 | {len(transcript_text)} 字符")
+        transcript_text, transcript_segments = whisper_result
+        log(f"✅ 转写完成 | {len(transcript_text)} 字符 / {len(transcript_segments)} 段")
     except Exception as e:
         log(f"⚠️  Whisper 转写失败: {e}")
         return {"summary_path": "subtitle", "transcript": [], "summary_error": f"转写失败: {e}"}

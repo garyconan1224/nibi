@@ -328,7 +328,11 @@ def test_subtitle_summary_without_api_key_runs_rules_only(tmp_path: Path) -> Non
         patch("backend.app.services.asr_fast_whisper.is_fast_whisper_available",
               return_value=True),
         patch("backend.app.services.asr_fast_whisper.transcribe_file_with_fast_whisper",
-              return_value="嗯 今天天气不错 啊\n今天天气不错"),
+              return_value=(
+                  "嗯 今天天气不错 啊\n今天天气不错",
+                  [{"start": 0.0, "end": 2.5, "text": "嗯 今天天气不错 啊"},
+                   {"start": 2.5, "end": 5.0, "text": "今天天气不错"}],
+              )),
     ):
         result = handle_analyze_task(record, runner)
 
@@ -337,6 +341,13 @@ def test_subtitle_summary_without_api_key_runs_rules_only(tmp_path: Path) -> Non
     assert "嗯" not in result["transcript_text"]
     assert "天气不错" in result["transcript_text"]
     assert result["summary"] == ""
+    # segments 应被保留并传给 _normalize_transcript_to_lines
+    assert isinstance(result["transcript"], list)
+    assert len(result["transcript"]) == 2
+    assert result["transcript"][0]["t_sec"] == 0.0
+    assert result["transcript"][0]["t_str"] == "00:00"
+    assert result["transcript"][1]["t_sec"] == 2.5
+    assert result["transcript"][1]["t_str"] == "00:02"
 
 
 # ── Phase 1F：验证 PROBE / STORE 框架级阶段被触发 ────────────────────────────
