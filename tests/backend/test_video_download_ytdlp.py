@@ -317,6 +317,51 @@ class TestDouyinFallback:
         assert result["ok"] is True
         assert not any("抖音" in m for m in logs)
 
+    def test_douyin_fallback_receives_progress_callback(self, tmp_path):
+        """run_ytdlp_download 把 progress_callback 透传给 Douyin helper。"""
+        from shared.video_download_ytdlp import run_ytdlp_download
+
+        output_dir = str(tmp_path)
+        logs: list[str] = []
+        fake_ytdlp = _make_ydl_mock()
+        fake_dy_result = {
+            "ok": True,
+            "save_path": os.path.join(output_dir, "test.mp4"),
+            "file_name": "test.mp4",
+            "error": "",
+            "error_full": "",
+            "percent": 100.0,
+        }
+        Path(fake_dy_result["save_path"]).write_bytes(b"fake_mp4_data")
+
+        captured_callbacks: dict[str, list] = {"progress": [], "speed": []}
+
+        def _fake_douyin_download(*, url_or_text, output_dir, log, progress_callback, speed_callback, **kw):
+            if progress_callback:
+                progress_callback(0.5, "50%")
+                captured_callbacks["progress"].append(True)
+            if speed_callback:
+                speed_callback("2.5MiB/s")
+                captured_callbacks["speed"].append(True)
+            return fake_dy_result
+
+        with patch.dict(sys.modules, {"yt_dlp": fake_ytdlp}):
+            with patch(
+                "shared.douyin_mobile_share.run_douyin_mobile_download",
+                side_effect=_fake_douyin_download,
+            ):
+                result = run_ytdlp_download(
+                    url="https://v.douyin.com/iJvcK8CLC_o/",
+                    output_dir=output_dir,
+                    log=logs.append,
+                    progress_callback=lambda r, s: captured_callbacks["progress"].append((r, s)),
+                    speed_callback=lambda s: captured_callbacks["speed"].append(s),
+                )
+
+        assert result["ok"] is True
+        assert len(captured_callbacks["progress"]) >= 1
+        assert len(captured_callbacks["speed"]) >= 1
+
     def test_douyin_fallback_import_error_graceful(self, tmp_path):
         """douyin_mobile_share 模块导入失败时静默回落 yt-dlp。"""
         from shared.video_download_ytdlp import run_ytdlp_download

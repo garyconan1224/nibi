@@ -32,6 +32,18 @@ describe('normalizeMediaUrl', () => {
     )
   })
 
+  it('抖音分享文案 → 提取纯短链', () => {
+    const shareText =
+      '8.92 复制打开抖音，看看【光郡的作品】地毯式最强之一智能体Codex零基础攻略 # ag... https://v.douyin.com/VXJAb-M34nc/ :9pm 01/06 nda:/ r@E.hb'
+    expect(normalizeMediaUrl(shareText)).toBe('https://v.douyin.com/VXJAb-M34nc')
+  })
+
+  it('纯抖音短链 → 不受影响', () => {
+    expect(normalizeMediaUrl('https://v.douyin.com/iJvcK8CLC_o/')).toBe(
+      'https://v.douyin.com/iJvcK8CLC_o'
+    )
+  })
+
   it('保留非追踪参数', () => {
     const raw = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLxxx'
     const result = normalizeMediaUrl(raw)

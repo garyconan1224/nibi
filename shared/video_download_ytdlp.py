@@ -330,6 +330,8 @@ def run_ytdlp_download(
                 url_or_text=url,
                 output_dir=output_dir,
                 log=log,
+                progress_callback=progress_callback,
+                speed_callback=speed_callback,
             )
             if dy_result.get("ok"):
                 return dy_result

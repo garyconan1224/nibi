@@ -20,6 +20,7 @@ from shared.douyin_mobile_share import (
     run_douyin_mobile_download,
     _extract_play_uri,
     _build_mp4_url,
+    _CHUNK_SIZE,
 )
 
 
@@ -194,8 +195,8 @@ class TestParseSharePage:
         uri = "v0200fg10000cjkv7abc123"
         html = _make_share_html(play_uri=uri)
         result = parse_douyin_share_page(html)
-        # url_list[0] 完整 URL 优先于 uri 片段
-        assert uri in result["play_uri"]
+        # uri 优先于 url_list（无水印），返回值应为纯 uri 片段
+        assert result["play_uri"] == uri
 
     def test_extract_title(self):
         html = _make_share_html(title="我的视频标题")
@@ -359,6 +360,104 @@ class TestRunDownload:
         assert isinstance(result["ok"], bool)
         assert isinstance(result["percent"], (int, float))
 
+    def test_progress_callback_is_called(self, tmp_path):
+        """下载过程中 progress_callback 被多次调用。"""
+        uri = "v0200fg10000cjkv7abc123"
+        html = _make_share_html(play_uri=uri)
+        output_dir = str(tmp_path)
+        progress_calls: list[tuple[float, str]] = []
+
+        def _session_factory():
+            s = MagicMock(name="Session")
+            s.headers = {}
+
+            fake_data = b"\x00" * (_CHUNK_SIZE * 3 + 512)  # 3 chunks + partial
+            total = len(fake_data)
+
+            def _get(url, **kwargs):
+                mock_resp = MagicMock(name="Response")
+                mock_resp.raise_for_status = MagicMock()
+                if "play" in url or "aweme" in url:
+                    mock_resp.headers = {"Content-Length": str(total)}
+                    mock_resp.iter_content = MagicMock(
+                        return_value=[fake_data[i:i + _CHUNK_SIZE] for i in range(0, total, _CHUNK_SIZE)]
+                    )
+
+                    def _enter():
+                        return mock_resp
+
+                    mock_resp.__enter__ = MagicMock(side_effect=_enter)
+                    mock_resp.__exit__ = MagicMock(return_value=False)
+                else:
+                    mock_resp.url = "https://www.iesdouyin.com/share/video/7123456789012345678/"
+                    mock_resp.text = html
+                return mock_resp
+
+            s.get = MagicMock(side_effect=_get)
+            return s
+
+        with patch("shared.douyin_mobile_share.requests.Session", side_effect=_session_factory):
+            result = run_douyin_mobile_download(
+                url_or_text="https://v.douyin.com/iJvcK8CLC_o/",
+                output_dir=output_dir,
+                progress_callback=lambda ratio, status: progress_calls.append((ratio, status)),
+            )
+
+        assert result["ok"] is True
+        assert len(progress_calls) >= 2, f"progress_callback 至少应调用 2 次，实际 {len(progress_calls)}"
+        # ratio 应单调递增且在 (0, 1] 范围内
+        ratios = [r for r, _ in progress_calls]
+        assert all(0 < r <= 1.0 for r in ratios)
+        assert ratios == sorted(ratios), "ratio 应单调递增"
+
+    def test_speed_callback_is_called(self, tmp_path):
+        """下载过程中 speed_callback 被调用。"""
+        uri = "v0200fg10000cjkv7abc123"
+        html = _make_share_html(play_uri=uri)
+        output_dir = str(tmp_path)
+        speed_calls: list[str] = []
+
+        def _session_factory():
+            s = MagicMock(name="Session")
+            s.headers = {}
+
+            fake_data = b"\x00" * (_CHUNK_SIZE * 2)
+            total = len(fake_data)
+
+            def _get(url, **kwargs):
+                mock_resp = MagicMock(name="Response")
+                mock_resp.raise_for_status = MagicMock()
+                if "play" in url or "aweme" in url:
+                    mock_resp.headers = {"Content-Length": str(total)}
+                    mock_resp.iter_content = MagicMock(
+                        return_value=[fake_data[i:i + _CHUNK_SIZE] for i in range(0, total, _CHUNK_SIZE)]
+                    )
+
+                    def _enter():
+                        return mock_resp
+
+                    mock_resp.__enter__ = MagicMock(side_effect=_enter)
+                    mock_resp.__exit__ = MagicMock(return_value=False)
+                else:
+                    mock_resp.url = "https://www.iesdouyin.com/share/video/7123456789012345678/"
+                    mock_resp.text = html
+                return mock_resp
+
+            s.get = MagicMock(side_effect=_get)
+            return s
+
+        with patch("shared.douyin_mobile_share.requests.Session", side_effect=_session_factory):
+            result = run_douyin_mobile_download(
+                url_or_text="https://v.douyin.com/iJvcK8CLC_o/",
+                output_dir=output_dir,
+                speed_callback=lambda s: speed_calls.append(s),
+            )
+
+        assert result["ok"] is True
+        assert len(speed_calls) >= 1, f"speed_callback 至少应调用 1 次，实际 {len(speed_calls)}"
+        # 速度字符串应以 /s 结尾
+        assert all(s.endswith("/s") for s in speed_calls)
+
 
 # ── _deep_find 测试 ────────────────────────────────────────────────
 
@@ -370,8 +469,8 @@ class TestDeepFind:
         uri = "v0200fg10000cjkv7abc123"
         html = _make_share_html(play_uri=uri)
         found = _extract_play_uri(html)
-        # url_list[0] 完整 URL 优先于 uri 片段
-        assert uri in found
+        # uri 优先于 url_list，返回值应为纯 uri 片段
+        assert found == uri
 
     def test_find_play_uri_in_router_data(self):
         uri = "v0200fg10000cjkv7abc456"

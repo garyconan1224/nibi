@@ -1,5 +1,8 @@
 const BILIBILI_BV_RE = /^BV[a-zA-Z0-9]+$/;
 
+/** 抖音短链模式——用于从分享文案中提取纯 URL */
+const DOUYIN_URL_RE = /https?:\/\/(?:v\.douyin\.com|www\.douyin\.com|www\.iesdouyin\.com|dy\.com)\/[^\s]+/i;
+
 /** 追踪参数白名单——这些参数不影响视频唯一性，应移除 */
 const TRACKING_PARAMS = new Set([
   "spm_id_from",
@@ -16,17 +19,24 @@ const TRACKING_PARAMS = new Set([
 export function normalizeMediaUrl(raw: string): string {
   let s = raw.trim();
 
-  // ① 纯 BV 号 → 拼完整 B站 URL
+  // ① 从抖音分享文案中提取第一个抖音短链
+  // 例："8.92 复制打开抖音，看看【...】... https://v.douyin.com/xxx/ ..."
+  const dyMatch = s.match(DOUYIN_URL_RE);
+  if (dyMatch) {
+    s = dyMatch[0];
+  }
+
+  // ② 纯 BV 号 → 拼完整 B站 URL
   if (BILIBILI_BV_RE.test(s)) {
     s = `https://www.bilibili.com/video/${s}`;
   }
 
-  // ② 缺 scheme（没有任何 :// 的才补 https://）
+  // ③ 缺 scheme（没有任何 :// 的才补 https://）
   if (!s.includes("://")) {
     s = `https://${s}`;
   }
 
-  // ③ 解析 URL，清掉追踪参数 + 去掉尾斜杠
+  // ④ 解析 URL，清掉追踪参数 + 去掉尾斜杠
   try {
     const u = new URL(s);
     const removals: string[] = [];

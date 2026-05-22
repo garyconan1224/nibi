@@ -11,6 +11,8 @@ import json
 import logging
 import os
 import re
+import time
+from collections.abc import Callable
 from typing import Optional
 
 import requests
@@ -160,15 +162,15 @@ def _try_extract_uri_from_json(data) -> Optional[str]:
     if not isinstance(data, dict):
         return None
 
-    # 主路径：play_addr → url_list[0]（完整 URL 优先于 uri 片段）
+    # 主路径：play_addr → uri 优先（无缘无水印），url_list[0] 兜底（可能带 playwm）
     play_addr = _deep_find(data, _PLAY_ADDR_KEY)
     if isinstance(play_addr, dict):
-        url_list = play_addr.get("url_list")
-        if isinstance(url_list, list) and url_list and isinstance(url_list[0], str):
-            return url_list[0]
         uri = play_addr.get("uri")
         if isinstance(uri, str) and uri:
             return uri
+        url_list = play_addr.get("url_list")
+        if isinstance(url_list, list) and url_list and isinstance(url_list[0], str):
+            return url_list[0]
 
     # 备用：videoInfoRes.item_list[0].video.play_addr
     video_info = _deep_find(data, _VIDEO_PLAY_INFO_KEY)
@@ -304,11 +306,23 @@ def _build_mp4_url(play_uri: str) -> str:
     return f"https://www.iesdouyin.com/aweme/v1/play/?video_id={uri}&ratio=1080p&line=0"
 
 
+def _format_speed(bytes_per_sec: float) -> str:
+    """将字节/秒格式化为人类可读的速度字符串。"""
+    if bytes_per_sec >= 1024 * 1024:
+        return f"{bytes_per_sec / (1024 * 1024):.1f}MiB/s"
+    elif bytes_per_sec >= 1024:
+        return f"{bytes_per_sec / 1024:.1f}KiB/s"
+    else:
+        return f"{bytes_per_sec:.1f}B/s"
+
+
 def run_douyin_mobile_download(
     *,
     url_or_text: str,
     output_dir: str,
-    log=None,
+    log: Callable[[str], None] | None = None,
+    progress_callback: Callable[[float, str], None] | None = None,
+    speed_callback: Callable[[str], None] | None = None,
 ) -> dict:
     """抖音无 cookie 下载优先路径。
 
@@ -384,12 +398,21 @@ def run_douyin_mobile_download(
 
             with open(save_path, "wb") as f:
                 downloaded = 0
+                start_time = time.time()
                 for chunk in dl_resp.iter_content(chunk_size=_CHUNK_SIZE):
                     if chunk:
                         f.write(chunk)
                         downloaded += len(chunk)
                         if total > 0:
                             pct = min(99.0, downloaded / total * 100)
+                            elapsed = time.time() - start_time
+                            if progress_callback:
+                                progress_callback(
+                                    min(0.99, downloaded / total),
+                                    f"{pct:.0f}% · {_format_speed(downloaded / elapsed) if elapsed > 0 else '0B/s'}",
+                                )
+                            if speed_callback and elapsed > 0:
+                                speed_callback(_format_speed(downloaded / elapsed))
                             if int(pct) % 20 == 0:
                                 _log(f"   {pct:.0f}% ({downloaded}/{total})")
 
