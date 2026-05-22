@@ -6,10 +6,11 @@ import type { TaskRecord } from '@/types/task'
 import type { TaskCard } from './types'
 
 const STATE_COLOR: Record<TaskCard['state'], string> = {
-  done:    'var(--accent-green)',
-  running: 'var(--accent-blue)',
-  error:   'var(--accent-pink)',
-  queued:  'var(--ink-4)',
+  done:      'var(--accent-green)',
+  running:   'var(--accent-blue)',
+  error:     'var(--accent-pink)',
+  cancelled: 'var(--ink-3)',
+  queued:    'var(--ink-4)',
 }
 
 const TYPE_ICON = {
@@ -22,7 +23,8 @@ const TYPE_ICON = {
 function taskToCard(t: TaskRecord): TaskCard {
   let state: TaskCard['state'] = 'queued'
   if (t.status === 'SUCCESS') state = 'done'
-  else if (t.status === 'FAILED' || t.status === 'CANCELLED') state = 'error'
+  else if (t.status === 'FAILED') state = 'error'
+  else if (t.status === 'CANCELLED') state = 'cancelled'
   else if (isTaskTerminal(t.status)) state = 'done'
   else state = 'running'
 

@@ -21,7 +21,7 @@ export interface TaskCard {
   title: string
   src: string
   type: string
-  state: 'done' | 'running' | 'error' | 'queued'
+  state: 'done' | 'running' | 'error' | 'cancelled' | 'queued'
   thumb?: string
 }
 
