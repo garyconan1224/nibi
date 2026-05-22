@@ -117,3 +117,7 @@ git branch --show-current
 - Database and auth: `supabase-postgres-best-practices`, `better-auth-best-practices`
 - Testing and tooling: `webapp-testing`, `playwright`
 - Document and media workflows: `pdf`, `remotion-best-practices`
+
+## Imported Claude Cowork project instructions
+
+多媒体内容分析系统
