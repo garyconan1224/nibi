@@ -137,11 +137,18 @@ def _on_download_success(completed_task: TaskRecord, runner) -> None:  # type: i
     except Exception:
         return  # analyze enqueue 失败不影响 download 本身
 
-    # 把 analyze task_id 写入引用了此 download task 的所有 workspace items
+    # 从下载产物文件名里提取视频真实标题（yt-dlp 模板: %(title)s-%(id)s.%(ext)s）
+    import re as _re
+    _title = _re.sub(r'-[^-]+\.[^.]+$', '', video_basename) if video_basename else ""
+
+    # 把 analyze task_id + 视频标题写回所有关联此 download task 的 workspace items
     for ws, item in refs:
         new_ids = list(item.related_task_ids) + [analyze_task.task_id]
         try:
-            _store.update_item(ws.workspace_id, item.item_id, related_task_ids=new_ids)
+            _update_kwargs: Dict[str, Any] = {"related_task_ids": new_ids}
+            if _title and (not item.name or item.name in (item.source_value, item.source_value.split("/")[-1])):
+                _update_kwargs["name"] = _title
+            _store.update_item(ws.workspace_id, item.item_id, **_update_kwargs)
         except Exception:
             pass  # 写失败不阻断（X.1 桥仍能通过 download task 显示最终状态）
 
