@@ -330,6 +330,7 @@ DS 的工具能力：Bash / Read / Write / Edit / Grep / Glob 全套都能用，
   - 删除/重置等不可逆操作
   - 表单校验
   - 异步状态切换（loading / 成功 / 失败）
+- **手动冒烟测试 URL 清单**：`docs/test-urls.md`——覆盖 Bilibili / YouTube / 小红书 / 抖音 / 微信公众号 / 本地文件，共 10 条，验证 pipeline 和结果展示时直接用
 
 ---
 
