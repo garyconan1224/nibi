@@ -44,7 +44,7 @@ git log --oneline -20            # 对账铁律：phase 文档不是事实来源
 8. `docs/OUTSTANDING_TASKS.md`（散落 TODO 速查）
 9. `AGENTS.md`（如适用，给其他 AI 工具的协议）
 
-> **读取方式**：启动必读不等于整文件全量 `Read`。优先用 `rg -n "^#|关键词"`、目录索引和小片段读取定位当前任务需要的段落；`docs/SPEC.md`、`docs/ROADMAP.md`、`docs/AI_HANDOFF.md` 这类大文件只读相关章节。流程图相关任务先读 `docs/flows/*.md` 文本镜像，不要直接读 PNG；需要全局判断下一步时，至少检查 ROADMAP §2 和推荐顺序；需要产品仲裁时，再读 SPEC 对应模块。
+> **读取方式**：启动必读不等于整文件全量 `Read`。这里的“读”指先用 `rg -n "^#|关键词"`、目录索引和小片段读取定位当前任务需要的段落；`docs/SPEC.md`、`docs/ROADMAP.md`、`docs/AI_HANDOFF.md` 这类大文件不要用无 offset/limit 的 `Read`。流程图相关任务先读 `docs/flows/*.md` 文本镜像，不要直接读 PNG；需要全局判断下一步时，至少检查 ROADMAP §2 和推荐顺序；需要产品仲裁时，再读 SPEC 对应模块。
 
 > ⚠️ **不要只看 AI_HANDOFF.md 拍脑袋给"下一步建议"**——它是局部视角。任何"做什么 / 选哪个路线"的判断必须先打开 ROADMAP.md §2（6-track 进度 F/V/A/T/I/R）+ §11（推荐顺序）。漏读 ROADMAP 是 2026-05-22 之前几次会话犯过的错。
 
@@ -109,7 +109,8 @@ cd frontend && pnpm build       # tsc -b && vite build
 3. compact/resume 后不要重复读 unchanged 文件；先看 `git diff -- <file>` 或用 `rg` 找刚改过的函数/组件。
 4. 流程图先读 `docs/flows/README.md` 和对应 `docs/flows/<track>.md`。源 PNG 只在 Markdown 缺失、hash 过期、需求冲突，或必须判断视觉布局/颜色/层级时读取；读取前先裁剪相关区域。
 5. 代码入口先看 `docs/AI_CODE_INDEX.md`。它是低 token 路线图，只给入口和关键词；真正修改前仍以实际代码为准。
-6. 单次读取预算：大于 300 行的文件先 `rg -n "函数名|组件名|关键词"`，再读目标段落上下约 80-160 行；不要因为 `/clear` 或 compact 重新整读同一个大文件。
+6. 单次读取硬规则：大于 300 行的文件禁止无 offset/limit 的 `Read`。先跑 `rg -n "函数名|组件名|关键词" <file>`，再用 `sed -n '起始,结束p' <file>` 或 `nl -ba <file> | sed -n '起始,结束p'` 读取目标段落上下约 80-160 行。只有要全局重写该文件、确认全文结构未知且无法用 `rg` 定位时，才允许整文件读取，并先说明原因。
+7. `/clear` 或 compact 后不要重新整读同一个大文件；先用 `git diff -- <file>`、`rg -n` 或 checkpoint 确认变化点。
 
 ### 浏览器验证
 
