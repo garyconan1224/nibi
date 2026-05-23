@@ -409,14 +409,29 @@ _SUBTITLE_MIME: dict[str, str] = {
 
 
 def _get_transcript_segments(item: WorkspaceItem) -> list[dict[str, Any]]:
-    """从 item.results 中提取 transcript segments（兼容多种字段名）。"""
+    """从 item.results 中提取 transcript segments（兼容多种字段名 + 字段名归一化）。"""
     results = item.results or {}
-    segments = results.get("segments") or results.get("transcript_segments") or results.get("transcript") or []
-    if isinstance(segments, str):
+    raw = results.get("segments") or results.get("transcript_segments") or results.get("transcript") or []
+    if isinstance(raw, str):
         return []
-    if isinstance(segments, list) and segments and isinstance(segments[0], dict):
-        return segments
-    return []
+    if not (isinstance(raw, list) and raw and isinstance(raw[0], dict)):
+        return []
+
+    normalized: list[dict[str, Any]] = []
+    for seg in raw:
+        if not isinstance(seg, dict):
+            continue
+        # 归一化字段名：display 格式用 t_sec，whisper 原始格式用 start/end
+        start = seg.get("start") if "start" in seg else seg.get("t_sec", 0)
+        end = seg.get("end", start)
+        text = str(seg.get("text") or "").strip()
+        if not text:
+            continue
+        entry: dict[str, Any] = {"start": float(start), "end": float(end), "text": text}
+        if seg.get("speaker"):
+            entry["speaker"] = seg["speaker"]
+        normalized.append(entry)
+    return normalized
 
 
 @router.get("/{workspace_id}/items/{item_id}/subtitles")
