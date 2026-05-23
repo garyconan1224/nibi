@@ -183,9 +183,14 @@ git branch --show-current
 - 测试：后端全量 265 passed / 2 skipped；前端 build + vitest 通过；full lint 仍被 47 个存量 error 挡住
 - 已知后续增强：同一 item 重新执行时暂不缓存检测结果，会重新调用一次 LLM
 
-### 🥇 下一步：V3 完成后的收口选择
+### 🥇 下一步：Track A 音频深化
 
-优先建议进 **[D] 开源准备 / repo 收口**：整理 README、环境启动说明、CI、敏感信息检查、历史大文件策略和 lint 基线。若继续补业务能力，则选 **[C] AI 导演** 前先补完整设计稿和生成模型 API 决策。
+按 `docs/ROADMAP.md` §11，V2 + V3 完成后继续做 **A2 + A3 + A4（音频深化）**；`[C] AI 导演` 与 `[D] 开源准备` 仍排在后面，暂不启动。
+
+单 agent 串行建议按低风险到高复杂度推进：
+1. **A4 字幕导出**：后端支持 `.srt` / `.ass` / `.vtt`，前端在 AudioResultPage / VideoResultPage 加导出按钮
+2. **A3 无人声切音乐模式**：VAD 检测无人声占比，用户确认后跳过 ASR 走音乐分析
+3. **A2 说话人编辑修正 UI**：音频结果页说话人轨道、标签编辑、后端 PATCH、speaker mapping 持久化
 
 ### 🥈 补 #6~#8 URL + 收口 F2
 
