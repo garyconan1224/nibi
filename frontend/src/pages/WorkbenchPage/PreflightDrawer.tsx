@@ -113,7 +113,7 @@ export function PreflightDrawer({
       setVisionModelId(cd?.visionModelId ?? '')
       setTextModelId(cd?.textModelId ?? '')
       setSummaryPath('detailed')
-      setVideoTemplate('其它')
+      setVideoTemplate('auto')
       setOutputFormat('summary')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

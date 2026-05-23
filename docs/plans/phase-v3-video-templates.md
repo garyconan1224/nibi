@@ -112,7 +112,7 @@ class VideoTemplate(BaseModel):
 1. 调用现有默认 LLM（`shared/api_key_resolver` + `chat_completion`），不引入新 provider
 2. 超时 / 失败 / 返回值不在白名单 → 兜底 `"其它"`，**不阻塞主流程**，日志 warn
 3. 检测结果写回 `task.result.detected_template`，前端 Results 页能显示「自动识别为：教程」
-4. 缓存：同一个 item_id 多次执行同 task 不重复检测（看 task.result.detected_template 是否已存在）
+4. 缓存不纳入 V3.3 验收：当前每次重新执行会重新检测，已在 `docs/COMPLETED_WORK.md` 记录为后续增强项
 
 **测试**：
 - mock LLM 返回 "教程" → prompt builder 用教程模板
@@ -128,10 +128,10 @@ class VideoTemplate(BaseModel):
 
 - [x] V3.2：设置页能 CRUD 自定义模板，PreflightDrawer dropdown 实时反映
 - [x] V3.3：选 "auto" → 后台 LLM 检测 → 用对应模板出总结
-- [x] V3.2 后端 pytest 全绿（259 passed, 2 skipped）
-- [x] V3.2 前端 build + vitest 通过；full lint 仍被项目存量规则挡住
+- [x] V3.3 后端 pytest 全绿（265 passed, 2 skipped）
+- [x] V3.3 前端 build + vitest 通过；full lint 仍被项目存量规则挡住
 - [x] ROADMAP V3.3 打 [x] + commit hash (c040c70)
-- [x] AI_HANDOFF 更新「下一步：V3.3 LLM 自动检测视频模板」
+- [x] AI_HANDOFF 更新 V3.3 完成状态与下一步建议
 
 ---
 

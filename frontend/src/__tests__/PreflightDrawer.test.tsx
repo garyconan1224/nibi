@@ -262,4 +262,57 @@ describe('PreflightDrawer F4.3', () => {
       state: { url, workspaceId: 'ws-1', itemId: 'item-video' },
     })
   })
+
+  it('路径 1 默认使用 auto 视频模板，触发后端自动检测', async () => {
+    addWorkspaceItemMock.mockResolvedValue(
+      makeWorkspace([
+        makeItem({
+          item_id: 'item-video',
+          type: 'video',
+          source_value: defaultProps.url,
+          name: 'abc',
+        }),
+      ]),
+    )
+    savePreflightMock.mockResolvedValue(makeWorkspace([]))
+    startItemPipelineMock.mockResolvedValue({
+      workspace: makeWorkspace([]),
+      task_id: 'task-video',
+      task_type: 'download',
+    })
+
+    render(
+      <PreflightDrawer
+        {...defaultProps}
+        sniffResult={{
+          primary_type: 'video',
+          possible_types: ['video'],
+          platform: 'bilibili',
+          title: null,
+          thumbnail: null,
+          content_type_header: null,
+        }}
+      />,
+    )
+
+    fireEvent.click(screen.getByLabelText(/路径 1：字幕直接总结/))
+    fireEvent.click(screen.getByRole('button', { name: /开始解析/ }))
+
+    await waitFor(() => {
+      expect(savePreflightMock).toHaveBeenCalledTimes(1)
+    })
+
+    expect(savePreflightMock).toHaveBeenCalledWith(
+      'ws-1',
+      'item-video',
+      expect.objectContaining({
+        tasks: expect.objectContaining({
+          summary: expect.objectContaining({
+            path: 'subtitle',
+            video_template: 'auto',
+          }),
+        }),
+      }),
+    )
+  })
 })
