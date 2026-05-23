@@ -7,10 +7,12 @@ import remarkGfm from 'remark-gfm'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const remarkPlugins: any[] = [remarkGfm]
 
-import { ArrowLeft, FileText, Mic, Music, Pause, Play, Wand2 } from 'lucide-react'
+import { ArrowLeft, Download, FileText, Mic, Music, Pause, Play, Wand2 } from 'lucide-react'
 
+import { toast } from 'sonner'
 import {
   type AudioResult,
+  downloadSubtitles,
   getAudioItemResult,
 } from '@/services/workspaces'
 
@@ -110,6 +112,16 @@ export default function AudioResultPage() {
   const [currentSec, setCurrentSec] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [activeTab, setActiveTab] = useState<'transcript' | 'music' | 'summary' | 'vocal' | 'music_transcribe' | 'prompts'>('transcript')
+  const [exportOpen, setExportOpen] = useState(false)
+
+  const handleExportSubtitles = async (format: 'srt' | 'vtt' | 'ass') => {
+    setExportOpen(false)
+    try {
+      await downloadSubtitles(workspaceId, itemId, format)
+    } catch (err: unknown) {
+      toast.error('字幕导出失败：' + (err instanceof Error ? err.message : '未知错误'))
+    }
+  }
 
   const audioRef = useRef<HTMLAudioElement>(null)
 
@@ -223,6 +235,26 @@ export default function AudioResultPage() {
         {result.source === 'demo_fixture' && (
           <span className="mono" style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'var(--accent-warm)', color: '#fff', fontWeight: 600 }} title="demo fixture">DEMO</span>
         )}
+        <div style={{ marginLeft: 'auto' }} />
+        <div style={{ position: 'relative' }}>
+          <button className="btn-ghost" style={{ height: 28, padding: '0 10px', fontSize: 12 }} onClick={() => setExportOpen(!exportOpen)} title="导出字幕">
+            <Download size={13} /> 字幕
+          </button>
+          {exportOpen && (
+            <div className="vd-dropdown-menu" style={{ position: 'absolute', right: 0, top: 36, zIndex: 50, background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 8, padding: '4px 0', minWidth: 140, boxShadow: '0 4px 16px rgba(0,0,0,.12)' }}>
+              {(['srt', 'vtt', 'ass'] as const).map((fmt) => (
+                <button
+                  key={fmt}
+                  className="btn-ghost"
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 14px', fontSize: 12, borderRadius: 0 }}
+                  onClick={() => handleExportSubtitles(fmt)}
+                >
+                  .{fmt} 字幕
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Tags */}

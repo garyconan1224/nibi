@@ -496,3 +496,29 @@ export async function downloadExport(workspaceId: string, itemId: string): Promi
   a.remove()
   URL.revokeObjectURL(url)
 }
+
+/** GET /workspaces/{id}/items/{itemId}/subtitles?format=srt|vtt|ass — 下载字幕文件 */
+export async function downloadSubtitles(
+  workspaceId: string,
+  itemId: string,
+  format: 'srt' | 'vtt' | 'ass' = 'srt',
+): Promise<void> {
+  const res = await http.get(`${BASE}/${workspaceId}/items/${itemId}/subtitles`, {
+    params: { format },
+    responseType: 'blob',
+  })
+  const disposition = res.headers['content-disposition'] as string | undefined
+  let filename = `subtitles.${format}`
+  if (disposition) {
+    const match = disposition.match(/filename\*=(?:UTF-8''|")?([^";]+)/i)
+    if (match) filename = decodeURIComponent(match[1])
+  }
+  const url = URL.createObjectURL(res.data as Blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}

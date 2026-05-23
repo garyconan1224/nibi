@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Check, Copy, Pause, Play, Settings2, Star } from 'lucide-react'
+import { ArrowLeft, Check, Copy, Download, Pause, Play, Settings2, Star } from 'lucide-react'
 
 import {
   type PromptVersion,
   type VideoResult,
   type VideoResultFrame,
   addPromptVersion,
+  downloadSubtitles,
   // downloadExport, -- N11: 导出功能 UI 隐藏
   getItemResult,
   listPromptVersions,
@@ -71,6 +72,16 @@ export default function VideoResultPage() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerSelection, setPickerSelection] = useState<string[]>([])
   const [promptVersions, setPromptVersions] = useState<PromptVersion[]>([])
+  const [exportOpen, setExportOpen] = useState(false)
+
+  const handleExportSubtitles = async (format: 'srt' | 'vtt' | 'ass') => {
+    setExportOpen(false)
+    try {
+      await downloadSubtitles(workspaceId, itemId, format)
+    } catch (err: unknown) {
+      toast.error('字幕导出失败：' + (err instanceof Error ? err.message : '未知错误'))
+    }
+  }
 
   const videoRef = useRef<HTMLVideoElement>(null)
 
@@ -398,6 +409,26 @@ export default function VideoResultPage() {
           <span className="kw" style={{ fontSize: 10, background: 'var(--accent-green)', color: '#fff', padding: '2px 8px', borderRadius: 6 }}>
             {result.detected_template ? `自动识别：${result.detected_template}` : (result.video_template || '其它')}
           </span>
+          <div style={{ marginLeft: 'auto' }} />
+          <div style={{ position: 'relative' }}>
+            <button className="btn-ghost" style={{ height: 28, padding: '0 10px', fontSize: 12 }} onClick={() => setExportOpen(!exportOpen)} title="导出字幕">
+              <Download size={13} /> 字幕
+            </button>
+            {exportOpen && (
+              <div className="vd-dropdown-menu" style={{ position: 'absolute', right: 0, top: 36, zIndex: 50, background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 8, padding: '4px 0', minWidth: 140, boxShadow: '0 4px 16px rgba(0,0,0,.12)' }}>
+                {(['srt', 'vtt', 'ass'] as const).map((fmt) => (
+                  <button
+                    key={fmt}
+                    className="btn-ghost"
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 14px', fontSize: 12, borderRadius: 0 }}
+                    onClick={() => handleExportSubtitles(fmt)}
+                  >
+                    .{fmt} 字幕
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Tags */}
@@ -487,6 +518,26 @@ export default function VideoResultPage() {
               DEMO
             </span>
           )}
+          <div style={{ marginLeft: 'auto' }} />
+          <div style={{ position: 'relative' }}>
+            <button className="btn-ghost" style={{ height: 28, padding: '0 10px', fontSize: 12 }} onClick={() => setExportOpen(!exportOpen)} title="导出字幕">
+              <Download size={13} /> 字幕
+            </button>
+            {exportOpen && (
+              <div className="vd-dropdown-menu" style={{ position: 'absolute', right: 0, top: 36, zIndex: 50, background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 8, padding: '4px 0', minWidth: 140, boxShadow: '0 4px 16px rgba(0,0,0,.12)' }}>
+                {(['srt', 'vtt', 'ass'] as const).map((fmt) => (
+                  <button
+                    key={fmt}
+                    className="btn-ghost"
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 14px', fontSize: 12, borderRadius: 0 }}
+                    onClick={() => handleExportSubtitles(fmt)}
+                  >
+                    .{fmt} 字幕
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 标签展示 */}
