@@ -4,7 +4,37 @@
 >
 > **维护规则**：每完成一个子任务，在本文件**追加**一段（不删旧记录），格式见下方"记录模板"。
 >
-> Last updated: 2026-05-21 (N7b 路径 1 后端 + 结果契约修复)
+> Last updated: 2026-05-23 (V3.3 LLM 自动检测视频模板)
+
+---
+
+## Phase V3.3 – LLM 自动检测视频模板
+
+**完成日期**：2026-05-23
+**模型 / 工具**：DS v4-pro (ccswitch)
+**分支**：main
+**Commit**：c040c70
+
+### 影响范围
+- 后端：`pipeline_tasks.py`（新增 `_detect_video_template` + `_run_subtitle_summary` auto 分支）
+- 前端：`preflightTasks.ts`（类型 + 默认值 + 选项列表）、`PreflightDrawer.tsx`（默认值）、`VideoResultPage.tsx`（显示自动识别标签）、`templateStore.ts`（getOptions 加 auto）
+- 类型：`services/workspaces.ts` VideoResult 接口新增 `detected_template` 字段
+- 测试：新增 6 条用例子测（白名单/未知词/异常/无模型/自定义模板/端到端）
+
+### 关键改动
+- `_detect_video_template(title, transcript_preview)`：用默认 LLM 单轮分类，prompt 含内置 6 类 + 用户自定义模板名。返回白名单内名称或 "其它"。temperature=0.1 / max_tokens=20 以最小成本完成。
+- `_run_subtitle_summary` auto 分支：video_template="auto" 时先调 detect，检测失败/无 API key 兜底 "其它"，不阻塞主流程。
+- 前端 `VIDEO_TEMPLATE_OPTIONS` 第一位加 "auto"，默认值从 "其它" 改为 "auto"。
+- `VideoResultPage` 当 `detected_template` 存在时显示 "自动识别：教程" 而非仅 "教程"。
+
+### 为什么这么做
+- **用户体验**：新用户粘 URL 默认走 auto，省去手动选模板这一步。power user 仍可手动覆盖。
+- **安全性**：检测是 best-effort，超时/异常/返回非白名单值全部兜底 "其它"，绝不阻塞主流程。
+- **成本**：分类 prompt 极短（~100 tokens），max_tokens=20，单次调用成本可忽略。
+
+### 留给后续的影响
+- `detected_template` 写入 task.result，但同名 task 重新执行会重新检测（无缓存）。后续可加 item_id 粒度缓存。
+- auto 检测依赖 API key，无 key 时直接兜底 "其它"，用户可通过手动选模板绕过。
 
 ---
 

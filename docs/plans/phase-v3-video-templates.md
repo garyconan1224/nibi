@@ -1,7 +1,9 @@
 ---
 name: phase-v3-video-templates
-status: ready
+status: done
 phase: V3 (视频类型模板库)
+commits: [702177d, c040c70]
+completed_date: 2026-05-23
 track: V (Video)
 prerequisite: V2.2/V2.3 已完成（3b43a59）
 model: V3.1 已隐式完成 / V3.2 Sonnet 4.6 / V3.3 ⭐ DS v4-pro
@@ -125,10 +127,10 @@ class VideoTemplate(BaseModel):
 ## 完工标准
 
 - [x] V3.2：设置页能 CRUD 自定义模板，PreflightDrawer dropdown 实时反映
-- [ ] V3.3：选 "auto" → 后台 LLM 检测 → 用对应模板出总结
+- [x] V3.3：选 "auto" → 后台 LLM 检测 → 用对应模板出总结
 - [x] V3.2 后端 pytest 全绿（259 passed, 2 skipped）
 - [x] V3.2 前端 build + vitest 通过；full lint 仍被项目存量规则挡住
-- [ ] ROADMAP V3.3 打 [x] + commit hash
+- [x] ROADMAP V3.3 打 [x] + commit hash (c040c70)
 - [x] AI_HANDOFF 更新「下一步：V3.3 LLM 自动检测视频模板」
 
 ---
