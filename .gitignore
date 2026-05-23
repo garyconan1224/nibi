@@ -45,3 +45,7 @@ GEMINI.md
 *.zip
 .DS_Store
 *.swp
+
+# CodeGraph Index
+.codegraph/
+
