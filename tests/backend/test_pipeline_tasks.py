@@ -544,3 +544,185 @@ class TestVideoSummaryOutputFormat:
         run_batch.assert_not_called()
         assert result["summary_path"] == "subtitle"
         assert result["output_format"] == "key_points"
+
+
+# ── V3.3: _detect_video_template 单元测试 ─────────────────────────────────
+
+
+def _mock_detect_provider(chat_return: str) -> MagicMock:
+    """构造一个会返回 chat_return 的 LLM provider mock。"""
+    provider = MagicMock()
+    provider.chat.return_value = chat_return
+    registry = MagicMock()
+    registry.resolve_default_profile.return_value = MagicMock(
+        default_models=MagicMock(get=MagicMock(return_value="test-model")),
+    )
+    registry.build.return_value = provider
+    return provider, registry
+
+
+class TestDetectVideoTemplate:
+    """V3.3 _detect_video_template 白名单 / 兜底 / 自定义模板。"""
+
+    def test_detect_returns_valid_template(self) -> None:
+        """LLM 返回白名单内的模板名 → 直接返回。"""
+        from backend.app.services.pipeline_tasks import _detect_video_template
+
+        provider, registry = _mock_detect_provider("教程")
+        settings = _mock_settings("sk-test")
+
+        with (
+            patch("backend.app.services.pipeline_tasks.load_settings", return_value=settings),
+            patch("backend.app.services.pipeline_tasks.create_default_registry", return_value=registry),
+        ):
+            result = _detect_video_template("Python 入门", "今天我们来学习 Python 的基础语法")
+            assert result == "教程"
+
+    def test_detect_returns_unknown_word_fallback(self) -> None:
+        """LLM 返回白名单外的词 → 兜底「其它」。"""
+        from backend.app.services.pipeline_tasks import _detect_video_template
+
+        provider, registry = _mock_detect_provider("新闻联播")
+        settings = _mock_settings("sk-test")
+
+        with (
+            patch("backend.app.services.pipeline_tasks.load_settings", return_value=settings),
+            patch("backend.app.services.pipeline_tasks.create_default_registry", return_value=registry),
+        ):
+            result = _detect_video_template("测试标题", "测试转写内容")
+            assert result == "其它"
+
+    def test_detect_llm_raises_fallback(self) -> None:
+        """LLM 调用抛异常 → 兜底「其它」。"""
+        from backend.app.services.pipeline_tasks import _detect_video_template
+
+        provider = MagicMock()
+        provider.chat.side_effect = RuntimeError("connection timeout")
+        registry = MagicMock()
+        registry.resolve_default_profile.return_value = MagicMock(
+            default_models=MagicMock(get=MagicMock(return_value="test-model")),
+        )
+        registry.build.return_value = provider
+        settings = _mock_settings("sk-test")
+
+        with (
+            patch("backend.app.services.pipeline_tasks.load_settings", return_value=settings),
+            patch("backend.app.services.pipeline_tasks.create_default_registry", return_value=registry),
+        ):
+            result = _detect_video_template("标题", "转写内容")
+            assert result == "其它"
+
+    def test_detect_no_model_configured_fallback(self) -> None:
+        """未配置 chat model → 兜底「其它」。"""
+        from backend.app.services.pipeline_tasks import _detect_video_template
+
+        registry = MagicMock()
+        registry.resolve_default_profile.return_value = MagicMock(
+            default_models=MagicMock(get=MagicMock(return_value="")),
+        )
+        settings = _mock_settings("sk-test")
+        settings.text_model = ""
+
+        with (
+            patch("backend.app.services.pipeline_tasks.load_settings", return_value=settings),
+            patch("backend.app.services.pipeline_tasks.create_default_registry", return_value=registry),
+        ):
+            result = _detect_video_template("标题", "转写内容")
+            assert result == "其它"
+
+    def test_detect_prompt_includes_custom_templates(self) -> None:
+        """V3.2 自定义模板名出现在检测 prompt 中。"""
+        from backend.app.services.pipeline_tasks import _detect_video_template
+
+        captured_prompt: list[str] = []
+
+        def _record_chat(request):
+            captured_prompt.append(request.messages[0]["content"])
+            return "学术讲座"
+
+        provider = MagicMock()
+        provider.chat.side_effect = _record_chat
+        registry = MagicMock()
+        registry.resolve_default_profile.return_value = MagicMock(
+            default_models=MagicMock(get=MagicMock(return_value="test-model")),
+        )
+        registry.build.return_value = provider
+        settings = _mock_settings("sk-test")
+
+        with (
+            patch("backend.app.services.pipeline_tasks.load_settings", return_value=settings),
+            patch("backend.app.services.pipeline_tasks.create_default_registry", return_value=registry),
+            patch("backend.app.services.pipeline_tasks.list_video_templates", return_value={
+                "教程": "...", "Vlog": "...", "访谈": "...", "影视点评": "...", "产品评测": "...", "其它": "...",
+                "学术讲座": "custom prompt",
+            }),
+        ):
+            result = _detect_video_template("深度学习入门", "Transformer 架构的核心是自注意力机制")
+            assert result == "学术讲座"
+            assert captured_prompt
+            assert "学术讲座" in captured_prompt[0]
+
+    def test_detect_auto_in_subtitle_summary(self, tmp_path: Path) -> None:
+        """_run_subtitle_summary 传入 video_template='auto' → 自动检测后使用检测结果。"""
+        from backend.app.services.pipeline_tasks import handle_analyze_task
+
+        fake_video = tmp_path / "videos" / "test.mp4"
+        fake_video.parent.mkdir(parents=True, exist_ok=True)
+        fake_video.touch()
+        json_dir = tmp_path / "json"
+
+        runner = MagicMock()
+        record = TaskRecord(
+            task_id="auto-detect",
+            project_id="default_project",
+            task_type="analyze",
+            payload={
+                "summary_path": "subtitle",
+                "video_basenames": [fake_video.name],
+                "video_template": "auto",
+                "api_key": "sk-test",
+            },
+        )
+
+        # Mock detect → "访谈"，mock summary LLM 返回空（跳过长 prompt 验证）
+        def _fake_chat(request):
+            content = request.messages[0]["content"]
+            if "视频内容分类助手" in content:
+                return "访谈"
+            return "这是自动检测后的摘要内容"
+
+        provider = MagicMock()
+        provider.chat.side_effect = _fake_chat
+        registry = MagicMock()
+        registry.resolve_default_profile.return_value = MagicMock(
+            default_models=MagicMock(get=MagicMock(return_value="test-model")),
+        )
+        registry.build.return_value = provider
+        settings = _mock_settings("sk-test")
+
+        with (
+            patch("backend.app.services.pipeline_tasks.load_settings", return_value=settings),
+            patch("backend.app.services.pipeline_tasks.create_default_registry", return_value=registry),
+            patch("backend.app.services.pipeline_tasks.get_workspace_videos_dir",
+                  return_value=fake_video.parent),
+            patch("backend.app.services.pipeline_tasks.get_workspace_json_dir",
+                  return_value=json_dir),
+            patch("backend.app.services.pipeline_tasks.find_videos",
+                  return_value=[fake_video]),
+            patch("backend.app.services.pipeline_tasks.run_batch_analysis"),
+            patch("backend.app.services.pipeline_tasks._extract_audio_from_video",
+                  return_value=json_dir / "test.wav"),
+            patch("backend.app.services.asr_fast_whisper.is_fast_whisper_available",
+                  return_value=True),
+            patch("backend.app.services.asr_fast_whisper.transcribe_file_with_fast_whisper",
+                  return_value=(
+                      "今天我们采访了知名导演，聊聊电影创作背后的故事",
+                      [{"start": 0.0, "end": 5.0, "text": "今天我们采访了知名导演，聊聊电影创作背后的故事"}],
+                      5.0,
+                  )),
+        ):
+            result = handle_analyze_task(record, runner)
+
+        assert result["video_template"] == "访谈"
+        assert result["detected_template"] == "访谈"
+        assert result["summary"] == "这是自动检测后的摘要内容"

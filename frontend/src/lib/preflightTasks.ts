@@ -24,10 +24,10 @@ export interface VideoFramePromptsParams {
 
 export type VideoSummaryPath = 'subtitle' | 'detailed' | 'video_model'
 export type SummaryDepth = 'brief' | 'normal' | 'deep'
-export type VideoTemplate = '教程' | 'Vlog' | '访谈' | '影视点评' | '产品评测' | '其它'
+export type VideoTemplate = 'auto' | '教程' | 'Vlog' | '访谈' | '影视点评' | '产品评测' | '其它'
 export type VideoOutputFormat = 'summary' | 'key_points' | 'golden_quotes' | 'paragraph_rewrite'
 
-export const VIDEO_TEMPLATE_OPTIONS: VideoTemplate[] = ['教程', 'Vlog', '访谈', '影视点评', '产品评测', '其它']
+export const VIDEO_TEMPLATE_OPTIONS: VideoTemplate[] = ['auto', '教程', 'Vlog', '访谈', '影视点评', '产品评测', '其它']
 export const OUTPUT_FORMAT_OPTIONS: { value: VideoOutputFormat; label: string; desc: string }[] = [
   { value: 'summary', label: '摘要', desc: '全文结构化摘要' },
   { value: 'key_points', label: '要点', desc: '编号要点列表' },
@@ -128,7 +128,7 @@ export const DEFAULT_VIDEO_SUMMARY: VideoSummaryParams = {
   enabled: true,
   path: 'detailed',
   depth: 'normal',
-  video_template: '其它',
+  video_template: 'auto',
   output_format: 'summary',
 }
 

@@ -256,6 +256,8 @@ export interface VideoResult {
   summary?: string
   /** N7b 路径 1: 视频类型模板 */
   video_template?: string
+  /** V3.3: LLM 自动检测到的模板名 */
+  detected_template?: string
 }
 
 /** GET /workspaces/{id}/items/{itemId}/result — 视频三轨聚合数据 */

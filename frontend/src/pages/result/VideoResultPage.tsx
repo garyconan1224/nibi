@@ -396,7 +396,7 @@ export default function VideoResultPage() {
             VIDEO · 字幕总结模式
           </span>
           <span className="kw" style={{ fontSize: 10, background: 'var(--accent-green)', color: '#fff', padding: '2px 8px', borderRadius: 6 }}>
-            {result.video_template || '其它'}
+            {result.detected_template ? `自动识别：${result.detected_template}` : (result.video_template || '其它')}
           </span>
         </div>
 
@@ -413,7 +413,7 @@ export default function VideoResultPage() {
               <div className="vd-card-head">
                 <h2>内容摘要</h2>
                 <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>
-                  {result.video_template || '其它'} · {transcript.length} 段转录
+                  {result.detected_template ? `自动识别：${result.detected_template}` : (result.video_template || '其它')} · {transcript.length} 段转录
                 </span>
               </div>
               <div className="vd-summary-text">{result.summary}</div>

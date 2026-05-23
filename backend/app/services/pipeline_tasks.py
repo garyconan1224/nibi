@@ -194,6 +194,59 @@ def _extract_audio_from_video(
     return output_path
 
 
+def _detect_video_template(
+    title: str,
+    transcript_preview: str,
+) -> str:
+    """V3.3: 用 LLM 自动检测视频类型模板。失败时返回 "其它"。"""
+    all_templates = list_video_templates()
+    builtin_names = set(_BUILTIN_TEMPLATE_PROMPTS.keys())
+    custom_names = [n for n in all_templates if n not in builtin_names]
+    custom_str = "、".join(custom_names) if custom_names else "无"
+
+    prompt = (
+        "你是视频内容分类助手。给定视频标题和转写前 500 字，从以下类别中选一个最匹配的：\n"
+        "教程 / Vlog / 访谈 / 影视点评 / 产品评测 / 其它\n\n"
+        f"如果是用户自定义模板（下面列出），优先匹配它们：\n{custom_str}\n\n"
+        f"标题：{title}\n"
+        f"转写片段：{transcript_preview}\n\n"
+        "仅返回类别名（中文），不解释。"
+    )
+
+    try:
+        settings = load_settings()
+        registry = create_default_registry()
+        profile = registry.resolve_default_profile(settings, "chat")
+        provider = registry.build(profile)
+        model = (
+            profile.default_models.get("chat")
+            or (settings.text_model or "").strip()
+        )
+        if not model:
+            return "其它"
+
+        response = provider.chat(
+            ChatRequest(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+                max_tokens=20,
+            )
+        )
+        result = response.strip()
+
+        valid_names = set(all_templates.keys())
+        if result in valid_names:
+            return result
+        # Fuzzy match: check prefix overlap
+        for name in valid_names:
+            if result.startswith(name) or name.startswith(result):
+                return name
+        return "其它"
+    except Exception:
+        return "其它"
+
+
 def _build_video_summary_prompt(
     transcript: str,
     video_template: str = "其它",
@@ -444,6 +497,24 @@ def _run_subtitle_summary(
     output_format = str(payload.get("output_format") or "summary").strip()
     summary = ""
 
+    # V3.3: auto-detect video template
+    detected_template = ""
+    if video_template == "auto" and transcript_text.strip():
+        if api_key:
+            try:
+                video_title = video_path.stem
+                detected = _detect_video_template(video_title, transcript_text[:500])
+                if detected:
+                    detected_template = detected
+                    video_template = detected
+                    log(f"🤖 自动检测模板 → {detected}")
+            except Exception as e:
+                log(f"⚠️ 模板自动检测失败，兜底「其它」: {e}")
+                video_template = "其它"
+        else:
+            video_template = "其它"
+            log("⚠️ 无 API key，「auto」模式兜底「其它」")
+
     if api_key:
         try:
             runner.set_progress(task_id, 0.98, "LLM 生成摘要...")
@@ -492,6 +563,7 @@ def _run_subtitle_summary(
         "transcript_segments": transcript_segments,
         "summary": summary,
         "video_template": video_template,
+        "detected_template": detected_template,
         "output_format": output_format,
         "duration_sec": whisper_duration,
     }

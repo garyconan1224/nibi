@@ -77,7 +77,7 @@ export function PreflightDrawer({
   const [textModelId, setTextModelId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [summaryPath, setSummaryPath] = useState<SummaryPath>('detailed')
-  const [videoTemplate, setVideoTemplate] = useState('其它')
+  const [videoTemplate, setVideoTemplate] = useState('auto')
   const [outputFormat, setOutputFormat] = useState<VideoOutputFormat>('summary')
   const navigate = useNavigate()
 

@@ -36,6 +36,6 @@ export const useTemplateStore = create<TemplateStoreState>((set, get) => ({
   },
 
   getOptions: () => {
-    return get().templates.map((t) => t.name)
+    return ['auto', ...get().templates.map((t) => t.name)]
   },
 }))
