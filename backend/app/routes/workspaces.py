@@ -606,43 +606,12 @@ _AUTO_CREATE_LOGGER = logging.getLogger(f"{__name__}.auto_create")
 
 
 def _generate_workspace_name(hint_url: str | None, hint_text: str | None) -> str:
-    """用 LLM 根据 hint 生成 4-12 个汉字的工作空间名称；失败时 fallback。"""
+    """根据 hint URL/text 生成工作空间名称。
+
+    不调用 LLM（同步 LLM 调用可能耗时 20s+，触发 axios 15s 超时）。
+    以 hostname + 时间戳作为确定性 fallback。
+    """
     hint = (hint_url or hint_text or "").strip()
-    if hint:
-        prompt = (
-            "根据下面的 URL 或文本，给一个 4-12 个汉字的简短中文工作空间名称"
-            "（不要引号、不要标点）：\n" + hint
-        )
-    else:
-        prompt = "给一个 4-12 个汉字的简短中文工作空间名称（不要引号、不要标点）"
-
-    try:
-        from src.vidmirror.core.providers import ChatRequest
-        from src.vidmirror.core.providers.registry import create_default_registry
-
-        reg = create_default_registry()
-        from shared.settings_store import load_settings
-
-        settings = load_settings()
-        profile = reg.resolve_default_profile(settings, "chat")
-        provider = reg.build(profile)
-        model = (profile.default_models.get("chat") or "").strip()
-        if not model:
-            raise ValueError("no default chat model configured")
-        resp = provider.chat(ChatRequest(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-            max_tokens=64,
-        ))
-        name = resp.strip().strip("「」\"'。，、")
-        if 2 <= len(name) <= 20:
-            return name
-        _AUTO_CREATE_LOGGER.warning("LLM returned unexpected name length: %r", name)
-    except Exception:
-        _AUTO_CREATE_LOGGER.debug("LLM name generation failed, using fallback", exc_info=True)
-
-    # fallback: hostname + 时间
     hostname = ""
     if hint_url:
         try:
