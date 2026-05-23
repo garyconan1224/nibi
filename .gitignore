@@ -39,6 +39,7 @@ __pycache__/
 
 # Local agent/tool instructions
 GEMINI.md
+.claude/current-task.md
 
 # Design source archives (already extracted to docs/design/)
 *.zip

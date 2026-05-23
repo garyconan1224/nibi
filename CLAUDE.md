@@ -121,6 +121,25 @@ cd frontend && pnpm build       # tsc -b && vite build
 
 Skill 是能力入口，不是默认流程。需要浏览器、测试、设计、PDF 等专门流程时可以用 skill，但每个任务只调用一个最相关的 skill。Nibi 本地页面 QA 优先使用 `scripts/browser_smoke.py`；脚本覆盖不了的真实交互，再调用 `webapp-testing` 或 `playwright`。不要同时加载两个重叠 skill。
 
+### Agent / subagent 使用
+
+默认不要为小改动开 Agent。优先主上下文用 `rg`、小片段读取、直接编辑、项目测试解决。只有任务可并行拆分且返回结果会明显小于主上下文自己探索时，才开 Agent。
+
+开 Agent 时必须限制范围：只给一个明确问题、相关路径、输出上限；返回只要结论、`file:line` 证据、跑过的命令和下一步建议。不要让 Agent 返回完整文件、大段 diff、截图内容、全库扫描日志。一次默认最多 1 个 Agent；确实独立的调研最多 2 个。
+
+### `/clear` 接力
+
+用户会经常 `/clear`。Claude Code 终端在长任务、跨文件实现、或用户准备 `/clear` 前，维护本地 checkpoint：`.claude/current-task.md`。这个文件只放接力信息，不进 git。
+
+checkpoint 保持短小，只写：
+- 当前目标和分支状态
+- 已改文件
+- 已跑命令/测试及结果
+- 当前失败点或阻塞点
+- 下一步 1-3 个动作
+
+`/clear` 后恢复上下文时，先跑 git 状态检查，再读 `CLAUDE.md` 和 `.claude/current-task.md`；不要重新全量读取 `docs/AI_HANDOFF.md`、`docs/ROADMAP.md`、大 TSX 文件或源 PNG。
+
 ### 会话边界
 
 一个会话只做一个明确子任务。完成子任务后先测试、总结、commit 或等用户确认，再开新会话继续下一项。不要把 L1/L2/L3、临时 debug、视觉 QA、文档同步连续塞进同一个上下文。

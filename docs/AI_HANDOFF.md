@@ -208,7 +208,9 @@ git branch --show-current
 - 测试：11 个 A3 单测通过；全量 279 passed / 2 skipped
 
 单 agent 串行建议：
-1. **Track T 文字深化**：按 `docs/ROADMAP.md` §7 Track T，文字 3 种输入 + 长文分段 + 4 类并行任务前端交互落地
+1. **Track T 文字深化**：先做 T1 文字结果页升级。用户已拍板两条硬要求：
+   - 点击金句 / 要点必须精确跳到左侧原文位置；金句需 substring 校验，要点需 `source_excerpt` 锚点，不能做近似跳转。
+   - 「改写 · 翻译」tab 内做逐段对照：左原文段落，右当前改写 / 译文，按段落序号稳定对齐。
 
 ### 🥈 补 #6~#8 URL + 收口 F2
 
