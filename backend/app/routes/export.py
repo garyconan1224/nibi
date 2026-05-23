@@ -22,6 +22,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
+from shared.audio_analyzer import export_srt, export_vtt, export_ass
 from backend.app.models.workspace import ItemType, WorkspaceItem, WorkspaceRecord
 from backend.app.services.video_result_demo import build_demo_video_result
 from backend.app.routes.workspaces import _store, _sync_item_with_tasks
@@ -396,5 +397,70 @@ def export_workspace_item(workspace_id: str, item_id: str) -> StreamingResponse:
         media_type="application/zip",
         headers={
             "Content-Disposition": f"attachment; filename*= {filename_star}",
+        },
+    )
+
+
+_SUBTITLE_MIME: dict[str, str] = {
+    "srt": "text/plain; charset=utf-8",
+    "vtt": "text/vtt; charset=utf-8",
+    "ass": "text/plain; charset=utf-8",
+}
+
+
+def _get_transcript_segments(item: WorkspaceItem) -> list[dict[str, Any]]:
+    """从 item.results 中提取 transcript segments（兼容多种字段名）。"""
+    results = item.results or {}
+    segments = results.get("segments") or results.get("transcript_segments") or results.get("transcript") or []
+    if isinstance(segments, str):
+        return []
+    if isinstance(segments, list) and segments and isinstance(segments[0], dict):
+        return segments
+    return []
+
+
+@router.get("/{workspace_id}/items/{item_id}/subtitles")
+def export_subtitles(
+    workspace_id: str,
+    item_id: str,
+    format: str = "srt",
+) -> StreamingResponse:
+    """导出字幕文件（独立 .srt / .vtt / .ass 下载）。"""
+    if format not in ("srt", "vtt", "ass"):
+        raise HTTPException(status_code=400, detail=f"unsupported format: {format!r}, use srt/vtt/ass")
+
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+
+    overlay = _sync_item_with_tasks(item)
+    if overlay and overlay.get("results") and not item.results:
+        item.results = overlay["results"]
+
+    segments = _get_transcript_segments(item)
+    if not segments:
+        raise HTTPException(status_code=404, detail="no transcript segments found for this item")
+
+    title = item.name or "untitled"
+
+    if format == "srt":
+        content = export_srt(segments)
+        ext = "srt"
+    elif format == "vtt":
+        content = export_vtt(segments)
+        ext = "vtt"
+    else:
+        content = export_ass(segments, title=title)
+        ext = "ass"
+
+    safe_title = title.replace("/", "_").replace("\\", "_").replace(" ", "_")[:50]
+    filename = f"{safe_title}.{ext}"
+
+    return StreamingResponse(
+        io.BytesIO(content.encode("utf-8")),
+        media_type=_SUBTITLE_MIME[format],
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
         },
     )

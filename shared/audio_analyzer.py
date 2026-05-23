@@ -337,6 +337,75 @@ def export_txt(
     return "\n".join(lines)
 
 
+def export_vtt(
+    segments: List[Dict[str, Any]],
+    speaker_map: Optional[Dict[Tuple[float, float], str]] = None,
+) -> str:
+    """transcript_segments → WebVTT 字符串。"""
+    lines: List[str] = ["WEBVTT", ""]
+    for seg in segments:
+        try:
+            start = float(seg.get("start") or 0.0)
+            end = float(seg.get("end") or start)
+        except (TypeError, ValueError):
+            continue
+        text = str(seg.get("text") or "").strip()
+        if not text:
+            continue
+        speaker = None
+        if speaker_map is not None:
+            speaker = speaker_map.get((start, end))
+        if speaker is None:
+            speaker = seg.get("speaker")
+        line_text = f"<v {speaker}>{text}</v>" if speaker else text
+        lines.append(f"{_fmt_vtt_time(start)} --> {_fmt_vtt_time(end)}")
+        lines.append(line_text)
+        lines.append("")
+    return "\n".join(lines)
+
+
+def export_ass(
+    segments: List[Dict[str, Any]],
+    title: str = "Nibi Export",
+    speaker_map: Optional[Dict[Tuple[float, float], str]] = None,
+) -> str:
+    """transcript_segments → ASS (Advanced SubStation Alpha) 字符串。"""
+    header = _ASS_HEADER.format(title=title)
+    lines: List[str] = [header]
+    for seg in segments:
+        try:
+            start = float(seg.get("start") or 0.0)
+            end = float(seg.get("end") or start)
+        except (TypeError, ValueError):
+            continue
+        text = str(seg.get("text") or "").strip()
+        if not text:
+            continue
+        speaker = None
+        if speaker_map is not None:
+            speaker = speaker_map.get((start, end))
+        if speaker is None:
+            speaker = seg.get("speaker")
+        line_text = f"{speaker}: {text}" if speaker else text
+        lines.append(f"Dialogue: 0,{_fmt_ass_time(start)},{_fmt_ass_time(end)},Default,,0,0,0,,{line_text}")
+    return "\n".join(lines)
+
+
+_ASS_HEADER = """[Script Info]
+Title: {title}
+ScriptType: v4.00+
+WrapStyle: 0
+PlayResX: 384
+PlayResY: 288
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,20,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"""
+
+
 def _fmt_srt_time(sec: float) -> str:
     if sec < 0:
         sec = 0.0
@@ -346,6 +415,28 @@ def _fmt_srt_time(sec: float) -> str:
     m = (s_total % 3600) // 60
     s = s_total % 60
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+def _fmt_vtt_time(sec: float) -> str:
+    if sec < 0:
+        sec = 0.0
+    ms = int(round((sec - int(sec)) * 1000))
+    s_total = int(sec)
+    h = s_total // 3600
+    m = (s_total % 3600) // 60
+    s = s_total % 60
+    return f"{h:02d}:{m:02d}:{s:02d}.{ms:03d}"
+
+
+def _fmt_ass_time(sec: float) -> str:
+    if sec < 0:
+        sec = 0.0
+    cs = int(round((sec - int(sec)) * 100))
+    s_total = int(sec)
+    h = s_total // 3600
+    m = (s_total % 3600) // 60
+    s = s_total % 60
+    return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
 
 # ── 把说话人 segments 映射到 transcript segments ──────────────
