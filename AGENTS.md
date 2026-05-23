@@ -111,6 +111,8 @@ git branch --show-current
 - Respect server/client boundaries in Next.js.
 - Keep components focused and avoid unnecessary prop drilling or effect-heavy state flow.
 - Handle loading, empty, error, and success states cleanly.
+- **Remix Design Spec**: UI modifications and component generation must strictly adhere to the Remix tokens in `docs/DESIGN_SYSTEM.md`. Hardcoded color/border values are prohibited; always use the predefined CSS variable system.
+- **Runtime & Business Specs**: Align both frontend logic and backend services with the dependencies (e.g., summary path 2 forces frame analysis), VAD thresholds, state transitions, and step skip rules documented in `CLAUDE.md`.
 
 ## Skill Index
 
