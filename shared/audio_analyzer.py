@@ -468,3 +468,180 @@ def assign_speakers_to_segments(
             out["speaker"] = best[1]
         enriched.append(out)
     return enriched
+
+
+# ── A3.3: 多段音乐 6 维度切分 ─────────────────────────────────
+
+
+@dataclass
+class MusicSegment:
+    """A3.3: 单个音乐片段的 6 维度分析结果。"""
+    start: float
+    end: float
+    bpm: float
+    key: str
+    energy_mean: float
+    spectral_centroid_mean: float
+    # 6 维度（4 个 LLM 推断 + 2 个声学）
+    genre: str = ""           # 风格
+    mood: str = ""            # 情绪
+    instruments: List[str] = field(default_factory=list)  # 乐器
+    atmosphere: str = ""      # 氛围
+    # 生成类输出
+    music_prompt: str = ""
+    similar_references: List[str] = field(default_factory=list)
+    scenarios: List[str] = field(default_factory=list)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "start": round(self.start, 2),
+            "end": round(self.end, 2),
+            "bpm": round(self.bpm, 1),
+            "key": self.key,
+            "energy_mean": round(self.energy_mean, 4),
+            "spectral_centroid_mean": round(self.spectral_centroid_mean, 1),
+            "genre": self.genre,
+            "mood": self.mood,
+            "instruments": list(self.instruments),
+            "atmosphere": self.atmosphere,
+            "music_prompt": self.music_prompt,
+            "similar_references": list(self.similar_references),
+            "scenarios": list(self.scenarios),
+        }
+
+
+def segment_audio(
+    audio_path: str,
+    min_duration: float = 30.0,
+    fallback_duration: float = 90.0,
+) -> List[Tuple[float, float]]:
+    """用 librosa onset + RMS 能量变化做音频分段。
+
+    返回 (start_sec, end_sec) 列表，覆盖 0 到总时长。
+    检测不到显著边界时回退固定 90 秒窗。
+    """
+    try:
+        import librosa  # type: ignore
+        import numpy as np
+    except ImportError:
+        logger.warning("librosa 未安装，无法分段")
+        return []
+
+    try:
+        y, sr = librosa.load(audio_path, sr=None, mono=True)
+        total = float(librosa.get_duration(y=y, sr=sr))
+    except Exception as err:
+        logger.warning(f"音频加载失败，无法分段：{err}")
+        return []
+
+    if total < min_duration:
+        return [(0.0, total)]
+
+    try:
+        # onset 检测 → 候选边界时间
+        onset_frames = librosa.onset.onset_detect(
+            y=y, sr=sr, backtrack=True, units="frames"
+        )
+        onset_times = librosa.frames_to_time(onset_frames, sr=sr).tolist()
+
+        # RMS 能量 → 找能量显著变化的点
+        rms = librosa.feature.rms(y=y)[0]
+        rms_times = librosa.frames_to_time(range(len(rms)), sr=sr)
+        # 能量变化率 > 30% 的位置作为候选边界
+        rms_diff = np.abs(np.diff(rms) / np.maximum(rms[:-1], 1e-8))
+        threshold = 0.3
+        energy_boundary_idx = np.where(rms_diff > threshold)[0]
+        energy_boundary_times = rms_times[energy_boundary_idx + 1].tolist()
+
+        # 合并两类候选边界
+        candidates = sorted(set(
+            round(t, 1) for t in onset_times + energy_boundary_times
+            if min_duration < t < total - min_duration
+        ))
+    except Exception as err:
+        logger.warning(f"边界检测失败：{err}")
+        candidates = []
+
+    # 构造分段
+    if len(candidates) < 1:
+        # 回退：固定时长窗
+        boundaries: List[float] = []
+        t = 0.0
+        while t + fallback_duration < total:
+            t += fallback_duration
+            boundaries.append(t)
+    else:
+        # 合并过短的相邻段（< min_duration）
+        boundaries = [candidates[0]]
+        for c in candidates[1:]:
+            if c - boundaries[-1] < min_duration:
+                boundaries[-1] = c  # 合并：用新边界替代旧边界
+            else:
+                boundaries.append(c)
+
+    segments: List[Tuple[float, float]] = []
+    prev = 0.0
+    for b in boundaries:
+        if b - prev >= min_duration:
+            segments.append((prev, b))
+            prev = b
+    if total - prev > 1.0:  # 收尾残留 > 1s
+        segments.append((prev, total))
+    elif segments:
+        # 尾端短残留合并到最后一段
+        segments[-1] = (segments[-1][0], total)
+
+    if not segments:
+        segments.append((0.0, total))
+
+    return segments
+
+
+def analyze_music_segments(
+    audio_path: str,
+    boundaries: List[Tuple[float, float]],
+) -> List[MusicSegment]:
+    """对每个分段切片跑 librosa 声学分析（不含 LLM）。
+
+    返回 MusicSegment 列表，仅声学字段有值；
+    风格/情绪/乐器/氛围 留作后续 LLM enrich（A3.3b）。
+    """
+    try:
+        import librosa  # type: ignore
+        import numpy as np
+    except ImportError:
+        logger.warning("librosa 未安装，跳过多段分析")
+        return []
+
+    segments: List[MusicSegment] = []
+    for start, end in boundaries:
+        try:
+            y, sr = librosa.load(audio_path, sr=None, mono=True, offset=start, duration=end - start)
+            dur = float(end - start)
+            tempo_raw, _ = librosa.beat.beat_track(y=y, sr=sr)
+            tempo = float(np.atleast_1d(tempo_raw)[0])
+            rms_val = float(np.mean(librosa.feature.rms(y=y)))
+            centroid = float(np.mean(librosa.feature.spectral_centroid(y=y, sr=sr)))
+            # 调性估计
+            key_name = ""
+            try:
+                chroma = librosa.feature.chroma_cqt(y=y, sr=sr)
+                chroma_mean = chroma.mean(axis=1)
+                key_idx = int(np.argmax(chroma_mean))
+                minor_idx = (key_idx - 3) % 12
+                is_minor = chroma_mean[minor_idx] > chroma_mean[key_idx] * 0.95
+                key_name = _KEY_PROFILES[key_idx + (12 if is_minor else 0)]
+            except Exception:
+                key_name = "unknown"
+
+            segments.append(MusicSegment(
+                start=start, end=end,
+                bpm=tempo, key=key_name,
+                energy_mean=rms_val,
+                spectral_centroid_mean=centroid,
+            ))
+        except Exception as err:
+            logger.warning(f"片段 [{start:.1f}-{end:.1f}] 分析失败：{err}")
+            continue
+
+    return segments

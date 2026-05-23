@@ -401,6 +401,27 @@ export interface AudioResult {
   music_transcription?: string
   /** IP.9.2: 提示词输出（Markdown） */
   prompt_output?: string
+  /** A3: 是否已自动切换为音乐分析模式 */
+  music_mode?: boolean
+  /** A3.3: 多段音乐 6 维度分析结果 */
+  music_segments?: MusicSegmentData[]
+}
+
+/** A3.3: 单个音乐片段的 6 维度分析 */
+export interface MusicSegmentData {
+  start: number
+  end: number
+  bpm: number
+  key: string
+  energy_mean: number
+  spectral_centroid_mean: number
+  genre: string
+  mood: string
+  instruments: string[]
+  atmosphere: string
+  music_prompt: string
+  similar_references: string[]
+  scenarios: string[]
 }
 
 /** GET /workspaces/{id}/items/{itemId}/audio_result — 音频结果页聚合数据 */

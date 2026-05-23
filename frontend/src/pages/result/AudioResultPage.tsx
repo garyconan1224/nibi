@@ -12,6 +12,7 @@ import { ArrowLeft, Download, FileText, Mic, Music, Pause, Play, Wand2 } from 'l
 import { toast } from 'sonner'
 import {
   type AudioResult,
+  type MusicSegmentData,
   downloadSubtitles,
   getAudioItemResult,
 } from '@/services/workspaces'
@@ -140,6 +141,14 @@ export default function AudioResultPage() {
   }, [workspaceId, itemId])
 
   const result = fetchState.kind === 'ready' ? fetchState.data : null
+
+  // A3: music_mode → 默认切到音乐分析 tab
+  useEffect(() => {
+    if (result?.music_mode) {
+      setActiveTab('music')
+    }
+  }, [result?.music_mode])
+
   const transcript = useMemo(() => {
     const raw = result?.transcript
     if (Array.isArray(raw)) return raw
@@ -284,6 +293,26 @@ export default function AudioResultPage() {
         />
       </div>
 
+      {/* A3: 音乐模式信息 banner */}
+      {result.music_mode && (
+        <div
+          className="ad-info-banner"
+          style={{
+            background: 'var(--accent-warm-muted)',
+            padding: '8px 16px',
+            borderRadius: 8,
+            fontSize: 13,
+            marginBottom: 12,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          <Music size={16} style={{ color: 'var(--accent-warm)' }} />
+          <span>已自动切换为音乐分析模式（未检测到足够人声）</span>
+        </div>
+      )}
+
       {/* Tab nav */}
       <div className="ad-tabs">
         {([
@@ -414,7 +443,61 @@ export default function AudioResultPage() {
 
         {activeTab === 'music' && (
           <div className="ad-summary-scroll">
-            {musicAnalysisText ? (
+            {result.music_segments && result.music_segments.length > 0 ? (
+              <>
+                <div className="eyebrow" style={{ marginBottom: 12 }}>
+                  多段音乐分析（{result.music_segments.length} 段）
+                </div>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                  gap: 12,
+                }}>
+                  {result.music_segments.map((seg: MusicSegmentData, i: number) => (
+                    <div key={i} className="music-segment-card" style={{
+                      border: '1px solid var(--line)',
+                      borderRadius: 10,
+                      padding: 14,
+                      background: 'var(--bg-elev)',
+                    }}>
+                      <div className="mono" style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 8 }}>
+                        片段 {i + 1} · {formatSec(seg.start)} – {formatSec(seg.end)}
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12 }}>
+                        <div style={{ color: 'var(--ink-4)' }}>风格</div><div>{seg.genre || '—'}</div>
+                        <div style={{ color: 'var(--ink-4)' }}>情绪</div><div>{seg.mood || '—'}</div>
+                        <div style={{ color: 'var(--ink-4)' }}>BPM</div><div>{seg.bpm || '—'}</div>
+                        <div style={{ color: 'var(--ink-4)' }}>乐器</div><div>{(seg.instruments || []).join('、') || '—'}</div>
+                        <div style={{ color: 'var(--ink-4)' }}>调性</div><div>{seg.key || '—'}</div>
+                        <div style={{ color: 'var(--ink-4)' }}>氛围</div><div>{seg.atmosphere || '—'}</div>
+                      </div>
+                      {seg.music_prompt && (
+                        <details style={{ marginTop: 10, fontSize: 12 }}>
+                          <summary style={{ cursor: 'pointer', color: 'var(--ink-3)' }}>生成提示词</summary>
+                          <p style={{ marginTop: 4, lineHeight: 1.6 }}>{seg.music_prompt}</p>
+                        </details>
+                      )}
+                      {seg.similar_references?.length > 0 && (
+                        <div style={{ marginTop: 8, fontSize: 11, color: 'var(--ink-4)' }}>
+                          参考: {seg.similar_references.join(' / ')}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {/* 整体分析折叠区 */}
+                {musicAnalysisText && (
+                  <details style={{ marginTop: 16 }}>
+                    <summary style={{ cursor: 'pointer', fontSize: 13, color: 'var(--ink-3)' }}>整体分析</summary>
+                    <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.7, color: 'var(--ink-2)' }}>
+                      <ReactMarkdown remarkPlugins={remarkPlugins}>
+                        {musicAnalysisText}
+                      </ReactMarkdown>
+                    </div>
+                  </details>
+                )}
+              </>
+            ) : musicAnalysisText ? (
               <>
                 <div className="eyebrow" style={{ marginBottom: 8 }}>音乐分析</div>
                 <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--ink-2)' }}>

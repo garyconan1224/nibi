@@ -11,6 +11,7 @@ export enum TaskStatus {
   SUCCESS = 'SUCCESS',
   FAILED = 'FAILED',
   CANCELLED = 'CANCELLED',
+  AWAITING_CONFIRM = 'AWAITING_CONFIRM',  // A3: VAD 无人声等待确认
 }
 
 // 任务日志条目
@@ -155,6 +156,7 @@ export const getStatusText = (status: string): string => {
     [TaskStatus.SUCCESS]: '成功',
     [TaskStatus.FAILED]: '失败',
     [TaskStatus.CANCELLED]: '已取消',
+    [TaskStatus.AWAITING_CONFIRM]: '等待确认',
   }
   return statusMap[status] || status
 }
@@ -173,6 +175,7 @@ export const getStatusColor = (status: string): string => {
     [TaskStatus.SUCCESS]: 'bg-emerald-100 text-emerald-700',
     [TaskStatus.FAILED]: 'bg-red-100 text-red-700',
     [TaskStatus.CANCELLED]: 'bg-slate-100 text-slate-700',
+    [TaskStatus.AWAITING_CONFIRM]: 'bg-amber-100 text-amber-700',
   }
   return colorMap[status] || 'bg-gray-100 text-gray-700'
 }

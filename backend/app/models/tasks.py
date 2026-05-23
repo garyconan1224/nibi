@@ -32,6 +32,7 @@ class TaskStatus(str, Enum):
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
     CANCELLED = "CANCELLED"
+    AWAITING_CONFIRM = "AWAITING_CONFIRM"  # A3: VAD 无人声，等待用户确认切音乐模式
 
 
 # 历史遗留状态 → 新 Enum 的映射。

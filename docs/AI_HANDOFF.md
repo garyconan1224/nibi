@@ -1,6 +1,6 @@
 # AI Handoff
 
-Last updated: 2026-05-23（A4 字幕导出完成）
+Last updated: 2026-05-23（A3 无人声切音乐模式完成）
 
 ---
 
@@ -196,9 +196,17 @@ git branch --show-current
 - 额外修复：`auto-create` 去掉同步 LLM 命名，避免 15s 前端超时
 - 验证：后端全量 268 passed / 2 skipped；前端 build + vitest 通过；full lint 仍被 47 个存量 error 挡住
 
-单 agent 串行建议按低风险到高复杂度推进：
-1. **A3 无人声切音乐模式**：VAD 检测无人声占比，用户确认后跳过 ASR 走音乐分析
-2. **A2 说话人编辑修正 UI**：音频结果页说话人轨道、标签编辑、后端 PATCH、speaker mapping 持久化
+### ✅ A3 无人声切音乐模式（2026-05-23 已完成）
+
+- 后端：`AWAITING_CONFIRM` 状态 + `POST /pipeline/tasks/{id}/confirm-music` 端点 + 任务重提交机制
+- VAD 分叉：speech_ratio < 20% + 未勾音乐分析 → 弹窗；已勾 → 直接音乐分析；music_mode_confirmed 重跑 → 跳过 ASR
+- A3.3：`segment_audio()` + `analyze_music_segments()`（librosa onset + RMS 能量分段）+ 前端分段卡片网格（6 维度）
+- 前端：`MusicModeConfirmModal`（Radix Dialog）+ ProcessingPage 接入 + AudioResultPage banner + 默认 music tab
+- LLM 逐段 enrich（风格/情绪/乐器/氛围）留作 A3.3b 后续
+- 测试：11 个 A3 单测通过；全量 279 passed / 2 skipped
+
+单 agent 串行建议：
+1. **A2 说话人编辑修正 UI**：音频结果页说话人轨道、标签编辑、后端 PATCH、speaker mapping 持久化
 
 ### 🥈 补 #6~#8 URL + 收口 F2
 

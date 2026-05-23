@@ -116,6 +116,39 @@ def retry_task(task_id: str) -> Dict[str, Any]:
         raise HTTPException(status_code=404, detail=str(err)) from err
 
 
+class ConfirmMusicRequest(BaseModel):
+    pass  # 无需 body，服务端自行改 payload
+
+
+@router.post("/tasks/{task_id}/confirm-music")
+def confirm_music_mode(task_id: str) -> Dict[str, Any]:
+    """A3: 用户确认无人声音频切换为音乐分析模式。
+
+    1. 更新 payload（music=True, asr=False, music_mode_confirmed=True）
+    2. 重置状态为 PENDING，交 executor 重跑
+    3. SSE 连接保持在同一个 task_id 上继续推送进度
+    """
+    rec = _store.get(task_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"task not found: {task_id}")
+    if rec.status != TaskStatus.AWAITING_CONFIRM.value:
+        raise HTTPException(
+            status_code=409,
+            detail=f"task {task_id} is {rec.status}, expected AWAITING_CONFIRM",
+        )
+
+    payload = dict(rec.payload)
+    payload["music"] = {"enabled": True}
+    payload["asr"] = {"enabled": False}
+    payload["music_mode_confirmed"] = True
+
+    _store.update(task_id, payload=payload, status=TaskStatus.PENDING.value, progress=0.0, error="")
+    _store.append_log(task_id, "🎵 用户确认切换为音乐分析模式", level="info")
+    _runner.resubmit_task(task_id)
+
+    return _store.get(task_id).to_dict()
+
+
 @router.get("/tasks/{task_id}/events")
 def stream_task_events(task_id: str) -> StreamingResponse:
     """Server-Sent Events：推送任务快照与新增日志行。

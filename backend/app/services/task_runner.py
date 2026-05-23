@@ -141,6 +141,9 @@ class TaskRunner:
                 self.store.update(task_id, status=TaskStatus.CANCELLED.value, progress=1.0, result=result)
                 self.store.append_log(task_id, "Task cancelled by request", level="warning")
                 return
+            # A3: handler 设了 AWAITING_CONFIRM 后提前返回——不覆盖为 SUCCESS，等用户确认
+            if current and current.status == TaskStatus.AWAITING_CONFIRM.value:
+                return
             self.store.update(task_id, status=TaskStatus.SUCCESS.value, progress=1.0, result=result, error="")
             self.store.append_log(task_id, "Task succeeded")
             # 触发成功回调（例如：download→analyze 任务链）
@@ -193,3 +196,7 @@ class TaskRunner:
         if rec is None:
             raise KeyError(f"task not found: {task_id}")
         return self.create_task(rec.project_id, rec.task_type, rec.payload, retry_of=rec.task_id)
+
+    def resubmit_task(self, task_id: str) -> None:
+        """A3: 将已有任务重新提交到 executor（保持同一 task_id，SSE 连接不断）。"""
+        self._executor.submit(self._run, task_id)

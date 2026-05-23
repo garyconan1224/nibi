@@ -1711,64 +1711,94 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     diarization_enabled = _task_enabled("voiceprint", False)
     music_enabled = _task_enabled("music", False)
     subtitle_enabled = _task_enabled("srt", True)
+    _music_confirmed = bool(payload.get("music_mode_confirmed"))
 
     log(
         f"🎵 audio_task | source_type={source_type} | source={source[:80]} | "
         f"lang={whisper_lang} | diarize={diarization_enabled} | music={music_enabled} | "
-        f"subtitle={subtitle_enabled}"
+        f"subtitle={subtitle_enabled}" + (f" | music_confirmed" if _music_confirmed else "")
     )
 
     # ── 1. FETCH ────────────────────────────────────────────
     runner.store.update(task_id, status=TaskStatus.FETCH.value)
     runner.set_progress(task_id, 0.05, "拉取音频文件...")
 
+    # A3 重跑：文件已在首次运行时下载，跳过
+    from shared.config import get_workspace_root
+    audio_dir = get_workspace_root(record.project_id) / "audio"
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    audio_local_path: Path
+    content_type = ""
     if source_type == "url":
-        req = urllib.request.Request(source, headers={"User-Agent": "Mozilla/5.0"})
-        try:
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                audio_bytes = resp.read()
-                content_type = resp.headers.get("Content-Type", "")
-        except Exception as err:
-            raise RuntimeError(f"音频下载失败：{err}") from err
-        # 从 URL 推断文件名
         url_path = source.split("?")[0]
         audio_filename = url_path.split("/")[-1] or "audio.mp3"
+        audio_local_path = audio_dir / f"{task_id}_{audio_filename}"
+        if _music_confirmed and audio_local_path.exists():
+            log("📦 音频文件已存在（重跑），跳过下载")
+            audio_bytes = audio_local_path.read_bytes()
+        else:
+            req = urllib.request.Request(source, headers={"User-Agent": "Mozilla/5.0"})
+            try:
+                with urllib.request.urlopen(req, timeout=60) as resp:
+                    audio_bytes = resp.read()
+                    content_type = resp.headers.get("Content-Type", "")
+            except Exception as err:
+                raise RuntimeError(f"音频下载失败：{err}") from err
+            audio_local_path.write_bytes(audio_bytes)
     else:
         local = Path(source)
         if not local.is_file():
             raise RuntimeError(f"本地音频不存在：{source}")
         audio_bytes = local.read_bytes()
         audio_filename = local.name
-        content_type = ""
+        if _music_confirmed:
+            audio_local_path = local  # 重跑直接用原路径
+        else:
+            audio_local_path = audio_dir / f"{task_id}_{audio_filename}"
+            audio_local_path.write_bytes(audio_bytes)
 
     # 推断 MIME
     guessed, _ = mimetypes.guess_type(audio_filename)
     audio_mime = guessed or content_type.split(";")[0].strip() or "audio/mpeg"
     log(f"📦 音频已加载，{len(audio_bytes)//1024} KB，mime={audio_mime}，filename={audio_filename}")
 
-    # N8: 写入磁盘供 VAD / pyannote / librosa 读（这些库都需要文件路径）
-    from shared.config import get_workspace_root
-    audio_dir = get_workspace_root(record.project_id) / "audio"
-    audio_dir.mkdir(parents=True, exist_ok=True)
-    audio_local_path = audio_dir / f"{task_id}_{audio_filename}"
-    if not (source_type == "local" and Path(source).is_file()):
-        audio_local_path.write_bytes(audio_bytes)
-    else:
-        audio_local_path = Path(source)  # 本地源直接用原路径
-
-    # ── 1.5 VAD（N8）─────────────────────────────────────────
+    # ── 1.5 VAD（N8 / A3）────────────────────────────────────
     runner.set_progress(task_id, 0.15, "VAD 人声活动检测...")
     vad_result = run_vad(audio_local_path)
+    speech_ratio = (
+        vad_result.total_speech_duration / max(vad_result.total_duration, 0.1)
+        if vad_result.total_duration > 0
+        else 1.0
+    )
     log(
         f"🔍 VAD | has_speech={vad_result.has_speech} | "
         f"speech={vad_result.total_speech_duration:.1f}s / total={vad_result.total_duration:.1f}s"
+        f" ({speech_ratio:.1%})"
     )
-    # 无人声 + 用户没勾音乐分析 → 仅日志告警（不主动改 preflight，弹窗交互推迟到 N8b）
-    if not vad_result.has_speech and not music_enabled:
-        log("⚠️  未检测到人声，且未启用音乐分析。可在 Preflight 抽屉勾选「音乐分析」后重跑")
+    # A3: 无人声占比 > 80% + 未启用音乐分析 + 非已确认重跑 → 弹窗等用户确认
+    _music_confirmed = bool(payload.get("music_mode_confirmed"))
+    if speech_ratio < 0.2 and not music_enabled and not _music_confirmed:
+        runner.append_log(
+            task_id,
+            f"🎵 人声占比仅 {speech_ratio:.1%}（< 20%），等待用户确认是否切换音乐分析模式",
+            level="warning",
+        )
+        partial_result = {
+            "awaiting_confirm": True,
+            "speech_ratio": round(speech_ratio, 3),
+            "total_duration": round(vad_result.total_duration, 2),
+            "vad": vad_result.to_dict(),
+        }
+        runner.store.update(
+            task_id,
+            status=TaskStatus.AWAITING_CONFIRM.value,
+            progress=0.18,
+            result=partial_result,
+        )
+        return partial_result
 
     # 若无人声 + ASR 仍开启，按 spec 跳过 ASR（避免空 LLM 调用）
-    skip_asr = (not vad_result.has_speech) or (not asr_enabled)
+    skip_asr = (not vad_result.has_speech) or (not asr_enabled) or _music_confirmed
 
     # ── 2. TRANSCRIBE ────────────────────────────────────────
     runner.store.update(task_id, status=TaskStatus.VLM.value)  # 借用 VLM 状态表示「模型推理中」
@@ -1867,9 +1897,10 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             if transcript_segments:
                 transcript_segments = assign_speakers_to_segments(transcript_segments, diar)
 
-    # ── 3.6 音乐分析（N8）──────────────────────────────────
+    # ── 3.6 音乐分析（N8 / A3）──────────────────────────────
     music_dict: Optional[Dict[str, Any]] = None
-    if music_enabled:
+    _run_music = music_enabled or _music_confirmed
+    if _run_music:
         runner.set_progress(task_id, 0.82, "音乐特征分析（librosa）...")
         music_features = analyze_music(audio_local_path)
         if music_features is None:
@@ -1907,6 +1938,24 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 music_features = generate_music_prompt(music_features, _music_llm)
             music_dict = music_features.to_dict()
 
+            # A3.3: 多段音乐 6 维度切分
+            if _music_confirmed:
+                try:
+                    from shared.audio_analyzer import segment_audio, analyze_music_segments
+                    runner.set_progress(task_id, 0.89, "多段音乐特征切分...")
+                    boundaries = segment_audio(str(audio_local_path))
+                    if len(boundaries) > 1:
+                        segments = analyze_music_segments(str(audio_local_path), boundaries)
+                        music_dict["segments"] = [s.to_dict() for s in segments]
+                        music_dict["music_mode"] = True
+                        log(f"🎵 多段分析完成，共 {len(segments)} 个片段")
+                    else:
+                        music_dict["music_mode"] = True
+                        log("🎵 未检测到分段边界，使用整体分析")
+                except Exception as seg_err:
+                    music_dict["music_mode"] = True
+                    log(f"⚠️  多段切分失败（{seg_err}），已回退整体分析")
+
     # ── 3.7 字幕导出（N8）──────────────────────────────────
     subtitle_paths: Dict[str, str] = {}
     if subtitle_enabled and transcript_segments:
@@ -1939,6 +1988,7 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         "vad": vad_result.to_dict(),
         "diarization": diarization_dict,
         "music": music_dict,
+        "music_mode": bool(_music_confirmed or (music_dict and music_dict.get("music_mode"))),
         "subtitle_paths": subtitle_paths,
     }
     json_path = audio_dir / f"{task_id}.json"

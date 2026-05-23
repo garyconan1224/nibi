@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { ArrowRight, RotateCcw, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -7,6 +7,7 @@ import { useTaskStore } from '@/store/taskStore'
 import { useTaskSse } from '@/hooks/useTaskSse'
 import { isTaskTerminal, getStatusText } from '@/types/task'
 import { categorizeError } from '@/lib/errorCategories'
+import MusicModeConfirmModal from '@/components/workspace/MusicModeConfirmModal'
 import { StepProgress } from './StepProgress'
 import { LiveLog } from './LiveLog'
 
@@ -39,6 +40,24 @@ export default function ProcessingPage() {
   const isFailed = status === 'FAILED'
   const isCancelled = status === 'CANCELLED'
   const isSuccess = status === 'SUCCESS'
+
+  // A3: 音乐模式确认弹窗
+  const [showMusicModal, setShowMusicModal] = useState(false)
+
+  useEffect(() => {
+    if (status === 'AWAITING_CONFIRM') {
+      setShowMusicModal(true)
+    }
+  }, [status])
+
+  const handleMusicConfirmed = () => {
+    toast.success('已切换为音乐分析模式，任务继续执行')
+  }
+
+  const handleMusicCancelled = () => {
+    if (taskId) cancelTask(taskId)
+    toast.info('任务已取消，可在素材设置中手动勾选「音乐分析」后重跑')
+  }
 
   // F3.5: 任务卡住检测（非终结态 > 10 分钟无 updated_at 变化 → 警告）
   const STUCK_MS = 10 * 60 * 1000
@@ -212,6 +231,17 @@ export default function ProcessingPage() {
           <LiveLog logs={logs} />
         </aside>
       </div>
+
+      {/* A3: VAD 无人声 → 音乐模式确认弹窗 */}
+      <MusicModeConfirmModal
+        open={showMusicModal}
+        onOpenChange={setShowMusicModal}
+        taskId={taskId}
+        speechRatio={task?.result?.speech_ratio ?? 0}
+        totalDuration={task?.result?.total_duration ?? 0}
+        onConfirmed={handleMusicConfirmed}
+        onCancelled={handleMusicCancelled}
+      />
     </div>
   )
 }
