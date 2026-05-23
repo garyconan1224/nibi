@@ -408,11 +408,9 @@ _SUBTITLE_MIME: dict[str, str] = {
 }
 
 
-def _get_transcript_segments(item: WorkspaceItem) -> list[dict[str, Any]]:
-    """从 item.results 中提取 transcript segments（兼容多种字段名 + 字段名归一化）。"""
-    results = item.results or {}
-    raw = results.get("segments") or results.get("transcript_segments") or results.get("transcript") or []
-    if isinstance(raw, str):
+def _normalize_segments(raw: Any) -> list[dict[str, Any]]:
+    """归一化 transcript segments：兼容 display (t_sec) / whisper (start/end) 两种格式。"""
+    if isinstance(raw, str) or not raw:
         return []
     if not (isinstance(raw, list) and raw and isinstance(raw[0], dict)):
         return []
@@ -421,7 +419,6 @@ def _get_transcript_segments(item: WorkspaceItem) -> list[dict[str, Any]]:
     for seg in raw:
         if not isinstance(seg, dict):
             continue
-        # 归一化字段名：display 格式用 t_sec，whisper 原始格式用 start/end
         start = seg.get("start") if "start" in seg else seg.get("t_sec", 0)
         end = seg.get("end", start)
         text = str(seg.get("text") or "").strip()
@@ -449,11 +446,18 @@ def export_subtitles(
         raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
     item = _find_item(rec, item_id)
 
+    # 使用与 video_result / audio_result 一致的 overlay 优先模式
+    # X.1 bridge: 任务产物可能还没写回 item.results
     overlay = _sync_item_with_tasks(item)
-    if overlay and overlay.get("results") and not item.results:
-        item.results = overlay["results"]
+    results = (
+        dict(overlay.get("results", {}))
+        if overlay and overlay.get("results")
+        else dict(item.results or {})
+    )
 
-    segments = _get_transcript_segments(item)
+    # 直接在 results dict 上做三级降级查找 + 归一化
+    raw = results.get("segments") or results.get("transcript_segments") or results.get("transcript") or []
+    segments = _normalize_segments(raw)
     if not segments:
         raise HTTPException(status_code=404, detail="no transcript segments found for this item")
 
