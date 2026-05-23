@@ -162,7 +162,7 @@ checkpoint 保持短小，只写：
 ### Claude Code 终端版接入步骤
 1. **添加 MCP 服务**：在终端运行以下命令，将 CodeGraph 注册到 Claude Code：
    ```bash
-   claude mcp add codegraph npx -- -y @colbymchenry/codegraph start
+   claude mcp add codegraph npx -- -y @colbymchenry/codegraph serve --mcp
    ```
 2. **验证状态**：运行以下命令确认已成功添加并处于可用状态：
    ```bash
