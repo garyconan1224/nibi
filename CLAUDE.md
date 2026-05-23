@@ -155,6 +155,25 @@ checkpoint 保持短小，只写：
 
 ---
 
+## CodeGraph 语义检索 (MCP)
+
+本项目已初始化本地代码知识图谱 CodeGraph（已配置 `.gitignore` 过滤 `.codegraph/` 缓存）。
+
+### Claude Code 终端版接入步骤
+1. **添加 MCP 服务**：在终端运行以下命令，将 CodeGraph 注册到 Claude Code：
+   ```bash
+   claude mcp add codegraph npx -- -y @colbymchenry/codegraph serve --mcp
+   ```
+2. **验证状态**：运行以下命令确认已成功添加并处于可用状态：
+   ```bash
+   claude mcp list
+   ```
+3. **日常使用建议**：
+   - 寻找函数调用关系或评估改动影响时，鼓励优先使用 `codegraph_callers`、`codegraph_callees` 和 `codegraph_impact`，代替昂贵的全项目 grep 搜索与大文件 view 动作。
+   - 每次代码改动后，在终端运行 `npx @colbymchenry/codegraph sync`（或依靠其内置的文件监听器）以保持图谱数据最新。
+
+---
+
 ## 高层架构
 
 ### 后端（`backend/app/`）
@@ -316,6 +335,74 @@ checkpoint 保持短小，只写：
 - 严格 TypeScript，**禁止使用 `any`**。
 - 组件文件 PascalCase（`TaskCard.tsx`），hook 用 `useXxx`。
 - 错误用 toast 提示用户，不用 `alert()`。
+
+### 前端 UI 与设计规范 (Remix 版)
+
+所有前端 UI 的开发和更新，必须严格遵循 `/Users/conan/Downloads/vidmirror (Remix)` 沉淀的 Remix 设计规范，禁止使用任何硬编码（magic values）的颜色或边框：
+
+- **设计风格 (Vibe)**: Bold AI-creative vibe，极简的科技与艺术感。大字号 serif 衬线体标题配高饱和度 Accent 色块。
+- **颜色语义 (Semantic Colors)**:
+  - 紫色 (`--accent-2` / `#B84CFF`): 任务系统、视频模块、AI 分析层组件。
+  - 绿色 (`--accent-green` / `#22D39A`): 音频模块、可导出节点、完成/成功态。
+  - 蓝色 (`--accent-3` / `#3C77FB`): 图片模块、结构化层展示。
+  - 灰色 (`--ink-3` / `#6B6B6B`): 文字模块、系统处理节点、状态元信息。
+  - 橙色 (`--accent-warm` / `#FFB84C`): 用户决策节点、勾选面板、分镜。
+  - 红色 (`--accent` / `#FF4D7E`): 输入/输出层、入口/最终输出按钮。
+  - 深红 (`--accent-deep` / `#C8365A`): 复刻专项（Director）卡片或专属功能。
+- **背景与中性色 (Neutrals)**:
+  - 基础背景: `--bg` (Light: `#f6f5f0` / Dark: `#0d0c10`)
+  - 提升浮层 (卡片/弹窗): `--bg-elev` (Light: `#ffffff` / Dark: `#16151b`)
+  - 凹陷背景 (输入框/代码块): `--bg-sunken` (Light: `#efede6` / Dark: `#0a0a0d`)
+  - 文字等级: `--ink` (主文字)、`--ink-2` (正文)、`--ink-3` (辅助)、`--ink-4` (最淡元信息/占位符)
+  - 边框分割: `--line` (`rgba(0,0,0,0.08)` / `rgba(255,255,255,0.08)`)、`--line-strong` (Hover 态 border)
+- **字体栈 (Typography)**:
+  - Display: `Instrument Serif`, `Source Han Serif SC`, `Noto Serif SC`, Georgia, serif (对应 `.display` 类名)
+  - Sans (默认): `Inter`, `PingFang SC`, -apple-system, BlinkMacSystemFont, Arial, sans-serif
+  - Mono: `JetBrains Mono`, `SF Mono`, ui-monospace (对应 `.mono` / `.eyebrow` / `.kw`)
+- **圆角与阴影 (Radius & Shadow)**:
+  - 圆角: `--radius` (`18px` 默认卡片)、`--radius-sm` (`10px` 按钮/chip/kbd)、`--radius-lg` (`28px` Composer/Summary大容器)、`--radius-pill` (`99px` 胶囊按钮)
+  - 阴影: `--shadow-sm` (小卡片)、`--shadow-md` (Composer)、`--shadow-lg` (大悬浮面板)
+- **动效与交互 (Transitions)**:
+  - 动画加速曲线: `cubic-bezier(0.4, 0, 0.2, 1)`
+  - 过渡时间: 状态变更 120-220ms，抽屉/面板出入 280ms，进度条插值 400ms。避免不必要的装饰动效，切忌弹跳/overshoot。
+
+### 业务规格与运行时交互契约 (Remix 版)
+
+开发后端或前端业务流程代码时，必须严格参考并实现以下交互逻辑和默认阈值限制：
+
+1. **全局状态机与跃迁逻辑**:
+   - 任务状态：`draft` (无素材) -> `active` (至少一个素材在排队或处理中) -> `done` (全部素材 done 或 failed 且用户已知会) -> `archived` (归档)。
+   - 素材状态：`pending` -> `downloading` (仅链接素材) -> `probing` (探测格式/时长/字幕轨) -> `processing` (跑 pipeline 阶段) -> `done` 或 `failed`。
+   - 素材一旦到 `done` 状态，结果直接写入数据库，**不再因前置配置变更而自动重跑**。重新运行必须由用户显式触发新建作业。
+2. **前置配置依赖级联 (重要，前端必须联动限制，后端必须校验)**:
+   - 字段上限：说话人最多 `12` 人且名字限制 `16` 字；主题背景限制 `200` 字；专有名词最多 `30` 个且每个限制 `24` 字。
+   - 配置联动级联：
+     - 若勾选「视频文案总结 - 路径 2 (音视频合并)」，**必须且自动勾选「画面提示词生成」**（需截帧画面），且在前端禁用取消勾选。
+     - 若勾选「说话人音色区分」，**必须且自动勾选「人声转写」**。
+     - 「生成字幕文件」强制依赖「人声转写」。
+     - 「多图 / 多文对比」仅在一次性上传素材数 $\ge 2$ 时可选，否则置灰禁用。
+3. **视频处理分支参数**:
+   - 模式 A (按秒截帧)：默认间隔 `2秒`，最大上限 `60帧`。使用 pHash 汉明距离 $\le 6$ 过滤相似帧。
+   - 模式 B (AI 镜头)：镜头切换判定 SSIM $< 0.55$。2 帧模式取首尾，3 帧模式取首中尾。
+   - 总结三路径：
+     - 路径 1 (字幕直接总结)：仅通过字幕文本 LLM 生成。
+     - 路径 2 (音视频合并)：字幕 ↔ 帧描述时间戳对齐，送大模型。
+     - 路径 3 (视频模型直跑)：直接送视觉/视频大模型（如 Gemini 1.5 Pro / GPT-4o），不进行额外抽帧。
+4. **音频处理分支参数**:
+   - VAD 人声检测分叉：
+     - 人声占比 $\ge 15\%$：执行完整人声处理（Whisper ASR + 说话人声纹聚类）。
+     - $5\% \le$ 人声占比 $< 15\%$：弹窗/气泡提示「人声较少，是否仅分析音乐？」。
+     - 人声占比 $< 5\%$：默认按纯音乐路径处理。
+5. **处理阶段可跳过策略 (Resiliency)**:
+   - 顺序：`download` -> `probe` -> `frames` -> `asr` -> `vlm` -> `sum` -> `store`。
+   - `download` 与 `probe` 失败直接终止作业。
+   - `frames`（截帧）可跳过，跳过后总结退化为路径 1。
+   - `asr`（转写）可跳过，跳过后总结跳过文本分析。
+   - `vlm`（视觉分析）单帧失败不终止任务，对应帧标记「分析失败」。
+   - `sum` 与 `store` 不可跳过。
+6. **存储与自动清理策略**:
+   - 截帧、临时转码文件、临时提取音频等中间产物：默认保留 `14天`，归档任务保留 `3天`。
+   - 原始文件与 AI 文本分析结果：永久保留，直至用户手动删除任务。
 
 ### 通用
 - **单文件不超过 200 行**，超过就拆分。

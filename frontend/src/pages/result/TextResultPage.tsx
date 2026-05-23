@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Star, ChevronDown, ChevronRight, Layers } from 'lucide-react'
+import { ArrowLeft, Star, ChevronDown, ChevronRight, Layers, Copy, Check } from 'lucide-react'
 
 import {
   type TextResult,
   type TextCompareResult,
+  type StructuredSummary,
+  type MaybeAligned,
+  normalizeAligned,
   addPromptVersion,
   getTextItemResult,
   getTextCompare,
@@ -15,6 +18,167 @@ import { PromptVersionStack } from '@/components/result/PromptVersionStack'
 import './tokens.css'
 import './text-result.css'
 import { ItemTagsPanel } from '@/components/workspace/ItemTagsPanel'
+
+function renderSummary(
+  summary: string | StructuredSummary | null | undefined,
+  scrollToParagraph: (paraIndex: number) => void,
+) {
+  if (!summary) return null
+
+  // 兼容旧版纯字符串摘要
+  if (typeof summary === 'string') {
+    return (
+      <div className="im-section">
+        <div className="tx-summary-text">{summary}</div>
+      </div>
+    )
+  }
+
+  // T1.1: 结构化摘要
+  const { abstract, key_points, golden_quotes } = summary
+  return (
+    <>
+      {abstract && (
+        <div className="im-section">
+          <div className="eyebrow" style={{ marginBottom: 6 }}>摘要</div>
+          <div className="tx-summary-text">{abstract}</div>
+        </div>
+      )}
+
+      {key_points && key_points.length > 0 && (
+        <div className="im-section">
+          <div className="eyebrow" style={{ marginBottom: 8 }}>要点</div>
+          <div className="tx-kp-list">
+            {key_points.map((kp, i) => (
+              <div
+                key={i}
+                className="tx-kp-item"
+                data-clickable={kp.para_index !== undefined}
+                onClick={kp.para_index !== undefined ? () => scrollToParagraph(kp.para_index!) : undefined}
+              >
+                <span className="tx-kp-num">{String(i + 1).padStart(2, '0')}</span>
+                <div className="tx-kp-body">
+                  <div className="tx-kp-text">{kp.text}</div>
+                  {kp.source_excerpt && (
+                    <div className="tx-kp-excerpt">
+                      <span className="tx-kp-excerpt-label">原文：</span>
+                      {kp.source_excerpt}
+                      {kp.para_index !== undefined && (
+                        <span className="tx-kp-pos">第 {kp.para_index + 1} 段</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {golden_quotes && golden_quotes.length > 0 && (
+        <div className="im-section">
+          <div className="eyebrow" style={{ marginBottom: 8 }}>金句</div>
+          <div className="tx-gq-list">
+            {golden_quotes.map((q, i) => (
+              <div
+                key={i}
+                className="tx-gq-item"
+                data-clickable={q.para_index !== undefined}
+                onClick={() => scrollToParagraph(q.para_index)}
+              >
+                <blockquote className="tx-gq-text">{q.quote_text}</blockquote>
+                {q.para_index !== undefined && (
+                  <span className="tx-gq-pos">第 {q.para_index + 1} 段</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ── T1.2: 逐段对照视图 ──────────────────────────────────────
+
+function ParagraphAlignView({
+  originalContent,
+  result,
+  label,
+}: {
+  originalContent: string
+  result: MaybeAligned | undefined
+  label: string
+}) {
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
+
+  const section = normalizeAligned(result)
+  if (!section) return null
+
+  const origParas = originalContent.split(/\n{2,}/).filter(p => p.trim())
+  const resultParas = section.paragraphs
+  const maxLen = Math.max(origParas.length, resultParas.length)
+  const mismatch = origParas.length !== resultParas.length
+
+  const handleCopy = async (text: string, idx: number) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedIdx(idx)
+      setTimeout(() => setCopiedIdx(null), 1800)
+    } catch {
+      // fallback: ignore clipboard errors
+    }
+  }
+
+  return (
+    <div className="tx-align-container">
+      {mismatch && (
+        <div className="tx-align-mismatch-banner">
+          段落数不一致：原文 {origParas.length} 段，{label} {resultParas.length} 段，已按序号对齐
+        </div>
+      )}
+      {Array.from({ length: maxLen }, (_, i) => {
+        const orig = origParas[i]
+        const res = resultParas[i]
+        return (
+          <div key={i} className="tx-align-row">
+            <span className="tx-align-idx">{String(i + 1).padStart(2, '0')}</span>
+            <div className="tx-align-cols">
+              <div className="tx-align-cell tx-align-orig">
+                <div className="tx-align-cell-label">原文</div>
+                <div className="tx-align-cell-text">
+                  {orig || <span className="tx-align-missing">（无对应段落）</span>}
+                </div>
+                {orig && (
+                  <button
+                    className="tx-align-copy"
+                    onClick={() => handleCopy(orig, i * 2)}
+                  >
+                    {copiedIdx === i * 2 ? <Check size={12} /> : <Copy size={12} />}
+                  </button>
+                )}
+              </div>
+              <div className="tx-align-cell tx-align-result">
+                <div className="tx-align-cell-label">{label}</div>
+                <div className="tx-align-cell-text">
+                  {res || <span className="tx-align-missing">（无对应段落）</span>}
+                </div>
+                {res && (
+                  <button
+                    className="tx-align-copy"
+                    onClick={() => handleCopy(res, i * 2 + 1)}
+                  >
+                    {copiedIdx === i * 2 + 1 ? <Check size={12} /> : <Copy size={12} />}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 export default function TextResultPage() {
   const { workspaceId = '', itemId = '' } = useParams<{ workspaceId: string; itemId: string }>()
@@ -26,6 +190,7 @@ export default function TextResultPage() {
     | { kind: 'error'; message: string }
   const [fetchState, setFetchState] = useState<FetchState>({ kind: 'loading' })
   const [favored, setFavored] = useState(false)
+  const [highlightedPara, setHighlightedPara] = useState<number | null>(null)
 
   // N10: 折叠状态
   const [assocOpen, setAssocOpen] = useState(true)
@@ -75,6 +240,14 @@ export default function TextResultPage() {
       toast.success(next ? '已收藏此文稿' : '已取消收藏')
       return next
     })
+  }, [])
+
+  const scrollToParagraph = useCallback((paraIndex: number) => {
+    const el = document.getElementById(`tx-para-${paraIndex}`)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setHighlightedPara(paraIndex)
+    setTimeout(() => setHighlightedPara(null), 2200)
   }, [])
 
   // N10: 多文对比
@@ -138,7 +311,16 @@ export default function TextResultPage() {
         {/* 正文区域 */}
         <div className="tx-content-scroll">
           <div className="tx-content-body">
-            {result.content}
+            {result.content.split(/\n{2,}/).map((para, i) => (
+              <div
+                key={i}
+                id={`tx-para-${i}`}
+                className="tx-para"
+                data-highlight={highlightedPara === i}
+              >
+                {para}
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -153,14 +335,8 @@ export default function TextResultPage() {
         </div>
 
         <div className="tx-right-scroll">
-          {/* 摘要 */}
-          {result.summary && (
-            <div className="im-section">
-              <div className="tx-summary-text">
-                {result.summary}
-              </div>
-            </div>
-          )}
+          {/* 摘要 — T1.1: 支持结构化摘要 */}
+          {renderSummary(result.summary, scrollToParagraph)}
 
           {/* N10: 联想归纳 */}
           {hasAssociations && (
@@ -182,7 +358,7 @@ export default function TextResultPage() {
             </div>
           )}
 
-          {/* N10: 改写/润色 */}
+          {/* T1.2: 改写/润色 — 逐段对照 */}
           {hasRewrites && (
             <div className="im-section">
               <button className="tx-collapse-btn" onClick={() => setRewriteOpen(!rewriteOpen)}>
@@ -191,10 +367,14 @@ export default function TextResultPage() {
               </button>
               {rewriteOpen && (
                 <div className="tx-section-body">
-                  {Object.entries(result.rewrites!).map(([style, text]) => (
+                  {Object.entries(result.rewrites!).map(([style, val]) => (
                     <div key={style} className="tx-section-item">
                       <div className="tx-section-item-label">{style}</div>
-                      <div className="tx-section-item-text">{text}</div>
+                      <ParagraphAlignView
+                        originalContent={result.content}
+                        result={val}
+                        label={style}
+                      />
                     </div>
                   ))}
                 </div>
@@ -202,7 +382,7 @@ export default function TextResultPage() {
             </div>
           )}
 
-          {/* N10: 翻译 */}
+          {/* T1.2: 翻译 — 逐段对照 */}
           {hasTranslations && (
             <div className="im-section">
               <button className="tx-collapse-btn" onClick={() => setTranslateOpen(!translateOpen)}>
@@ -211,10 +391,14 @@ export default function TextResultPage() {
               </button>
               {translateOpen && (
                 <div className="tx-section-body">
-                  {Object.entries(result.translations!).map(([lang, text]) => (
+                  {Object.entries(result.translations!).map(([lang, val]) => (
                     <div key={lang} className="tx-section-item">
                       <div className="tx-section-item-label">{lang}</div>
-                      <div className="tx-section-item-text">{text}</div>
+                      <ParagraphAlignView
+                        originalContent={result.content}
+                        result={val}
+                        label={lang}
+                      />
                     </div>
                   ))}
                 </div>

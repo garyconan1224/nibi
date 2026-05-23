@@ -77,6 +77,13 @@ python3 scripts/preflight_check.py
 python3 tests/e2e_qa.py
 ```
 
+### UI 与设计规范
+
+本项目前端使用 **Remix 设计体系 (Bold AI-creative vibe)**。在修改 UI 或创建新页面时，请开发者及 AI 严格参考：
+- **设计令牌与样式规范**：[docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)
+- **业务流程与运行时契约**：[CLAUDE.md](CLAUDE.md) 中的相关章节
+- **视觉源文件与 CSS**：在 `docs/design/` 下，包含 JSX 组件原型以及 `styles.css`
+
 ### 任务日志流式接口
 
 - `GET /pipeline/tasks/{task_id}/events`（Server-Sent Events）

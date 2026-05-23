@@ -60,7 +60,10 @@ function extractSummary(itemType: ItemType, result: ItemResult): string | null {
     return (result as AudioResult).summary || null
   }
   if (itemType === 'text') {
-    return (result as TextResult).summary || null
+    const s = (result as TextResult).summary
+    if (typeof s === 'string') return s
+    if (s && typeof s === 'object') return s.abstract || null
+    return null
   }
   if (itemType === 'image') {
     return (result as ImageResult).description || null

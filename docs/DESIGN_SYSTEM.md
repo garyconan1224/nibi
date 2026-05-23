@@ -1,113 +1,127 @@
-# VidMirror Design System
+# VidMirror Design System (Remix Edition)
 
-> Token 定义：`frontend/src/styles/design-tokens.css`
-> 设计稿来源：`docs/design/styles.css` + `docs/design/system_design_v1.1.md`
-> 最后更新：2026-05-19
-
----
-
-## 1. 颜色
-
-### 1.1 语义对照表
-
-| Token | 色值 | 语义 | 典型用途 |
-|-------|------|------|---------|
-| `--accent` / `--accent-pink` | `#FF4D7E` coral | 输入 / 输出层 | 入口按钮、最终输出区、强调 |
-| `--accent-2` / `--accent-purple` | `#B84CFF` purple | AI 分析层 | 任务卡片、AI 相关 UI |
-| `--accent-3` / `--accent-blue` | `#3C77FB` blue | 结构化层 | 图片模块、结构化数据 |
-| `--accent-warm` / `--accent-amber` | `#FFB84C` amber | 分镜层 / 用户决策 | 需要用户选择的弹窗、分镜 UI |
-| `--accent-green` | `#22D39A` teal | 完成态 | 成功状态、可导出节点 |
-
-> 语义来源：`system_design_v1.1.md` §1.3
-
-### 1.2 中性色
-
-| Token | 用途 |
-|-------|------|
-| `--bg` | 页面背景 |
-| `--bg-elev` | 卡片 / 弹窗等浮起层 |
-| `--bg-sunken` | 凹陷区域（输入框背景、code block） |
-| `--ink` | 主文字 |
-| `--ink-2` | 正文 / 二级文字 |
-| `--ink-3` | 辅助文字 / placeholder |
-| `--ink-4` | 最淡文字（时间戳、计数） |
-| `--line` | 默认边框 / 分割线 |
-| `--line-strong` | 强调边框（hover 态） |
-
-### 1.3 暗色模式
-
-所有 token 在 `[data-theme="dark"]` 下有对应覆写，组件不需要单独处理。`next-themes` 的 `ThemeProvider` 通过 `class` 策略切换。
+> **Token 定义**：`frontend/src/styles/design-tokens.css` / `docs/design/styles.css`
+> **设计规格来源**：`/Users/conan/Downloads/vidmirror (Remix)/system_design_v1.1.md` 与 `styles.css` 
+> **最后更新**：2026-05-23
 
 ---
 
-## 2. 字体
+## 1. 设计风格与色彩 (Vibe & Colors)
+
+### 1.1 核心风格
+本系统采用 **Bold AI-creative vibe** 视觉调性，融合了极简现代排版与高饱和度的 AI 科技感。其核心特征为：
+- 大字号的 Serif 衬线体标题配以小字号的等宽 Monospace 元信息。
+- 根据不同的功能模块或处理阶段，采用不同的语义色彩做高亮。
+- 优秀的毛玻璃效果（backdrop-filter）和流畅的过渡动画。
+
+### 1.2 颜色语义对照表
+
+| 用途 | Token | 默认 Hex | 对应语义说明 |
+| :--- | :--- | :--- | :--- |
+| **输入 / 输出层** | `--accent` / `--accent-pink` | `#FF4D7E` | 入口按钮、最终输出区、核心 CTA 操作、系统错误状态（error） |
+| **任务系统 / AI 分析** | `--accent-2` / `--accent-purple` | `#B84CFF` | 任务卡片、视频模块相关的 AI 处理层、视觉分析（VLM） |
+| **结构化展示** | `--accent-3` / `--accent-blue` | `#3C77FB` | 图片模块、结构化层、链接下载阶段（download） |
+| **用户决策 / 分镜** | `--accent-warm` / `--accent-amber` | `#FFB84C` | 勾选面板、弹窗询问、分镜（Storyboard）及 AI 镜头分析 |
+| **完成态 / 可导出** | `--accent-green` | `#22D39A` | 成功完成的节点、音频模块主色、所有绿色的导出文件按钮 |
+| **复刻专项** | `--accent-deep` | `#C8365A` | 专用于复刻中心（Director）标签、收藏夹与版本记录等 |
+
+### 1.3 基础中性色
+
+| Token | Light Mode (`:root`) | Dark Mode (`[data-theme="dark"]`) | 典型用途 |
+| :--- | :--- | :--- | :--- |
+| `--bg` | `#f6f5f0` (温暖的灰白) | `#0d0c10` (极深紫灰) | 页面整体背景 |
+| `--bg-elev` | `#ffffff` | `#16151b` | 卡片、弹窗等悬浮/浮起层背景 |
+| `--bg-sunken` | `#efede6` | `#0a0a0d` | 输入框、代码块、凹陷式背景容器 |
+| `--ink` | `#111111` | `#f7f6f2` | 主标题、强调文字 |
+| `--ink-2` | `#3a3a3a` | `#d4d3ce` | 正文阅读、二级文字 |
+| `--ink-3` | `#6b6b6b` | `#8f8d86` | 辅助说明、placeholder 占位、等宽标签 |
+| `--ink-4` | `#a0a0a0` | `#5b5a55` | 极淡辅助字（时间戳、任务状态排队） |
+| `--line` | `rgba(0,0,0,0.08)` | `rgba(255,255,255,0.08)` | 默认轻量级边框、分割线 |
+| `--line-strong` | `rgba(0,0,0,0.18)` | `rgba(255,255,255,0.2)` | 悬停态（hover）或强化的边框 |
+
+---
+
+## 2. 字体与排版 (Typography)
 
 ### 2.1 字体栈
 
-| Token | 字体栈 | 用途 |
-|-------|--------|------|
-| `--sans` | Inter / PingFang SC / system-ui | 正文默认 |
-| `--mono` | SF Mono / JetBrains Mono / Menlo | 代码、时间戳、标签 |
-| `--display` | Instrument Serif / Source Han Serif SC | 大标题、数字展示 |
+| 类别 (Token) | 字体栈定义 | 适用场景 |
+| :--- | :--- | :--- |
+| **display** (`--display`) | `'Instrument Serif'`, `'Source Han Serif SC'`, Georgia, serif | 大标题、突出数字、强调倾斜字 |
+| **sans** (`--sans`) | `'Inter'`, `'PingFang SC'`, -apple-system, Arial, sans-serif | 默认阅读文本、组件标题、按钮等 |
+| **mono** (`--mono`) | ui-monospace, `'SF Mono'`, `'JetBrains Mono'`, monospace | 时间戳、参数值、小标签、KBD 键、日志 |
 
-### 2.2 字体级别
+### 2.2 辅助排版类名 (Typography Helpers)
 
-| 类名 | 字号 | 场景 |
-|------|------|------|
-| `.display` | 由容器控制（clamp） | 页面大标题（Hero h1、统计数字） |
-| `.lede` | 17px / 1.55 | Hero 区域引导段落 |
-| `.eyebrow` | 11px / mono / uppercase / 0.14em | 区域小标签（"PIPELINE"、"RECENT"） |
-| `.mono` | 继承父级 | 行内等宽文字 |
-| `.kw` | 10.5px / mono | 关键词高亮标签 |
+- `.display`: 启用衬线展示字体，字重 `400`，`letter-spacing: -0.02em; line-height: 0.95`。
+- `.lede`: 引导正文段落，字号 `17px`，行高 `1.55`。
+- `.eyebrow`: 用于卡片上方的小眉标，`11px`，等宽，全大写，`letter-spacing: 0.14em`，颜色为 `var(--ink-3)`。
+- `.mono`: 行内局部文本启用等宽字体。
+- `.kw`: 关键词高亮小气泡标签，字号 `10.5px`，使用 `mono`。
 
 ---
 
-## 3. 间距
+## 3. 圆角与阴影 (Radius & Shadows)
 
-### 3.1 Spacing Scale
+### 3.1 圆角 Scale
+Remix 规范采用了更为饱满圆滑的倒角：
+- `--radius-sm`: `10px`，用于表单输入框、下拉框、小按钮、chip 标签、kbd 键和内部小缩略图。
+- `--radius`: `18px` (基准圆角)，用于常规任务卡片、设置弹窗面板、详情页结果区块等。
+- `--radius-lg`: `28px`，用于主容器，如 URL Composer 面板、Summary 主体容器等。
+- `--radius-pill`: `99px`，用于全圆角胶囊按钮、流程指示点和 Step Pill 管道。
 
-| Token | 值 | 常见用途 |
-|-------|----|---------|
-| `--sp-1` | 4px | 图标与文字间距、紧凑 gap |
-| `--sp-2` | 8px | 列表项间距、小 padding |
-| `--sp-3` | 12px | 按钮内部 padding、中等 gap |
-| `--sp-4` | 16px | 卡片内 padding、标准 gap |
-| `--sp-5` | 20px | 区域 padding |
-| `--sp-6` | 24px | 大区域间距 |
-| `--sp-8` | 32px | section 间距 |
-
-### 3.2 密度规则
-
-- **紧凑区**（toolbar、chip 行）：`--sp-1` ~ `--sp-2`
-- **标准区**（卡片内容、表单）：`--sp-3` ~ `--sp-4`
-- **宽松区**（section 之间、页面 padding）：`--sp-6` ~ `--sp-8`
+### 3.2 阴影 Scale
+- `--shadow-sm`: `0 1px 2px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.04)` — 用于小卡片、菜单弹出层。
+- `--shadow-md`: `0 6px 24px rgba(0,0,0,0.08)` — 用于主 Composer 面板。
+- `--shadow-lg`: `0 24px 80px rgba(0,0,0,0.18)` — 用于侧拉抽屉、全屏模态框。
 
 ---
 
-## 4. 圆角
+## 4. 间距与密度 (Spacing & Density)
 
-| Token | 值 | 场景 |
-|-------|----|------|
-| `--radius-sm` | 10px | 小元素（chip、kbd、缩略图） |
-| `--radius` | 18px | 卡片、面板（默认） |
-| `--radius-lg` | 28px | 大卡片（Composer、Summary） |
-| `--radius-pill` | 99px | 胶囊形（按钮、badge、step pill） |
+### 4.1 Spacing Scale
+- `4px` (`--sp-1`): 图标与文本的间距、极紧凑布局
+- `8px` (`--sp-2`): 列表间距、内容 Padding、小 Gap
+- `12px` (`--sp-3`): 按钮内部横向 Padding、常规 Flex Gap
+- `16px` (`--sp-4`): 标准卡片 Padding、网格间距 (standard gap)
+- `20px` (`--sp-5`): 详情页区域 Margin、大区域 Padding
+- `24px` (`--sp-6`): 工作区外边距、大区段间距
+- `32px` (`--sp-8`): Section 级间距、Hero 主标题上方 Padding
+
+### 4.2 密度 Tweaks 规则
+界面通过 `[data-density]` 属性支持三种密度切换：
+1. **compact**（紧凑）：行高缩至 `0.92`，卡片 padding 与 margin 等比缩至 `0.85`。
+2. **cozy**（标准，默认）：基准比例。
+3. **roomy**（宽松）：各项间距比例扩至 `1.15` 倍。
 
 ---
 
-## 5. 按钮
+## 5. 交互与动效 (Transitions)
 
-### 5.1 三种形态
+### 5.1 动画物理曲线
+- 动画加速曲线统一使用：`cubic-bezier(0.4, 0, 0.2, 1)`。
+- 绝不使用超调或弹跳动效（no bounce/overshoot），确保专业低调的生产力工具调性。
 
-| 类名 | 样式 | 场景 |
-|------|------|------|
-| `.btn` | 白底 + 边框 | 次要操作（"取消"、"筛选"） |
-| `.btn-ghost` | 透明无边框 | 工具栏图标按钮、最小干扰操作 |
-| `.btn-primary` | 黑底白字 | 主操作（"保存"、"确认"） |
-| `.btn-run` | 黑底 + 红色图标圆 | 启动任务（Composer 的"开始解析"） |
+### 5.2 状态过渡时间
+- **微交互状态** (按钮 hover、数据勾选、文字高亮): `120ms – 160ms`。
+- **组件级状态** (切换 Tab、卡片上浮、列表重排): `200ms – 220ms`。
+- **大面板出入** (抽屉拉出、侧边对话框展示、模态框浮现): `280ms`。
+- **进度条缓动** (处理进度增长插值): `400ms`。
 
-### 5.2 使用规则
+---
 
-- 一个区域最多一个 `.btn-primary` 或 `.btn-run`
-- 禁用态：`opacity: 0.5; pointer-events: none`
-- hover 态由 token 自带，不需要额外 class
+## 6. 默认预设与业务契约 (Presets & Contracts)
+
+根据 `system_design_v1.1.md` §15，前端呈现和交互处理须遵循如下默认契约：
+
+1. **并行处理限制**：
+   - 轻量配置（4 核 / 8GB）建议并行任务数：`1`（最大允许 2）
+   - 中等配置（8 核 / 16GB）建议并行任务数：`2`（最大允许 4）
+   - 重度配置（16+ 核 / 32GB+）建议并行任务数：`4`（最大允许 8）
+2. **可跳过的中间阶段**：
+   - 画面准备 (`frames`)：可跳过（跳过则自动将总结路径退化为纯文本路径 1）
+   - 人声转录 (`asr`)：可跳过（跳过则字幕为空，总结只基于画面或视频模型进行）
+   - 视觉大模型分析 (`vlm`)：部分可跳过（单帧 API 报错 3 次后该帧标为“分析失败”，但任务整体不报错）
+   - 总结与入库 (`sum` / `store`)：不可跳过，是作业的终态核心价值。
+3. **存储与清理保留时间**：
+   - 临时生成的截帧和音频：默认保留 `14` 天，归档任务保留 `3` 天。

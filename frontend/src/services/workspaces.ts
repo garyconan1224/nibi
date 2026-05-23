@@ -471,11 +471,53 @@ export interface PromptVersion {
   created_at: string
 }
 
+export interface KeyPoint {
+  text: string
+  source_excerpt?: string
+  char_start?: number
+  char_end?: number
+  para_index?: number
+}
+
+export interface GoldenQuote {
+  quote_text: string
+  char_start: number
+  char_end: number
+  para_index: number
+}
+
+export interface StructuredSummary {
+  abstract: string
+  key_points: KeyPoint[]
+  golden_quotes: GoldenQuote[]
+}
+
+/** T1.2: 逐段对照用的段落数组结构 */
+export interface AlignedTextSection {
+  full_text: string
+  paragraphs: string[]
+}
+
+/** 兼容旧版纯字符串和 T1.2 新版结构化格式 */
+export type MaybeAligned = string | AlignedTextSection
+
+export function normalizeAligned(val: MaybeAligned | undefined): AlignedTextSection | null {
+  if (!val) return null
+  if (typeof val === 'string') {
+    return {
+      full_text: val,
+      paragraphs: val.split(/\n{2,}/).filter(p => p.trim()),
+    }
+  }
+  return val
+}
+
 export interface TextResult {
   source: string
   title: string
   content: string
-  summary: string
+  summary: string | StructuredSummary
+  summary_version?: number
   char_count: number
   source_type: string
   source_url: string
@@ -483,10 +525,10 @@ export interface TextResult {
   prompt_versions: PromptVersion[]
   /** N10: 联想归纳 {方向: 分析} */
   associations?: Record<string, string>
-  /** N10: 改写/润色 {风格: 结果} */
-  rewrites?: Record<string, string>
-  /** N10: 翻译 {语言代码: 结果} */
-  translations?: Record<string, string>
+  /** N10: 改写/润色 {风格: 结果} — T1.2 升级为 AlignedTextSection */
+  rewrites?: Record<string, MaybeAligned>
+  /** N10: 翻译 {语言代码: 结果} — T1.2 升级为 AlignedTextSection */
+  translations?: Record<string, MaybeAligned>
 }
 
 /** GET /workspaces/{id}/items/{itemId}/text_result — 文本结果页聚合数据 */
