@@ -155,6 +155,25 @@ checkpoint 保持短小，只写：
 
 ---
 
+## CodeGraph 语义检索 (MCP)
+
+本项目已初始化本地代码知识图谱 CodeGraph（已配置 `.gitignore` 过滤 `.codegraph/` 缓存）。
+
+### Claude Code 终端版接入步骤
+1. **添加 MCP 服务**：在终端运行以下命令，将 CodeGraph 注册到 Claude Code：
+   ```bash
+   claude mcp add codegraph npx -- -y @colbymchenry/codegraph start
+   ```
+2. **验证状态**：运行以下命令确认已成功添加并处于可用状态：
+   ```bash
+   claude mcp list
+   ```
+3. **日常使用建议**：
+   - 寻找函数调用关系或评估改动影响时，鼓励优先使用 `codegraph_callers`、`codegraph_callees` 和 `codegraph_impact`，代替昂贵的全项目 grep 搜索与大文件 view 动作。
+   - 每次代码改动后，在终端运行 `npx @colbymchenry/codegraph sync`（或依靠其内置的文件监听器）以保持图谱数据最新。
+
+---
+
 ## 高层架构
 
 ### 后端（`backend/app/`）
