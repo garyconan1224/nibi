@@ -300,14 +300,15 @@ git log --oneline -10
 - A3.2 用户确认后跳过 ASR 直接走音乐分析
 - A3.3 多段音乐 6 维度切分 UI
 
-### A4 字幕导出 + .srt/.ass/.vtt 格式
+### A4 字幕导出 + .srt/.ass/.vtt 格式 ✅
 
 **索引**：`音频.png` 中"字幕导出"分支
 **模型**：⭐ DS v4-pro
 **分支**：`feat/a4-subtitle-export`
 **子任务**：
-- A4.1 后端字幕生成支持多格式
-- A4.2 前端导出按钮（在 AudioResultPage / VideoResultPage）
+- [x] A4.1 后端字幕生成支持多格式（`2559164`）
+- [x] A4.2 前端导出按钮（在 AudioResultPage / VideoResultPage）（`acfb00b`）
+- [x] A4 收口修复：overlay 优先读取、display transcript 归一化、demo fixture fallback、测试补齐（`e830889` `9d061dc` `0f4e98f` `476a354`）
 
 ---
 

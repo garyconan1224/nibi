@@ -4,7 +4,33 @@
 >
 > **维护规则**：每完成一个子任务，在本文件**追加**一段（不删旧记录），格式见下方"记录模板"。
 >
-> Last updated: 2026-05-23 (V3.3 LLM 自动检测视频模板)
+> Last updated: 2026-05-23 (A4 字幕导出)
+
+---
+
+## Phase A4 – 字幕导出（.srt / .vtt / .ass）
+
+**完成日期**：2026-05-23
+**模型 / 工具**：DS v4-pro + Codex QA
+**分支**：main
+**Commit**：2559164 / acfb00b / e830889 / 9d061dc / 0f4e98f / 476a354
+
+### 影响范围
+- 后端：`backend/app/routes/export.py` 新增独立字幕导出端点
+- 后端：`shared/audio_analyzer.py` 新增 `.vtt` / `.ass` 导出函数，复用已有 `.srt`
+- 前端：`AudioResultPage.tsx` / `VideoResultPage.tsx` 增加字幕导出按钮
+- 前端：`frontend/src/services/workspaces.ts` 新增 `downloadSubtitles()`
+- 测试：`tests/backend/test_export_api.py` 补字幕端点格式与错误路径覆盖
+
+### 关键改动
+- `GET /workspaces/{workspace_id}/items/{item_id}/subtitles?format=srt|vtt|ass` 返回独立字幕文件下载。
+- 字幕来源按 `segments` → `transcript_segments` → `transcript` 降级，并兼容 display transcript 的 `t_sec` 字段。
+- 端点优先读取 task overlay，避免任务结果已生成但尚未写回 `item.results` 时导出 404。
+- demo result 页展示占位字幕时，导出端点同步提供 demo 字幕，避免页面可见但无法导出的不一致。
+
+### 留给后续的影响
+- A4 只做导出，不做字幕内容编辑；说话人标签人工修正仍在 A2。
+- `.playwright-mcp/` 是本地浏览器验证产物，已加入 `.gitignore`，不进入版本库。
 
 ---
 

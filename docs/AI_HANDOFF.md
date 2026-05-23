@@ -1,6 +1,6 @@
 # AI Handoff
 
-Last updated: 2026-05-23（V3.3 视频模板 LLM 自动检测完成）
+Last updated: 2026-05-23（A4 字幕导出完成）
 
 ---
 
@@ -187,10 +187,18 @@ git branch --show-current
 
 按 `docs/ROADMAP.md` §11，V2 + V3 完成后继续做 **A2 + A3 + A4（音频深化）**；`[C] AI 导演` 与 `[D] 开源准备` 仍排在后面，暂不启动。
 
+### ✅ A4 字幕导出（2026-05-23 已完成）
+
+- 后端：`GET /workspaces/{workspace_id}/items/{item_id}/subtitles?format=srt|vtt|ass`
+- 格式：`.srt` / `.vtt` / `.ass`，支持 `segments` / `transcript_segments` / display `transcript(t_sec)` 三类结果结构
+- 数据源：优先读 task overlay，其次读 `item.results`；demo result 页有占位字幕时，导出端点也保持一致 fallback
+- 前端：AudioResultPage / VideoResultPage 增加「字幕」下拉导出按钮
+- 额外修复：`auto-create` 去掉同步 LLM 命名，避免 15s 前端超时
+- 验证：后端全量 268 passed / 2 skipped；前端 build + vitest 通过；full lint 仍被 47 个存量 error 挡住
+
 单 agent 串行建议按低风险到高复杂度推进：
-1. **A4 字幕导出**：后端支持 `.srt` / `.ass` / `.vtt`，前端在 AudioResultPage / VideoResultPage 加导出按钮
-2. **A3 无人声切音乐模式**：VAD 检测无人声占比，用户确认后跳过 ASR 走音乐分析
-3. **A2 说话人编辑修正 UI**：音频结果页说话人轨道、标签编辑、后端 PATCH、speaker mapping 持久化
+1. **A3 无人声切音乐模式**：VAD 检测无人声占比，用户确认后跳过 ASR 走音乐分析
+2. **A2 说话人编辑修正 UI**：音频结果页说话人轨道、标签编辑、后端 PATCH、speaker mapping 持久化
 
 ### 🥈 补 #6~#8 URL + 收口 F2
 

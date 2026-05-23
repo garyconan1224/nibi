@@ -97,6 +97,65 @@ def test_export_image_happy_path(client: TestClient) -> None:
     assert srt == ""
 
 
+def test_export_subtitles_srt_from_audio_segments(client: TestClient) -> None:
+    ws_id, item_id = _create_workspace_with_item(client, "audio")
+    ws_module._store.update_item(
+        ws_id,
+        item_id,
+        results={
+            "transcript_segments": [
+                {"start": 0.0, "end": 1.5, "text": "第一句", "speaker": "S0"},
+                {"start": 1.5, "end": 3.0, "text": "第二句"},
+            ],
+        },
+        status="done",
+    )
+
+    resp = client.get(f"/workspaces/{ws_id}/items/{item_id}/subtitles?format=srt")
+
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/plain")
+    assert "filename*=UTF-8''" in resp.headers.get("content-disposition", "")
+    body = resp.content.decode()
+    assert "00:00:00,000 --> 00:00:01,500" in body
+    assert "[S0] 第一句" in body
+    assert "00:00:01,500 --> 00:00:03,000" in body
+
+
+def test_export_subtitles_vtt_from_video_display_transcript(client: TestClient) -> None:
+    ws_id, item_id = _create_workspace_with_item(client, "video")
+    ws_module._store.update_item(
+        ws_id,
+        item_id,
+        results={
+            "summary_path": "subtitle",
+            "transcript": [
+                {"t_sec": 0.0, "t_str": "00:00", "text": "开场"},
+                {"t_sec": 2.0, "t_str": "00:02", "text": "第二段"},
+            ],
+        },
+        status="done",
+    )
+
+    resp = client.get(f"/workspaces/{ws_id}/items/{item_id}/subtitles?format=vtt")
+
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/vtt")
+    body = resp.content.decode()
+    assert body.startswith("WEBVTT")
+    assert "00:00:00.000 --> 00:00:02.000" in body
+    assert "00:00:02.000 --> 00:00:07.000" in body
+
+
+def test_export_subtitles_rejects_unknown_format(client: TestClient) -> None:
+    ws_id, item_id = _create_workspace_with_item(client, "audio")
+
+    resp = client.get(f"/workspaces/{ws_id}/items/{item_id}/subtitles?format=txt")
+
+    assert resp.status_code == 400
+    assert "unsupported format" in resp.json()["detail"]
+
+
 def test_export_404_workspace_not_found(client: TestClient) -> None:
     resp = client.get("/workspaces/nonexistent/items/anything/export")
     assert resp.status_code == 404
