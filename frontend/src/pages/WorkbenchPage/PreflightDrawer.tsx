@@ -15,7 +15,7 @@ import type { SniffResult } from '@/services/workspaces'
 import type { ItemType } from '@/types/workspace'
 import type { ComposerDefaults, QualityOption } from './types'
 import { OUTPUT_FORMAT_OPTIONS } from '@/lib/preflightTasks'
-import type { VideoOutputFormat } from '@/lib/preflightTasks'
+import type { RewriteStyle, VideoOutputFormat } from '@/lib/preflightTasks'
 
 const QUALITY_MAP: Record<QualityOption, string> = {
   '最高画质': 'best',
@@ -79,6 +79,10 @@ export function PreflightDrawer({
   const [summaryPath, setSummaryPath] = useState<SummaryPath>('detailed')
   const [videoTemplate, setVideoTemplate] = useState('auto')
   const [outputFormat, setOutputFormat] = useState<VideoOutputFormat>('summary')
+  const [textRewriteEnabled, setTextRewriteEnabled] = useState(false)
+  const [textRewriteStyle, setTextRewriteStyle] = useState<RewriteStyle>('formal')
+  const [textTranslateEnabled, setTextTranslateEnabled] = useState(false)
+  const [textTranslateLang, setTextTranslateLang] = useState('en')
   const navigate = useNavigate()
 
   // Track which Composer defaults have been applied
@@ -115,6 +119,10 @@ export function PreflightDrawer({
       setSummaryPath('detailed')
       setVideoTemplate('auto')
       setOutputFormat('summary')
+      setTextRewriteEnabled(false)
+      setTextRewriteStyle('formal')
+      setTextTranslateEnabled(false)
+      setTextTranslateLang('en')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -249,6 +257,16 @@ export function PreflightDrawer({
               depth: 'normal',
               video_template: videoTemplate,
               output_format: outputFormat,
+            }
+          }
+          if (itemType === 'text') {
+            tasks.rewrite = {
+              enabled: textRewriteEnabled,
+              style: textRewriteStyle,
+            }
+            tasks.translate = {
+              enabled: textTranslateEnabled,
+              target_lang: textTranslateLang,
             }
           }
 
@@ -439,6 +457,68 @@ export function PreflightDrawer({
                   </div>
                 </>
               )}
+            </section>
+          )}
+
+          {/* Section 2b: Text processing options */}
+          {(selectedTypes?.length
+            ? selectedTypes.some((t) => t === '文字' || t === 'text')
+            : resolvedType === 'text') && (
+            <section className="pf-section">
+              <h4 className="pf-section-title">文本处理选项</h4>
+
+              {/* 改写 / 润色 */}
+              <div className="pf-field">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={textRewriteEnabled}
+                    onChange={(e) => setTextRewriteEnabled(e.target.checked)}
+                  />
+                  改写 / 润色
+                </label>
+                {textRewriteEnabled && (
+                  <select
+                    value={textRewriteStyle}
+                    onChange={(e) => setTextRewriteStyle(e.target.value as RewriteStyle)}
+                    style={{ marginTop: 6 }}
+                  >
+                    <option value="formal">正式</option>
+                    <option value="casual">口语</option>
+                    <option value="concise">简洁</option>
+                    <option value="rich">丰富</option>
+                  </select>
+                )}
+              </div>
+
+              {/* 翻译 */}
+              <div className="pf-field">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={textTranslateEnabled}
+                    onChange={(e) => setTextTranslateEnabled(e.target.checked)}
+                  />
+                  翻译
+                </label>
+                {textTranslateEnabled && (
+                  <select
+                    value={textTranslateLang}
+                    onChange={(e) => setTextTranslateLang(e.target.value)}
+                    style={{ marginTop: 6 }}
+                  >
+                    <option value="en">英文</option>
+                    <option value="ja">日文</option>
+                    <option value="ko">韩文</option>
+                    <option value="zh">中文</option>
+                    <option value="es">西班牙文</option>
+                    <option value="fr">法文</option>
+                    <option value="de">德文</option>
+                    <option value="ru">俄文</option>
+                    <option value="pt">葡萄牙文</option>
+                  </select>
+                )}
+              </div>
             </section>
           )}
 

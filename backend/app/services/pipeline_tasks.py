@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import re
 import subprocess
 import time
 import urllib.request
@@ -1084,6 +1085,93 @@ def _text_llm_call(
         return ""
 
 
+def _find_para_index(char_pos: int, paragraphs: list[str]) -> int:
+    """按字符偏移定位所属段落序号（0 起始）。"""
+    cumulative = 0
+    for i, para in enumerate(paragraphs):
+        cumulative += len(para)
+        if char_pos < cumulative:
+            return i
+        cumulative += 2  # "\n\n" 分隔符
+    return len(paragraphs) - 1 if paragraphs else 0
+
+
+def _parse_structured_summary(raw: str, content: str, log: Any) -> dict[str, Any]:
+    """解析 LLM 返回的 JSON 摘要，并对金句/要点做原文子串校验和位置计算。"""
+    # 剥离 ``` 代码块包裹
+    text = raw.strip()
+    if text.startswith("```"):
+        text = text.removeprefix("```")
+        if text.lower().startswith("json"):
+            text = text[4:]
+        text = text.strip().removesuffix("```").strip()
+
+    # 尝试 JSON 解析
+    parsed: dict[str, Any] = {}
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        # 尝试截取 { ... } 重试
+        lbrace = text.find("{")
+        rbrace = text.rfind("}")
+        if lbrace != -1 and rbrace != -1 and rbrace > lbrace:
+            try:
+                parsed = json.loads(text[lbrace : rbrace + 1])
+            except json.JSONDecodeError:
+                pass
+
+    abstract = str(parsed.get("abstract", raw)) if parsed else raw
+    key_points_raw = parsed.get("key_points", []) if parsed else []
+    quotes_raw = parsed.get("golden_quotes", []) if parsed else []
+
+    paragraphs = content.split("\n\n")
+
+    # 校验金句：必须是原文精确子串
+    golden_quotes: list[dict[str, Any]] = []
+    for q in quotes_raw:
+        if not isinstance(q, dict):
+            continue
+        quote_text = str(q.get("quote_text", "")).strip()
+        if not quote_text:
+            continue
+        pos = content.find(quote_text)
+        if pos == -1:
+            log(f"⚠️  金句子串校验失败，已丢弃: {quote_text[:60]}...")
+            continue
+        golden_quotes.append(
+            {
+                "quote_text": quote_text,
+                "char_start": pos,
+                "char_end": pos + len(quote_text),
+                "para_index": _find_para_index(pos, paragraphs),
+            }
+        )
+
+    # 校验要点 source_excerpt
+    key_points: list[dict[str, Any]] = []
+    for kp in key_points_raw:
+        if not isinstance(kp, dict):
+            continue
+        text_kp = str(kp.get("text", "")).strip()
+        excerpt = str(kp.get("source_excerpt", "")).strip()
+        if not text_kp:
+            continue
+        item: dict[str, Any] = {"text": text_kp}
+        if excerpt:
+            pos = content.find(excerpt)
+            if pos != -1:
+                item["source_excerpt"] = excerpt
+                item["char_start"] = pos
+                item["char_end"] = pos + len(excerpt)
+                item["para_index"] = _find_para_index(pos, paragraphs)
+            else:
+                log(f"⚠️  要点 source_excerpt 未在原文找到，已丢弃: {excerpt[:60]}...")
+                continue
+        key_points.append(item)
+
+    return {"abstract": abstract, "key_points": key_points, "golden_quotes": golden_quotes}
+
+
 def _summarize_text(
     *,
     content: str,
@@ -1091,18 +1179,27 @@ def _summarize_text(
     settings,
     payload: Dict[str, Any],
     log: Any,
-) -> str:
-    """对正文做一轮 LLM 摘要。支持 preflight summary.length 参数。"""
+) -> Dict[str, Any]:
+    """对正文做一轮 LLM 摘要，返回结构化 dict（abstract + key_points + golden_quotes）。"""
     summary_params = payload.get("summary") or {}
     length_map = {"short": 50, "medium": 100, "long": 200}
     length = length_map.get(summary_params.get("length", "medium"), 100)
 
     sys_prompt = (
-        f"你是一名严谨的中文文档摘要助手。请基于给定正文，输出 Markdown 格式的摘要，"
-        f"摘要约 {length} 字，结构为：1) 一句话摘要；2) 3–6 条要点（项目符号）；3) 关键术语（若有，最多 5 个）。"
+        f"你是一名严谨的中文文档摘要助手。请基于给定正文，输出一个 JSON 对象，"
+        f"结构必须严格如下（不要输出任何其他内容）：\n\n"
+        f'{{"abstract": "约{length}字的一段话摘要", '
+        f'"key_points": [{{"text": "归纳性要点句", "source_excerpt": "该要点对应的原文精确片段"}}], '
+        f'"golden_quotes": [{{"quote_text": "原文中一字不差的精确引文"}}]}}\n\n'
+        f"关键规则：\n"
+        f"- quote_text 必须是原文中的逐字原文，直接复制粘贴，不得改写、不得增减任何字。\n"
+        f"- source_excerpt 也必须是原文中的精确片段，用于锚定要点位置。\n"
+        f"- abstract 约 {length} 字。\n"
+        f"- key_points 输出 3–6 条。\n"
+        f"- 只输出 JSON 对象本身，不要用 ``` 代码块包裹，不要加任何解释性文字。"
         "不要编造文中没有的事实。"
     )
-    return _text_llm_call(
+    raw = _text_llm_call(
         content=content,
         title=title,
         sys_prompt=sys_prompt,
@@ -1110,8 +1207,11 @@ def _summarize_text(
         settings=settings,
         payload=payload,
         log=log,
-        max_tokens=int(payload.get("summary_max_tokens") or 1024),
+        max_tokens=int(payload.get("summary_max_tokens") or 2048),
     )
+    if not raw:
+        return {"abstract": "", "key_points": [], "golden_quotes": []}
+    return _parse_structured_summary(raw, content, log)
 
 
 def _associate_text(
@@ -1241,6 +1341,11 @@ def _translate_text(
     )
 
 
+def _split_paragraphs(text: str) -> list:
+    """按双换行拆分为段落数组，去除首尾空白和空段。"""
+    return [p.strip() for p in re.split(r"\n{2,}", text) if p.strip()]
+
+
 def handle_text_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     """文本输入层任务（Phase 2C.1）。
 
@@ -1334,7 +1439,10 @@ def handle_text_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             log=log,
         )
         if result:
-            rewrites[rewrite_params["style"]] = result
+            rewrites[rewrite_params["style"]] = {
+                "full_text": result,
+                "paragraphs": _split_paragraphs(result),
+            }
 
     # ── 3.7 N10: 翻译 ──────────────────────────────────────
     translations: Dict[str, str] = {}
@@ -1352,7 +1460,10 @@ def handle_text_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             log=log,
         )
         if result:
-            translations[translate_params["target_lang"]] = result
+            translations[translate_params["target_lang"]] = {
+                "full_text": result,
+                "paragraphs": _split_paragraphs(result),
+            }
 
     # ── 4. STORE ────────────────────────────────────────────
     runner.store.update(task_id, status=TaskStatus.STORE.value)
@@ -1366,8 +1477,31 @@ def handle_text_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     md_parts = [
         f"# {doc.title}\n\n",
         f"> 来源：{doc.source} ｜ 类型：{doc.source_type} ｜ 字符数：{doc.char_count}\n\n",
-        f"## 摘要\n\n{summary.strip() if summary else '_（未生成摘要）_'}\n\n",
     ]
+    # 结构化摘要 → Markdown
+    if isinstance(summary, dict):
+        abstract = summary.get("abstract", "")
+        key_points = summary.get("key_points", [])
+        golden_quotes = summary.get("golden_quotes", [])
+        if abstract:
+            md_parts.append(f"## 摘要\n\n{abstract}\n\n")
+        if key_points:
+            md_parts.append("## 要点\n\n")
+            for i, kp in enumerate(key_points, 1):
+                md_parts.append(f"{i}. {kp['text']}\n")
+                if kp.get("source_excerpt"):
+                    md_parts.append(f"   > 原文：{kp['source_excerpt']}\n")
+            md_parts.append("\n")
+        if golden_quotes:
+            md_parts.append("## 金句\n\n")
+            for q in golden_quotes:
+                md_parts.append(f"> {q['quote_text']}\n\n")
+        if not abstract and not key_points and not golden_quotes:
+            md_parts.append("## 摘要\n\n_（未生成摘要）_\n\n")
+    elif summary:
+        md_parts.append(f"## 摘要\n\n{summary.strip()}\n\n")
+    else:
+        md_parts.append("## 摘要\n\n_（未生成摘要）_\n\n")
     if associations:
         md_parts.append("## 联想归纳\n\n")
         for direction, analysis in associations.items():
@@ -1393,6 +1527,7 @@ def handle_text_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 "associations": associations,
                 "rewrites": rewrites,
                 "translations": translations,
+                "summary_version": 2,
             },
             ensure_ascii=False,
             indent=2,
@@ -1406,6 +1541,7 @@ def handle_text_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         "title": doc.title,
         "content": doc.content,
         "summary": summary,
+        "summary_version": 2,
         "associations": associations,
         "rewrites": rewrites,
         "translations": translations,

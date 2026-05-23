@@ -1814,7 +1814,7 @@ def get_text_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
 
     # 优先从 item.results 读取
     results = item.results or {}
-    has_real = isinstance(results, dict) and results.get("content") and results.get("title")
+    has_real = isinstance(results, dict) and "content" in results and bool(results.get("title"))
     if has_real:
         payload = dict(results)
         payload.setdefault("source", "item_results")
@@ -1831,7 +1831,7 @@ def get_text_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
             continue
         task_result = task.result or {}
         # 优先用 task.result 里的数据
-        if task_result.get("content") and task_result.get("title"):
+        if "content" in task_result and bool(task_result.get("title")):
             payload = dict(task_result)
             payload.setdefault("source", "task_result")
             payload["prompt_versions"] = [
@@ -1840,7 +1840,7 @@ def get_text_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
             return payload
         # 再尝试磁盘 JSON
         disk_data = _read_text_result_from_disk(task_id, project_id)
-        if disk_data and disk_data.get("content"):
+        if disk_data and "content" in disk_data:
             disk_data.setdefault("source", "disk_json")
             disk_data["prompt_versions"] = [
                 pv.to_dict() for pv in rec.prompt_versions.get(item_id) or []
