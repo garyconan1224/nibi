@@ -317,6 +317,36 @@ checkpoint 保持短小，只写：
 - 组件文件 PascalCase（`TaskCard.tsx`），hook 用 `useXxx`。
 - 错误用 toast 提示用户，不用 `alert()`。
 
+### 前端 UI 与设计规范 (Remix 版)
+
+所有前端 UI 的开发和更新，必须严格遵循 `/Users/conan/Downloads/vidmirror (Remix)` 沉淀的 Remix 设计规范，禁止使用任何硬编码（magic values）的颜色或边框：
+
+- **设计风格 (Vibe)**: Bold AI-creative vibe，极简的科技与艺术感。大字号 serif 衬线体标题配高饱和度 Accent 色块。
+- **颜色语义 (Semantic Colors)**:
+  - 紫色 (`--accent-2` / `#B84CFF`): 任务系统、视频模块、AI 分析层组件。
+  - 绿色 (`--accent-green` / `#22D39A`): 音频模块、可导出节点、完成/成功态。
+  - 蓝色 (`--accent-3` / `#3C77FB`): 图片模块、结构化层展示。
+  - 灰色 (`--ink-3` / `#6B6B6B`): 文字模块、系统处理节点、状态元信息。
+  - 橙色 (`--accent-warm` / `#FFB84C`): 用户决策节点、勾选面板、分镜。
+  - 红色 (`--accent` / `#FF4D7E`): 输入/输出层、入口/最终输出按钮。
+  - 深红 (`--accent-deep` / `#C8365A`): 复刻专项（Director）卡片或专属功能。
+- **背景与中性色 (Neutrals)**:
+  - 基础背景: `--bg` (Light: `#f6f5f0` / Dark: `#0d0c10`)
+  - 提升浮层 (卡片/弹窗): `--bg-elev` (Light: `#ffffff` / Dark: `#16151b`)
+  - 凹陷背景 (输入框/代码块): `--bg-sunken` (Light: `#efede6` / Dark: `#0a0a0d`)
+  - 文字等级: `--ink` (主文字)、`--ink-2` (正文)、`--ink-3` (辅助)、`--ink-4` (最淡元信息/占位符)
+  - 边框分割: `--line` (`rgba(0,0,0,0.08)` / `rgba(255,255,255,0.08)`)、`--line-strong` (Hover 态 border)
+- **字体栈 (Typography)**:
+  - Display: `Instrument Serif`, `Source Han Serif SC`, `Noto Serif SC`, Georgia, serif (对应 `.display` 类名)
+  - Sans (默认): `Inter`, `PingFang SC`, -apple-system, BlinkMacSystemFont, Arial, sans-serif
+  - Mono: `JetBrains Mono`, `SF Mono`, ui-monospace (对应 `.mono` / `.eyebrow` / `.kw`)
+- **圆角与阴影 (Radius & Shadow)**:
+  - 圆角: `--radius` (`18px` 默认卡片)、`--radius-sm` (`10px` 按钮/chip/kbd)、`--radius-lg` (`28px` Composer/Summary大容器)、`--radius-pill` (`99px` 胶囊按钮)
+  - 阴影: `--shadow-sm` (小卡片)、`--shadow-md` (Composer)、`--shadow-lg` (大悬浮面板)
+- **动效与交互 (Transitions)**:
+  - 动画加速曲线: `cubic-bezier(0.4, 0, 0.2, 1)`
+  - 过渡时间: 状态变更 120-220ms，抽屉/面板出入 280ms，进度条插值 400ms。避免不必要的装饰动效，切忌弹跳/overshoot。
+
 ### 通用
 - **单文件不超过 200 行**，超过就拆分。
 - 不要写注释解释"代码在做什么"（让代码本身可读）。注释只用于解释"为什么这么做"。
