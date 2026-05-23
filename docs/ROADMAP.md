@@ -4,7 +4,7 @@
 > **不是**：不是详细执行计划。详细计划在 `docs/plans/phase-XXX.md`（进入对应 phase 时由 AI 展开）。
 > **遵循**：[CLAUDE.md](../CLAUDE.md) 工作流 + 全局规则 + 模型选择策略 + 长期记忆（`~/.claude/projects/-Users-conan-Desktop-nibi/memory/MEMORY.md`）。
 >
-> Last updated: 2026-05-22（F2 冒烟 8/10 通过，3 Bug 已修）
+> Last updated: 2026-05-23（新增 `docs/flows/*.md` 流程图文本镜像，Claude Code 终端优先读 Markdown）
 
 ---
 
@@ -31,18 +31,18 @@ git log --oneline -10
 
 ## 1. 资源索引（哪里找什么）
 
-### 1.1 用户需求源（流程图 5 张）
+### 1.1 用户需求源（流程图文本镜像 + 源图）
 
-| 文件 | 内容 |
-|---|---|
-| `docs/conversation-inputs/2026-05-18-spec-merge/流程全.png` | 总流程图（输入 → 分析 → 结果 → 复刻）|
-| `docs/conversation-inputs/2026-05-18-spec-merge/视频.png` | 视频分支（3 总结路径 + 字幕清洗 + 视频类型模板）|
-| `docs/conversation-inputs/2026-05-18-spec-merge/音频.png` | 音频分支（6 任务勾选 + 人声/音乐双路）|
-| `docs/conversation-inputs/2026-05-18-spec-merge/图片.png` | 图片分支（基本信息 + 任务勾选）|
-| `docs/conversation-inputs/2026-05-18-spec-merge/文字.png` | 文字分支（3 种输入 + 4 并行任务）|
-| `docs/conversation-inputs/2026-05-18-spec-merge/场景复刻.png` | 复刻路径（[C] AI 导演方向）|
+| 优先读 | 源图 | 内容 |
+|---|---|---|
+| `docs/flows/overview.md` | `docs/conversation-inputs/2026-05-18-spec-merge/流程全.png` | 总流程图（输入 -> 分析 -> 结果 -> 复刻）|
+| `docs/flows/video.md` | `docs/conversation-inputs/2026-05-18-spec-merge/视频.png` | 视频分支（3 总结路径 + 字幕清洗 + 视频类型模板）|
+| `docs/flows/audio.md` | `docs/conversation-inputs/2026-05-18-spec-merge/音频.png` | 音频分支（6 任务勾选 + 人声/音乐双路）|
+| `docs/flows/image.md` | `docs/conversation-inputs/2026-05-18-spec-merge/图片.png` | 图片分支（基本信息 + 任务勾选）|
+| `docs/flows/text.md` | `docs/conversation-inputs/2026-05-18-spec-merge/文字.png` | 文字分支（3 种输入 + 4 并行任务）|
+| `docs/flows/remix.md` | `docs/conversation-inputs/2026-05-18-spec-merge/场景复刻.png` | 复刻路径（[C] AI 导演方向）|
 
-**AI 阅读建议**：每次开始一个 track 前，先 `Read` 对应 PNG，再 cross-check 代码。
+**AI 阅读建议**：每次开始一个 track 前，先读 `docs/flows/*.md` 对应文本镜像，再 cross-check 代码。只有文本镜像缺失、hash 过期、需求冲突，或必须判断视觉布局/颜色/层级时，才读取对应 PNG；读取前先裁剪到相关区域。
 
 ### 1.2 设计稿源（视觉真相）
 
@@ -217,11 +217,11 @@ git log --oneline -10
 
 ## 4. Track V：视频（Video）
 
-> **流程图依据**：`视频.png`——3 路径 + 字幕清洗 + 视频类型模板 + 输出格式选择
+> **流程图依据**：`docs/flows/video.md`（源图：`视频.png`）——3 路径 + 字幕清洗 + 视频类型模板 + 输出格式选择
 
 ### V1 视频路径选择 UI + 路径 1/3 后端
 
-**索引**：`视频.png` + `system_design_v3_final.md` §视频 + 现有 `handle_analyze_task`
+**索引**：`docs/flows/video.md` + `system_design_v3_final.md` §视频 + 现有 `handle_analyze_task`
 **模型**：UI ⭐ DS v4-pro；路径 1 Sonnet；路径 3 Opus
 **分支**：`feat/ip9-flow-gaps`（UI 已合并入 main）
 **子任务**：
@@ -236,7 +236,7 @@ git log --oneline -10
 
 ### V2 字幕清洗 + 输出格式选择
 
-**索引**：`视频.png` 中独立的"字幕清洗"节点 + "选择输出格式"节点
+**索引**：`docs/flows/video.md` 中独立的"字幕清洗"节点 + "选择输出格式"节点
 **模型**：Sonnet
 **分支**：`feat/v2-subtitle-polish`
 **子任务**：
@@ -246,7 +246,7 @@ git log --oneline -10
 
 ### V3 视频类型模板库
 
-**索引**：`视频.png`「教程/Vlog/访谈/影视点评/产品评测」分类
+**索引**：`docs/flows/video.md`「教程/Vlog/访谈/影视点评/产品评测」分类
 **模型**：Sonnet（写模板，需对内容理解）
 **分支**：`feat/v3-video-templates`
 **子任务**：
@@ -268,11 +268,11 @@ git log --oneline -10
 
 ## 5. Track A：音频（Audio）
 
-> **流程图依据**：`音频.png`——6 任务勾选 + 人声/音乐双路 + 字幕修正
+> **流程图依据**：`docs/flows/audio.md`（源图：`音频.png`）——6 任务勾选 + 人声/音乐双路 + 字幕修正
 
 ### A1 音频前端 6 任务勾选（= F1.2 = IP.9.2）
 
-**索引**：`音频.png` + `pipeline_tasks.py::handle_audio_task`
+**索引**：`docs/flows/audio.md` + `pipeline_tasks.py::handle_audio_task`
 **模型**：⭐ DS v4-pro
 **分支**：`feat/ip9-flow-gaps`（已合并入 main）
 **子任务**：
@@ -280,19 +280,20 @@ git log --oneline -10
 - [x] A1.2 AudioResultPage 按勾选展示对应区块 — `cb27dd5`
 - [x] A1.3 后端 bridge 透传所有 6 个字段（部分 N8 未做的留 TODO）— `d9d3836`
 
-### A2 说话人编辑修正 UI（N8b 核心）
+### A2 说话人编辑修正 UI（N8b 核心）✅
 
-**索引**：`音频.png` 中"说话人识别"节点 + N8b plan
+**索引**：`docs/flows/audio.md` 中"说话人识别"节点 + N8b plan
 **模型**：Sonnet（多说话人轨交互复杂）
-**分支**：`feat/a2-speaker-edit`
+**分支**：`feat/a2-speaker-edit`（直接打 main）
+**完成**：2026-05-23，commit `b559d19`
 **子任务**：
-- A2.1 音频结果页加说话人轨道 + 标签编辑
-- A2.2 后端补 PATCH speaker label endpoint
-- A2.3 编辑后产物（speaker mapping）持久化
+- [x] A2.1 音频结果页加说话人轨道 + 标签编辑 — `b559d19`
+- [x] A2.2 后端补 PATCH speaker label endpoint — `b559d19`
+- [x] A2.3 编辑后产物（speaker mapping）持久化 — `b559d19`
 
 ### A3 无人声切音乐模式（N8b 第 2 部分）✅
 
-**索引**：`音频.png` 中"无人声 → 音乐分析"分支
+**索引**：`docs/flows/audio.md` 中"无人声 -> 音乐分析"分支
 **模型**：⭐ DS v4-pro
 **分支**：main（直接做）
 **完成**：2026-05-23，commit `(pending)`
@@ -304,7 +305,7 @@ git log --oneline -10
 
 ### A4 字幕导出 + .srt/.ass/.vtt 格式 ✅
 
-**索引**：`音频.png` 中"字幕导出"分支
+**索引**：`docs/flows/audio.md` 中"字幕导出"分支
 **模型**：⭐ DS v4-pro
 **分支**：`feat/a4-subtitle-export`
 **子任务**：
@@ -316,7 +317,7 @@ git log --oneline -10
 
 ## 6. Track T：文字（Text）
 
-> **流程图依据**：`文字.png`——3 种输入 + 4 并行任务（摘要 / 联想 / 改写 / 翻译 / 多文对比）
+> **流程图依据**：`docs/flows/text.md`（源图：`文字.png`）——3 种输入 + 4 并行任务（摘要 / 联想 / 改写 / 翻译 / 多文对比）
 
 ### T1 文字结果页升级
 
@@ -330,7 +331,7 @@ git log --oneline -10
 
 ### T2 网页抓取扩展
 
-**索引**：`文字.png` 中"网页 URL 抓取"分支 + `shared/web_enrich.py`
+**索引**：`docs/flows/text.md` 中"网页 URL 抓取"分支 + `shared/web_enrich.py`
 **模型**：Sonnet
 **分支**：`feat/t2-web-extract`
 **子任务**：
@@ -351,11 +352,11 @@ git log --oneline -10
 
 ## 7. Track I：图片（Image）
 
-> **流程图依据**：`图片.png`——基本信息 + 任务勾选 + 联想
+> **流程图依据**：`docs/flows/image.md`（源图：`图片.png`）——基本信息 + 任务勾选 + 联想
 
 ### I1 EXIF 提取 + 基本信息卡
 
-**索引**：`图片.png` 中"基本信息（分辨率 / 拍摄设备 / EXIF）"
+**索引**：`docs/flows/image.md` 中"基本信息（分辨率 / 拍摄设备 / EXIF）"
 **模型**：⭐ DS v4-pro（前端展示 + 后端 PIL 一行）
 
 **分支**：`feat/i1-image-exif`
@@ -365,7 +366,7 @@ git log --oneline -10
 
 ### I2 批量任务执行
 
-**索引**：`图片.png` 多图勾选区
+**索引**：`docs/flows/image.md` 多图勾选区
 **模型**：Sonnet
 **分支**：`feat/i2-image-batch`
 **子任务**：
@@ -374,7 +375,7 @@ git log --oneline -10
 
 ### I3 图片风格 DNA 报告（与 R3 重叠）
 
-**索引**：N9 现有 4 联想方向 + `场景复刻.png`
+**索引**：N9 现有 4 联想方向 + `docs/flows/remix.md`
 **模型**：Sonnet
 **分支**：`feat/i3-image-style-dna`
 **子任务**：
@@ -386,7 +387,7 @@ git log --oneline -10
 
 ## 8. Track R：复刻（Remix / AI 导演 [C]）
 
-> **流程图依据**：`场景复刻.png` + `docs/design/components/director.jsx`
+> **流程图依据**：`docs/flows/remix.md`（源图：`场景复刻.png`） + `docs/design/components/director.jsx`
 
 ### R1 Storyboard shot 网格升级
 
