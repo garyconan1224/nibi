@@ -7,7 +7,7 @@ import remarkGfm from 'remark-gfm'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const remarkPlugins: any[] = [remarkGfm]
 
-import { ArrowLeft, Download, FileText, Mic, Music, Pause, Play, Wand2 } from 'lucide-react'
+import { ArrowLeft, Download, FileText, Mic, Music, Pause, Pencil, Play, Wand2 } from 'lucide-react'
 
 import { toast } from 'sonner'
 import {
@@ -15,6 +15,7 @@ import {
   type MusicSegmentData,
   downloadSubtitles,
   getAudioItemResult,
+  updateSpeakerMap,
 } from '@/services/workspaces'
 
 import './tokens.css'
@@ -100,6 +101,24 @@ function formatMusicAnalysis(result: AudioResult): string {
   return lines.join('\n')
 }
 
+const SPEAKER_COLORS = [
+  'hsl(210, 65%, 55%)',
+  'hsl(340, 60%, 55%)',
+  'hsl(160, 55%, 45%)',
+  'hsl(30, 70%, 55%)',
+  'hsl(270, 55%, 55%)',
+  'hsl(50, 65%, 48%)',
+]
+function speakerColor(speakerId: string): string {
+  let hash = 0
+  for (const ch of speakerId) hash = (hash * 31 + ch.charCodeAt(0)) | 0
+  return SPEAKER_COLORS[Math.abs(hash) % SPEAKER_COLORS.length]
+}
+
+function speakerDisplayName(speakerId: string, speakerMap: Record<string, string>): string {
+  return speakerMap[speakerId] || speakerId.replace('SPEAKER_', 'S')
+}
+
 export default function AudioResultPage() {
   const { workspaceId = '', itemId = '' } = useParams<{ workspaceId: string; itemId: string }>()
   const navigate = useNavigate()
@@ -114,6 +133,9 @@ export default function AudioResultPage() {
   const [playing, setPlaying] = useState(false)
   const [activeTab, setActiveTab] = useState<'transcript' | 'music' | 'summary' | 'vocal' | 'music_transcribe' | 'prompts'>('transcript')
   const [exportOpen, setExportOpen] = useState(false)
+  const [speakerMap, setSpeakerMap] = useState<Record<string, string>>({})
+  const [editingSpeaker, setEditingSpeaker] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
 
   const handleExportSubtitles = async (format: 'srt' | 'vtt' | 'ass') => {
     setExportOpen(false)
@@ -149,14 +171,47 @@ export default function AudioResultPage() {
     }
   }, [result?.music_mode])
 
-  const transcript = useMemo(() => {
+  // A2: initialize speaker_map from result
+  useEffect(() => {
+    if (result?.speaker_map) {
+      setSpeakerMap(result.speaker_map)
+    }
+  }, [result?.speaker_map])
+
+  const transcriptSegments = useMemo(() => {
+    // Prefer transcript_segments (has speaker + start/end from whisper)
+    const segs = result?.transcript_segments
+    if (Array.isArray(segs) && segs.length > 0) {
+      return segs.map((seg) => ({
+        t_sec: seg.start ?? seg.t_sec ?? 0,
+        t_str: formatSec(seg.start ?? seg.t_sec ?? 0),
+        text: seg.text || '',
+        start: seg.start,
+        end: seg.end,
+        speaker: seg.speaker,
+      }))
+    }
+    // Fallback to transcript (display format or string)
     const raw = result?.transcript
-    if (Array.isArray(raw)) return raw
+    if (Array.isArray(raw)) return raw.map(l => ({ ...l, start: undefined as number | undefined, end: undefined as number | undefined, speaker: undefined as string | undefined }))
     if (typeof raw === 'string' && raw.length > 0) {
-      return [{ t_sec: 0, t_str: '00:00', text: raw }]
+      return [{ t_sec: 0, t_str: '00:00', text: raw, start: undefined as number | undefined, end: undefined as number | undefined, speaker: undefined as string | undefined }]
     }
     return []
   }, [result])
+
+  const speakerStats = useMemo(() => {
+    const map = new Map<string, { count: number; durationSec: number }>()
+    for (const seg of transcriptSegments) {
+      if (!seg.speaker) continue
+      const prev = map.get(seg.speaker) || { count: 0, durationSec: 0 }
+      const dur = (seg.end || seg.t_sec || 0) - (seg.start || seg.t_sec || 0)
+      map.set(seg.speaker, { count: prev.count + 1, durationSec: prev.durationSec + Math.max(0, dur) })
+    }
+    return map
+  }, [transcriptSegments])
+
+  const hasSpeakers = speakerStats.size > 0
 
   const totalSec = result?.tracks_meta?.total_sec ?? result?.audio?.duration_sec ?? 0
   const progress = totalSec > 0 ? Math.min(1, currentSec / totalSec) : 0
@@ -188,15 +243,33 @@ export default function AudioResultPage() {
     [handleSeek, totalSec],
   )
 
+  const handleSpeakerRename = useCallback(async (speakerId: string, newName: string) => {
+    const trimmed = newName.trim()
+    if (!trimmed || trimmed === speakerId) {
+      setEditingSpeaker(null)
+      return
+    }
+    const updated = { ...speakerMap, [speakerId]: trimmed }
+    setSpeakerMap(updated) // optimistic
+    setEditingSpeaker(null)
+    try {
+      await updateSpeakerMap(workspaceId, itemId, updated)
+      toast.success('说话人标签已保存')
+    } catch {
+      setSpeakerMap(speakerMap) // rollback
+      toast.error('保存失败，请重试')
+    }
+  }, [speakerMap, workspaceId, itemId])
+
   const activeLineIdx = useMemo(() => {
-    if (!transcript.length) return -1
+    if (!transcriptSegments.length) return -1
     let best = 0
-    for (let i = 0; i < transcript.length; i++) {
-      if (transcript[i].t_sec <= currentSec) best = i
+    for (let i = 0; i < transcriptSegments.length; i++) {
+      if (transcriptSegments[i].t_sec <= currentSec) best = i
       else break
     }
     return best
-  }, [transcript, currentSec])
+  }, [transcriptSegments, currentSec])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -342,10 +415,10 @@ export default function AudioResultPage() {
         {activeTab === 'transcript' && (
           <>
             <div className="ad-transcript-scroll">
-              {transcript.length === 0 ? (
+              {transcriptSegments.length === 0 ? (
                 <span className="mono" style={{ fontSize: 12, color: 'var(--ink-4)' }}>暂无转写数据</span>
               ) : (
-                transcript.map((line, idx) => (
+                transcriptSegments.map((line, idx) => (
                   <button
                     key={idx}
                     className="ad-tr-row"
@@ -353,22 +426,93 @@ export default function AudioResultPage() {
                     onClick={() => handleSeek(line.t_sec)}
                   >
                     <span className="ad-tr-time">{line.t_str}</span>
-                    <div className="ad-tr-avatar" style={{ background: 'var(--ink-3)' }}>
-                      {String(idx + 1).slice(-1)}
+                    <div
+                      className="ad-tr-avatar"
+                      style={{ background: line.speaker ? speakerColor(line.speaker) : 'var(--ink-3)' }}
+                    >
+                      {line.speaker
+                        ? speakerDisplayName(line.speaker, speakerMap).charAt(0)
+                        : String(idx + 1).slice(-1)}
                     </div>
-                    <span className="ad-tr-text">{line.text}</span>
+                    <span className="ad-tr-text">
+                      {line.speaker && hasSpeakers && (
+                        <span className="ad-speaker-label" style={{ color: speakerColor(line.speaker), fontWeight: 600, fontSize: 11, marginRight: 6 }}>
+                          {speakerDisplayName(line.speaker, speakerMap)}
+                        </span>
+                      )}
+                      {line.text}
+                    </span>
                   </button>
                 ))
               )}
             </div>
 
-            {/* Speaker summary sidebar (placeholder when no speaker data) */}
+            {/* Speaker summary sidebar */}
             <div className="ad-speaker-side">
-              <div className="eyebrow" style={{ marginBottom: 14 }}>转录统计</div>
+              {hasSpeakers ? (
+                <>
+                  <div className="eyebrow" style={{ marginBottom: 14 }}>说话人</div>
+                  {Array.from(speakerStats.entries()).map(([spkId, stats]) => {
+                    const totalDur = Array.from(speakerStats.values()).reduce((a, b) => a + b.durationSec, 0)
+                    const pct = totalDur > 0 ? (stats.durationSec / totalDur) * 100 : 0
+                    const displayName = speakerDisplayName(spkId, speakerMap)
+                    const isEditing = editingSpeaker === spkId
+                    return (
+                      <div key={spkId} className="ad-speaker-card">
+                        <div className="ad-speaker-row">
+                          <div className="ad-speaker-avatar" style={{ background: speakerColor(spkId) }}>
+                            {displayName.charAt(0)}
+                          </div>
+                          {isEditing ? (
+                            <input
+                              className="ad-speaker-edit-input"
+                              autoFocus
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSpeakerRename(spkId, editValue)
+                                if (e.key === 'Escape') setEditingSpeaker(null)
+                              }}
+                              onBlur={() => handleSpeakerRename(spkId, editValue)}
+                            />
+                          ) : (
+                            <>
+                              <span style={{ fontSize: 13, fontWeight: 500, flex: 1 }}>{displayName}</span>
+                              <button
+                                className="btn-ghost"
+                                style={{ padding: '2px 6px', opacity: 0.5 }}
+                                onClick={() => { setEditingSpeaker(spkId); setEditValue(speakerMap[spkId] || '') }}
+                                title="重命名"
+                              >
+                                <Pencil size={12} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                        <div className="ad-speaker-bar">
+                          <div className="ad-speaker-bar-fill" style={{ width: `${pct}%`, background: speakerColor(spkId) }} />
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 4 }}>
+                          {stats.count} 段 · {formatSec(stats.durationSec)}
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <hr style={{ border: 'none', borderTop: '1px solid var(--line)', margin: '16px 0' }} />
+                </>
+              ) : (
+                <div className="eyebrow" style={{ marginBottom: 14 }}>转录统计</div>
+              )}
               <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.8 }}>
-                <div>转录行数：<strong>{transcript.length}</strong></div>
+                <div>转录行数：<strong>{transcriptSegments.length}</strong></div>
                 <div>总时长：<strong>{result.audio?.duration_str || formatSec(totalSec)}</strong></div>
+                {hasSpeakers && <div>说话人数：<strong>{speakerStats.size}</strong></div>}
               </div>
+              {!hasSpeakers && (
+                <div style={{ marginTop: 12, fontSize: 11, color: 'var(--ink-4)' }}>
+                  提示：勾选「说话人音色区分」后可自动识别说话人
+                </div>
+              )}
               {result.summary && (
                 <div style={{ marginTop: 20 }}>
                   <div className="eyebrow" style={{ marginBottom: 8 }}>摘要预览</div>

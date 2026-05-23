@@ -270,3 +270,22 @@
   flex-shrink: 0;
   background: var(--bg-sunken);
 }
+
+/* ─── A2: Speaker edit ─── */
+.vm-audio-scope .ad-speaker-edit-input {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--ink);
+  outline: none;
+}
+
+.vm-audio-scope .ad-speaker-label {
+  display: inline;
+  user-select: none;
+}
+

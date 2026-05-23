@@ -474,6 +474,15 @@ def export_subtitles(
     # 直接在 results dict 上做三级降级查找 + 归一化
     raw = results.get("segments") or results.get("transcript_segments") or results.get("transcript") or []
     segments = _normalize_segments(raw)
+
+    # A2：应用说话人名称映射
+    raw_speaker_map = results.get("speaker_map") or {}
+    if raw_speaker_map:
+        for seg in segments:
+            original = seg.get("speaker", "")
+            if original and original in raw_speaker_map:
+                seg["speaker"] = raw_speaker_map[original]
+
     # demo fixture 降级：result 页面展示的 demo 字幕，导出时也下发
     if not segments and item.type == ItemType.VIDEO.value:
         raw = build_demo_video_result(item.item_id, item.name).get("transcript") or []

@@ -370,7 +370,17 @@ export async function getTextCompare(
   return res.data
 }
 
-// ── Phase 2B: 音频结果页聚合 ──────────────────────────────
+// ── Phase 2B: 音频结果页聚合 ──────────────────────────
+
+/** A2: 音频转录片段（含 speaker / start / end 等扩展字段） */
+export interface AudioTranscriptSegment {
+  t_sec: number
+  t_str: string
+  text: string
+  start?: number
+  end?: number
+  speaker?: string
+}
 
 export interface AudioResult {
   source: 'demo_fixture' | 'item_results'
@@ -383,7 +393,7 @@ export interface AudioResult {
     duration_str: string
   }
   transcript: VideoResultTranscriptLine[] | string
-  transcript_segments?: VideoResultTranscriptLine[]
+  transcript_segments?: AudioTranscriptSegment[]
   summary: string
   tracks_meta: {
     total_sec: number
@@ -405,6 +415,13 @@ export interface AudioResult {
   music_mode?: boolean
   /** A3.3: 多段音乐 6 维度分析结果 */
   music_segments?: MusicSegmentData[]
+  /** N8: 说话人分离结果 */
+  diarization?: {
+    num_speakers: number
+    segments: Array<{ start: number; end: number; speaker: string }>
+  }
+  /** A2: 用户自定义说话人映射 */
+  speaker_map?: Record<string, string>
 }
 
 /** A3.3: 单个音乐片段的 6 维度分析 */
@@ -433,6 +450,17 @@ export async function getAudioItemResult(
     `${BASE}/${workspaceId}/items/${itemId}/audio_result`,
   )
   return res.data
+}
+
+/** PATCH /workspaces/{id}/items/{itemId}/speaker_map — 保存说话人标签映射 */
+export async function updateSpeakerMap(
+  workspaceId: string,
+  itemId: string,
+  speakerMap: Record<string, string>,
+): Promise<void> {
+  await http.patch(`${BASE}/${workspaceId}/items/${itemId}/speaker_map`, {
+    speaker_map: speakerMap,
+  })
 }
 
 // ── Phase 2C.2: 文本结果页 + 提示词版本栈 ──────────────────

@@ -1977,3 +1977,27 @@ def regenerate_item_tags(workspace_id: str, item_id: str) -> Dict[str, Any]:
     rec = _store.update_item(workspace_id, item_id, tags=new_tags)
     item = next(it for it in rec.items if it.item_id == item_id)
     return {"tags": item.tags}
+
+
+# ── A2：说话人名称映射 ─────────────────────────────────────
+
+
+class SpeakerMapRequest(BaseModel):
+    """说话人名称映射请求体。"""
+
+    speaker_map: Dict[str, str]
+
+
+@router.patch("/{workspace_id}/items/{item_id}/speaker_map")
+def update_speaker_map(
+    workspace_id: str, item_id: str, req: SpeakerMapRequest
+) -> Dict[str, Any]:
+    """保存说话人名称映射到 item.results。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+    results = dict(item.results or {})
+    results["speaker_map"] = req.speaker_map
+    _store.update_item(workspace_id, item_id, results=results)
+    return {"speaker_map": req.speaker_map}
