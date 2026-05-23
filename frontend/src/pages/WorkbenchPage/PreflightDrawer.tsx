@@ -4,6 +4,7 @@ import { X, ArrowRight, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useProviderStore } from '@/store/providerStore'
 import { useTaskStore } from '@/store/taskStore'
+import { useTemplateStore } from '@/store/templateStore'
 import {
   addWorkspaceItem,
   autoCreateWorkspace,
@@ -25,7 +26,6 @@ const QUALITY_MAP: Record<QualityOption, string> = {
 
 const CONTENT_TYPES = ['课程', '会议', '宣传片', 'Vlog', '访谈', '纯音乐', '其他']
 const PURPOSES = ['复刻参考', '竞品分析', '内容学习', '其他']
-const VIDEO_TEMPLATES = ['教程', 'Vlog', '访谈', '影视点评', '产品评测', '其它']
 const ITEM_TYPE_ALIASES: Record<string, ItemType> = {
   article: 'text',
   audio: 'audio',
@@ -90,10 +90,16 @@ export function PreflightDrawer({
 
   const { providers, providerModels, fetchProviders, modelsLoading } = useProviderStore()
   const addTask = useTaskStore((s) => s.addTask)
+  const templateOptions = useTemplateStore((s) => s.getOptions)
+  const fetchTemplates = useTemplateStore((s) => s.fetch)
 
   useEffect(() => {
     if (open && providers.length === 0) fetchProviders()
   }, [open, providers.length, fetchProviders])
+
+  useEffect(() => {
+    if (open) fetchTemplates()
+  }, [open, fetchTemplates])
 
   // Reset form when opened, applying Composer defaults as initial values
   useEffect(() => {
@@ -396,7 +402,7 @@ export function PreflightDrawer({
                   <div className="pf-field">
                     <label>视频类型模板</label>
                     <select value={videoTemplate} onChange={(e) => setVideoTemplate(e.target.value)}>
-                      {VIDEO_TEMPLATES.map((t) => <option key={t} value={t}>{t}</option>)}
+                      {templateOptions().map((t) => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </div>
                   <div className="pf-field">

@@ -58,6 +58,7 @@ function buildDefaultTabs(
     { path: '/settings/network', label: t('layout.menu.network') },
     { path: '/settings/monitor', label: t('layout.menu.monitor') },
     { path: '/settings/trash', label: '垃圾桶' },
+    { path: '/settings/video-templates', label: '视频模板' },
     { path: '/settings/about', label: t('layout.menu.about') },
   ]
 }

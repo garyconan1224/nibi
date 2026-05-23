@@ -1,6 +1,6 @@
 # AI Handoff
 
-Last updated: 2026-05-23（V2.2/V2.3 视频输出格式选择 + 提示词模板完成）
+Last updated: 2026-05-23（V3.2 视频模板设置页 CRUD 完成）
 
 ---
 
@@ -163,11 +163,24 @@ git branch --show-current
 - 旧数据兼容：未传 `output_format` 默认 `summary`（原摘要逻辑）
 - 新增 5 个测试，全量 239 后端 test + 15 前端 test + build 通过
 
-### 🥇 下一步：补 #6~#8 URL + 收口 F2 或 V3 视频类型模板库
+### ✅ V3.2 视频模板设置页 CRUD（2026-05-23 已完成）
 
-V2.2/V2.3 已完成。可选下一步（按 ROI）：
-- **补 F2 剩余 3 个 URL**（小红书/抖音/微信），用户提供真实 URL 即可跑完 F2
-- **V3 视频类型模板库**（后端模板库扩充 + 用户自定义模板 + 自动选模板）——增强路径 1 的内容质量
+- `shared/template_store.py`：JSON 持久化层，CRUD + duplicate
+- `backend/app/routes/templates.py`：5 个端点（GET/POST/PUT/DELETE/duplicate）
+- `backend/app/services/pipeline_tasks.py`：`list_video_templates()` 合并内置 + 用户自定义
+- `frontend/src/pages/SettingPage/VideoTemplatesPage.tsx`：列表 + 新建/编辑模态 + 内置保护
+- `frontend/src/store/templateStore.ts`：zustand 缓存，PreflightDrawer 自动拉取
+- 路由 `/settings/video-templates` + SettingsShell Tab 已注册
+- 测试：20 个 V3.2 后端测试覆盖 CRUD happy/error/空白输入路径，全量 259 passed / 2 skipped
+- `_build_video_summary_prompt` 已改用 `list_video_templates()` 动态模板
+
+### 🥇 下一步：V3.3 LLM 自动检测视频模板
+
+V3.2 已完成。推荐直接做 **V3.3**：
+- 在 PreflightDrawer 模板下拉第一位加 `auto`（🤖 自动识别）
+- 后端新增 `_detect_video_template(title, transcript_preview) -> str`，用现有 LLM provider 单轮分类
+- 检测失败 → 兜底 `其它`，不阻塞主流程
+- 文件 ≤4，DS v4-pro 就能做
 
 ### 🥈 补 #6~#8 URL + 收口 F2
 

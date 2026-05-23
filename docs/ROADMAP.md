@@ -250,8 +250,8 @@ git log --oneline -10
 **模型**：Sonnet（写模板，需对内容理解）
 **分支**：`feat/v3-video-templates`
 **子任务**：
-- V3.1 后端模板库（6+ 类型）：每个类型 system prompt + 输出 schema
-- V3.2 设置页 → 模板编辑（用户可自定义）
+- [x] V3.1 后端模板库（6+ 类型）：每个类型 system prompt + 输出 schema（隐式完成，已在 pipeline_tasks.py:54）
+- [x] V3.2 设置页 → 模板编辑（用户可自定义）
 - V3.3 默认模板由 LLM 检测内容自动选
 
 ### V4 视频结果页升级

@@ -51,6 +51,9 @@ _OUTPUT_FORMAT_PROMPTS: Dict[str, str] = {
     "paragraph_rewrite": "请将以下视频转写文本重新组织为通顺的叙事段落，保留原意但优化表达，去掉口语填充词和冗余重复。",
 }
 
+# V3.2: 公开别名，供 templates.py router 导入
+_BUILTIN_TEMPLATE_PROMPTS: Dict[str, str] = {}
+
 _VIDEO_TEMPLATE_PROMPTS: Dict[str, str] = {
     "教程": (
         "这是一段教程/课程类视频的转写文本。请按以下结构输出总结：\n"
@@ -94,6 +97,20 @@ _VIDEO_TEMPLATE_PROMPTS: Dict[str, str] = {
         "3. 金句摘录（如有精彩表达）\n"
     ),
 }
+
+
+# 将内置字典复制到公开别名
+_BUILTIN_TEMPLATE_PROMPTS.update(_VIDEO_TEMPLATE_PROMPTS)
+
+
+def list_video_templates() -> Dict[str, str]:
+    """返回合并后的模板 dict：内置 6 类 + 用户自定义（自定义覆盖同名内置）。"""
+    from shared.template_store import load_templates as _load_user_templates
+
+    merged = dict(_BUILTIN_TEMPLATE_PROMPTS)
+    for t in _load_user_templates():
+        merged[t.name] = t.prompt
+    return merged
 
 
 def _normalize_transcript_to_lines(
@@ -191,8 +208,9 @@ def _build_video_summary_prompt(
     format_instruction = _OUTPUT_FORMAT_PROMPTS.get(
         output_format, _OUTPUT_FORMAT_PROMPTS["summary"]
     )
-    template_instruction = _VIDEO_TEMPLATE_PROMPTS.get(
-        video_template, _VIDEO_TEMPLATE_PROMPTS["其它"]
+    all_templates = list_video_templates()
+    template_instruction = all_templates.get(
+        video_template, all_templates.get("其它", "")
     )
     depth_hint = {
         "brief": "请简洁输出，总字数控制在 200 字以内。",

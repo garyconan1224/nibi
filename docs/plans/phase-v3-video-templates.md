@@ -124,12 +124,12 @@ class VideoTemplate(BaseModel):
 
 ## 完工标准
 
-- [ ] V3.2：设置页能 CRUD 自定义模板，PreflightDrawer dropdown 实时反映
+- [x] V3.2：设置页能 CRUD 自定义模板，PreflightDrawer dropdown 实时反映
 - [ ] V3.3：选 "auto" → 后台 LLM 检测 → 用对应模板出总结
-- [ ] 后端 pytest 全绿
-- [ ] 前端 build + lint + vitest 全绿
-- [ ] ROADMAP V3.1/V3.2/V3.3 打 [x] + commit hash
-- [ ] AI_HANDOFF 更新「下一步：V4 视频结果页升级 或 A2 说话人编辑」
+- [x] V3.2 后端 pytest 全绿（259 passed, 2 skipped）
+- [x] V3.2 前端 build + vitest 通过；full lint 仍被项目存量规则挡住
+- [ ] ROADMAP V3.3 打 [x] + commit hash
+- [x] AI_HANDOFF 更新「下一步：V3.3 LLM 自动检测视频模板」
 
 ---
 
