@@ -22,21 +22,20 @@
 
 > 本目录里的是**原始命名副本**，方便用户/其他 AI 直接拿去用；权威归档版本在 `docs/archive/` 下。
 
-### 流程图截图（5 张，用户手动补充）
+### 流程图截图与文本镜像
 
-那次对话用户一次性贴了 5 张流程图截图：
+那次对话用户贴了流程图截图；当前目录已保留源 PNG，`docs/flows/` 已建立 Claude Code 终端优先读取的 Markdown 文本镜像：
 
-| # | 内容 | 文件名（建议） |
-|---|---|---|
-| 1 | 多媒体内容分析系统 — 完整最终流程图（总图） | `01-overall-flow.png` |
-| 2 | 视频分支详细流程图（含三条总结路径） | `02-video-branch.png` |
-| 3 | 音频分支详细流程图（含 VAD 双路 / 音乐分析） | `03-audio-branch.png` |
-| 4 | 图片分支流程图（输入 → 基本信息 → 任务勾选） | `04-image-branch.png` |
-| 5 | 文字分支流程图（三种输入 / 4 并行任务） | `05-text-branch.png` |
+| # | 内容 | 源 PNG | 文本镜像 |
+|---|---|---|---|
+| 1 | 多媒体内容分析系统完整最终流程图（总图） | `流程全.png` | [`../../flows/overview.md`](../../flows/overview.md) |
+| 2 | 视频分支详细流程图（含三条总结路径） | `视频.png` | [`../../flows/video.md`](../../flows/video.md) |
+| 3 | 音频分支详细流程图（含 VAD 双路 / 音乐分析） | `音频.png` | [`../../flows/audio.md`](../../flows/audio.md) |
+| 4 | 图片分支流程图（输入 -> 基本信息 -> 任务勾选） | `图片.png` | [`../../flows/image.md`](../../flows/image.md) |
+| 5 | 文字分支流程图（三种输入 / 并行任务） | `文字.png` | [`../../flows/text.md`](../../flows/text.md) |
+| 6 | 复刻路径 / AI 导演方向 | `场景复刻.png` | [`../../flows/remix.md`](../../flows/remix.md) |
 
-⚠️ **图片需要用户手动放进 `flowcharts/` 目录**：
-- 因为 AI 无法从历史对话中提取图片字节
-- 找到原图后按上表命名拖进 `flowcharts/`
+读取建议：Claude Code 终端先读文本镜像，只有要核对视觉布局、颜色层级或文本镜像过期时再读取源 PNG。
 
 ---
 
@@ -46,4 +45,4 @@
 - [`docs/EXECUTION_PLAN.md`](../../EXECUTION_PLAN.md) — N1~N11 phase 路线
 - [`docs/WORKFLOW.md`](../../WORKFLOW.md) — 主工作流
 
-如果以后产品方向调整需要回看原始决议来源，从本目录的两份 md + 5 张流程图入手最完整。
+如果以后产品方向调整需要回看原始决议来源，从本目录的两份 md + 源 PNG + `docs/flows/*.md` 入手最完整。

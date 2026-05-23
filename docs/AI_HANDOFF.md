@@ -1,6 +1,6 @@
 # AI Handoff
 
-Last updated: 2026-05-23（A3 无人声切音乐模式完成）
+Last updated: 2026-05-23（A2+A3+A4 全部完成，下一步 Track T）
 
 ---
 
@@ -23,6 +23,8 @@ git branch --show-current
 5. **`docs/ROADMAP.md`**（2026-05-21 新增——长期升级路线图，6 条 track 全景视图）
 6. `docs/design/`（如需视觉对照）
 7. 本文件「下一步」段
+
+涉及用户流程图时，Claude Code 终端先读 `docs/flows/README.md` 和对应 `docs/flows/*.md`，必要时再看 PNG。
 
 ---
 
@@ -56,7 +58,7 @@ git branch --show-current
 
 ## 2026-05-21 调整方向
 
-用户决议：**不去 [C] / [D]**，先把现有功能跟流程图 5 张对齐打磨。新长期路线图 `docs/ROADMAP.md` 6 条 track 已落盘。
+用户决议：**不去 [C] / [D]**，先把现有功能跟流程图对齐打磨。流程图文本镜像在 `docs/flows/*.md`，源 PNG 在 `docs/conversation-inputs/2026-05-18-spec-merge/`。新长期路线图 `docs/ROADMAP.md` 6 条 track 已落盘。
 
 **IP.9 Flow Gaps 已完成**（5 个 commit 合入 main）：
 - IP.9.1 Results 总览页（s05）+ 修跳转 bug + 路由重命名
@@ -206,7 +208,7 @@ git branch --show-current
 - 测试：11 个 A3 单测通过；全量 279 passed / 2 skipped
 
 单 agent 串行建议：
-1. **A2 说话人编辑修正 UI**：音频结果页说话人轨道、标签编辑、后端 PATCH、speaker mapping 持久化
+1. **Track T 文字深化**：按 `docs/ROADMAP.md` §7 Track T，文字 3 种输入 + 长文分段 + 4 类并行任务前端交互落地
 
 ### 🥈 补 #6~#8 URL + 收口 F2
 

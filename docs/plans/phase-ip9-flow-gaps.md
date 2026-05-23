@@ -16,7 +16,7 @@ commits: 235be39, 9886826, cb27dd5, e618d1a, d9d3836
 
 ## 来源
 
-用户提供的 5 张流程图（`docs/conversation-inputs/2026-05-18-spec-merge/流程全.png / 视频.png / 音频.png / 图片.png / 文字.png`）对照代码现状，发现 6 处缺口。
+用户提供的流程图已有文本镜像：`docs/flows/overview.md / video.md / audio.md / image.md / text.md / remix.md`。Claude Code 终端先读文本镜像，再按需回看源图（`docs/conversation-inputs/2026-05-18-spec-merge/*.png`）对照代码现状，发现 6 处缺口。
 
 ## 用户决议（2026-05-21）
 
@@ -79,7 +79,7 @@ commit: `feat(IP.9.1): Results 总览页（s05）+ 修跳转 bug`
 **模型**：⭐ 小米
 **预计**：4-6h
 
-**流程图依据**：`docs/conversation-inputs/.../音频.png` 列出 6 个任务勾选项：
+**流程图依据**：`docs/flows/audio.md`（源图：`docs/conversation-inputs/.../音频.png`）列出 6 个任务勾选项：
 1. 人声内容总结（asr_summary）
 2. 输出人声音频（vocal_separation）
 3. 生成字幕文件（subtitle_file）
@@ -112,7 +112,7 @@ commit: `feat(IP.9.2): N8b 音频前端 6 任务勾选 + 结果页对应区块`
 **模型**：⭐ 小米
 **预计**：2-3h
 
-**流程图依据**：`视频.png` 画了 3 条总结路径
+**流程图依据**：`docs/flows/video.md`（源图：`视频.png`）画了 3 条总结路径
 
 **改动文件**：
 - `frontend/src/components/workspace/PreflightConfigPanel.tsx`（video 分支加"路径"单选区）
@@ -202,8 +202,8 @@ commit: `feat(IP.9.3): N7b 视频路径选择 UI（3 路径 + 视频类型模板
 
 - 6 子任务独立 commit
 - pytest 全绿
-- 真粘 B 站 URL → 走完整流程图：Workbench → Preflight（含 6 音频任务/视频路径）→ Processing → Results 总览 → 详情 → 分镜
-- 视觉对照设计稿 s05 + 5 张流程图
+- 真粘 B 站 URL -> 走完整流程图：Workbench -> Preflight（含 6 音频任务/视频路径）-> Processing -> Results 总览 -> 详情 -> 分镜
+- 需求对照 `docs/flows/*.md`；只有需要视觉布局判断时再对照源 PNG
 
 ## 与下一阶段的关系
 

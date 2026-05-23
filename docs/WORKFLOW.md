@@ -6,7 +6,7 @@
 > - 哪份 spec 是真相源
 > - 怎么对账避免重做
 >
-> Last updated: 2026-05-19
+> Last updated: 2026-05-23
 
 ---
 
@@ -24,11 +24,13 @@
 | ~~6~~ | ~~`docs/archive/system_design_v3_final.md`~~ | ⚠️ DEPRECATED |
 | ~~7~~ | ~~`docs/archive/plan-v1.md` / `docs/archive/design-spec-v1.md`~~ | ⚠️ DEPRECATED |
 
+流程图需求的低 token 入口是 [`docs/flows/README.md`](flows/README.md)。Claude Code 终端先读 `docs/flows/*.md`，只有需要核对视觉布局或文本镜像过期时才读取 `docs/conversation-inputs/2026-05-18-spec-merge/*.png`。
+
 ---
 
 ## 2. 整体工作流（从现在到开源 / v1 发布）
 
-合并 spec 已落地，现状同步与 N1~N11 差异补齐已完成。项目现在处于 **N11 后决策点**。**总流程图**：
+合并 spec 已落地，现状同步与 N1~N11 差异补齐已完成。项目现在处于 **N11 后决策点**。产品完整流程图的文本镜像见 [`docs/flows/overview.md`](flows/overview.md)。工程阶段总图：
 
 ```
 [A] 现状同步                          ✅ 已完成
