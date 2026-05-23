@@ -24,6 +24,7 @@ from fastapi.responses import StreamingResponse
 
 from shared.audio_analyzer import export_srt, export_vtt, export_ass
 from backend.app.models.workspace import ItemType, WorkspaceItem, WorkspaceRecord
+from backend.app.services.audio_result_demo import build_demo_audio_result
 from backend.app.services.video_result_demo import build_demo_video_result
 from backend.app.routes.workspaces import _store, _sync_item_with_tasks
 
@@ -458,8 +459,18 @@ def export_subtitles(
     # 直接在 results dict 上做三级降级查找 + 归一化
     raw = results.get("segments") or results.get("transcript_segments") or results.get("transcript") or []
     segments = _normalize_segments(raw)
+    # demo fixture 降级：result 页面展示的 demo 字幕，导出时也下发
+    if not segments and item.type == ItemType.VIDEO.value:
+        raw = build_demo_video_result(item.item_id, item.name).get("transcript") or []
+        segments = _normalize_segments(raw)
+    if not segments and item.type == ItemType.AUDIO.value:
+        raw = build_demo_audio_result(item.item_id, item.name).get("transcript") or []
+        segments = _normalize_segments(raw)
     if not segments:
-        raise HTTPException(status_code=404, detail="no transcript segments found for this item")
+        raise HTTPException(
+            status_code=404,
+            detail="此素材尚无字幕数据，请先执行分析任务（视频路径 1「字幕直接总结」或音频「转写+总结」）",
+        )
 
     title = item.name or "untitled"
 
