@@ -410,26 +410,41 @@ _SUBTITLE_MIME: dict[str, str] = {
 
 
 def _normalize_segments(raw: Any) -> list[dict[str, Any]]:
-    """归一化 transcript segments：兼容 display (t_sec) / whisper (start/end) 两种格式。"""
+    """归一化 transcript segments：兼容 display (t_sec) / whisper (start/end) 两种格式。
+
+    display 格式缺 end 时用下一段的 start 推算；最后一段默认 +5s。
+    """
     if isinstance(raw, str) or not raw:
         return []
     if not (isinstance(raw, list) and raw and isinstance(raw[0], dict)):
         return []
 
-    normalized: list[dict[str, Any]] = []
+    # 第一遍：收集所有有效 segment 的 start + text
+    entries: list[dict[str, Any]] = []
     for seg in raw:
         if not isinstance(seg, dict):
             continue
-        start = seg.get("start") if "start" in seg else seg.get("t_sec", 0)
-        end = seg.get("end", start)
+        start = float(seg.get("start") if "start" in seg else seg.get("t_sec", 0))
         text = str(seg.get("text") or "").strip()
         if not text:
             continue
-        entry: dict[str, Any] = {"start": float(start), "end": float(end), "text": text}
+        entry: dict[str, Any] = {"start": start, "text": text}
+        # whisper 格式自带 end，先用上
+        if "end" in seg:
+            entry["end"] = float(seg["end"])
         if seg.get("speaker"):
             entry["speaker"] = seg["speaker"]
-        normalized.append(entry)
-    return normalized
+        entries.append(entry)
+
+    # 第二遍：补 end（缺 end 的用下一段 start 推算）
+    for i, entry in enumerate(entries):
+        if "end" not in entry:
+            if i + 1 < len(entries):
+                entry["end"] = entries[i + 1]["start"]
+            else:
+                entry["end"] = entry["start"] + 5.0  # 最后一段默认 5s
+
+    return entries
 
 
 @router.get("/{workspace_id}/items/{item_id}/subtitles")
