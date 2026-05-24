@@ -42,7 +42,7 @@ const BG_PURPOSES = ['复刻参考', '竞品分析', '内容总结', '学习研�
 
 export interface StagedConfig {
   types: ItemType[]
-  features: Record<ItemType, Record<string, boolean>>
+  features: Partial<Record<ItemType, Record<string, boolean>>>
   background: Partial<WorkspaceBackground>
   workspaceIds: string[]
   urlValue?: string
