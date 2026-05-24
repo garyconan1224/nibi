@@ -131,6 +131,15 @@
 - [x] IP.9.3 N7b 视频路径选择 UI（3 路径 + 视频类型模板）
 - [x] IP.9.fix align Tier A UI with pipeline payloads
 
+**Phase R 输入层重构**（2026-05-24 启动）：Composer 瘦身 + AddMaterialModal 4 步合一 + 单链接多类型循环入队。详细计划：[docs/plans/phase-r-input-refactor.md](plans/phase-r-input-refactor.md)
+- [ ] R0 准备分支 `feat/phase-r-input-refactor`
+- [ ] R1 Composer 瘦身（删 6 块死 UI）
+- [ ] R2 AddMaterialModal 重写为 4 步合一统一入口
+- [ ] R3 featuresToSteps 翻译层 + 单 URL 多类型循环入队
+- [ ] R4 PreflightDrawer 接管细粒度参数
+- [ ] R5 端到端冒烟 5 条链接
+- [ ] R6 合并 main + 文档同步
+
 ---
 
 **H 系列 + IP 系列全部完工**（2026-05-20，一日产出 ~30 个 commit）：
