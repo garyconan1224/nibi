@@ -1,4 +1,7 @@
+import type { Feature } from '@/lib/featuresToSteps'
+import { featuresToSteps } from '@/lib/featuresToSteps'
 import type { TaskCreateRequest, TaskCreateResponse } from '@/types/task'
+import type { ItemType, WorkspaceBackground } from '@/types/workspace'
 import { http } from './client'
 
 /** POST /pipeline/tasks 请求路径 */
@@ -59,5 +62,33 @@ export async function retryPipelineTask(taskId: string) {
 export async function confirmMusicMode(taskId: string) {
   const res = await http.post(`${PIPELINE_TASKS_URL}/${taskId}/confirm-music`)
   return res.data
+}
+
+// ── Phase R: note 任务创建 ──────────────────────────────────
+
+export interface CreateNoteTaskParams {
+  url: string
+  material_type: ItemType
+  enabled_features: Feature[]
+  background?: Partial<WorkspaceBackground>
+  workspace_id: string
+}
+
+/** 创建 note 类型 pipeline 任务，features 自动翻译为 backend steps */
+export async function createNoteTask(
+  params: CreateNoteTaskParams,
+): Promise<TaskCreateResponse> {
+  const steps = featuresToSteps(params.material_type, params.enabled_features)
+  return createPipelineTask({
+    project_id: params.workspace_id,
+    task_type: 'note',
+    payload: {
+      url: params.url,
+      material_type: params.material_type,
+      enabled_features: params.enabled_features,
+      background: params.background ?? {},
+    },
+    steps,
+  })
 }
 

@@ -26,48 +26,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { FEATURES_BY_TYPE, type Feature } from '@/lib/featuresToSteps'
+import { createNoteTask } from '@/services/pipeline'
 import type { SniffResult } from '@/services/workspaces'
-import { addWorkspaceItem, sniffUrl } from '@/services/workspaces'
+import { sniffUrl } from '@/services/workspaces'
 import type {
   ItemType,
   WorkspaceBackground,
   WorkspaceRecord,
 } from '@/types/workspace'
-
-// ── 一级 Feature 定义（SPEC §2.6 表格）────────────────────
-
-interface FeatureDef {
-  id: string
-  label: string
-  defaultChecked: boolean
-}
-
-const FEATURES_BY_TYPE: Record<ItemType, FeatureDef[]> = {
-  video: [
-    { id: 'visual_prompt', label: '画面提示词', defaultChecked: true },
-    { id: 'summary', label: '文案总结', defaultChecked: true },
-    { id: 'subtitle_export', label: '字幕导出', defaultChecked: true },
-    { id: 'music_analysis', label: '音乐分析', defaultChecked: false },
-  ],
-  audio: [
-    { id: 'transcribe_summary', label: '转写+总结', defaultChecked: true },
-    { id: 'speaker_diarize', label: '说话人音色', defaultChecked: false },
-    { id: 'subtitle_export', label: '字幕导出', defaultChecked: true },
-    { id: 'music_analysis', label: '音乐分析', defaultChecked: false },
-  ],
-  image: [
-    { id: 'describe', label: '内容识别', defaultChecked: true },
-    { id: 'ocr', label: 'OCR', defaultChecked: false },
-    { id: 'prompt', label: '提示词', defaultChecked: true },
-    { id: 'assoc', label: '联想总结', defaultChecked: false },
-  ],
-  text: [
-    { id: 'summary_keypoints', label: '摘要+要点+金句', defaultChecked: true },
-    { id: 'rewrite', label: '改写', defaultChecked: false },
-    { id: 'translate', label: '翻译', defaultChecked: false },
-    { id: 'multi_compare', label: '多文对比', defaultChecked: false },
-  ],
-}
 
 const TYPE_META: Record<ItemType, { icon: typeof FileVideo; label: string }> = {
   video: { icon: FileVideo, label: '视频' },
@@ -256,22 +223,41 @@ export function AddMaterialModal({
     setError(null)
 
     const primaryWs = workspaceIds[0]
-    try {
-      // R2 阶段：仅对第一个类型创建单条素材（循环 POST 在 R3 实现）
-      const firstType = selectedTypes[0]
-      const updated = await addWorkspaceItem(primaryWs, {
-        type: firstType,
-        source: 'url',
-        source_value: effectiveUrl,
-      })
-      toast.success(`${TYPE_META[firstType].label}素材已入队`)
-      onAdded?.(updated)
-      onOpenChange(false)
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : '添加失败')
-    } finally {
-      setSubmitting(false)
+    const merged: Partial<WorkspaceBackground> = {
+      ...mergedBg,
+      ...bgOverrides,
     }
+    let succeeded = 0
+    const total = selectedTypes.length
+
+    for (const type of selectedTypes) {
+      try {
+        const enabledFeatures = Object.entries(features[type] ?? {})
+          .filter(([, v]) => v)
+          .map(([k]) => k as Feature)
+
+        await createNoteTask({
+          url: effectiveUrl,
+          material_type: type,
+          enabled_features: enabledFeatures,
+          background: merged,
+          workspace_id: primaryWs,
+        })
+        succeeded++
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : '创建失败'
+        toast.error(`${TYPE_META[type].label}任务创建失败: ${msg}`)
+      }
+    }
+
+    if (succeeded === total) {
+      toast.success(`${total} 个任务已入队`)
+    } else if (succeeded > 0) {
+      toast.warning(`已入队 ${succeeded}/${total}，部分失败请重试`)
+    }
+    onAdded?.({} as WorkspaceRecord)
+    onOpenChange(false)
+    setSubmitting(false)
   }
 
   // ── 细调 ──
