@@ -1,6 +1,18 @@
 # AI Handoff
 
-Last updated: 2026-05-23（A2+A3+A4 全部完成，下一步 Track T）
+Last updated: 2026-05-24（**当前阶段 = Phase R 输入层重构**，详见 `docs/plans/phase-r-input-refactor.md`）
+
+---
+
+## 🔴 当前下一步（2026-05-24 拍板，覆盖下面所有"下一步"段）
+
+**Phase R — 首页输入层重构**（in_progress，分支 `feat/phase-r-input-refactor` 待 R0 创建）
+
+- 计划文件：[`docs/plans/phase-r-input-refactor.md`](plans/phase-r-input-refactor.md)
+- 起因：Composer.tsx 把 SPEC §3.1 的三层配置压成一层，首页全是死按钮
+- 范围：Composer 瘦身 + AddMaterialModal 重写为「4 步合一」+ 单链接多类型循环入队（多文件批量押后）
+- 拆分：R0~R6 共 7 个可独立 commit 的子任务，含模型档位与升 Opus 触发条件
+- **R 做完前不要启动 Track T / [C] / [D] / N7b / N8b**，下面历史的「下一步」段都不算数
 
 ---
 

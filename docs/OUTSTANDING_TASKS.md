@@ -2,7 +2,15 @@
 
 > 本文件是「下一步该做什么」的快照。写入前必须先 `git log --oneline -20` 对账，避免把已完成阶段当作待办。
 
-Last updated: 2026-05-21（N7b 路径 1 UI 收口完成）
+Last updated: 2026-05-24（**当前阶段 = Phase R 输入层重构**）
+
+---
+
+## 🔴 当前阶段（一切让路）
+
+**Phase R — 首页输入层重构**（in_progress）— [`docs/plans/phase-r-input-refactor.md`](plans/phase-r-input-refactor.md)
+
+R 阶段完成并 merge 进 main 前，下方 P1 / 长期遗留 / 历史"推荐下一步"全部冻结，**不要并行启动**。R 子任务 R0~R6 是真相源。
 
 ---
 
