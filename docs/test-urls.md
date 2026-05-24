@@ -45,3 +45,16 @@
 |---|------|------|
 | 9 | `data/workspaces/default_project/videos/21年省体的夜-BV1u44y1L7Vj.mp4` | 31s 有声 .mp4 |
 | 10 | `data/workspaces/default_project/videos/test_f2_10_audio.mp3` | 提取自 #9 的 .mp3 |
+
+---
+
+## 2026-05-24 Phase R 端到端冒烟
+
+| # | URL | type | features | task_id | 最终 status | 备注 |
+|---|---|---|---|---|---|---|
+| 1a | BV1u44y1L7Vj | video | visual_prompt+video_summary+subtitle_export | note-a1332ac283d7 | SUCCESS | - |
+| 1b | BV1u44y1L7Vj | audio | asr_summary+subtitle_export | note-86bbf008f274 | SUCCESS | - |
+| 2 | yt shorts ERnYWR0OLKg | video | visual_prompt+video_summary+subtitle_export | note-751c8b35706a | SUCCESS | 需代理 7890 |
+| 3 | xhslink o/6ADdwOBRd4R | image | describe+ocr+prompt | note-83c7505d8441 | FAILED | 外部限制：yt-dlp 不支持小红书图文图片下载；仅支持视频 |
+| 4 | mp.weixin BSroSYpckb6OSc5_ZtWdng | text | summary_keypoints | note-6d9aa16c25c5 | FAILED | 外部限制：yt-dlp 不支持的 URL 格式 |
+| 5 | v.douyin iJvcK8CLC_o | video | visual_prompt+video_summary+subtitle_export | note-01c7c54d5212 | FRAMES | 截帧卡在 76.6%，30min+ 无进展；DL/ASR 已完成 |
