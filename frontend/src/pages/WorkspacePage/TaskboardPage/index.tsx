@@ -133,6 +133,7 @@ export default function TaskboardPage() {
         open={addOpen}
         onOpenChange={setAddOpen}
         workspaceIds={[workspace.workspace_id]}
+        workspaceBackgrounds={{ [workspace.workspace_id]: workspace.background }}
         onAdded={(updated) => setWorkspace(updated)}
       />
 

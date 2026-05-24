@@ -53,6 +53,11 @@ export function Composer({ onTaskCreated }: ComposerProps) {
     [workspaces],
   )
 
+  const wsBackgrounds = useMemo(
+    () => Object.fromEntries(workspaces.map((w) => [w.workspace_id, w.background])),
+    [workspaces],
+  )
+
   const filteredWs = wsQuery
     ? workspaces.filter((w) => w.name.toLowerCase().includes(wsQuery.toLowerCase()))
     : workspaces
@@ -79,12 +84,14 @@ export function Composer({ onTaskCreated }: ComposerProps) {
   const normalizedUrl = useMemo(() => normalizeMediaUrl(url), [url])
   const platform = detectPlatform(normalizedUrl || url)
 
+  const handleUrlChange = useCallback((value: string) => {
+    setUrl(value)
+    setSniffResult(null)
+  }, [])
+
   // Debounced URL sniff
   useEffect(() => {
-    if (!normalizedUrl) {
-      setSniffResult(null)
-      return
-    }
+    if (!normalizedUrl) return
     clearTimeout(sniffTimer.current)
     sniffTimer.current = setTimeout(async () => {
       try {
@@ -144,7 +151,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
 
         <input
           value={url}
-          onChange={(e) => setUrl(e.target.value)}
+          onChange={(e) => handleUrlChange(e.target.value)}
           placeholder="粘贴 B站 / YouTube / 小红书 / 抖音 / 本地文件路径..."
         />
 
@@ -299,6 +306,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
         open={uploadOpen}
         onOpenChange={setUploadOpen}
         workspaceIds={workspaceSel}
+        workspaceBackgrounds={wsBackgrounds}
         sniffResult={sniffResult}
         urlValue={normalizedUrl || undefined}
         onAdded={handleAdded}

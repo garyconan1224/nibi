@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   FileAudio,
   FileImage,
@@ -7,7 +7,6 @@ import {
   Link2,
   Settings2,
   Sparkles,
-  Upload,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -28,7 +27,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import type { SniffResult } from '@/services/workspaces'
-import { addWorkspaceItem } from '@/services/workspaces'
+import { addWorkspaceItem, sniffUrl } from '@/services/workspaces'
 import type {
   ItemType,
   WorkspaceBackground,
@@ -115,6 +114,13 @@ function resolveInitialTypes(
   return { types: ['video'], locked: false }
 }
 
+function getSniffTypes(sniffResult: SniffResult | null | undefined): ItemType[] {
+  if (!sniffResult) return []
+  return sniffResult.possible_types.filter((t): t is ItemType =>
+    ALL_TYPES.includes(t as ItemType),
+  )
+}
+
 // ── 组件 ──────────────────────────────────────────────────
 
 export function AddMaterialModal({
@@ -128,13 +134,12 @@ export function AddMaterialModal({
   onFineTune,
 }: AddMaterialModalProps) {
   // ── 类型选择 ──
-  const initial = useMemo(() => resolveInitialTypes(sniffResult), [sniffResult])
-  const [selectedTypes, setSelectedTypes] = useState<ItemType[]>(initial.types)
-  const typeLocked = initial.locked
+  const propInitial = useMemo(() => resolveInitialTypes(sniffResult), [sniffResult])
+  const [selectedTypes, setSelectedTypes] = useState<ItemType[]>(propInitial.types)
 
   // ── Feature 勾选（按类型）──
   const [features, setFeatures] = useState<Record<ItemType, Record<string, boolean>>>(
-    () => buildDefaults(initial.types),
+    () => buildDefaults(propInitial.types),
   )
 
   // ── 背景信息 ──
@@ -149,23 +154,69 @@ export function AddMaterialModal({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // ── sniffResult 变化时重置类型与 features ──
+  // ── 内部 URL 输入（调用方未传 urlValue 时使用）──
+  const [internalUrl, setInternalUrl] = useState('')
+  const [internalSniff, setInternalSniff] = useState<SniffResult | null>(null)
+  const sniffTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  const effectiveSniff = sniffResult ?? internalSniff
+  const effectiveUrl = (urlValue ?? internalUrl).trim()
+  const sniffTypes = useMemo(() => getSniffTypes(effectiveSniff), [effectiveSniff])
+  const effectiveInitial = useMemo(() => resolveInitialTypes(effectiveSniff), [effectiveSniff])
+  const typeLocked = sniffTypes.length === 1
+
+  // ── open / sniff 变化时重置类型与 features ──
   useEffect(() => {
-    if (open) {
-      const { types } = resolveInitialTypes(sniffResult)
-      setSelectedTypes(types)
-      setFeatures(buildDefaults(types))
-      setBgOverrides({})
-      setBgOpen(false)
-      setError(null)
-      setSubmitting(false)
+    if (!open) return
+    const { types } = effectiveInitial
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setSelectedTypes(types)
+    setFeatures(buildDefaults(types))
+    setBgOverrides({})
+    setBgOpen(false)
+    setError(null)
+    setSubmitting(false)
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [open, effectiveInitial])
+
+  useEffect(() => {
+    if (!open) return
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setInternalUrl('')
+    setInternalSniff(null)
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [open, urlValue])
+
+  // ── 内部 URL 变化时 debounced 嗅探 ──
+  const doSniff = useCallback(async (url: string) => {
+    try {
+      const result = await sniffUrl(url)
+      setInternalSniff(result)
+    } catch {
+      setInternalSniff(null)
     }
-  }, [open, sniffResult])
+  }, [])
+
+  useEffect(() => {
+    if (!internalUrl.trim() || urlValue) return
+    clearTimeout(sniffTimer.current)
+    sniffTimer.current = setTimeout(() => {
+      doSniff(internalUrl.trim())
+    }, 500)
+    return () => clearTimeout(sniffTimer.current)
+  }, [internalUrl, urlValue, doSniff])
+
+  const handleInternalUrlChange = (value: string) => {
+    setInternalUrl(value)
+    setError(null)
+    setInternalSniff(null)
+  }
 
   // ── 类型勾选切换（仅混合类型模式）──
   const toggleType = (t: ItemType) => {
     if (typeLocked) return
     setSelectedTypes((prev) => {
+      if (prev.includes(t) && prev.length === 1) return prev
       const next = prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
       if (!prev.includes(t)) {
         setFeatures((f) => ({ ...f, [t]: buildTypeDefaults(t) }))
@@ -189,6 +240,10 @@ export function AddMaterialModal({
 
   // ── 一键解析 ──
   const handleQuickSubmit = async () => {
+    if (!effectiveUrl) {
+      setError('请先输入素材链接')
+      return
+    }
     if (selectedTypes.length === 0) {
       setError('请至少选择一种素材类型')
       return
@@ -206,8 +261,8 @@ export function AddMaterialModal({
       const firstType = selectedTypes[0]
       const updated = await addWorkspaceItem(primaryWs, {
         type: firstType,
-        source: urlValue ? 'url' : 'local',
-        source_value: urlValue ?? '',
+        source: 'url',
+        source_value: effectiveUrl,
       })
       toast.success(`${TYPE_META[firstType].label}素材已入队`)
       onAdded?.(updated)
@@ -226,14 +281,14 @@ export function AddMaterialModal({
       features,
       background: bgOverrides,
       workspaceIds,
-      urlValue,
+      urlValue: effectiveUrl,
     }
     onFineTune?.(staged)
   }
 
   // ── 渲染 ──
-  const sourceLabel = urlValue ? '网络链接' : '本地文件'
-  const hasContent = urlValue || selectedTypes.length > 0
+  const sourceLabel = effectiveUrl ? '网络链接' : '待输入'
+  const hasContent = effectiveUrl.length > 0 && selectedTypes.length > 0
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -241,8 +296,8 @@ export function AddMaterialModal({
         <DialogHeader>
           <DialogTitle>添加素材</DialogTitle>
           <DialogDescription>
-            {sniffResult?.title
-              ? `来自 ${sniffResult.platform ?? '未知平台'} · ${sniffResult.title}`
+            {effectiveSniff?.title
+              ? `来自 ${effectiveSniff.platform ?? '未知平台'} · ${effectiveSniff.title}`
               : '配置素材类型与分析选项'}
           </DialogDescription>
         </DialogHeader>
@@ -256,31 +311,33 @@ export function AddMaterialModal({
         {/* ── 素材类型区 ── */}
         <div className="space-y-2">
           <Label className="text-xs text-muted-foreground">素材类型</Label>
-          {sniffResult && typeLocked ? (
+          {effectiveSniff && typeLocked ? (
             <TypeChip type={selectedTypes[0]} />
-          ) : sniffResult && !typeLocked ? (
+          ) : effectiveSniff && sniffTypes.length > 1 ? (
             <div className="space-y-1">
-              {selectedTypes.map((t) => {
-                const meta = TYPE_META[t]
-                const Icon = meta.icon
-                return (
-                  <label
-                    key={t}
-                    className="flex items-center gap-3 rounded-md border p-3 cursor-pointer hover:bg-muted/30"
-                  >
-                    <Checkbox
-                      checked={true}
-                      disabled={selectedTypes.length === 1}
-                      onCheckedChange={() => toggleType(t)}
-                    />
-                    <Icon className="size-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">{meta.label}</span>
-                    <span className="ml-auto text-[10px] text-muted-foreground">
-                      {sniffResult.platform ?? '已识别'}
-                    </span>
-                  </label>
-                )
-              })}
+              {sniffTypes
+                .map((t) => {
+                  const meta = TYPE_META[t]
+                  const Icon = meta.icon
+                  const checked = selectedTypes.includes(t)
+                  return (
+                    <label
+                      key={t}
+                      className="flex items-center gap-3 rounded-md border p-3 cursor-pointer hover:bg-muted/30"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        disabled={checked && selectedTypes.length === 1}
+                        onCheckedChange={() => toggleType(t)}
+                      />
+                      <Icon className="size-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">{meta.label}</span>
+                      <span className="ml-auto text-[10px] text-muted-foreground">
+                        {effectiveSniff.platform ?? '已识别'}
+                      </span>
+                    </label>
+                  )
+                })}
             </div>
           ) : (
             <div className="grid grid-cols-4 gap-2">
@@ -309,25 +366,30 @@ export function AddMaterialModal({
           )}
         </div>
 
-        {/* ── 输入源展示（只读）── */}
+        {/* ── 输入源 ── */}
         <div className="space-y-2">
           <Label className="text-xs text-muted-foreground">输入源</Label>
-          <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2.5 text-sm">
-            {urlValue ? (
-              <>
-                <Link2 className="size-4 shrink-0 text-muted-foreground" />
-                <span className="truncate text-muted-foreground">{urlValue}</span>
-              </>
-            ) : (
-              <>
-                <Upload className="size-4 shrink-0 text-muted-foreground" />
-                <span className="text-muted-foreground">本地文件</span>
-              </>
-            )}
-            <span className="ml-auto shrink-0 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-              {sourceLabel}
-            </span>
-          </div>
+          {urlValue ? (
+            <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2.5 text-sm">
+              <Link2 className="size-4 shrink-0 text-muted-foreground" />
+              <span className="truncate text-muted-foreground">{urlValue}</span>
+              <span className="ml-auto shrink-0 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                {sourceLabel}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder="粘贴 B站 / YouTube / 小红书 / 抖音链接..."
+                value={internalUrl}
+                onChange={(e) => handleInternalUrlChange(e.target.value)}
+                className="flex-1 text-sm"
+              />
+              <span className="shrink-0 text-[10px] text-muted-foreground">
+                {internalSniff ? '已识别' : '输入后自动识别'}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* ── 一级勾选区（按类型分组）── */}
@@ -411,13 +473,14 @@ export function AddMaterialModal({
           </CollapsibleContent>
         </Collapsible>
 
-        {/* ── 底部双按钮 ── */}
+        {/* ── 底部按钮 ── */}
         <DialogFooter className="gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={handleFineTune}
-            disabled={!hasContent}
+            disabled={!hasContent || !onFineTune}
+            title={onFineTune ? undefined : 'R4 接入细调参数'}
           >
             <Settings2 className="mr-1 size-3.5" />
             细调…
