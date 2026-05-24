@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 
 import { getWorkspace } from '@/services/workspaces'
 import { AddMaterialModal } from '@/components/workspace/AddMaterialModal'
+import { usePipelineTasks } from '@/hooks/usePipelineTasks'
 import { useTaskStore } from '@/store/taskStore'
 import { isTaskTerminal } from '@/types/task'
 import type { WorkspaceRecord } from '@/types/workspace'
@@ -36,6 +37,8 @@ export default function TaskboardPage() {
   const [bgOpen, setBgOpen] = useState(false)
   const tasks = useTaskStore((s) => s.tasks)
   const abortRef = useRef<AbortController | null>(null)
+
+  usePipelineTasks({ projectId: id, pollInterval: 5000, enabled: Boolean(id) })
 
   useEffect(() => {
     if (!id) return
@@ -78,7 +81,7 @@ export default function TaskboardPage() {
 
   const counts: Partial<Record<TabId, number>> = {
     materials: workspace.items.length,
-    queue: tasks.filter((t) => !isTaskTerminal(t.status)).length,
+    queue: tasks.filter((t) => t.project_id === workspace.workspace_id && !isTaskTerminal(t.status)).length,
     favs: workspace.favorites.length,
   }
 
@@ -101,7 +104,7 @@ export default function TaskboardPage() {
             onAddMaterial={() => setAddOpen(true)}
           />
         )}
-        {tab === 'queue' && <QueueTab />}
+        {tab === 'queue' && <QueueTab workspaceId={workspace.workspace_id} />}
         {tab === 'favs' && (
           <FavoritesTab
             favoriteIds={workspace.favorites}
@@ -134,7 +137,7 @@ export default function TaskboardPage() {
         onOpenChange={setAddOpen}
         workspaceIds={[workspace.workspace_id]}
         workspaceBackgrounds={{ [workspace.workspace_id]: workspace.background }}
-        onAdded={(updated) => setWorkspace(updated)}
+        onAdded={() => getWorkspace(workspace.workspace_id).then(setWorkspace).catch(() => {})}
       />
 
       <BackgroundEditor

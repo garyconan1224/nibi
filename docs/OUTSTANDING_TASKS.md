@@ -10,7 +10,9 @@ Last updated: 2026-05-24（**当前阶段 = Phase R 输入层重构**）
 
 **Phase R — 首页输入层重构**（in_progress）— [`docs/plans/phase-r-input-refactor.md`](plans/phase-r-input-refactor.md)
 
-R 阶段完成并 merge 进 main 前，下方 P1 / 长期遗留 / 历史"推荐下一步"全部冻结，**不要并行启动**。R 子任务 R0~R6 是真相源。
+R 阶段完成并 merge 进 main 前，下方 P1 / 长期遗留 / 历史"推荐下一步"全部冻结，**不要并行启动**。R 子任务 R0~R6 与新增 R3.1 是真相源。
+
+- **当前下一步**：R4 PreflightDrawer 接管细粒度参数。R3.1 `AddMaterialModal` Remix 风格化已完成并写入 `CLAUDE.md` / `docs/DESIGN_SYSTEM.md`。
 
 ---
 

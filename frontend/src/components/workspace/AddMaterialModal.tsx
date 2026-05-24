@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  Check,
+  ChevronDown,
   FileAudio,
   FileImage,
   FileText,
@@ -7,23 +9,14 @@ import {
   Link2,
   Settings2,
   Sparkles,
+  X,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible'
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
 import { FEATURES_BY_TYPE, type Feature } from '@/lib/featuresToSteps'
@@ -33,15 +26,17 @@ import { sniffUrl } from '@/services/workspaces'
 import type {
   ItemType,
   WorkspaceBackground,
-  WorkspaceRecord,
 } from '@/types/workspace'
 
-const TYPE_META: Record<ItemType, { icon: typeof FileVideo; label: string }> = {
-  video: { icon: FileVideo, label: '视频' },
-  audio: { icon: FileAudio, label: '音频' },
-  image: { icon: FileImage, label: '图片' },
-  text: { icon: FileText, label: '文字' },
+const TYPE_META: Record<ItemType, { icon: typeof FileVideo; label: string; sub: string }> = {
+  video: { icon: FileVideo, label: '视频', sub: 'Video · URL/文件' },
+  audio: { icon: FileAudio, label: '音频', sub: 'Audio · MP3/WAV' },
+  image: { icon: FileImage, label: '图片', sub: 'Image · 批量' },
+  text:  { icon: FileText,  label: '文字', sub: 'Text · 链接/粘贴' },
 }
+
+const BG_CONTENT_TYPES = ['课程', '会议', '宣传片', 'Vlog', '访谈', '纯音乐', '新闻报道']
+const BG_PURPOSES = ['复刻参考', '竞品分析', '内容总结', '学习研究']
 
 // ── Props ──────────────────────────────────────────────────
 
@@ -60,7 +55,7 @@ interface AddMaterialModalProps {
   workspaceBackgrounds?: Record<string, WorkspaceBackground>
   sniffResult?: SniffResult | null
   urlValue?: string
-  onAdded?: (updated: WorkspaceRecord) => void
+  onAdded?: () => void
   onFineTune?: (staged: StagedConfig) => void
 }
 
@@ -179,9 +174,12 @@ export function AddMaterialModal({
     setInternalSniff(null)
   }
 
-  // ── 类型勾选切换（仅混合类型模式）──
+  // ── 类型勾选切换 ──
   const toggleType = (t: ItemType) => {
+    // 嗅探锁定类型不可切换；嗅探多选时只能选 sniff 返回的类型
     if (typeLocked) return
+    if (sniffTypes.length > 1 && !sniffTypes.includes(t)) return
+
     setSelectedTypes((prev) => {
       if (prev.includes(t) && prev.length === 1) return prev
       const next = prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
@@ -254,8 +252,12 @@ export function AddMaterialModal({
       toast.success(`${total} 个任务已入队`)
     } else if (succeeded > 0) {
       toast.warning(`已入队 ${succeeded}/${total}，部分失败请重试`)
+    } else {
+      toast.error('任务创建失败，请检查链接或后端状态后重试')
+      setSubmitting(false)
+      return
     }
-    onAdded?.({} as WorkspaceRecord)
+    onAdded?.()
     onOpenChange(false)
     setSubmitting(false)
   }
@@ -272,262 +274,351 @@ export function AddMaterialModal({
     onFineTune?.(staged)
   }
 
-  // ── 渲染 ──
-  const sourceLabel = effectiveUrl ? '网络链接' : '待输入'
+  // ── 派生值 ──
   const hasContent = effectiveUrl.length > 0 && selectedTypes.length > 0
+  const enabledCount = useMemo(() => {
+    let n = 0
+    for (const t of selectedTypes) {
+      if (features[t]) {
+        n += Object.values(features[t]).filter(Boolean).length
+      }
+    }
+    return n
+  }, [selectedTypes, features])
+
+  const sourceSummary = effectiveSniff?.title
+    ? `${effectiveSniff.platform ?? '未知平台'} · ${effectiveSniff.title}`
+    : effectiveUrl
+      ? '网络链接'
+      : '配置素材类型与分析选项'
+  const workspaceSummary =
+    workspaceIds.length > 1
+      ? `${workspaceIds.length} 个工作空间`
+      : workspaceIds.length === 1
+        ? '当前工作空间'
+        : '未选择工作空间'
+
+  // ── 判断某类型是否可选择 ──
+  const isTypeSelectable = (t: ItemType): boolean => {
+    if (typeLocked) return selectedTypes.includes(t)
+    if (sniffTypes.length > 1) return sniffTypes.includes(t)
+    return true
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
-        <DialogHeader>
-          <DialogTitle>添加素材</DialogTitle>
-          <DialogDescription>
-            {effectiveSniff?.title
-              ? `来自 ${effectiveSniff.platform ?? '未知平台'} · ${effectiveSniff.title}`
-              : '配置素材类型与分析选项'}
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent
+        className="remix-modal-content"
+        overlayClassName="remix-modal-backdrop"
+        showCloseButton={false}
+      >
+        <DialogTitle className="sr-only">添加素材</DialogTitle>
+        <DialogDescription className="sr-only">
+          配置素材类型、输入源、分析任务与背景信息
+        </DialogDescription>
 
-        {error && (
-          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-2 text-sm text-destructive">
-            {error}
+        {/* ── m-head ── */}
+        <div className="m-head">
+          <div>
+            <div className="eyebrow">ADD MATERIAL · 添加素材</div>
+            <h3 className="display" style={{ fontSize: 28, margin: '4px 0 0' }}>
+              添加素材
+            </h3>
+            <p className="modal-subtitle">{workspaceSummary} · {sourceSummary}</p>
           </div>
-        )}
+          <DialogClose className="btn btn-ghost modal-close">
+            <X size={16} />
+          </DialogClose>
+        </div>
 
-        {/* ── 素材类型区 ── */}
-        <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground">素材类型</Label>
-          {effectiveSniff && typeLocked ? (
-            <TypeChip type={selectedTypes[0]} />
-          ) : effectiveSniff && sniffTypes.length > 1 ? (
-            <div className="space-y-1">
-              {sniffTypes
-                .map((t) => {
-                  const meta = TYPE_META[t]
-                  const Icon = meta.icon
-                  const checked = selectedTypes.includes(t)
-                  return (
-                    <label
-                      key={t}
-                      className="flex items-center gap-3 rounded-md border p-3 cursor-pointer hover:bg-muted/30"
-                    >
-                      <Checkbox
-                        checked={checked}
-                        disabled={checked && selectedTypes.length === 1}
-                        onCheckedChange={() => toggleType(t)}
-                      />
-                      <Icon className="size-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">{meta.label}</span>
-                      <span className="ml-auto text-[10px] text-muted-foreground">
-                        {effectiveSniff.platform ?? '已识别'}
-                      </span>
-                    </label>
-                  )
-                })}
-            </div>
-          ) : (
-            <div className="grid grid-cols-4 gap-2">
+        {/* ── m-body ── */}
+        <div className="m-body">
+          {error && (
+            <div className="modal-error">{error}</div>
+          )}
+
+          {/* ① 素材类型 */}
+          <div className="m-section">
+            <div className="eyebrow" style={{ marginBottom: 10 }}>① 素材类型</div>
+            <div className="type-row">
               {ALL_TYPES.map((t) => {
                 const meta = TYPE_META[t]
                 const Icon = meta.icon
-                const on = selectedTypes.includes(t)
+                const active = selectedTypes.includes(t)
+                const selectable = isTypeSelectable(t)
                 return (
                   <button
                     key={t}
                     type="button"
-                    onClick={() => toggleType(t)}
-                    className={[
-                      'flex flex-col items-center gap-1.5 rounded-lg border-2 p-3 text-sm transition-colors',
-                      on
-                        ? 'border-primary bg-primary/5 text-primary'
-                        : 'border-border hover:border-primary/40',
-                    ].join(' ')}
+                    className="type-card"
+                    data-active={active ? 'true' : 'false'}
+                    onClick={() => selectable && toggleType(t)}
+                    disabled={!selectable}
                   >
-                    <Icon className="size-5" />
-                    <span>{meta.label}</span>
+                    <Icon size={22} />
+                    <div className="tc-l">{meta.label}</div>
+                    <div className="mono tc-en">{meta.sub}</div>
                   </button>
                 )
               })}
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* ── 输入源 ── */}
-        <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground">输入源</Label>
-          {urlValue ? (
-            <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2.5 text-sm">
-              <Link2 className="size-4 shrink-0 text-muted-foreground" />
-              <span className="truncate text-muted-foreground">{urlValue}</span>
-              <span className="ml-auto shrink-0 text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                {sourceLabel}
+          {/* ② 输入源 */}
+          <div className="m-section">
+            <div className="eyebrow" style={{ marginBottom: 10 }}>② 输入源</div>
+            {urlValue ? (
+              <div className="composer-url modal-composer-url">
+                <div className="platform">
+                  <Link2 size={16} />
+                </div>
+                <span className="modal-source-value">{urlValue}</span>
+                <span className="kw">Composer 传入</span>
+              </div>
+            ) : (
+              <div className="composer-url modal-composer-url">
+                <div className="platform">
+                  <Link2 size={16} />
+                </div>
+                <input
+                  value={internalUrl}
+                  onChange={(e) => handleInternalUrlChange(e.target.value)}
+                  placeholder="B站 / 小红书 / 抖音 / YouTube / 本地文件路径"
+                />
+              </div>
+            )}
+            <div className="modal-kw-row">
+              <span className="kw">
+                <Link2 size={11} />
+                支持网络链接
               </span>
+              <span className="kw">本地版无大小限制</span>
+              {!urlValue && (
+                <span className="kw" data-state={internalSniff ? 'recognized' : undefined}>
+                  {internalSniff ? '已识别' : '输入后自动识别'}
+                </span>
+              )}
             </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Input
-                placeholder="粘贴 B站 / YouTube / 小红书 / 抖音链接..."
-                value={internalUrl}
-                onChange={(e) => handleInternalUrlChange(e.target.value)}
-                className="flex-1 text-sm"
-              />
-              <span className="shrink-0 text-[10px] text-muted-foreground">
-                {internalSniff ? '已识别' : '输入后自动识别'}
-              </span>
-            </div>
-          )}
-        </div>
+          </div>
 
-        {/* ── 一级勾选区（按类型分组）── */}
-        {selectedTypes.length > 0 && (
-          <div className="space-y-3">
-            <Label className="text-xs text-muted-foreground">
-              分析任务 · 已按类型智能默认勾选
-            </Label>
-            {selectedTypes.map((type) => {
-              const meta = TYPE_META[type]
-              const Icon = meta.icon
-              const typeFeatures = FEATURES_BY_TYPE[type]
-              return (
-                <div key={type} className="rounded-lg border p-3">
-                  <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                    <Icon className="size-3.5" />
-                    {meta.label}
+          {/* ③ 分析任务 */}
+          {selectedTypes.length > 0 && (
+            <div className="m-section">
+              <div className="eyebrow" style={{ marginBottom: 10 }}>
+                ③ 勾选分析任务 · 已按类型智能默认
+              </div>
+              {selectedTypes.map((type) => {
+                const meta = TYPE_META[type]
+                const Icon = meta.icon
+                const typeFeatures = FEATURES_BY_TYPE[type]
+                return (
+                  <div key={type} style={{ marginBottom: 10 }}>
+                    <div
+                      className="mono"
+                      style={{
+                        fontSize: 10,
+                        color: 'var(--ink-3)',
+                        marginBottom: 6,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5,
+                      }}
+                    >
+                      <Icon size={12} />
+                      {meta.label}
+                    </div>
+                    <div className="task-chips">
+                      {typeFeatures.map((feat) => {
+                        const on = features[type]?.[feat.id] ?? false
+                        return (
+                          <button
+                            key={feat.id}
+                            type="button"
+                            className="task-chip"
+                            data-on={on ? 'true' : 'false'}
+                            onClick={() => toggleFeature(type, feat.id)}
+                          >
+                            <span className="tc-box">
+                              {on && <Check size={12} strokeWidth={2.5} />}
+                            </span>
+                            {feat.label}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    {typeFeatures.map((feat) => (
-                      <label
-                        key={feat.id}
-                        className="flex items-center gap-2.5 rounded py-1 cursor-pointer hover:bg-muted/30"
-                      >
-                        <Checkbox
-                          checked={features[type]?.[feat.id] ?? false}
-                          onCheckedChange={() => toggleFeature(type, feat.id)}
-                        />
-                        <span className="text-sm">{feat.label}</span>
-                      </label>
-                    ))}
+                )
+              })}
+            </div>
+          )}
+
+          {/* ④ 背景信息 */}
+          <div className="m-section">
+            <button
+              type="button"
+              onClick={() => setBgOpen((o) => !o)}
+              className="bg-toggle"
+            >
+              <Sparkles size={14} className="bg-toggle-icon" />
+              <span className="mono bg-toggle-label">
+                ④ 背景信息（可选 · 强烈推荐）
+              </span>
+              <span className="kw bg-toggle-tag">
+                注入所有 AI 调用
+              </span>
+              <ChevronDown
+                size={12}
+                className="bg-toggle-chevron"
+                data-open={bgOpen ? 'true' : 'false'}
+              />
+            </button>
+
+            {bgOpen && (
+              <div className="bg-panel" style={{ marginTop: 10 }}>
+                {/* 内容类型 */}
+                <div>
+                  <div className="field-label">
+                    内容类型 <span style={{ opacity: 0.5 }}>· 影响分析视角</span>
+                  </div>
+                  <div className="pill-row">
+                    {BG_CONTENT_TYPES.map((ct) => {
+                      const current = bgOverrides.content_type ?? mergedBg?.content_type
+                      const on = current === ct
+                      return (
+                        <button
+                          key={ct}
+                          type="button"
+                          className="pill"
+                          data-on={on ? 'true' : 'false'}
+                          onClick={() =>
+                            updateBg('content_type', on ? '' : ct)
+                          }
+                        >
+                          {ct}
+                        </button>
+                      )
+                    })}
                   </div>
                 </div>
-              )
-            })}
-          </div>
-        )}
 
-        {/* ── 背景信息（折叠）── */}
-        <Collapsible open={bgOpen} onOpenChange={setBgOpen}>
-          <CollapsibleTrigger asChild>
-            <Button variant="outline" size="sm" className="w-full text-xs">
-              {bgOpen ? '收起背景信息' : '展开背景信息（从工作空间继承）'}
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-3 space-y-3">
-            <BgField
-              label="内容类型"
-              placeholder={mergedBg?.content_type || '课程 / 宣传片 / Vlog / 访谈 / 纯音乐'}
-              value={bgOverrides.content_type ?? ''}
-              onChange={(v) => updateBg('content_type', v)}
-            />
-            <BgField
-              label="参与人物"
-              placeholder={mergedBg?.participants?.join(', ') || '例：Hugo · 影视飓风'}
-              value={bgOverrides.participants?.join(', ') ?? ''}
-              onChange={(v) =>
-                updateBg('participants', v ? v.split(/[,，]/).map((s) => s.trim()) : [])
-              }
-            />
-            <BgField
-              label="主题背景"
-              placeholder={mergedBg?.topic || '例：Q2 数码产品开箱评测'}
-              value={bgOverrides.topic ?? ''}
-              onChange={(v) => updateBg('topic', v)}
-            />
-            <BgField
-              label="专有名词"
-              placeholder={mergedBg?.glossary?.join(', ') || '用逗号分隔'}
-              value={bgOverrides.glossary?.join(', ') ?? ''}
-              onChange={(v) =>
-                updateBg('glossary', v ? v.split(/[,，]/).map((s) => s.trim()) : [])
-              }
-            />
-            <BgField
-              label="分析目的"
-              placeholder={mergedBg?.purpose || '复刻参考 / 竞品分析 / 内容学习'}
-              value={bgOverrides.purpose ?? ''}
-              onChange={(v) => updateBg('purpose', v)}
-            />
-          </CollapsibleContent>
-        </Collapsible>
+                {/* 参与人物 */}
+                <div>
+                  <div className="field-label">
+                    参与人物 <span style={{ opacity: 0.5 }}>· 用于说话人识别匹配</span>
+                  </div>
+                  <input
+                    className="field-input"
+                    placeholder={mergedBg?.participants?.join(', ') || '张总、李总、产品负责人…'}
+                    value={bgOverrides.participants?.join(', ') ?? ''}
+                    onChange={(e) =>
+                      updateBg(
+                        'participants',
+                        e.target.value ? e.target.value.split(/[,，]/).map((s) => s.trim()) : [],
+                      )
+                    }
+                  />
+                </div>
 
-        {/* ── 底部按钮 ── */}
-        <DialogFooter className="gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleFineTune}
-            disabled={!hasContent || !onFineTune}
-            title={onFineTune ? undefined : 'R4 接入细调参数'}
-          >
-            <Settings2 className="mr-1 size-3.5" />
-            细调…
-          </Button>
-          <Button
-            size="sm"
-            onClick={handleQuickSubmit}
-            disabled={!hasContent || submitting}
-          >
-            {submitting ? (
-              '提交中…'
-            ) : (
-              <>
-                <Sparkles className="mr-1 size-3.5" />
-                一键解析
-              </>
+                {/* 主题背景 */}
+                <div>
+                  <div className="field-label">
+                    主题背景 <span style={{ opacity: 0.5 }}>· 注入 LLM 上下文</span>
+                  </div>
+                  <input
+                    className="field-input"
+                    placeholder={mergedBg?.topic || 'Q3 战略会议 · AI 工具评测…'}
+                    value={bgOverrides.topic ?? ''}
+                    onChange={(e) => updateBg('topic', e.target.value)}
+                  />
+                </div>
+
+                {/* 专有名词 */}
+                <div>
+                  <div className="field-label">
+                    专有名词 <span style={{ opacity: 0.5 }}>· 提升 Whisper 识别准确率</span>
+                  </div>
+                  <input
+                    className="field-input"
+                    placeholder={mergedBg?.glossary?.join(', ') || 'Pocket 4, D-Log M, ProRes RAW…'}
+                    value={bgOverrides.glossary?.join(', ') ?? ''}
+                    onChange={(e) =>
+                      updateBg(
+                        'glossary',
+                        e.target.value ? e.target.value.split(/[,，]/).map((s) => s.trim()) : [],
+                      )
+                    }
+                  />
+                </div>
+
+                {/* 分析目的 */}
+                <div>
+                  <div className="field-label">
+                    分析目的 <span style={{ opacity: 0.5 }}>· 影响总结侧重点</span>
+                  </div>
+                  <div className="pill-row">
+                    {BG_PURPOSES.map((p) => {
+                      const current = bgOverrides.purpose ?? mergedBg?.purpose
+                      const on = current === p
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          className="pill"
+                          data-on={on ? 'true' : 'false'}
+                          onClick={() =>
+                            updateBg('purpose', on ? '' : p)
+                          }
+                        >
+                          {p}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div className="mono" style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 2 }}>
+                  以上信息将注入到所有后续 AI 调用（视觉分析 · 文本总结 · LLM 对话），提升准确率。
+                </div>
+              </div>
             )}
-          </Button>
-        </DialogFooter>
+          </div>
+        </div>
+
+        {/* ── m-foot ── */}
+        <div className="m-foot">
+          <span className="mono modal-foot-status">
+            <span className="chip-dot" style={{ marginRight: 6 }} />
+            已勾选 {enabledCount} 项 · {selectedTypes.length} 种素材类型
+          </span>
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="btn"
+              onClick={handleFineTune}
+              disabled={!hasContent || !onFineTune}
+            >
+              <Settings2 size={14} />
+              细调…
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleQuickSubmit}
+              disabled={!hasContent || submitting}
+            >
+              {submitting ? (
+                '提交中…'
+              ) : (
+                <>
+                  <Sparkles size={14} />
+                  一键解析
+                </>
+              )}
+            </button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
-  )
-}
-
-// ── 子组件 ──────────────────────────────────────────────────
-
-function TypeChip({ type }: { type: ItemType }) {
-  const meta = TYPE_META[type]
-  const Icon = meta.icon
-  return (
-    <div className="inline-flex items-center gap-2 rounded-md border bg-muted/50 px-3 py-2">
-      <Icon className="size-4 text-primary" />
-      <span className="text-sm font-medium">{meta.label}</span>
-      <span className="text-[10px] text-muted-foreground bg-muted px-1 py-0.5 rounded">
-        已识别
-      </span>
-    </div>
-  )
-}
-
-function BgField({
-  label,
-  placeholder,
-  value,
-  onChange,
-}: {
-  label: string
-  placeholder: string
-  value: string
-  onChange: (v: string) => void
-}) {
-  return (
-    <div className="space-y-1">
-      <Label className="text-xs">{label}</Label>
-      <Input
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="text-sm"
-      />
-    </div>
   )
 }
 

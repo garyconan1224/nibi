@@ -87,8 +87,8 @@ export async function createNoteTask(
       material_type: params.material_type,
       enabled_features: params.enabled_features,
       background: params.background ?? {},
+      workspace_id: params.workspace_id,
     },
     steps,
   })
 }
-

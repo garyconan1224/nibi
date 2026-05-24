@@ -365,6 +365,12 @@ checkpoint 保持短小，只写：
 - **动效与交互 (Transitions)**:
   - 动画加速曲线: `cubic-bezier(0.4, 0, 0.2, 1)`
   - 过渡时间: 状态变更 120-220ms，抽屉/面板出入 280ms，进度条插值 400ms。避免不必要的装饰动效，切忌弹跳/overshoot。
+- **二级交互面板 / AddMaterialModal**:
+  - 用户点击「添加素材」后出现的界面属于 Remix modal，不是默认 shadcn/Radix 表单弹窗；可保留无障碍底座，但可见结构必须落在 Remix class vocabulary 上。
+  - 标准结构：`modal-backdrop` / `modal` / `m-head` / `m-body` / `m-section` / `m-foot`，标题区使用 `.eyebrow` + `.display`。
+  - 素材类型用 `.type-row` + `.type-card[data-active]`；分析任务用 `.task-chips` + `.task-chip[data-on]` + `.tc-box`；输入源复用 `.composer-url` 和 `.kw`。
+  - 背景信息折叠区必须使用 `var(--bg-sunken)` 凹陷面板、等宽字段标签和 token 化 pill；组件内不得新增 hardcoded hex / rgba / border / radius / shadow。
+  - 后续设置弹窗、Preflight 二级面板、任务配置面板若属于同类决策流，也应延续此 modal / section / chip 语法。
 
 ### 业务规格与运行时交互契约 (Remix 版)
 
