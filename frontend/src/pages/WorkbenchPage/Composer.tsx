@@ -8,7 +8,8 @@ import { detectPlatform } from './platforms'
 import { normalizeMediaUrl } from '@/lib/url'
 import { listWorkspaces, createWorkspace, sniffUrl } from '@/services/workspaces'
 import type { SniffResult } from '@/services/workspaces'
-import { AddMaterialModal } from '@/components/workspace/AddMaterialModal'
+import { AddMaterialModal, type StagedConfig } from '@/components/workspace/AddMaterialModal'
+import { PreflightDrawer } from '@/pages/WorkbenchPage/PreflightDrawer'
 
 const WS_COLORS = [
   '#22c55e', '#f59e0b', '#a855f7', '#0ea5e9',
@@ -28,6 +29,8 @@ export function Composer({ onTaskCreated }: ComposerProps) {
   const [wsOpen, setWsOpen] = useState(false)
   const [wsQuery, setWsQuery] = useState('')
   const [sniffResult, setSniffResult] = useState<SniffResult | null>(null)
+  const [preflightOpen, setPreflightOpen] = useState(false)
+  const [preflightStaged, setPreflightStaged] = useState<StagedConfig | undefined>(undefined)
 
   const popRef = useRef<HTMLDivElement>(null)
   const sniffTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -310,6 +313,26 @@ export function Composer({ onTaskCreated }: ComposerProps) {
         sniffResult={sniffResult}
         urlValue={normalizedUrl || undefined}
         onAdded={handleAdded}
+        onFineTune={(staged) => {
+          setUploadOpen(false)
+          setPreflightStaged(staged)
+          setPreflightOpen(true)
+        }}
+      />
+
+      {/* R4: PreflightDrawer via fine-tune */}
+      <PreflightDrawer
+        open={preflightOpen}
+        url={normalizedUrl || url}
+        platformName={platform?.name ?? null}
+        sniffResult={sniffResult}
+        workspaceId={workspaceSel[0]}
+        stagedConfig={preflightStaged}
+        onClose={() => setPreflightOpen(false)}
+        onCreated={() => {
+          setPreflightOpen(false)
+          handleAdded()
+        }}
       />
     </div>
   )

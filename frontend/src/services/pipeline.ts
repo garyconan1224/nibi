@@ -66,12 +66,20 @@ export async function confirmMusicMode(taskId: string) {
 
 // ── Phase R: note 任务创建 ──────────────────────────────────
 
+export interface NotePreflightOverrides {
+  models?: { vision?: string; text?: string }
+  summary?: { path?: string; video_template?: string; output_format?: string }
+  text_rewrite?: { enabled: boolean; style: string }
+  text_translate?: { enabled: boolean; target_lang: string }
+}
+
 export interface CreateNoteTaskParams {
   url: string
   material_type: ItemType
   enabled_features: Feature[]
   background?: Partial<WorkspaceBackground>
   workspace_id: string
+  preflight?: NotePreflightOverrides
 }
 
 /** 创建 note 类型 pipeline 任务，features 自动翻译为 backend steps */
@@ -88,6 +96,7 @@ export async function createNoteTask(
       enabled_features: params.enabled_features,
       background: params.background ?? {},
       workspace_id: params.workspace_id,
+      ...(params.preflight ? { preflight: params.preflight } : {}),
     },
     steps,
   })
