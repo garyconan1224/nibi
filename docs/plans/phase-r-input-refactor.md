@@ -149,27 +149,22 @@ flowchart TD
 ### R4 PreflightDrawer 接管细粒度参数（Sonnet 4.6，2h）
 **目标**：模态"细调"按钮唤起 PreflightDrawer，PreflightDrawer 拿到模态的 staged config 作初值。
 
-- [ ] R4.1 PreflightDrawer props 增加 `stagedConfig: { type, features, background, workspaceId }`
-- [ ] R4.2 PreflightDrawer 内已有的截帧/模型/Whisper 字段保留，初值改为优先用 `stagedConfig.*` ?? 设置页默认
-- [ ] R4.3 PreflightDrawer 的"开始解析"也走 `createNoteTask`（与 R3 共用同一 service）
-- [ ] R4.4 检查 `composerDefaults` 的旧链路是否还有引用，删除残余
-- [ ] R4.5 跑端到端：点"细调…"→ 抽屉打开 → 改抽帧间隔 → 提交 → 队列出现任务且 payload 含新参数
+- [x] R4.1 PreflightDrawer props 增加 `stagedConfig: { type, features, background, workspaceId }`
+- [x] R4.2 PreflightDrawer 内已有的截帧/模型/Whisper 字段保留，初值改为优先用 `stagedConfig.*` ?? 设置页默认
+- [x] R4.3 PreflightDrawer 的"开始解析"也走 `createNoteTask`（与 R3 共用同一 service）
+- [x] R4.4 检查 `composerDefaults` 的旧链路是否还有引用，删除残余
+- [x] R4.5 跑端到端：点"细调…"→ 抽屉打开 → 改抽帧间隔 → 提交 → 队列出现任务且 payload 含新参数
 - [ ] commit: `feat(phase-r): R4 PreflightDrawer 接管细粒度参数`
 
 ### R5 端到端冒烟（DS v4-pro 跑命令，1h）
 **目标**：跑通 5 条真实链接确认闭环。
 
-- [ ] R5.1 `./start.sh` 起服务
-- [ ] R5.2 跑 `scripts/browser_smoke.py` 对 `/workbench` 验证：URL 输入 → sniff → 模态弹出 → 类型回填
-- [ ] R5.3 手动跑 5 条：
-  - B 站视频链接（混合：视频+音频）
-  - YouTube 视频链接（单一）
-  - 小红书图文链接（混合：图片+文字）
-  - 微信公众号文章（单一：文字）
-  - 抖音视频（单一：视频）
-- [ ] R5.4 在 `docs/test-urls.md` 追加本次测试结果记录
-- [ ] R5.5 若有 bug 回到 R2-R4 对应步骤修
-- [ ] commit: `test(phase-r): R5 端到端冒烟 5 条链接`
+- [x] R5.1 `./start.sh` 起服务
+- [x] R5.2 跑 `scripts/browser_smoke.py` 对 `/workbench` 验证：URL 输入 → sniff → 模态弹出 → 类型回填
+- [x] R5.3 手动跑 6 条（1a B站视频 / 1b B站音频 / 2 YouTube / 3 小红书 / 4 微信 / 5 抖音）
+- [x] R5.4 在 `docs/test-urls.md` 追加本次测试结果记录
+- [x] R5.5 无 R2-R4 bug（FAILED均为外部平台限制）
+- [x] commit: `test(phase-r): R5 端到端冒烟 6 条链接`
 
 ### R6 合并与收尾（DS v4-pro，10 min）
 - [ ] R6.1 自测全绿后：本地 `git checkout main && git merge --no-ff feat/phase-r-input-refactor`
