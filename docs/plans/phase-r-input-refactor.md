@@ -1,6 +1,6 @@
 ---
 name: phase-r-input-refactor
-status: ready
+status: in_progress
 phase: R (输入层重构 / Composer 瘦身 + 模态化 + 单链接多类型)
 track: F (Flow)
 prerequisite: IP.9 已合入 main；H1 Workbench 已落地
