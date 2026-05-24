@@ -6,7 +6,8 @@ import { toast } from 'sonner'
 import type { WorkspaceRecord } from '@/types/workspace'
 import { detectPlatform } from './platforms'
 import { normalizeMediaUrl } from '@/lib/url'
-import { listWorkspaces, createWorkspace } from '@/services/workspaces'
+import { listWorkspaces, createWorkspace, sniffUrl } from '@/services/workspaces'
+import type { SniffResult } from '@/services/workspaces'
 import { AddMaterialModal } from '@/components/workspace/AddMaterialModal'
 
 const WS_COLORS = [
@@ -26,8 +27,10 @@ export function Composer({ onTaskCreated }: ComposerProps) {
   const [workspaceSel, setWorkspaceSel] = useState<string[]>([])
   const [wsOpen, setWsOpen] = useState(false)
   const [wsQuery, setWsQuery] = useState('')
+  const [sniffResult, setSniffResult] = useState<SniffResult | null>(null)
 
   const popRef = useRef<HTMLDivElement>(null)
+  const sniffTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   // Fetch workspaces on mount
   useEffect(() => {
@@ -75,6 +78,24 @@ export function Composer({ onTaskCreated }: ComposerProps) {
 
   const normalizedUrl = useMemo(() => normalizeMediaUrl(url), [url])
   const platform = detectPlatform(normalizedUrl || url)
+
+  // Debounced URL sniff
+  useEffect(() => {
+    if (!normalizedUrl) {
+      setSniffResult(null)
+      return
+    }
+    clearTimeout(sniffTimer.current)
+    sniffTimer.current = setTimeout(async () => {
+      try {
+        const result = await sniffUrl(normalizedUrl)
+        setSniffResult(result)
+      } catch {
+        setSniffResult(null)
+      }
+    }, 500)
+    return () => clearTimeout(sniffTimer.current)
+  }, [normalizedUrl])
 
   const handleAdd = () => {
     if (!url.trim()) return
@@ -277,7 +298,9 @@ export function Composer({ onTaskCreated }: ComposerProps) {
       <AddMaterialModal
         open={uploadOpen}
         onOpenChange={setUploadOpen}
-        workspaceId={workspaceSel[0] ?? ''}
+        workspaceIds={workspaceSel}
+        sniffResult={sniffResult}
+        urlValue={normalizedUrl || undefined}
         onAdded={handleAdded}
       />
     </div>

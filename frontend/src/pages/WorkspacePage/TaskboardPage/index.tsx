@@ -132,7 +132,7 @@ export default function TaskboardPage() {
       <AddMaterialModal
         open={addOpen}
         onOpenChange={setAddOpen}
-        workspaceId={workspace.workspace_id}
+        workspaceIds={[workspace.workspace_id]}
         onAdded={(updated) => setWorkspace(updated)}
       />
 
