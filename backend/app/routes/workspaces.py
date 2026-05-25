@@ -135,6 +135,14 @@ def _on_download_success(completed_task: TaskRecord, runner) -> None:  # type: i
     if refs:
         _augment_video_analyze_payload(analyze_payload, refs[0][1])
 
+    # R13.1 继承 download 阶段 yt-dlp 抽取的视频元数据，供 ProcessingPage 在 analyze 阶段展示
+    _dl_result = completed_task.result or {}
+    for _key in ("video_title", "video_duration", "video_uploader", "video_thumbnail_url"):
+        if _dl_result.get(_key):
+            analyze_payload[_key] = _dl_result[_key]
+    if completed_task.payload.get("url"):
+        analyze_payload["source_url"] = completed_task.payload["url"]
+
     try:
         analyze_task = runner.create_task(project_id, "analyze", analyze_payload)
     except Exception:
@@ -154,6 +162,16 @@ def _on_download_success(completed_task: TaskRecord, runner) -> None:  # type: i
             _store.update_item(ws.workspace_id, item.item_id, **_update_kwargs)
         except Exception:
             pass  # 写失败不阻断（X.1 桥仍能通过 download task 显示最终状态）
+
+        # R13.4 把自动生成的 workspace 名回写为「平台 · 视频标题」
+        _yt_title = (completed_task.result or {}).get("video_title") or _title
+        if _yt_title and _is_auto_generated_workspace_name(ws.name):
+            try:
+                _platform = _platform_prefix_from_url(completed_task.payload.get("url") or "")
+                _new_ws_name = f"{_platform} · {_yt_title}" if _platform else _yt_title
+                _store.update(ws.workspace_id, name=_new_ws_name)
+            except Exception:
+                pass
 
 
 _pipeline_runner.register_success_callback("download", _on_download_success)
@@ -625,6 +643,39 @@ def _generate_workspace_name(hint_url: str | None, hint_text: str | None) -> str
         hostname = hostname.capitalize()
     ts = datetime.now(timezone.utc).strftime("%m%d-%H%M")
     return f"{hostname} · {ts}" if hostname else f"工作空间 · {ts}"
+
+
+def _is_auto_generated_workspace_name(name: str) -> bool:
+    """判断 workspace name 是否是自动生成的 hostname + 时间戳格式（R13.4 用）。
+
+    匹配 _generate_workspace_name 产出的模式：Xxx · MMDD-HHMM 或 工作空间 · MMDD-HHMM。
+    """
+    return bool(re.match(r"^(?:[A-Za-z一-龥]+ · \d{4}-\d{4}|工作空间 · \d{4}-\d{4})$", name or ""))
+
+
+_PLATFORM_HOST_MAP: list[tuple[tuple[str, ...], str]] = [
+    (("bilibili.com",), "bilibili"),
+    (("youtube.com", "youtu.be"), "youtube"),
+    (("xiaohongshu.com",), "xiaohongshu"),
+    (("douyin.com", "iesdouyin.com"), "douyin"),
+    (("kuaishou.com",), "kuaishou"),
+    (("mp.weixin.qq.com",), "weixin"),
+]
+
+
+def _platform_prefix_from_url(url: str) -> str:
+    """与前端 platformPrefixFromUrl 同语义，返回小写平台名或 ''."""
+    if not url:
+        return ""
+    try:
+        host = (urlparse(url).hostname or "").lower()
+    except Exception:
+        return ""
+    for hosts, name in _PLATFORM_HOST_MAP:
+        if any(host.endswith(h) for h in hosts):
+            return name
+    parts = host.replace("www.", "").split(".")
+    return parts[-2] if len(parts) >= 2 else host
 
 
 @router.post("/auto-create")
