@@ -13,7 +13,6 @@ import {
 import type { SniffResult } from '@/services/workspaces'
 import type { ItemType, WorkspaceBackground } from '@/types/workspace'
 import type { StagedConfig } from '@/components/workspace/AddMaterialModal'
-import { FEATURES_BY_TYPE, type Feature } from '@/lib/featuresToSteps'
 import { OUTPUT_FORMAT_OPTIONS } from '@/lib/preflightTasks'
 import type { RewriteStyle, VideoOutputFormat } from '@/lib/preflightTasks'
 import {
@@ -95,9 +94,6 @@ export function PreflightDrawer({
   onCreated,
 }: PreflightDrawerProps) {
   // ── Old state (kept for R8.2-R8.6 old ad-hoc sections) ──
-  const [contentType, setContentType] = useState('')
-  const [purpose, setPurpose] = useState('')
-  const [topic, setTopic] = useState('')
   const [textProviderId, setTextProviderId] = useState('')
   const [textModelId, setTextModelId] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -154,9 +150,6 @@ export function PreflightDrawer({
   useEffect(() => {
     if (open) {
       // old state
-      setContentType(sc?.background?.content_type ?? '')
-      setPurpose(sc?.background?.purpose ?? '')
-      setTopic(sc?.background?.topic ?? '')
       setTextProviderId('')
       setTextModelId('')
       setSummaryPath('detailed')
@@ -240,14 +233,7 @@ export function PreflightDrawer({
     })
   }, [kind])
 
-  // ── handleConfirm (keep old logic) ──
-  const stagedFeaturesForType = (type: ItemType): Feature[] => {
-    if (!stagedConfig?.features?.[type]) return []
-    return (Object.entries(stagedConfig.features[type]) as [Feature, boolean][])
-      .filter(([, enabled]) => enabled)
-      .map(([id]) => id)
-  }
-
+  // ── handleConfirm ──
   const handleConfirm = async () => {
     setSubmitting(true)
     try {
@@ -274,31 +260,25 @@ export function PreflightDrawer({
           const item = ws.items[ws.items.length - 1]
           const itemId = item.item_id
 
-          const features: Feature[] = stagedFeaturesForType(itemType).length > 0
-            ? stagedFeaturesForType(itemType)
-            : FEATURES_BY_TYPE[itemType].filter(f => f.defaultChecked).map(f => f.id)
-
           const bgPayload: Partial<WorkspaceBackground> = {}
-          if (contentType) bgPayload.content_type = contentType
-          if (purpose) bgPayload.purpose = purpose
-          if (topic) bgPayload.topic = topic
+          if (bg.contentType) bgPayload.content_type = bg.contentType
+          if (bg.purpose) bgPayload.purpose = bg.purpose
+          if (bg.theme) bgPayload.topic = bg.theme
 
+          // R8: serialize task state for this material type
+          const taskKind = itemType as MediaKind
+          const kindTaskState = (tasks[taskKind] ?? {}) as Record<string, { on?: boolean; [k: string]: unknown }>
+          const enabledFeatures = Object.entries(kindTaskState)
+            .filter(([, v]) => v.on)
+            .map(([k]) => k)
           const tasksPayload: Record<string, unknown> = {
             material_type: itemType,
-            enabled_features: features,
+            enabled_features: enabledFeatures,
           }
-          for (const feat of features) {
-            tasksPayload[feat] = true
+          for (const [gid, gState] of Object.entries(kindTaskState)) {
+            tasksPayload[gid] = { ...gState }
           }
-          if (itemType === 'video') {
-            tasksPayload.summary_path = summaryPath
-            tasksPayload.video_template = videoTemplate
-            tasksPayload.output_format = outputFormat
-          }
-          if (itemType === 'text') {
-            tasksPayload.text_rewrite = { enabled: textRewriteEnabled, style: textRewriteStyle }
-            tasksPayload.text_translate = { enabled: textTranslateEnabled, target_lang: textTranslateLang }
-          }
+
           const preflightModels: Record<string, string> = {}
           if (textModelId) preflightModels.text = textModelId
 
@@ -353,9 +333,9 @@ export function PreflightDrawer({
       }
     }
     const bgPayload: Partial<WorkspaceBackground> = {}
-    if (contentType) bgPayload.content_type = contentType
-    if (purpose) bgPayload.purpose = purpose
-    if (topic) bgPayload.topic = topic
+    if (bg.contentType) bgPayload.content_type = bg.contentType
+    if (bg.purpose) bgPayload.purpose = bg.purpose
+    if (bg.theme) bgPayload.topic = bg.theme
 
     onSaveStaged?.({
       types: typesToCreate,
@@ -630,24 +610,29 @@ export function PreflightDrawer({
 
         {/* ── Footer ── */}
         <div className="pf-drawer-foot">
-          <button className="btn btn-ghost" onClick={onClose}>取消</button>
-          {mode === 'stage' ? (
-            <button className="wb-btn-run" onClick={handleSaveStaged}>
-              保存配置 & 返回
-            </button>
-          ) : (
-            <button
-              className="wb-btn-run"
-              onClick={handleConfirm}
-              disabled={submitting}
-            >
-              {submitting ? (
-                <><Loader2 size={14} className="animate-spin" /> 创建中…</>
-              ) : (
-                <>开始解析 <span className="iconwrap"><ArrowRight size={14} /></span></>
-              )}
-            </button>
-          )}
+          <div className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+            <span style={{ color: 'var(--accent-green)' }}>●</span> 配置已就绪 · {enabledCount} 项分析任务
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-ghost" onClick={onClose}>取消</button>
+            {mode === 'stage' ? (
+              <button className="wb-btn-run" onClick={handleSaveStaged}>
+                保存配置 & 返回
+              </button>
+            ) : (
+              <button
+                className="wb-btn-run"
+                onClick={handleConfirm}
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <><Loader2 size={14} className="animate-spin" /> 创建中…</>
+                ) : (
+                  <>开始解析 <span className="iconwrap"><ArrowRight size={14} /></span></>
+                )}
+              </button>
+            )}
+          </div>
         </div>
       </aside>
     </>

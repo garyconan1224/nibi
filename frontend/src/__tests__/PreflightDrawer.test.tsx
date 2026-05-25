@@ -172,7 +172,7 @@ describe('PreflightDrawer R4', () => {
     expect((screen.getByDisplayValue('深度学习') as HTMLInputElement).value).toBe('深度学习')
   })
 
-  it('R4: 视频素材传入 summary 配置到 preflight tasks', async () => {
+  it('R4: 视频素材传入 tasks 配置到 preflight（R8 新格式）', async () => {
     autoCreateWorkspaceMock.mockResolvedValue({
       workspace_id: 'ws-1',
       name: '自动工作空间',
@@ -184,8 +184,6 @@ describe('PreflightDrawer R4', () => {
     startItemPipelineMock.mockResolvedValue({ task_id: 'task-video' })
     render(<PreflightDrawer {...defaultProps} />)
 
-    // 切换到路径 1
-    fireEvent.click(screen.getByLabelText(/路径 1：字幕直接总结/))
     fireEvent.click(screen.getByRole('button', { name: /开始解析/ }))
 
     await waitFor(() => {
@@ -197,8 +195,12 @@ describe('PreflightDrawer R4', () => {
       'item-1',
       expect.objectContaining({
         tasks: expect.objectContaining({
-          summary_path: 'subtitle',
-          video_template: 'auto',
+          material_type: 'video',
+          enabled_features: expect.arrayContaining(['frame_prompt', 'summary', 'srt']),
+          summary: expect.objectContaining({
+            on: true,
+            summary_path: '音视频合并 · 最详细',
+          }),
         }),
       }),
     )
