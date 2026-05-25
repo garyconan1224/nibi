@@ -61,6 +61,8 @@ interface AddMaterialModalProps {
   workspaceBackgrounds?: Record<string, WorkspaceBackground>
   sniffResult?: SniffResult | null
   urlValue?: string
+  /** R7.4: stage 回写配置，modal 打开时用其回填 selectedTypes / features / bgOverrides */
+  initialStaged?: StagedConfig
   onAdded?: () => void
   onFineTune?: (staged: StagedConfig) => void
 }
@@ -98,6 +100,7 @@ export function AddMaterialModal({
   workspaceBackgrounds,
   sniffResult,
   urlValue,
+  initialStaged,
   onAdded,
   onFineTune,
 }: AddMaterialModalProps) {
@@ -134,19 +137,29 @@ export function AddMaterialModal({
   const effectiveInitial = useMemo(() => resolveInitialTypes(effectiveSniff), [effectiveSniff])
   const typeLocked = sniffTypes.length === 1
 
-  // ── open / sniff 变化时重置类型与 features ──
+  // ── open / sniff / initialStaged 变化时重置类型与 features ──
   useEffect(() => {
     if (!open) return
     const { types } = effectiveInitial
     /* eslint-disable react-hooks/set-state-in-effect */
-    setSelectedTypes(types)
-    setFeatures(buildDefaults(types))
-    setBgOverrides({})
+    // R7.4: initialStaged 回填优先于 sniff 默认值
+    if (initialStaged?.types?.length) {
+      setSelectedTypes(initialStaged.types)
+      setFeatures({
+        ...buildDefaults(initialStaged.types),
+        ...(initialStaged.features ?? {}),
+      })
+      setBgOverrides(initialStaged.background ?? {})
+    } else {
+      setSelectedTypes(types)
+      setFeatures(buildDefaults(types))
+      setBgOverrides({})
+    }
     setBgOpen(false)
     setError(null)
     setSubmitting(false)
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [open, effectiveInitial])
+  }, [open, effectiveInitial, initialStaged])
 
   useEffect(() => {
     if (!open) return

@@ -46,6 +46,10 @@ interface PreflightDrawerProps {
   workspaceId?: string
   /** R4: 模态传入的 staged config，优先于设置页默认 */
   stagedConfig?: StagedConfig
+  /** R7.4: 执行模式——execute 直接执行任务；stage 收集配置回写 */
+  mode?: 'execute' | 'stage'
+  /** R7.4 stage 模式回调——收集当前抽屉配置并回写 StagedConfig */
+  onSaveStaged?: (staged: StagedConfig) => void
   onClose: () => void
   onCreated: () => void
 }
@@ -58,6 +62,8 @@ export function PreflightDrawer({
   sniffResult,
   workspaceId,
   stagedConfig,
+  mode = 'execute',
+  onSaveStaged,
   onClose,
   onCreated,
 }: PreflightDrawerProps) {
@@ -244,6 +250,31 @@ export function PreflightDrawer({
     } finally {
       setSubmitting(false)
     }
+  }
+
+  // R7.4 stage 模式：收集配置回写，不动后端、不 navigate
+  const handleSaveStaged = () => {
+    const features: StagedConfig['features'] = { ...sc?.features }
+    // 叠加 PreflightDrawer 中 text 类可调参数
+    if (typesToCreate.includes('text') && (textRewriteEnabled || textTranslateEnabled)) {
+      features.text = {
+        ...(features.text ?? {}),
+        ...(textRewriteEnabled && { rewrite: true }),
+        ...(textTranslateEnabled && { translate: true }),
+      }
+    }
+    const bg: Partial<WorkspaceBackground> = {}
+    if (contentType) bg.content_type = contentType
+    if (purpose) bg.purpose = purpose
+    if (topic) bg.topic = topic
+
+    onSaveStaged?.({
+      types: typesToCreate,
+      features,
+      background: bg,
+      workspaceIds: workspaceId ? [workspaceId] : [],
+      urlValue: url,
+    })
   }
 
   return (
@@ -486,6 +517,11 @@ export function PreflightDrawer({
 
         <div className="pf-drawer-foot">
           <button className="btn btn-ghost" onClick={onClose}>取消</button>
+          {mode === 'stage' ? (
+            <button className="wb-btn-run" onClick={handleSaveStaged}>
+              保存配置 & 返回
+            </button>
+          ) : (
           <button
             className="wb-btn-run"
             onClick={handleConfirm}
@@ -497,6 +533,7 @@ export function PreflightDrawer({
               <>开始解析 <span className="iconwrap"><ArrowRight size={14} /></span></>
             )}
           </button>
+          )}
         </div>
       </div>
     </>

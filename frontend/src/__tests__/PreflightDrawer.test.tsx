@@ -204,3 +204,46 @@ describe('PreflightDrawer R4', () => {
     )
   })
 })
+
+describe('PreflightDrawer R7.4 stage 模式', () => {
+  beforeEach(() => {
+    addWorkspaceItemMock.mockReset()
+    autoCreateWorkspaceMock.mockReset()
+    startItemPipelineMock.mockReset()
+    savePreflightMock.mockReset()
+  })
+
+  it('mode="stage" 时按钮文案是「保存配置 & 返回」，点击后调 onSaveStaged 不调后端', () => {
+    const onSaveStaged = vi.fn()
+    render(
+      <PreflightDrawer
+        {...defaultProps}
+        mode="stage"
+        onSaveStaged={onSaveStaged}
+      />,
+    )
+
+    const btn = screen.getByRole('button', { name: /保存配置 & 返回/ })
+    expect(btn).toBeDefined()
+    fireEvent.click(btn)
+
+    expect(onSaveStaged).toHaveBeenCalledTimes(1)
+    expect(onSaveStaged).toHaveBeenCalledWith(
+      expect.objectContaining({
+        types: expect.any(Array),
+        features: expect.any(Object),
+        background: expect.any(Object),
+      }),
+    )
+    // 不应调后端 pipeline
+    expect(startItemPipelineMock).not.toHaveBeenCalled()
+    expect(savePreflightMock).not.toHaveBeenCalled()
+  })
+
+  it('不传 mode 时保持原有 execute 行为（按钮文案「开始解析」）', () => {
+    render(<PreflightDrawer {...defaultProps} />)
+
+    const btn = screen.getByRole('button', { name: /开始解析/ })
+    expect(btn).toBeDefined()
+  })
+})

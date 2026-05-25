@@ -360,6 +360,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
         workspaceBackgrounds={wsBackgrounds}
         sniffResult={sniffResult}
         urlValue={normalizedUrl || undefined}
+        initialStaged={preflightStaged}
         onAdded={handleAdded}
         onFineTune={(staged) => {
           setUploadOpen(false)
@@ -368,7 +369,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
         }}
       />
 
-      {/* R4: PreflightDrawer via fine-tune */}
+      {/* R7.4: PreflightDrawer stage 模式 — 回写配置后重开 modal */}
       <PreflightDrawer
         open={preflightOpen}
         url={normalizedUrl || url}
@@ -376,6 +377,12 @@ export function Composer({ onTaskCreated }: ComposerProps) {
         sniffResult={sniffResult}
         workspaceId={workspaceSel[0]}
         stagedConfig={preflightStaged}
+        mode="stage"
+        onSaveStaged={(staged) => {
+          setPreflightStaged(staged)
+          setPreflightOpen(false)
+          setUploadOpen(true)
+        }}
         onClose={() => setPreflightOpen(false)}
         onCreated={() => {
           setPreflightOpen(false)
