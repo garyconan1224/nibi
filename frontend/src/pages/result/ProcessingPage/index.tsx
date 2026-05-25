@@ -7,6 +7,7 @@ import { useTaskStore } from '@/store/taskStore'
 import { useTaskSse } from '@/hooks/useTaskSse'
 import { isTaskTerminal, getStatusText } from '@/types/task'
 import { categorizeError } from '@/lib/errorCategories'
+import { platformPrefixFromUrl } from '@/lib/platformPrefix'
 import MusicModeConfirmModal from '@/components/workspace/MusicModeConfirmModal'
 import { StepProgress } from './StepProgress'
 import SystemResourceCard from './SystemResourceCard'
@@ -115,6 +116,7 @@ export default function ProcessingPage() {
   const payload = task?.payload ?? {} as Record<string, unknown>
   // R13.2 标题/封面/时长来源优先级：result（直接来源）→ payload（从 download 继承）→ fallback
   const url = task?.payload?.url ?? (payload.source_url as string) ?? state?.url ?? ''
+  const platform = platformPrefixFromUrl(url)
   const safeHostname = (() => {
     if (!url) return '任务'
     try { return new URL(url).hostname } catch { return '任务' }
@@ -160,7 +162,10 @@ export default function ProcessingPage() {
             </div>
             <div className="info">
               <div className="eyebrow">PROCESSING · {taskId.slice(0, 8)}</div>
-              <div className="title">{title}</div>
+              <div className="title">
+                {platform && <span style={{ color: 'var(--ink-3)', fontWeight: 400, marginRight: 10 }}>{platform} ·</span>}
+                {title}
+              </div>
               <div className="src">{url}</div>
               <div className="stats">
                 {durationLabel && (
