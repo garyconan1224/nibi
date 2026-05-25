@@ -726,3 +726,185 @@ class TestDetectVideoTemplate:
         assert result["video_template"] == "访谈"
         assert result["detected_template"] == "访谈"
         assert result["summary"] == "这是自动检测后的摘要内容"
+
+
+# ── Phase R: handle_image_task 分派测试 ──────────────────────────────
+
+
+class TestImageTask:
+    """handle_image_task (image→image) 覆盖：URL 图片、本地文件、小红书 HTML 回退、retry 兜底。"""
+
+    # 一份最小 PNG（67 字节，1×1 像素）
+    FAKE_PNG = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+        b"\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f"
+        b"\x00\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+
+    _fake_settings = _mock_settings("sk-test")
+
+    @staticmethod
+    def _fake_provider(chat_return: str) -> MagicMock:
+        provider = MagicMock()
+        provider.chat.return_value = chat_return
+        registry = MagicMock()
+        registry.resolve_default_profile.return_value = MagicMock(
+            default_models=MagicMock(get=MagicMock(return_value="test-vision-model")),
+        )
+        registry.build.return_value = provider
+        return provider, registry
+
+    @staticmethod
+    def _make_image_rec(source: str, source_type: str = "url") -> TaskRecord:
+        return TaskRecord(
+            task_id="img-test",
+            project_id="default_project",
+            task_type="image",
+            payload={"source": source, "source_type": source_type},
+        )
+
+    def test_url_image_happy_path(self, tmp_path: Path) -> None:
+        """URL 直接返回图片字节 → FETCH → VLM → STORE → SUCCESS。"""
+        from backend.app.services.pipeline_tasks import handle_image_task
+
+        image_dir = tmp_path / "image"
+        image_dir.mkdir(parents=True, exist_ok=True)
+        runner = MagicMock()
+        rec = self._make_image_rec("https://example.com/photo.jpg")
+
+        provider, registry = self._fake_provider('{"description":"测试描述","tags":{"subject":["猫"]}}')
+        from io import BytesIO
+
+        with (
+            patch("urllib.request.urlopen", return_value=BytesIO(self.FAKE_PNG)),
+            patch("shared.config.get_workspace_root", return_value=tmp_path),
+            patch("backend.app.services.pipeline_tasks.load_settings",
+                  return_value=self._fake_settings),
+            patch("backend.app.services.pipeline_tasks.create_default_registry",
+                  return_value=registry),
+        ):
+            result = handle_image_task(rec, runner)
+
+        assert result["source"] == "https://example.com/photo.jpg"
+        assert result["source_type"] == "url"
+        assert "测试描述" in result["description"]
+
+    def test_local_image_happy_path(self, tmp_path: Path) -> None:
+        """本地文件路径 → 直接读取 → VLM → SUCCESS。"""
+        from backend.app.services.pipeline_tasks import handle_image_task
+
+        img_file = tmp_path / "photo.png"
+        img_file.write_bytes(self.FAKE_PNG)
+
+        runner = MagicMock()
+        rec = self._make_image_rec(str(img_file), source_type="local")
+        provider, registry = self._fake_provider('{"description":"本地图片描述","tags":{}}')
+
+        with (
+            patch("shared.config.get_workspace_root", return_value=tmp_path),
+            patch("backend.app.services.pipeline_tasks.load_settings",
+                  return_value=self._fake_settings),
+            patch("backend.app.services.pipeline_tasks.create_default_registry",
+                  return_value=registry),
+        ):
+            result = handle_image_task(rec, runner)
+
+        assert result["source"] == str(img_file)
+        assert result["source_type"] == "local"
+        assert "本地图片描述" in result["description"]
+
+    def test_missing_source_raises(self) -> None:
+        """缺少 payload.source → ValueError。"""
+        from backend.app.services.pipeline_tasks import handle_image_task
+
+        runner = MagicMock()
+        rec = TaskRecord(
+            task_id="img-no-src",
+            project_id="default_project",
+            task_type="image",
+            payload={},
+        )
+        with pytest.raises(ValueError, match="image task 需要 payload.source"):
+            handle_image_task(rec, runner)
+
+    def test_html_ytdlp_fallback_succeeds(self, tmp_path: Path) -> None:
+        """URL 返回 HTML 非图片 → _extract_thumbnails_via_ytdlp 提取图片并继续 VLM。"""
+        from backend.app.services.pipeline_tasks import handle_image_task
+
+        image_dir = tmp_path / "image"
+        image_dir.mkdir(parents=True, exist_ok=True)
+        thumbs_dir = image_dir / "_ytdlp_thumbs"
+        thumbs_dir.mkdir(parents=True, exist_ok=True)
+
+        # 模拟 yt-dlp 产出的缩略图（webp 兜底也覆盖）
+        thumb_file = thumbs_dir / "thumb_001.webp"
+        # RIFF header + WEBP FourCC
+        webp_header = b"RIFF\x00\x00\x00\x00WEBP"
+        thumb_file.write_bytes(webp_header + b"\x00" * 32)
+
+        runner = MagicMock()
+        rec = self._make_image_rec("https://www.xiaohongshu.com/explore/abc123")
+
+        provider, registry = self._fake_provider('{"description":"小红书图文描述","tags":{}}')
+        from io import BytesIO
+
+        html_content = "<html><body>小红书页面</body></html>".encode()
+
+        with (
+            patch("urllib.request.urlopen", return_value=BytesIO(html_content)),
+            patch("shared.config.get_workspace_root", return_value=tmp_path),
+            patch("backend.app.services.pipeline_tasks.load_settings",
+                  return_value=self._fake_settings),
+            patch("backend.app.services.pipeline_tasks.create_default_registry",
+                  return_value=registry),
+            # yt-dlp 在回退路径中会被真正调用，mock 它以跳过真实网络
+            patch("backend.app.services.pipeline_tasks._extract_thumbnails_via_ytdlp",
+                  return_value=[str(thumb_file)]),
+        ):
+            result = handle_image_task(rec, runner)
+
+        assert result["source"] == str(thumb_file)
+        assert result["source_type"] == "local"
+        assert "小红书图文描述" in result["description"]
+
+    def test_thumbnail_extract_retry_fallback(self, tmp_path: Path) -> None:
+        """retry 场景：yt-dlp 不再生成新文件时返回已有图片（含 .webp）。"""
+        from backend.app.services.pipeline_tasks import _extract_thumbnails_via_ytdlp
+
+        thumbs_dir = tmp_path / "_ytdlp_thumbs"
+        thumbs_dir.mkdir(parents=True, exist_ok=True)
+
+        # 模拟第一次运行后已存在的图片（含 webp）
+        (thumbs_dir / "img_01.jpg").write_bytes(b"jpeg")
+        (thumbs_dir / "img_02.png").write_bytes(b"png")
+        (thumbs_dir / "img_03.webp").write_bytes(b"webp")
+
+        log = MagicMock()
+
+        # patch yt_dlp.YoutubeDL 使其不新增任何文件（模拟 retry）
+        with patch("yt_dlp.YoutubeDL") as mock_ydl:
+            mock_ydl.return_value.__enter__.return_value.extract_info.return_value = {}
+            result = _extract_thumbnails_via_ytdlp(
+                "https://www.xiaohongshu.com/explore/retry-test", tmp_path, log,
+            )
+
+        assert len(result) == 3
+        assert any(p.endswith(".webp") for p in result)
+        assert any(p.endswith(".jpg") for p in result)
+        assert any(p.endswith(".png") for p in result)
+
+    def test_thumbnail_extract_no_files_at_all(self, tmp_path: Path) -> None:
+        """yt-dlp 未提取任何图片 → 返回空列表。"""
+        from backend.app.services.pipeline_tasks import _extract_thumbnails_via_ytdlp
+
+        thumbs_dir = tmp_path / "_ytdlp_thumbs"
+        thumbs_dir.mkdir(parents=True, exist_ok=True)
+
+        log = MagicMock()
+        with patch("yt_dlp.YoutubeDL") as mock_ydl:
+            mock_ydl.return_value.__enter__.return_value.extract_info.return_value = {}
+            result = _extract_thumbnails_via_ytdlp(
+                "https://example.com/no-images", tmp_path, log,
+            )
+
+        assert result == []

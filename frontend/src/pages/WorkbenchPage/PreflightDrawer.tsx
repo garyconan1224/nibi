@@ -211,7 +211,7 @@ export function PreflightDrawer({
           addTask({
             task_id: res.task_id,
             project_id: '',
-            task_type: 'note',
+            task_type: res.task_type,
             payload: {},
             status: 'PENDING',
             progress: 0,

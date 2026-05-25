@@ -100,8 +100,7 @@ describe('PreflightDrawer R4', () => {
       workspace_id: 'ws-1',
       name: '自动工作空间',
     })
-    createNoteTaskMock.mockResolvedValue({ status: 'created', task_id: 'task-video' })
-
+    createNoteTaskMock.mockResolvedValue({ status: 'created', task_id: 'task-video', task_type: 'note' })
     render(<PreflightDrawer {...defaultProps} />)
 
     fireEvent.click(screen.getByRole('button', { name: /开始解析/ }))
@@ -177,8 +176,7 @@ describe('PreflightDrawer R4', () => {
       workspace_id: 'ws-1',
       name: '自动工作空间',
     })
-    createNoteTaskMock.mockResolvedValue({ status: 'created', task_id: 'task-video' })
-
+    createNoteTaskMock.mockResolvedValue({ status: 'created', task_id: 'task-video', task_type: 'note' })
     render(<PreflightDrawer {...defaultProps} />)
 
     // 切换到路径 1

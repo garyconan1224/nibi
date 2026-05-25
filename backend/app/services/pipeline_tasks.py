@@ -953,6 +953,24 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         runner.store.update(task_id, status=TaskStatus.FRAMES.value)
         runner.set_progress(task_id, 0.50, "开始视觉帧分析...")
 
+        # #5: 从 payload 读 frame_prompt 子参数（截帧模式/间隔/最大帧数）
+        frame_prompts = payload.get("frame_prompt")
+        if preflight := payload.get("preflight"):
+            frame_prompts = frame_prompts or (isinstance(preflight, dict) and preflight.get("frame_prompt"))
+        if frame_prompts is not None:
+            capture_params = CaptureParams.from_dict(frame_prompts)
+        else:
+            # 未传时给合理兜底（max_frames=60），避免 fallback 到 video_analyzer 的 10**6
+            capture_params = CaptureParams(mode="interval", interval_sec=2, max_frames=60, frames_per_shot=3)
+        if capture_params is not None:
+            runner.append_log(
+                task_id,
+                f"🎬 note capture_params | mode={capture_params.mode} | "
+                f"interval={capture_params.interval_sec}s | "
+                f"max_frames={capture_params.max_frames} | "
+                f"frames_per_shot={capture_params.frames_per_shot}"
+            )
+
         state = run_batch_analysis(
             api_key=api_key,
             video_paths=videos,
@@ -960,6 +978,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             text_model=text_model,
             auto_sync_json=True,
             target_json_dir=project_json_dir,
+            capture_params=capture_params,
         )
 
         while not state.finished:
@@ -1554,6 +1573,64 @@ def handle_text_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     }
 
 
+def _extract_thumbnails_via_ytdlp(url: str, output_dir: Path, log: Any) -> list[str]:
+    """#3: 用 yt-dlp write_all_thumbnails 提取平台页面中的图片（如小红书图文）。
+
+    适用于图文类平台（无 video formats），跳过视频下载，仅提取所有 thumbnail。
+    返回已下载的图片路径列表（可能为空）。
+    """
+    try:
+        import yt_dlp
+    except ImportError:
+        if log:
+            log("⚠️ yt-dlp 未安装，跳过缩略图提取")
+        return []
+
+    work_dir = output_dir / "_ytdlp_thumbs"
+    work_dir.mkdir(parents=True, exist_ok=True)
+
+    # 记录操作前的文件
+    before = {p.name for p in work_dir.iterdir()}
+
+    opts: dict[str, Any] = {
+        "skip_download": True,
+        "writethumbnail": True,
+        "write_all_thumbnails": True,
+        "ignore_no_formats_error": True,
+        "outtmpl": {"default": str(work_dir / "%(title)s_%(id)s.%(ext)s")},
+        "quiet": True,
+        "no_warnings": True,
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            ydl.extract_info(url, download=True)
+    except Exception as exc:
+        if log:
+            log(f"⚠️ yt-dlp 缩略图提取失败: {exc}")
+        return []
+
+    IMG_SUFFIXES = (".jpg", ".jpeg", ".png", ".webp")
+
+    # 扫描新文件
+    after = {p.name for p in work_dir.iterdir()}
+    new_files = [
+        str(work_dir / name)
+        for name in (after - before)
+        if Path(work_dir, name).suffix.lower() in IMG_SUFFIXES
+    ]
+
+    # 若无新文件（如 retry 时 yt-dlp 不再重复下载），返回目录中已有图片
+    if not new_files:
+        existing = [
+            str(p) for p in sorted(work_dir.iterdir())
+            if p.is_file() and p.suffix.lower() in IMG_SUFFIXES
+        ]
+        return existing
+
+    return sorted(new_files)
+
+
 def handle_image_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     """图片分析任务（Phase X.4 + N9 扩展）。
 
@@ -1590,6 +1667,11 @@ def handle_image_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     fp_params = payload.get("prompt") or {}
     prompt_format = fp_params.get("format", "mj") if isinstance(fp_params, dict) else "mj"
 
+    from shared.config import get_workspace_root
+
+    image_dir = get_workspace_root(record.project_id) / "image"
+    image_dir.mkdir(parents=True, exist_ok=True)
+
     log(f"🖼 image_task | source_type={source_type} | source={source[:80]}")
     if ocr_enabled:
         log("🔤 OCR 已启用（PaddleOCR）")
@@ -1607,6 +1689,21 @@ def handle_image_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 image_bytes = resp.read()
         except Exception as err:
             raise RuntimeError(f"图片下载失败：{err}") from err
+
+        # #3: 检测下载内容是否为图片；若是 HTML 页（如小红书图文），
+        #     回退到 yt-dlp write_all_thumbnails 提取
+        if not image_bytes[:4] in (b"\x89PNG", b"RIFF") and not image_bytes[:2] in (b"\xff\xd8",):
+            if log:
+                log(f"🔍 下载内容非图片（前 16 字节: {image_bytes[:16].hex()}），尝试 yt-dlp 缩略图提取…")
+            thumb_paths = _extract_thumbnails_via_ytdlp(source, image_dir, log)
+            if thumb_paths:
+                log(f"✅ yt-dlp 提取 {len(thumb_paths)} 张图片到 {image_dir}")
+                # 用第一张图继续后续 VLM/OCR 流程
+                image_bytes = Path(thumb_paths[0]).read_bytes()
+                source_type = "local"
+                source = thumb_paths[0]
+            else:
+                raise RuntimeError(f"URL 不是直接图片地址，且 yt-dlp 未能提取缩略图: {source[:80]}")
     else:
         local = Path(source)
         if not local.is_file():
@@ -1777,9 +1874,6 @@ def handle_image_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     runner.store.update(task_id, status=TaskStatus.STORE.value)
     runner.set_progress(task_id, 0.90, "归档图片产物...")
 
-    from shared.config import get_workspace_root
-    image_dir = get_workspace_root(record.project_id) / "image"
-    image_dir.mkdir(parents=True, exist_ok=True)
 
     result: Dict[str, Any] = {
         "task_id": task_id,

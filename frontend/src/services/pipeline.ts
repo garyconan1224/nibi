@@ -12,7 +12,7 @@ const PIPELINE_TASKS_URL = '/pipeline/tasks'
  *
  * 请求体（TaskCreateRequest）：
  *   - project_id  : string             — 项目 ID（crypto.randomUUID()）
- *   - task_type   : 'download'|'analyze'|'create'|'storyboard'
+ *   - task_type   : 'download'|'analyze'|'create'|'storyboard'|'note'|'text'|'image'|'audio'
  *   - payload     : AnalyzePayload | DownloadPayload
  *
  * analyze payload 新增字段：
@@ -71,6 +71,13 @@ export interface NotePreflightOverrides {
   summary?: { path?: string; video_template?: string; output_format?: string }
   text_rewrite?: { enabled: boolean; style: string }
   text_translate?: { enabled: boolean; target_lang: string }
+  /** #5: 视频帧分析参数（capture_params），透传到 note 的 analyze 步骤 */
+  frame_prompt?: {
+    mode?: 'interval' | 'ai_shot'
+    interval_sec?: number
+    max_frames?: number
+    frames_per_shot?: number
+  }
 }
 
 export interface CreateNoteTaskParams {
@@ -82,22 +89,96 @@ export interface CreateNoteTaskParams {
   preflight?: NotePreflightOverrides
 }
 
-/** 创建 note 类型 pipeline 任务，features 自动翻译为 backend steps */
+/** 按 material_type 分派 pipeline 任务。
+ *
+ * - video/audio → task_type: 'note'（现有复合流水线：download→transcribe→analyze→note）
+ * - text → task_type: 'text'（handle_text_task：FETCH→PARSE→SUM→STORE）
+ * - image → task_type: 'image'（handle_image_task：FETCH→VLM→STORE）
+ *
+ * 返回扩展了 task_type 的响应，供前端 store 使用正确类型。
+ * 解决 R5 误判：text/image 不再经 yt-dlp 下载（#3/#4）。
+ */
 export async function createNoteTask(
   params: CreateNoteTaskParams,
-): Promise<TaskCreateResponse> {
-  const steps = featuresToSteps(params.material_type, params.enabled_features)
-  return createPipelineTask({
-    project_id: params.workspace_id,
+): Promise<TaskCreateResponse & { task_type: string }> {
+  const { url, material_type, enabled_features, background, workspace_id, preflight } = params
+  const bg = background ?? {}
+
+  // ── text: 转派给 handle_text_task ──────────────────────────
+  if (material_type === 'text') {
+    const payload: Record<string, unknown> = { source: url }
+
+    // summary_keypoints → 默认 summary（handler 始终执行）
+    if (enabled_features.includes('summary_keypoints')) {
+      payload.summary = {}
+    }
+    // rewrite → rewrite 子参数
+    if (preflight?.text_rewrite?.enabled) {
+      payload.rewrite = { enabled: true, style: preflight.text_rewrite.style }
+    } else if (enabled_features.includes('rewrite')) {
+      payload.rewrite = { enabled: true, style: 'concise' }
+    }
+    // translate → translate 子参数
+    if (preflight?.text_translate?.enabled) {
+      payload.translate = { enabled: true, target_lang: preflight.text_translate.target_lang }
+    } else if (enabled_features.includes('translate')) {
+      payload.translate = { enabled: true, target_lang: 'en' }
+    }
+    // preflight.models → 模型配置
+    if (preflight?.models?.text) {
+      payload.text_model = preflight.models.text
+    }
+    if (bg) payload.background = bg
+
+    const res = await createPipelineTask({
+      project_id: workspace_id,
+      task_type: 'text',
+      payload,
+    })
+    return { ...res, task_type: 'text' }
+  }
+
+  // ── image: 转派给 handle_image_task ────────────────────────
+  if (material_type === 'image') {
+    const payload: Record<string, unknown> = { source: url }
+
+    // features → handler 子参数
+    if (enabled_features.includes('ocr')) {
+      payload.ocr = { enabled: true }
+    }
+    if (enabled_features.includes('prompt')) {
+      payload.prompt = { enabled: true, format: 'mj' }
+    }
+    if (enabled_features.includes('assoc')) {
+      payload.assoc = { enabled: true, directions: ['usage'] }
+    }
+    // preflight.models → 模型配置
+    if (preflight?.models?.text) payload.text_model = preflight.models.text
+    if (preflight?.models?.vision) payload.vision_model = preflight.models.vision
+    if (bg) payload.background = bg
+
+    const res = await createPipelineTask({
+      project_id: workspace_id,
+      task_type: 'image',
+      payload,
+    })
+    return { ...res, task_type: 'image' }
+  }
+
+  // ── video / audio: 现有 note 复合任务 ─────────────────────
+  const steps = featuresToSteps(material_type, enabled_features)
+  const res = await createPipelineTask({
+    project_id: workspace_id,
     task_type: 'note',
     payload: {
-      url: params.url,
-      material_type: params.material_type,
-      enabled_features: params.enabled_features,
-      background: params.background ?? {},
-      workspace_id: params.workspace_id,
-      ...(params.preflight ? { preflight: params.preflight } : {}),
+      url,
+      material_type,
+      enabled_features,
+      background: bg,
+      workspace_id,
+      ...(preflight ? { preflight } : {}),
     },
     steps,
   })
+  return { ...res, task_type: 'note' }
 }

@@ -12,7 +12,7 @@ Last updated: 2026-05-24（**当前阶段 = Phase R 输入层重构**，详见 `
 - 起因：Composer.tsx 把 SPEC §3.1 的三层配置压成一层，首页全是死按钮
 - 范围：Composer 瘦身 + AddMaterialModal 重写为「4 步合一」+ 单链接多类型循环入队 + ~~R3.1 添加素材二级界面 Remix 风格化~~ ✅ 已完成
 - 拆分：R0~R6 可独立 commit 的子任务，含模型档位与升 Opus 触发条件
-- 当前进度：R0 ✅ / R1 ✅ / R2 ✅ / R3 ✅ / R3.1 ✅ → **下一步 R4 PreflightDrawer 接管细粒度参数**
+- 当前进度：R0 ✅ / R1 ✅ / R2 ✅ / R3 ✅ / R3.1 ✅ / R4 ✅ / R5 ✅（含误判修复：createNoteTask material_type 分派、note analyze capture_params 透传、handle_image_task yt-dlp 缩略图兜底）→ **下一步 R6 合并 main + 文档同步**
 - **R 做完前不要启动 Track T / [C] / [D] / N7b / N8b**，下面历史的「下一步」段都不算数
 
 ---
