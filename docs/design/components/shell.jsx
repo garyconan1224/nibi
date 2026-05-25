@@ -39,7 +39,6 @@ const Topbar = ({ route, onOpenTasks, theme, setTheme, onToggleTweaks, tasksCoun
   const crumbs = {
     home:         ['工作台',   'Workbench'],
     taskboard:    ['任务中心', 'Task DB'],
-    materials:    ['素材详情', 'Material Detail'],
     process:      ['处理中',   'Processing'],
     results:      ['结果',     'Results'],
     storyboard:   ['分镜',     'Storyboard'],
@@ -151,7 +150,7 @@ const TasksDrawer = ({ open, onClose, tasks, activeId, onPick }) => {
 };
 
 // ─── Tweaks panel ───
-const Tweaks = ({ open, onClose, theme, setTheme, density, setDensity, accent, setAccent, layout, setLayout, lang, setLang }) => {
+const Tweaks = ({ open, onClose, theme, setTheme, density, setDensity, accent, setAccent, layout, setLayout, lang, setLang, recentMode, setRecentMode, modelsConfigured, setModelsConfigured }) => {
   const swatches = [
     { id:'pink',   color:'linear-gradient(135deg,#FF4D7E,#B84CFF,#3C77FB)' },
     { id:'sunset', color:'linear-gradient(135deg,#FFB84C,#FF4D7E)' },
@@ -184,9 +183,9 @@ const Tweaks = ({ open, onClose, theme, setTheme, density, setDensity, accent, s
         <div className="tw-row">
           <label>Density</label>
           <div className="tw-segm">
-            <button data-active={density==='cozy'} onClick={() => setDensity('cozy')}>Cozy</button>
-            <button data-active={density==='comfy'} onClick={() => setDensity('comfy')}>Comfy</button>
             <button data-active={density==='compact'} onClick={() => setDensity('compact')}>Compact</button>
+            <button data-active={density==='cozy'} onClick={() => setDensity('cozy')}>Cozy</button>
+            <button data-active={density==='roomy'} onClick={() => setDensity('roomy')}>Roomy</button>
           </div>
         </div>
         <div className="tw-row">
@@ -205,6 +204,15 @@ const Tweaks = ({ open, onClose, theme, setTheme, density, setDensity, accent, s
             <button data-active={layout==='stack'} onClick={() => setLayout('stack')}>Stack</button>
           </div>
         </div>
+        {setRecentMode && (
+          <div className="tw-row">
+            <label>首页近期区</label>
+            <div className="tw-segm">
+              <button data-active={recentMode==='workspaces'} onClick={() => setRecentMode('workspaces')}>工作空间</button>
+              <button data-active={recentMode==='tasks'} onClick={() => setRecentMode('tasks')}>任务</button>
+            </div>
+          </div>
+        )}
         <div className="tw-row">
           <label>Typography Scale</label>
           <div className="tw-segm">
@@ -213,6 +221,16 @@ const Tweaks = ({ open, onClose, theme, setTheme, density, setDensity, accent, s
             <button data-active={false}>L</button>
           </div>
         </div>
+        {/* §13 异常模拟 — 让设计师可触发未配置模型的拦截弹窗 */}
+        {setModelsConfigured && (
+          <div className="tw-row" style={{ borderTop:'1px dashed var(--line)', paddingTop:14, marginTop:6 }}>
+            <label>§13 模型已配置</label>
+            <div className="tw-segm">
+              <button data-active={modelsConfigured===true}  onClick={() => setModelsConfigured(true)}>已配置</button>
+              <button data-active={modelsConfigured===false} onClick={() => setModelsConfigured(false)}>未配置</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
