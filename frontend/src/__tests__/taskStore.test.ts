@@ -23,7 +23,7 @@ const makeTask = (overrides: Partial<TaskRecord> = {}): TaskRecord => ({
 describe('taskStore smoke tests', () => {
   beforeEach(() => {
     // 每个用例前重置 store，隔离 persist middleware 可能的残留
-    useTaskStore.setState({ tasks: [], currentTaskId: null, isPolling: false })
+    useTaskStore.setState({ tasks: [], hiddenTaskIds: [], currentTaskId: null, isPolling: false })
   })
 
   it('初始状态 tasks 为空数组', () => {
@@ -42,5 +42,24 @@ describe('taskStore smoke tests', () => {
     const updated = useTaskStore.getState().tasks.find((t) => t.task_id === 't-upd-1')
     expect(updated?.status).toBe('SUCCESS')
   })
-})
 
+  it('removeTask 应从列表中删除指定任务', () => {
+    useTaskStore.getState().addTask(makeTask({ task_id: 't-rm-1' }))
+    useTaskStore.getState().addTask(makeTask({ task_id: 't-rm-2' }))
+
+    useTaskStore.getState().removeTask('t-rm-1')
+
+    expect(useTaskStore.getState().tasks.map((t) => t.task_id)).toEqual(['t-rm-2'])
+    expect(useTaskStore.getState().hiddenTaskIds).toContain('t-rm-1')
+  })
+
+  it('setTasks 不会把本地隐藏任务重新同步回来', () => {
+    useTaskStore.getState().removeTask('t-hidden')
+    useTaskStore.getState().setTasks([
+      makeTask({ task_id: 't-hidden' }),
+      makeTask({ task_id: 't-visible' }),
+    ])
+
+    expect(useTaskStore.getState().tasks.map((t) => t.task_id)).toEqual(['t-visible'])
+  })
+})

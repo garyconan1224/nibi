@@ -4,7 +4,35 @@
 >
 > **维护规则**：每完成一个子任务，在本文件**追加**一段（不删旧记录），格式见下方"记录模板"。
 >
-> Last updated: 2026-05-25 (Phase R 输入层重构)
+> Last updated: 2026-05-25 (Phase R10 hotfix + FloatingTaskQueue v2)
+
+---
+
+## Phase R10 – 平台 URL 音频抽取 hotfix + 悬浮队列 v2
+
+**完成日期**：2026-05-25
+**模型 / 工具**：DS v4-pro + Codex QA
+**分支**：feat/phase-r10-hotfix-and-queue-v2
+**Commit**：62b4f27 / ee204d6 / R10 completion
+
+### 影响范围
+- 后端：`pipeline_tasks.py` 的 audio URL 分支对平台 URL 改走 yt-dlp bestaudio。
+- 共享工具：`video_download_ytdlp.py` 新增 `is_platform_url()`。
+- 前端：新增 `FloatingTaskQueue` v2 组件和动画样式，并在 `AppShell` 全局挂载。
+- Store：`taskStore` 新增 `removeTask` 和 `hiddenTaskIds`，保证 FAILED 本地隐藏不会被轮询重新同步回来。
+- 测试：新增 `test_audio_task_platform_url.py`、`FloatingTaskQueue.test.tsx`，扩展 `taskStore.test.ts`。
+
+### 关键改动
+- B 站 / YouTube / 抖音等平台 URL 的 audio 任务不再用 urllib 直 GET 页面地址，避免 412 / 403 / 反爬拦截。
+- FloatingTaskQueue v2 支持 mini ring、聚合进度、stage 显示、当前任务高亮、单项取消、失败重试、FAILED 本地隐藏、footer 批量暂停/重试。
+- 「查看全部」指向现有 `/workspaces` 路由，避免跳到未注册 `/taskboard`。
+
+### 验证
+- `.venv/bin/python -m pytest tests/backend -q`：318 passed, 2 skipped
+- `cd frontend && pnpm test --run`：9 files / 47 tests passed
+- `cd frontend && pnpm build`：passed
+- `pnpm exec eslint ...R10 touched files...`：passed
+- `pnpm lint`：49 个存量错误 / 2 个 warning，不属于 R10 新增
 
 ---
 

@@ -1,18 +1,18 @@
 # AI Handoff
 
-Last updated: 2026-05-25（**当前阶段 = Phase R7/R8 merge 收口**）
+Last updated: 2026-05-25（**当前阶段 = Phase R10/R11 merge 收口**）
 
 ---
 
 ## 🔴 当前状态（2026-05-25）
 
-**Phase R 输入层重构 + R7/R8 收口已完成，正在本地 merge 到 `main`。**
+**Phase R10 已完成 QA 修复；R11 设计同步分支待本地 merge 到 `main`。**
 
 - R0~R6：Composer 瘦身、AddMaterialModal 4 步合一、单 URL 多类型循环入队、PreflightDrawer 接管细粒度参数、端到端冒烟、文档同步均已完成。
 - R7：输入流统一收尾，包含单 URL 多类型默认全勾、Composer URL modal 简化、PreflightDrawer stage 模式、Hero 文案精简。
 - R8：PreflightDrawer Remix 复刻，包含 media kind tabs、背景 5 字段、任务卡片、级联锁定、footer 状态 pill、R8 tasks payload 序列化。
-- merge 前补丁已修复：stage 回写丢 R8 `tasks/models`、PreflightDrawer 视觉大模型残留、路径 3 `models.video` 未保存。
-- 验证：`pnpm test --run` 通过；`pnpm build` 通过；`.venv/bin/python -m pytest tests/backend -q` 通过。`pnpm lint` 仍被项目存量 baseline 拦截。
+- R10：平台 URL 音频任务改走 yt-dlp bestaudio；FloatingTaskQueue v2 已补视觉骨架、取消、重试、FAILED 本地隐藏、批量按钮、当前任务高亮。
+- R10 验证：`pnpm test --run` 通过；`pnpm build` 通过；`.venv/bin/python -m pytest tests/backend -q` 通过；R10 touched files targeted eslint 通过。
 
 ---
 

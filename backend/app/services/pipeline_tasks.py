@@ -38,7 +38,7 @@ from shared.video_analyzer import (
     get_safe_name,
     run_batch_analysis,
 )
-from shared.video_download_ytdlp import run_ytdlp_download
+from shared.video_download_ytdlp import is_platform_url, run_ytdlp_download
 from src.vidmirror.core.providers import ChatRequest
 from src.vidmirror.core.providers.registry import create_default_registry
 
@@ -1963,9 +1963,25 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         url_path = source.split("?")[0]
         audio_filename = url_path.split("/")[-1] or "audio.mp3"
         audio_local_path = audio_dir / f"{task_id}_{audio_filename}"
+        _is_platform = is_platform_url(source)
         if _music_confirmed and audio_local_path.exists():
             log("📦 音频文件已存在（重跑），跳过下载")
             audio_bytes = audio_local_path.read_bytes()
+        elif _is_platform:
+            log(f"🎬 检测到平台 URL，使用 yt-dlp 抽取音频流")
+            result = run_ytdlp_download(
+                url=source,
+                output_dir=str(audio_dir),
+                format_selector="bestaudio/best",
+                log=lambda m: runner.append_log(task_id, m),
+                progress_callback=lambda p, msg: runner.set_progress(task_id, 0.05 + p * 0.1, msg),
+            )
+            if not result.get("ok"):
+                raise RuntimeError(f"音频下载失败（yt-dlp）：{result.get('error', '未知错误')}")
+            audio_local_path = Path(result["save_path"])
+            audio_filename = audio_local_path.name
+            audio_bytes = audio_local_path.read_bytes()
+            content_type = ""
         else:
             req = urllib.request.Request(source, headers={"User-Agent": "Mozilla/5.0"})
             try:

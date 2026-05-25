@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSystemStats } from '@/hooks/useSystemStats'
+import { FloatingTaskQueue } from '@/components/FloatingTaskQueue'
 
 interface NavItem {
   id: string
@@ -185,6 +186,9 @@ export function AppShell({ children }: AppShellProps) {
         </div>
         {children}
       </div>
+
+      {/* Global floating task queue — fixed position, outside layout flow */}
+      <FloatingTaskQueue />
     </div>
   )
 }
