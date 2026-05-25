@@ -107,7 +107,29 @@ export default function ProcessingPage() {
   const categorized = categorizeError(task?.error)
 
   const url = task?.payload?.url ?? state?.url ?? ''
-  const title = task?.payload?.title ?? (url ? new URL(url).hostname : '任务')
+  // R12.2 标题优先级：result.video_title > payload.title > URL hostname
+  const result = task?.result ?? {}
+  const safeHostname = (() => {
+    if (!url) return '任务'
+    try { return new URL(url).hostname } catch { return '任务' }
+  })()
+  const title: string = result.video_title || task?.payload?.title || safeHostname
+  // R12.2 封面：远程 URL（B 站 CDN）优先，本地路径暂不展示（需后端 static 路由）
+  const coverUrl: string = result.video_thumbnail_url || ''
+  const durationSec: number = Number(result.video_duration) || 0
+  const fmtDuration = (sec: number) => {
+    if (!sec) return ''
+    const m = Math.floor(sec / 60)
+    const s = Math.floor(sec % 60)
+    return `${m}:${s.toString().padStart(2, '0')}`
+  }
+  const durationLabel = fmtDuration(durationSec)
+  const framesCount: number = Number(result.frames_count) || 0
+  const asrSegments: number = Number(result.asr_segments) || 0
+  // ETA = 剩余时间估算（基于 progress）；任务无总时长信息时不显示
+  const etaSec = durationSec && progress > 0 && progress < 1
+    ? Math.max(0, Math.round(durationSec * (1 - progress) / progress))
+    : 0
 
   return (
     <div className="vm-processing-scope">
@@ -116,6 +138,17 @@ export default function ProcessingPage() {
           {/* Hero */}
           <div className="proc-hero">
             <div className="thumb">
+              {coverUrl && (
+                <img
+                  src={coverUrl}
+                  alt={title}
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    // 封面加载失败（B 站 CDN 防盗链等）静默隐藏，露出黑底
+                    (e.target as HTMLImageElement).style.display = 'none'
+                  }}
+                />
+              )}
               {!isFailed && !isCancelled && (
                 <div className="live">● LIVE</div>
               )}
@@ -125,15 +158,30 @@ export default function ProcessingPage() {
               <div className="title">{title}</div>
               <div className="src">{url}</div>
               <div className="stats">
+                {durationLabel && (
+                  <span>
+                    <strong>{durationLabel}</strong> 时长
+                  </span>
+                )}
+                {framesCount > 0 && (
+                  <span>
+                    <strong>{framesCount}</strong> 帧
+                  </span>
+                )}
+                {asrSegments > 0 && (
+                  <span>
+                    <strong>{asrSegments}</strong> 句转录
+                  </span>
+                )}
                 <span>
                   状态 <strong>{getStatusText(status)}</strong>
                 </span>
                 <span>
                   进度 <strong>{Math.round(progress * 100)}%</strong>
                 </span>
-                {logs.length > 0 && (
+                {etaSec > 0 && (
                   <span>
-                    <strong>{logs.length}</strong> 条日志
+                    剩余 <strong>{etaSec}s</strong>
                   </span>
                 )}
               </div>
