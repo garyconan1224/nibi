@@ -438,18 +438,18 @@ export function AddMaterialModal({
                 />
               </div>
             )}
+            {!urlValue && (
             <div className="modal-kw-row">
               <span className="kw">
                 <Link2 size={11} />
                 支持网络链接
               </span>
               <span className="kw">本地版无大小限制</span>
-              {!urlValue && (
-                <span className="kw" data-state={internalSniff ? 'recognized' : undefined}>
-                  {internalSniff ? '已识别' : '输入后自动识别'}
-                </span>
-              )}
+              <span className="kw" data-state={internalSniff ? 'recognized' : undefined}>
+                {internalSniff ? '已识别' : '输入后自动识别'}
+              </span>
             </div>
+            )}
           </div>
 
           {/* ③ 分析任务 */}
