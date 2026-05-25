@@ -307,6 +307,10 @@
   color: var(--accent-warm);
 }
 
+.vm-processing-scope .step-row .body .logs .ln.err {
+  color: var(--accent);
+}
+
 .vm-processing-scope .step-row .progress {
   min-width: 140px;
   display: flex;
