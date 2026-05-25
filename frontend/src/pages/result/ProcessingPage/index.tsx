@@ -111,17 +111,17 @@ export default function ProcessingPage() {
 
   const categorized = categorizeError(task?.error)
 
-  const url = task?.payload?.url ?? state?.url ?? ''
-  // R12.2 标题优先级：result.video_title > payload.title > URL hostname
   const result = task?.result ?? {}
+  const payload = task?.payload ?? {} as Record<string, unknown>
+  // R13.2 标题/封面/时长来源优先级：result（直接来源）→ payload（从 download 继承）→ fallback
+  const url = task?.payload?.url ?? (payload.source_url as string) ?? state?.url ?? ''
   const safeHostname = (() => {
     if (!url) return '任务'
     try { return new URL(url).hostname } catch { return '任务' }
   })()
-  const title: string = result.video_title || task?.payload?.title || safeHostname
-  // R12.2 封面：远程 URL（B 站 CDN）优先，本地路径暂不展示（需后端 static 路由）
-  const coverUrl: string = result.video_thumbnail_url || ''
-  const durationSec: number = Number(result.video_duration) || 0
+  const title: string = result.video_title || (payload.video_title as string) || (task?.payload?.title as string) || safeHostname
+  const coverUrl: string = result.video_thumbnail_url || (payload.video_thumbnail_url as string) || ''
+  const durationSec: number = Number(result.video_duration || payload.video_duration) || 0
   const fmtDuration = (sec: number) => {
     if (!sec) return ''
     const m = Math.floor(sec / 60)
