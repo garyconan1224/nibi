@@ -9,6 +9,8 @@ import { isTaskTerminal, getStatusText } from '@/types/task'
 import { categorizeError } from '@/lib/errorCategories'
 import MusicModeConfirmModal from '@/components/workspace/MusicModeConfirmModal'
 import { StepProgress } from './StepProgress'
+import SystemResourceCard from './SystemResourceCard'
+import TasksCard from './TasksCard'
 import { LiveLog } from './LiveLog'
 
 import './processing.css'
@@ -18,6 +20,8 @@ interface LocationState {
   itemId?: string
   url?: string
 }
+
+const STUCK_MS = 10 * 60 * 1000
 
 export default function ProcessingPage() {
   const { taskId = '' } = useParams<{ taskId: string }>()
@@ -42,32 +46,29 @@ export default function ProcessingPage() {
   const isSuccess = status === 'SUCCESS'
 
   // A3: 音乐模式确认弹窗
-  const [showMusicModal, setShowMusicModal] = useState(false)
-
-  useEffect(() => {
-    if (status === 'AWAITING_CONFIRM') {
-      setShowMusicModal(true)
-    }
-  }, [status])
+  const [dismissedMusicModalTaskId, setDismissedMusicModalTaskId] = useState<string | null>(null)
+  const showMusicModal = status === 'AWAITING_CONFIRM' && dismissedMusicModalTaskId !== taskId
 
   const handleMusicConfirmed = () => {
+    setDismissedMusicModalTaskId(taskId)
     toast.success('已切换为音乐分析模式，任务继续执行')
   }
 
   const handleMusicCancelled = () => {
+    setDismissedMusicModalTaskId(taskId)
     if (taskId) cancelTask(taskId)
     toast.info('任务已取消，可在素材设置中手动勾选「音乐分析」后重跑')
   }
 
   // F3.5: 任务卡住检测（非终结态 > 10 分钟无 updated_at 变化 → 警告）
-  const STUCK_MS = 10 * 60 * 1000
-  const lastActivityRef = useRef(Date.now())
+  const lastActivityRef = useRef<number | null>(null)
   const stuckToastedRef = useRef(false)
 
   useEffect(() => {
     if (!task?.updated_at) return
+    const currentActivity = lastActivityRef.current ?? 0
     lastActivityRef.current = Math.max(
-      lastActivityRef.current,
+      currentActivity,
       new Date(task.updated_at).getTime(),
     )
     // 有新活动时重置 toast 标记，以便下次卡住能再次提醒
@@ -76,8 +77,12 @@ export default function ProcessingPage() {
 
   useEffect(() => {
     if (!isActive) return
+    if (lastActivityRef.current == null) {
+      lastActivityRef.current = Date.now()
+    }
     const timer = setInterval(() => {
-      if (Date.now() - lastActivityRef.current > STUCK_MS && !stuckToastedRef.current) {
+      const lastActivity = lastActivityRef.current ?? Date.now()
+      if (Date.now() - lastActivity > STUCK_MS && !stuckToastedRef.current) {
         toast.warning('任务已超过 10 分钟无进度更新，可能已卡住。建议取消后重试。')
         stuckToastedRef.current = true
       }
@@ -107,7 +112,29 @@ export default function ProcessingPage() {
   const categorized = categorizeError(task?.error)
 
   const url = task?.payload?.url ?? state?.url ?? ''
-  const title = task?.payload?.title ?? (url ? new URL(url).hostname : '任务')
+  // R12.2 标题优先级：result.video_title > payload.title > URL hostname
+  const result = task?.result ?? {}
+  const safeHostname = (() => {
+    if (!url) return '任务'
+    try { return new URL(url).hostname } catch { return '任务' }
+  })()
+  const title: string = result.video_title || task?.payload?.title || safeHostname
+  // R12.2 封面：远程 URL（B 站 CDN）优先，本地路径暂不展示（需后端 static 路由）
+  const coverUrl: string = result.video_thumbnail_url || ''
+  const durationSec: number = Number(result.video_duration) || 0
+  const fmtDuration = (sec: number) => {
+    if (!sec) return ''
+    const m = Math.floor(sec / 60)
+    const s = Math.floor(sec % 60)
+    return `${m}:${s.toString().padStart(2, '0')}`
+  }
+  const durationLabel = fmtDuration(durationSec)
+  const framesCount: number = Number(result.frames_count) || 0
+  const asrSegments: number = Number(result.asr_segments) || 0
+  // ETA = 剩余时间估算（基于 progress）；任务无总时长信息时不显示
+  const etaSec = durationSec && progress > 0 && progress < 1
+    ? Math.max(0, Math.round(durationSec * (1 - progress) / progress))
+    : 0
 
   return (
     <div className="vm-processing-scope">
@@ -116,6 +143,17 @@ export default function ProcessingPage() {
           {/* Hero */}
           <div className="proc-hero">
             <div className="thumb">
+              {coverUrl && (
+                <img
+                  src={coverUrl}
+                  alt={title}
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    // 封面加载失败（B 站 CDN 防盗链等）静默隐藏，露出黑底
+                    (e.target as HTMLImageElement).style.display = 'none'
+                  }}
+                />
+              )}
               {!isFailed && !isCancelled && (
                 <div className="live">● LIVE</div>
               )}
@@ -125,15 +163,30 @@ export default function ProcessingPage() {
               <div className="title">{title}</div>
               <div className="src">{url}</div>
               <div className="stats">
+                {durationLabel && (
+                  <span>
+                    <strong>{durationLabel}</strong> 时长
+                  </span>
+                )}
+                {framesCount > 0 && (
+                  <span>
+                    <strong>{framesCount}</strong> 帧
+                  </span>
+                )}
+                {asrSegments > 0 && (
+                  <span>
+                    <strong>{asrSegments}</strong> 句转录
+                  </span>
+                )}
                 <span>
                   状态 <strong>{getStatusText(status)}</strong>
                 </span>
                 <span>
                   进度 <strong>{Math.round(progress * 100)}%</strong>
                 </span>
-                {logs.length > 0 && (
+                {etaSec > 0 && (
                   <span>
-                    <strong>{logs.length}</strong> 条日志
+                    剩余 <strong>{etaSec}s</strong>
                   </span>
                 )}
               </div>
@@ -228,6 +281,8 @@ export default function ProcessingPage() {
 
         {/* Sidebar */}
         <aside className="proc-side">
+          <SystemResourceCard etaSec={etaSec} />
+          <TasksCard currentTaskId={taskId} />
           <LiveLog logs={logs} />
         </aside>
       </div>
@@ -235,7 +290,9 @@ export default function ProcessingPage() {
       {/* A3: VAD 无人声 → 音乐模式确认弹窗 */}
       <MusicModeConfirmModal
         open={showMusicModal}
-        onOpenChange={setShowMusicModal}
+        onOpenChange={(open) => {
+          setDismissedMusicModalTaskId(open ? null : taskId)
+        }}
         taskId={taskId}
         speechRatio={task?.result?.speech_ratio ?? 0}
         totalDuration={task?.result?.total_duration ?? 0}

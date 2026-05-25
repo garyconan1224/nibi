@@ -27,6 +27,7 @@ from backend.app.routes.prompt_formats import router as prompt_formats_router
 from backend.app.routes.providers import router as providers_router
 from backend.app.routes.rag import router as rag_router
 from backend.app.routes.search import router as search_router
+from backend.app.routes.system import router as system_router
 from backend.app.routes.transcriber_config import router as transcriber_config_router
 from backend.app.routes.templates import router as templates_router
 from backend.app.routes.transcript import router as transcript_router
@@ -126,6 +127,7 @@ app.include_router(workspaces_router)
 app.include_router(chat_router)
 app.include_router(export_router)
 app.include_router(admin_router)
+app.include_router(system_router)
 
 
 @app.get("/health")

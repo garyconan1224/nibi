@@ -4,7 +4,40 @@
 >
 > **维护规则**：每完成一个子任务，在本文件**追加**一段（不删旧记录），格式见下方"记录模板"。
 >
-> Last updated: 2026-05-25 (Phase R10 hotfix + FloatingTaskQueue v2)
+> Last updated: 2026-05-25 (Phase R12 ProcessingPage 1:1 replica)
+
+---
+
+## Phase R12 – ProcessingPage 1:1 复刻设计稿
+
+**完成日期**：2026-05-25
+**模型 / 工具**：Claude Opus 4.7 + DS v4-pro + Codex QA
+**分支**：feat/phase-r12-processing-page-replica
+**Commit**：7bee6d3 / d6edc1e / 3801eb3 / 4922c80 / f88de4a / 634f3c5 / R12 QA cleanup
+
+### 影响范围
+- 后端：新增 `/system/stats`，返回 CPU/RAM/GPU/VRAM 实时数据；`main.py` 注册 system router。
+- 共享工具：`video_download_ytdlp.py` 抽取平台标题、时长、up 主和缩略图，写入 task result。
+- 前端：`ProcessingPage` Hero 读取真实标题/封面/stats；`StepProgress` 增加 desc 和 ok/warn/err 三色日志；右侧栏新增 `SystemResourceCard` 和 `TasksCard`。
+- 测试：新增 `tests/backend/test_system_stats.py` 覆盖系统资源端点。
+
+### 关键改动
+- `/processing/<task_id>` 不再只展示任务 ID / URL，优先展示 yt-dlp 元数据和可用统计。
+- step-stream 以固定 7 步顺序呈现，每步附带说明和按级别着色的日志行。
+- 系统资源卡以 3 秒轮询 `/system/stats`，无 NVIDIA GPU 时兼容显示 CPU only。
+- 任务侧栏复用 `taskStore`，显示当前/活跃任务并支持点击切换路由。
+- QA 收口清掉分支里混入的非 R12 global SSE/R9 残留，并修复 `ProcessingPage/index.tsx` touched-file React hooks lint 问题。
+
+### 验证
+- `.venv/bin/python -m pytest tests/backend -q`：320 passed, 2 skipped
+- `cd frontend && pnpm test --run`：9 files / 47 tests passed
+- `cd frontend && pnpm build`：passed
+- `cd frontend && pnpm exec eslint src/pages/result/ProcessingPage/index.tsx src/pages/result/ProcessingPage/StepProgress.tsx src/pages/result/ProcessingPage/SystemResourceCard.tsx src/pages/result/ProcessingPage/TasksCard.tsx`：passed
+- `cd frontend && pnpm lint`：47 errors / 1 warning，仍为项目存量 lint 基线；R12 touched files targeted eslint 已通过
+
+### 留给后续的影响
+- 预览帧卡仍按计划延后到 N7b，等视频后端回写 `current_frame` 后再接。
+- R12 当前只在 feature branch 完成；本地 merge 到 `main` 需用户授权，且仍不 push origin。
 
 ---
 

@@ -469,8 +469,10 @@ def run_ytdlp_download(
             if log:
                 log(f"尝试策略 {i + 1}/{len(attempts)}（格式: {fmt}）…")
             try:
+                info_dict: dict[str, Any] = {}
                 with yt_dlp.YoutubeDL(opts) as ydl:
-                    ydl.download([url])
+                    # extract_info(download=True) 与 ydl.download 等价，但能返回 info dict
+                    info_dict = ydl.extract_info(url, download=True) or {}
                 final_path = task_state.get("save_path", "")
                 if not final_path or not os.path.isfile(final_path):
                     fallback = _find_latest_final_media(output_dir)
@@ -486,11 +488,21 @@ def run_ytdlp_download(
                 thumbnail_path = _find_thumbnail(output_dir, converted)
                 if thumbnail_path and log:
                     log(f"封面图：{os.path.basename(thumbnail_path)}")
+                # 从 info_dict 抽取元数据（标题/时长/上传者），供前端 ProcessingPage 展示
+                # 注：playlist / multi-entry 时取 entries[0]
+                meta_src = info_dict
+                if "entries" in meta_src and meta_src.get("entries"):
+                    first = meta_src["entries"][0] or {}
+                    meta_src = {**meta_src, **first}
                 return {
                     "ok": True,
                     "save_path": converted,
                     "file_name": task_state.get("file_name", ""),
                     "thumbnail_path": thumbnail_path,
+                    "title": meta_src.get("title") or "",
+                    "duration": meta_src.get("duration") or 0,  # seconds (int/float)
+                    "uploader": meta_src.get("uploader") or meta_src.get("channel") or "",
+                    "thumbnail_url": meta_src.get("thumbnail") or "",
                     "error": "",
                     "error_full": "",
                     "percent": 100.0,

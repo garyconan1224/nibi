@@ -382,6 +382,15 @@ def handle_download_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, An
     thumb = out.get("thumbnail_path") or ""
     if thumb:
         result["cover_thumbnail"] = thumb
+    # R12.1 抽取 yt-dlp 元数据写入 task.result，ProcessingPage Hero 展示
+    if out.get("title"):
+        result["video_title"] = out["title"]
+    if out.get("duration"):
+        result["video_duration"] = out["duration"]  # seconds
+    if out.get("uploader"):
+        result["video_uploader"] = out["uploader"]
+    if out.get("thumbnail_url"):
+        result["video_thumbnail_url"] = out["thumbnail_url"]
     return result
 
 

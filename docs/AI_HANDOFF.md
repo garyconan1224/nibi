@@ -1,18 +1,21 @@
 # AI Handoff
 
-Last updated: 2026-05-25（**当前阶段 = Phase R10/R11 merge 收口**）
+Last updated: 2026-05-25（**当前阶段 = Phase R12 merge 前收口**）
 
 ---
 
 ## 🔴 当前状态（2026-05-25）
 
-**Phase R10 已完成 QA 修复；R11 设计同步分支待本地 merge 到 `main`。**
+**Phase R12 已在 `feat/phase-r12-processing-page-replica` 完成并通过验证；等待用户授权本地 merge 到 `main`。不 push origin。**
 
 - R0~R6：Composer 瘦身、AddMaterialModal 4 步合一、单 URL 多类型循环入队、PreflightDrawer 接管细粒度参数、端到端冒烟、文档同步均已完成。
 - R7：输入流统一收尾，包含单 URL 多类型默认全勾、Composer URL modal 简化、PreflightDrawer stage 模式、Hero 文案精简。
 - R8：PreflightDrawer Remix 复刻，包含 media kind tabs、背景 5 字段、任务卡片、级联锁定、footer 状态 pill、R8 tasks payload 序列化。
 - R10：平台 URL 音频任务改走 yt-dlp bestaudio；FloatingTaskQueue v2 已补视觉骨架、取消、重试、FAILED 本地隐藏、批量按钮、当前任务高亮。
-- R10 验证：`pnpm test --run` 通过；`pnpm build` 通过；`.venv/bin/python -m pytest tests/backend -q` 通过；R10 touched files targeted eslint 通过。
+- R11：设计稿同步 canonicalize 已合入 local main（`7ec9914`）。
+- R12：ProcessingPage 1:1 复刻已完成：真实标题/封面/stats、step-stream 日志、系统资源卡、任务侧栏卡。
+- R12 验证：`.venv/bin/python -m pytest tests/backend -q` 320 passed / 2 skipped；`pnpm test --run` 47 passed；`pnpm build` 通过；R12 touched files targeted eslint 通过。
+- `pnpm lint` 全量仍有 47 errors / 1 warning，属于项目存量 lint 基线，不在 R12 touched files。
 
 ---
 
@@ -64,7 +67,7 @@ git branch --show-current
 - IP.8.6-fix：N4 默认勾选 4 处对齐设计稿
 - H2.6：删除旧 WorkspaceDetail.tsx + WorkspaceSearchBar.tsx（-680 行）
 
-**当前 main**：`f33db14 merge: feat/ip9-flow-gaps into main`
+**当前 local main**：`7ec9914 merge: feat/phase-r11-design-sync-canonicalize into main`；R12 在 `feat/phase-r12-processing-page-replica` 完成，尚未 merge。
 
 ---
 
@@ -98,6 +101,12 @@ git branch --show-current
 ---
 
 ## 下一步（按 ROI 排序，明天接力会话直接选）
+
+### 🥇 当前立即下一步：R12 本地 merge 收口
+
+- 分支：`feat/phase-r12-processing-page-replica`
+- 状态：R12.1~R12.6 已完成，Codex QA 收口验证通过。
+- 操作边界：用户授权后 merge 到 local main；不 push origin。
 
 ### ✅ Phase L 资料库聚合页（2026-05-22 已完成）
 
