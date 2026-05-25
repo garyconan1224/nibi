@@ -1,6 +1,9 @@
 ---
 name: phase-r-input-refactor
-status: in_progress
+status: done
+commits: 12 commits (R0~R6), feat/phase-r-input-refactor → main
+completed_date: 2026-05-25
+actual_hours: ~8h (R1~R5 分散实现 + R6 合并收尾)
 phase: R (输入层重构 / Composer 瘦身 + 模态化 + 单链接多类型)
 track: F (Flow)
 prerequisite: IP.9 已合入 main；H1 Workbench 已落地
@@ -154,7 +157,7 @@ flowchart TD
 - [x] R4.3 PreflightDrawer 的"开始解析"也走 `createNoteTask`（与 R3 共用同一 service）
 - [x] R4.4 检查 `composerDefaults` 的旧链路是否还有引用，删除残余
 - [x] R4.5 跑端到端：点"细调…"→ 抽屉打开 → 改抽帧间隔 → 提交 → 队列出现任务且 payload 含新参数
-- [ ] commit: `feat(phase-r): R4 PreflightDrawer 接管细粒度参数`
+- [x] commit: `feat(phase-r): R4 PreflightDrawer 接管细粒度参数` @ a5df14d
 
 ### R5 端到端冒烟（DS v4-pro 跑命令，1h）
 **目标**：跑通 5 条真实链接确认闭环。
@@ -167,12 +170,12 @@ flowchart TD
 - [x] commit: `test(phase-r): R5 端到端冒烟 6 条链接`
 
 ### R6 合并与收尾（DS v4-pro，10 min）
-- [ ] R6.1 自测全绿后：本地 `git checkout main && git merge --no-ff feat/phase-r-input-refactor`
-- [ ] R6.2 更新 `docs/EXECUTION_PLAN.md`：在 IP.9 段后新增 "R 输入层重构" 块，子任务全 `- [x]`
-- [ ] R6.3 更新本文件 frontmatter：`status: done` + `commits` + `completed_date` + `actual_hours`
-- [ ] R6.4 在 `docs/COMPLETED_WORK.md` 追加记录
-- [ ] R6.5 通知用户「Phase R 完工，可考虑打 tag `v0.x.y-phase-r`」
-- [ ] commit: `docs(phase-r): R6 收尾文档同步`
+- [x] R6.1 自测全绿后：本地 `git checkout main && git merge --no-ff feat/phase-r-input-refactor`
+- [x] R6.2 更新 `docs/EXECUTION_PLAN.md`：R6 子任务打勾
+- [x] R6.3 更新本文件 frontmatter：`status: done` + `commits` + `completed_date` + `actual_hours`
+- [x] R6.4 在 `docs/COMPLETED_WORK.md` 追加记录
+- [x] R6.5 通知用户「Phase R 完工，可考虑打 tag `v0.x.y-phase-r`」
+- [ ] commit
 
 ---
 

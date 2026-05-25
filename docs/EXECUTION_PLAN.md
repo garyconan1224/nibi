@@ -139,7 +139,7 @@
 - [x] R3.1 AddMaterialModal Remix 风格化（点击添加素材后的二级界面）
 - [x] R4 PreflightDrawer 接管细粒度参数
 - [x] R5 端到端冒烟 6 条链接（含误判修复：createNoteTask material_type 分派 / note analyze 传 capture_params / 小红书 yt-dlp 缩略图兜底）
-- [ ] R6 合并 main + 文档同步
+- [x] R6 合并 main + 文档同步
 
 ---
 

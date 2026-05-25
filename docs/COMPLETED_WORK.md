@@ -4,7 +4,7 @@
 >
 > **维护规则**：每完成一个子任务，在本文件**追加**一段（不删旧记录），格式见下方"记录模板"。
 >
-> Last updated: 2026-05-23 (A4 字幕导出)
+> Last updated: 2026-05-25 (Phase R 输入层重构)
 
 ---
 
@@ -94,6 +94,40 @@
 ---
 
 # 历史记录（倒序，最新在上）
+
+---
+
+## Phase R – 输入层重构（Composer 瘦身 + AddMaterialModal 4 步合一 + 单 URL 多类型 + PreflightDrawer）
+
+**完成日期**：2026-05-25
+**模型 / 工具**：R1/R5/R6 DS v4-pro；R2/R3/R4 Sonnet 4.6
+**分支**：feat/phase-r-input-refactor → main
+**Commit**：05bc586 / 81aeecd / c7f94b8 / a5df14d / 4b87616 / 66fba34 / (merge 1594307)
+
+### 影响范围
+- 前端：Composer.tsx 删 6 块死 UI（-405 行），AddMaterialModal.tsx 重写（+1108 行，─98 行 MixedContentModal 删除），PreflightDrawer.tsx 重构（+191 行），新增 featuresToSteps.ts（89 行）、pipeline.ts（123 行）、design-tokens.css（355 行）
+- 文档：EXECUTION_PLAN.md / ROADMAP.md / AI_HANDOFF.md / DESIGN_SYSTEM.md / test-urls.md 同步
+- 后端：pipeline_tasks.py 微调 material_type 分派逻辑；video_analyzer.py 小红书缩略图 webp 兜底
+- 测试：新增 QueueTab.test.tsx（47 行）/ pipeline.test.ts（40 行）/ test_pipeline_tasks.py（182 行）
+
+### 关键改动
+- Composer 从 630 行瘦身到 ~250 行，删除所有"死按钮"（画质/抽帧/模型下拉/pipeline pill）
+- AddMaterialModal 统一作为入口（URL sniff / 上传 → 类型选择 → 一级勾选 → 背景信息 → 一键解析）
+- featuresToSteps 翻译层将前端 feature 勾选 → 后端 steps（`lib/featuresToSteps.ts`）
+- PreflightDrawer 接管细粒度参数（截帧/模型/Whisper），从模态"细调"按钮唤起
+- 小红书 yt-dlp 缩略图 webp 格式兜底 + retry 机制
+- 后端 note task 的 material_type 分派修复（image/audio/video 正确映射）
+- R3.1 AddMaterialModal Remix 风格化：modal-backdrop / type-card / task-chip / token 化颜色
+
+### 为什么这么做
+- 原 Composer 将 SPEC 规定的三层配置（设置页/添加素材/Preflight）压成一层，首页堆了大量无用 UI
+- sniff 返回 possible_types ≥ 2 时需支持单链接多类型循环入队
+- Remix 风格化让素材添加界面与设计稿 1:1 对齐
+
+### 留给后续的影响
+- `enabled_features` 字段塞在 task payload（Dict[str,Any]），后端不动 schema
+- 一级项如「音乐分析/OCR」后端可能报"未实现"warning，UI 占位不阻塞
+- 多文件批量上传暂不支持（需单独 phase）
 
 ---
 
