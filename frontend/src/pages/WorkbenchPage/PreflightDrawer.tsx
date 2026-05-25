@@ -1,9 +1,8 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, ArrowRight, Loader2 } from 'lucide-react'
+import { X, ArrowRight, Loader2, Settings, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { useProviderStore } from '@/store/providerStore'
-import { useTemplateStore } from '@/store/templateStore'
 import {
   autoCreateWorkspace,
   addWorkspaceItem,
@@ -13,12 +12,16 @@ import {
 import type { SniffResult } from '@/services/workspaces'
 import type { ItemType, WorkspaceBackground } from '@/types/workspace'
 import type { StagedConfig } from '@/components/workspace/AddMaterialModal'
-import { FEATURES_BY_TYPE, type Feature } from '@/lib/featuresToSteps'
-import { OUTPUT_FORMAT_OPTIONS } from '@/lib/preflightTasks'
-import type { RewriteStyle, VideoOutputFormat } from '@/lib/preflightTasks'
+import {
+  TASK_GROUPS,
+  MEDIA_KINDS,
+  CONTENT_TYPES,
+  PURPOSES,
+  buildInitialTasks,
+  applyCascades,
+} from './preflightTasks'
+import type { MediaKind, TaskState } from './preflightTasks'
 
-const CONTENT_TYPES = ['课程', '会议', '宣传片', 'Vlog', '访谈', '纯音乐', '其他']
-const PURPOSES = ['复刻参考', '竞品分析', '内容学习', '其他']
 const ITEM_TYPE_ALIASES: Record<string, ItemType> = {
   article: 'text',
   audio: 'audio',
@@ -32,23 +35,70 @@ const ITEM_TYPE_LABELS: Record<ItemType, string> = {
   image: '图片',
   text: '文字',
 }
-type SummaryPath = 'subtitle' | 'detailed' | 'video_model'
-
+const TASK_TO_FEATURE: Record<MediaKind, Record<string, string>> = {
+  video: {
+    frame_prompt: 'visual_prompt',
+    summary: 'video_summary',
+    srt: 'subtitle_export',
+    music: 'music_analysis',
+  },
+  audio: {
+    asr: 'transcribe_summary',
+    voiceprint: 'speaker_diarize',
+    srt: 'subtitle_export',
+    music: 'music_analysis',
+  },
+  image: {
+    describe: 'describe',
+    ocr: 'ocr',
+    prompt: 'prompt',
+    assoc: 'assoc',
+  },
+  text: {
+    summary: 'summary_keypoints',
+    rewrite: 'rewrite',
+    translate: 'translate',
+    multi: 'multi_compare',
+  },
+}
 interface PreflightDrawerProps {
   open: boolean
   url: string
   platformName: string | null
-  /** 当混合内容场景下用户选了多种类型时传入 */
   selectedTypes?: string[]
-  /** F4.2: URL 嗅探结果——用于自动确定 item type */
   sniffResult?: SniffResult | null
-  /** IP.6: 选中的工作空间 ID（简化方案：只传第一个） */
   workspaceId?: string
-  /** R4: 模态传入的 staged config，优先于设置页默认 */
   stagedConfig?: StagedConfig
+  mode?: 'execute' | 'stage'
+  onSaveStaged?: (staged: StagedConfig) => void
+  /** R8: 当前素材数量（级联用） */
+  materialCount?: number
   onClose: () => void
   onCreated: () => void
 }
+
+/* ─── Preset bar data (R8 simplified) ─── */
+const PRESETS: { id: string; label: string; apply: Record<MediaKind, Record<string, Partial<{ on: boolean }>>> | null }[] = [
+  { id: 'custom', label: '自定义', apply: null },
+  {
+    id: 'standard', label: '标准',
+    apply: {
+      video: { frame_prompt: { on: true }, summary: { on: true }, music: { on: false }, srt: { on: true } },
+      audio: { asr: { on: true }, voiceprint: { on: true }, srt: { on: true }, music: { on: false } },
+      image: { describe: { on: true }, ocr: { on: false }, prompt: { on: true }, assoc: { on: false }, compare: { on: false } },
+      text: { summary: { on: true }, assoc: { on: true }, rewrite: { on: false }, translate: { on: false }, multi: { on: false } },
+    },
+  },
+  {
+    id: 'minimal', label: '极简',
+    apply: {
+      video: { frame_prompt: { on: false }, summary: { on: true }, music: { on: false }, srt: { on: false } },
+      audio: { asr: { on: true }, voiceprint: { on: false }, srt: { on: false }, music: { on: false } },
+      image: { describe: { on: true }, ocr: { on: false }, prompt: { on: false }, assoc: { on: false }, compare: { on: false } },
+      text: { summary: { on: true }, assoc: { on: false }, rewrite: { on: false }, translate: { on: false }, multi: { on: false } },
+    },
+  },
+]
 
 export function PreflightDrawer({
   open,
@@ -58,91 +108,128 @@ export function PreflightDrawer({
   sniffResult,
   workspaceId,
   stagedConfig,
+  mode = 'execute',
+  onSaveStaged,
+  materialCount = 1,
   onClose,
   onCreated,
 }: PreflightDrawerProps) {
-  const [contentType, setContentType] = useState('')
-  const [purpose, setPurpose] = useState('')
-  const [topic, setTopic] = useState('')
-  const [visionProviderId, setVisionProviderId] = useState('')
+  // ── Old state (kept for R8.2-R8.6 old ad-hoc sections) ──
   const [textProviderId, setTextProviderId] = useState('')
-  const [visionModelId, setVisionModelId] = useState('')
   const [textModelId, setTextModelId] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [summaryPath, setSummaryPath] = useState<SummaryPath>('detailed')
-  const [videoTemplate, setVideoTemplate] = useState('auto')
-  const [outputFormat, setOutputFormat] = useState<VideoOutputFormat>('summary')
-  const [textRewriteEnabled, setTextRewriteEnabled] = useState(false)
-  const [textRewriteStyle, setTextRewriteStyle] = useState<RewriteStyle>('formal')
-  const [textTranslateEnabled, setTextTranslateEnabled] = useState(false)
-  const [textTranslateLang, setTextTranslateLang] = useState('en')
   const navigate = useNavigate()
 
-  // F4.2: 组件级素材类型——嗅探结果优先，失败退化为 video
+  // ── New state (R8 Remix structure) ──
   const resolvedType = sniffResult?.primary_type ?? 'video'
-
-  // R4: 从 stagedConfig 提取 feature 列表
-  const stagedFeaturesForType = (type: ItemType): Feature[] => {
-    if (!stagedConfig?.features?.[type]) return []
-    return (Object.entries(stagedConfig.features[type]) as [Feature, boolean][])
-      .filter(([, enabled]) => enabled)
-      .map(([id]) => id)
-  }
+  const kindFromType: MediaKind = (ITEM_TYPE_ALIASES[resolvedType] ?? resolvedType) as MediaKind
+  const [kind, setKind] = useState<MediaKind>(kindFromType)
+  const [activePreset, setActivePreset] = useState<string | null>(null)
+  const [bg, setBg] = useState({
+    contentType: '',
+    people: '',
+    theme: '',
+    terms: '',
+    purpose: '',
+  })
+  const [models, setModels] = useState({ text: '', video: '' })
+  const [tasks, setTasks] = useState(() => {
+    const init: Record<MediaKind, Record<string, unknown>> = {} as Record<MediaKind, Record<string, unknown>>
+    for (const k of Object.keys(TASK_GROUPS) as MediaKind[]) {
+      init[k] = buildInitialTasks(k) as unknown as Record<string, unknown>
+    }
+    return init
+  })
 
   const sc = stagedConfig
 
   const { providers, providerModels, fetchProviders, modelsLoading } = useProviderStore()
-  const templateOptions = useTemplateStore((s) => s.getOptions)
-  const fetchTemplates = useTemplateStore((s) => s.fetch)
-
   useEffect(() => {
     if (open && providers.length === 0) fetchProviders()
   }, [open, providers.length, fetchProviders])
 
-  useEffect(() => {
-    if (open) fetchTemplates()
-  }, [open, fetchTemplates])
+  const hydrateTasks = (stagedTasks: StagedConfig['tasks'] | undefined) => {
+    const init: Record<MediaKind, Record<string, unknown>> = {} as Record<MediaKind, Record<string, unknown>>
+    for (const taskKind of Object.keys(TASK_GROUPS) as MediaKind[]) {
+      const defaults = buildInitialTasks(taskKind) as unknown as Record<string, unknown>
+      const staged = stagedTasks?.[taskKind]
+      if (!staged) {
+        init[taskKind] = defaults
+        continue
+      }
 
-  // Reset form when opened, R4: stagedConfig 优先，否则用设置页默认。
-  // react-hooks/set-state-in-effect: intentional reset-on-open pattern, consistent with codebase.
+      const next: Record<string, unknown> = { ...defaults }
+      const enabled = new Set((staged.enabled_features as string[] | undefined) ?? [])
+      for (const group of TASK_GROUPS[taskKind]) {
+        const current = (next[group.id] as Record<string, unknown>) ?? {}
+        const stagedGroup = staged[group.id]
+        next[group.id] = {
+          ...current,
+          ...(typeof stagedGroup === 'object' && stagedGroup !== null ? stagedGroup as Record<string, unknown> : {}),
+          on: enabled.has(group.id) || Boolean((stagedGroup as { on?: unknown } | undefined)?.on),
+        }
+      }
+      init[taskKind] = next
+    }
+    return init
+  }
+
+  const serializeTasksForType = (itemType: ItemType) => {
+    const taskKind = itemType as MediaKind
+    const raw = (tasks[taskKind] ?? {}) as TaskState
+    const effective = applyCascades(taskKind, raw, materialCount).state
+    const enabledFeatures = Object.entries(effective)
+      .filter(([, v]) => v.on)
+      .map(([k]) => k)
+    const tasksPayload: Record<string, unknown> = {
+      material_type: itemType,
+      enabled_features: enabledFeatures,
+    }
+    for (const [gid, gState] of Object.entries(effective)) {
+      tasksPayload[gid] = { ...gState }
+    }
+    return { taskKind, effective, enabledFeatures, tasksPayload }
+  }
+
+  const featureMapFromTasks = (taskKind: MediaKind, effective: TaskState) => {
+    const map: Record<string, boolean> = {}
+    for (const [taskId, featureId] of Object.entries(TASK_TO_FEATURE[taskKind])) {
+      map[featureId] = Boolean(effective[taskId]?.on)
+    }
+    return map
+  }
+
+  // Reset form on open
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) {
-      setContentType(sc?.background?.content_type ?? '')
-      setPurpose(sc?.background?.purpose ?? '')
-      setTopic(sc?.background?.topic ?? '')
-      setVisionProviderId('')
       setTextProviderId('')
-      setVisionModelId('')
-      setTextModelId('')
-      setSummaryPath('detailed')
-      setVideoTemplate('auto')
-      setOutputFormat('summary')
-      setTextRewriteEnabled(sc?.features?.text?.rewrite ?? false)
-      setTextRewriteStyle('formal')
-      setTextTranslateEnabled(sc?.features?.text?.translate ?? false)
-      setTextTranslateLang('en')
+      setTextModelId(sc?.models?.text ?? '')
+      setKind(kindFromType)
+      setActivePreset(null)
+      setBg({
+        contentType: sc?.background?.content_type ?? '',
+        people: '',
+        theme: sc?.background?.topic ?? '',
+        terms: '',
+        purpose: sc?.background?.purpose ?? '',
+      })
+      setModels({ text: sc?.models?.text ?? '', video: sc?.models?.video ?? '' })
+      setTasks(hydrateTasks(sc?.tasks))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const enabledProviders = providers.filter((p) => p.enabled && p.has_api_key)
-  const visionProviders = useMemo(
-    () => enabledProviders.filter((p) => (p.capabilities ?? []).includes('vision')),
-    [enabledProviders],
-  )
   const textProviders = useMemo(
     () => enabledProviders.filter((p) => (p.capabilities ?? []).includes('chat')),
     [enabledProviders],
   )
-
-  const visionModels = visionProviderId ? (providerModels[visionProviderId] ?? []) : []
   const textModels = textProviderId ? (providerModels[textProviderId] ?? []) : []
 
   const normalizeItemType = (type: string): ItemType => ITEM_TYPE_ALIASES[type] ?? (type as ItemType)
 
-  // R4: stagedConfig.types 优先，否则退化为 selectedTypes → sniffResult → resolvedType
   const typesToCreate: ItemType[] = (() => {
     if (sc?.types?.length) return sc.types
     const rawTypes = selectedTypes?.length
@@ -155,7 +242,40 @@ export function PreflightDrawer({
 
   const typeLabel = (type: ItemType): string => ITEM_TYPE_LABELS[type]
 
-  // R4: 标准 workspace flow — autoCreateWorkspace → addWorkspaceItem → savePreflight → startItemPipeline → navigate
+  // ── New: current kind task state & counts ──
+  const groups = TASK_GROUPS[kind] ?? []
+  const currentTasks = (tasks[kind] ?? {}) as Record<string, { on?: boolean; [k: string]: unknown }>
+  // ── Cascade: compute effective state + lock/disabled reasons ──
+  const cascaded = applyCascades(kind, currentTasks as TaskState, materialCount)
+  const effState = cascaded.state
+  const locks = cascaded.locks
+  const disabledReasons = cascaded.disabled
+  const enabledCount = Object.values(effState).filter(v => v && v.on).length
+
+  const setKindTask = (gid: string, patch: Record<string, unknown>) => {
+    // Block uncheck if locked-on by cascade
+    if (patch.on === false && locks[gid]) return
+    // Block check if disabled (e.g. multi compare with only 1 material)
+    if (patch.on === true && disabledReasons[gid]) return
+    setTasks(s => ({ ...s, [kind]: { ...s[kind], [gid]: { ...(s[kind]?.[gid] as Record<string, unknown> ?? {}), ...patch } } }))
+  }
+
+  // ── Preset apply ──
+  const applyPreset = useCallback((preset: typeof PRESETS[number]) => {
+    setActivePreset(preset.id)
+    if (preset.apply === null) return
+    const patch = preset.apply[kind]
+    if (!patch) return
+    setTasks(s => {
+      const next: Record<string, unknown> = { ...s[kind] }
+      for (const [gid, gp] of Object.entries(patch)) {
+        next[gid] = { ...(next[gid] as Record<string, unknown>), ...gp }
+      }
+      return { ...s, [kind]: next }
+    })
+  }, [kind])
+
+  // ── handleConfirm ──
   const handleConfirm = async () => {
     setSubmitting(true)
     try {
@@ -173,7 +293,6 @@ export function PreflightDrawer({
 
       for (const itemType of typesToCreate) {
         try {
-          // 1. addWorkspaceItem
           const ws = await addWorkspaceItem(wsId, {
             type: itemType,
             source: 'url',
@@ -183,44 +302,23 @@ export function PreflightDrawer({
           const item = ws.items[ws.items.length - 1]
           const itemId = item.item_id
 
-          // 2. build preflight config
-          const features: Feature[] = stagedFeaturesForType(itemType).length > 0
-            ? stagedFeaturesForType(itemType)
-            : FEATURES_BY_TYPE[itemType].filter(f => f.defaultChecked).map(f => f.id)
+          const bgPayload: Partial<WorkspaceBackground> = {}
+          if (bg.contentType) bgPayload.content_type = bg.contentType
+          if (bg.purpose) bgPayload.purpose = bg.purpose
+          if (bg.theme) bgPayload.topic = bg.theme
 
-          const bg: Partial<WorkspaceBackground> = {}
-          if (contentType) bg.content_type = contentType
-          if (purpose) bg.purpose = purpose
-          if (topic) bg.topic = topic
+          const { tasksPayload } = serializeTasksForType(itemType)
 
-          const tasks: Record<string, unknown> = {
-            material_type: itemType,
-            enabled_features: features,
-          }
-          for (const feat of features) {
-            tasks[feat] = true
-          }
-          if (itemType === 'video') {
-            tasks.summary_path = summaryPath
-            tasks.video_template = videoTemplate
-            tasks.output_format = outputFormat
-          }
-          if (itemType === 'text') {
-            tasks.text_rewrite = { enabled: textRewriteEnabled, style: textRewriteStyle }
-            tasks.text_translate = { enabled: textTranslateEnabled, target_lang: textTranslateLang }
-          }
           const preflightModels: Record<string, string> = {}
-          if (visionModelId) preflightModels.vision = visionModelId
           if (textModelId) preflightModels.text = textModelId
+          if (models.video) preflightModels.video = models.video
 
-          // 3. savePreflight
           await savePreflight(wsId, itemId, {
-            background_overrides: bg,
+            background_overrides: bgPayload,
             models: preflightModels,
-            tasks,
+            tasks: tasksPayload,
           })
 
-          // 4. startItemPipeline
           const { task_id } = await startItemPipeline(wsId, itemId)
 
           if (!firstTaskId) { firstTaskId = task_id; firstItemId = itemId }
@@ -256,256 +354,120 @@ export function PreflightDrawer({
     }
   }
 
+  const handleSaveStaged = () => {
+    const bgPayload: Partial<WorkspaceBackground> = {}
+    if (bg.contentType) bgPayload.content_type = bg.contentType
+    if (bg.purpose) bgPayload.purpose = bg.purpose
+    if (bg.theme) bgPayload.topic = bg.theme
+
+    const stagedTasks: StagedConfig['tasks'] = {}
+    const stagedFeatures: StagedConfig['features'] = {}
+    for (const itemType of typesToCreate) {
+      const { taskKind, effective, tasksPayload } = serializeTasksForType(itemType)
+      stagedTasks[itemType] = tasksPayload
+      stagedFeatures[itemType] = featureMapFromTasks(taskKind, effective)
+    }
+    const stagedModels: Record<string, string> = {}
+    if (textModelId) stagedModels.text = textModelId
+    if (models.video) stagedModels.video = models.video
+
+    onSaveStaged?.({
+      types: typesToCreate,
+      features: stagedFeatures,
+      tasks: stagedTasks,
+      models: stagedModels,
+      background: bgPayload,
+      workspaceIds: workspaceId ? [workspaceId] : [],
+      urlValue: url,
+    })
+  }
+
   return (
     <>
-      <div
-        className="wb-modal-backdrop"
-        data-open={open}
-        onClick={onClose}
-      />
-      <div
-        className="pf-drawer"
-        data-open={open}
-      >
+      <div className="wb-modal-backdrop" data-open={open} onClick={onClose} />
+      <aside className="pf-drawer" data-open={open}>
+        {/* ── Head ── */}
         <div className="pf-drawer-head">
           <div>
-            <div className="eyebrow">前置配置</div>
-            <h3 className="display" style={{ fontSize: 22, margin: '4px 0 0' }}>
-              {platformName ?? '未知来源'}
-            </h3>
-            {selectedTypes && selectedTypes.length > 0 && (
-              <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-                {selectedTypes.map((t) => (
-                  <span key={t} className="kw">{t}</span>
-                ))}
-              </div>
-            )}
+            <div className="eyebrow" style={{ marginBottom: 6 }}>Preflight · 前置配置 · §4</div>
+            <h3 className="display" style={{ fontSize: 22, margin: 0 }}>开始解析前</h3>
+            <div className="mono" style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>
+              {url || '从工作台传入'} · {platformName || 'auto'}
+            </div>
           </div>
-          <button className="btn btn-ghost" onClick={onClose}>
-            <X size={16} />
-          </button>
+          <button className="btn btn-ghost" onClick={onClose}><X size={16} /></button>
         </div>
 
-        <div className="pf-drawer-body">
-          {/* Section 1: Background info */}
-          <section className="pf-section">
-            <h4 className="pf-section-title">背景信息 · 可选</h4>
-            <div className="pf-field">
-              <label>内容类型</label>
-              <select value={contentType} onChange={(e) => setContentType(e.target.value)}>
-                <option value="">不指定</option>
-                {CONTENT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-            <div className="pf-field">
-              <label>分析目的</label>
-              <select value={purpose} onChange={(e) => setPurpose(e.target.value)}>
-                <option value="">不指定</option>
-                {PURPOSES.map((p) => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </div>
-            <div className="pf-field">
-              <label>主题背景</label>
-              <input
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                placeholder="例：Q3 战略会议"
-              />
-            </div>
-          </section>
+        <div className="pf-drawer-body" style={{ padding: '4px 22px 16px' }}>
+          {/* ── Media kind tabs ── */}
+          <div style={{ display: 'flex', gap: 6, padding: '14px 0 18px' }}>
+            {MEDIA_KINDS.map(m => {
+              const active = kind === m.id
+              return (
+                <button key={m.id}
+                  onClick={() => setKind(m.id)}
+                  className="btn"
+                  style={{
+                    flex: 1, height: 42, justifyContent: 'center',
+                    background: active ? 'var(--ink)' : 'var(--bg-elev)',
+                    color: active ? 'var(--bg)' : 'var(--ink)',
+                    borderColor: active ? 'var(--ink)' : 'var(--line)',
+                  }}>
+                  {m.label}
+                </button>
+              )
+            })}
+          </div>
 
-          {/* Section 2: Video summary path (F4.2: 用 resolvedType 替代 selectedTypes 的宽松判空) */}
-          {(selectedTypes?.length
-            ? selectedTypes.some((t) => t === '视频' || t === 'video')
-            : resolvedType === 'video') && (
-            <section className="pf-section">
-              <h4 className="pf-section-title">视频分析路径</h4>
-              <div className="pf-field">
-                <label>摘要方式</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {([
-                    { value: 'subtitle', label: '路径 1：字幕直接总结', desc: '便宜快，适合口播/访谈' },
-                    { value: 'detailed', label: '路径 2：详细总结（套模板）', desc: '推荐 · 字幕 + 截帧画面合并分析' },
-                    { value: 'video_model', label: '路径 3：视频大模型直传', desc: '~$0.05/min，整段视频送大模型' },
-                  ] as const).map((opt) => (
-                    <label key={opt.value} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 12px', border: `1px solid ${summaryPath === opt.value ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 8, cursor: 'pointer', background: summaryPath === opt.value ? 'var(--accent-bg)' : 'transparent' }}>
-                      <input
-                        type="radio"
-                        name="summaryPath"
-                        value={opt.value}
-                        checked={summaryPath === opt.value}
-                        onChange={() => setSummaryPath(opt.value)}
-                        style={{ marginTop: 2 }}
-                      />
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 500 }}>{opt.label}</div>
-                        <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{opt.desc}</div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              {summaryPath === 'subtitle' && (
-                <>
-                  <div className="pf-field">
-                    <label>视频类型模板</label>
-                    <select value={videoTemplate} onChange={(e) => setVideoTemplate(e.target.value)}>
-                      {templateOptions().map((t) => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </div>
-                  <div className="pf-field">
-                    <label>输出格式</label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {OUTPUT_FORMAT_OPTIONS.map((opt) => (
-                        <label
-                          key={opt.value}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'flex-start',
-                            gap: 8,
-                            padding: '6px 10px',
-                            border: `1px solid ${outputFormat === opt.value ? 'var(--accent)' : 'var(--border)'}`,
-                            borderRadius: 6,
-                            cursor: 'pointer',
-                            background: outputFormat === opt.value ? 'var(--accent-bg)' : 'transparent',
-                          }}
-                        >
-                          <input
-                            type="radio"
-                            name="outputFormat"
-                            value={opt.value}
-                            checked={outputFormat === opt.value}
-                            onChange={() => setOutputFormat(opt.value)}
-                          />
-                          <div>
-                            <div style={{ fontSize: 13, fontWeight: 500 }}>{opt.label}</div>
-                            <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{opt.desc}</div>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-            </section>
-          )}
+          {/* ── Section 01: 背景信息 ── */}
+          <PFSection num="01" title="背景信息" sub="Context · 注入到所有 AI 调用">
+            <PFGrid>
+              <PFField label="内容类型" hint="影响总结结构">
+                <select className="pf-sel" value={bg.contentType} onChange={e => setBg(s => ({ ...s, contentType: e.target.value }))}>
+                  <option value="">不指定</option>
+                  {CONTENT_TYPES.map(t => <option key={t}>{t}</option>)}
+                </select>
+              </PFField>
+              <PFField label="分析目的" hint="影响 LLM 风格">
+                <select className="pf-sel" value={bg.purpose} onChange={e => setBg(s => ({ ...s, purpose: e.target.value }))}>
+                  <option value="">不指定</option>
+                  {PURPOSES.map(t => <option key={t}>{t}</option>)}
+                </select>
+              </PFField>
+            </PFGrid>
+            <PFField label="参与人员" hint="逗号分隔 · 用于声纹匹配">
+              <input className="pf-inp" value={bg.people} onChange={e => setBg(s => ({ ...s, people: e.target.value }))} />
+            </PFField>
+            <PFField label="主题背景" hint="一句话上下文">
+              <input className="pf-inp" value={bg.theme} onChange={e => setBg(s => ({ ...s, theme: e.target.value }))} />
+            </PFField>
+            <PFField label="专有名词" hint="影响 Whisper 识别准确率">
+              <input className="pf-inp" value={bg.terms} onChange={e => setBg(s => ({ ...s, terms: e.target.value }))} />
+            </PFField>
+          </PFSection>
 
-          {/* Section 2b: Text processing options */}
-          {(selectedTypes?.length
-            ? selectedTypes.some((t) => t === '文字' || t === 'text')
-            : resolvedType === 'text') && (
-            <section className="pf-section">
-              <h4 className="pf-section-title">文本处理选项</h4>
-
-              {/* 改写 / 润色 */}
-              <div className="pf-field">
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={textRewriteEnabled}
-                    onChange={(e) => setTextRewriteEnabled(e.target.checked)}
-                  />
-                  改写 / 润色
-                </label>
-                {textRewriteEnabled && (
-                  <select
-                    value={textRewriteStyle}
-                    onChange={(e) => setTextRewriteStyle(e.target.value as RewriteStyle)}
-                    style={{ marginTop: 6 }}
-                  >
-                    <option value="formal">正式</option>
-                    <option value="casual">口语</option>
-                    <option value="concise">简洁</option>
-                    <option value="rich">丰富</option>
-                  </select>
-                )}
-              </div>
-
-              {/* 翻译 */}
-              <div className="pf-field">
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={textTranslateEnabled}
-                    onChange={(e) => setTextTranslateEnabled(e.target.checked)}
-                  />
-                  翻译
-                </label>
-                {textTranslateEnabled && (
-                  <select
-                    value={textTranslateLang}
-                    onChange={(e) => setTextTranslateLang(e.target.value)}
-                    style={{ marginTop: 6 }}
-                  >
-                    <option value="en">英文</option>
-                    <option value="ja">日文</option>
-                    <option value="ko">韩文</option>
-                    <option value="zh">中文</option>
-                    <option value="es">西班牙文</option>
-                    <option value="fr">法文</option>
-                    <option value="de">德文</option>
-                    <option value="ru">俄文</option>
-                    <option value="pt">葡萄牙文</option>
-                  </select>
-                )}
-              </div>
-            </section>
-          )}
-
-          {/* Section 3: Model selection */}
-          <section className="pf-section">
-            <h4 className="pf-section-title">模型选择</h4>
+          {/* ── Section 02: 模型选择 ── */}
+          <PFSection num="02" title="模型选择" sub="Models · 仅可选已配置项" extra={
+            <button className="btn btn-ghost" style={{ height: 26, padding: '0 10px', fontSize: 11 }}>
+              <Settings size={11} />
+              管理模型
+            </button>
+          }>
             {enabledProviders.length === 0 ? (
-              <div style={{ fontSize: 12, color: 'var(--ink-4)', padding: '8px 0' }}>
+              <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '8px 0' }}>
                 还没有可用的 provider，请先去设置页面添加
               </div>
             ) : (
               <>
-                <div className="pf-field">
-                  <label>视觉大模型</label>
+                <PFField label="文本大模型" hint="LLM · 总结 / 归纳 / 对话">
                   <div className="pf-model-row">
-                    <select
-                      value={visionProviderId}
-                      onChange={(e) => { setVisionProviderId(e.target.value); setVisionModelId('') }}
-                    >
-                      <option value="">选择 provider</option>
-                      {visionProviders.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                    <select
-                      value={visionModelId}
-                      onChange={(e) => setVisionModelId(e.target.value)}
-                      disabled={!visionProviderId}
-                    >
-                      <option value="">选择模型</option>
-                      {modelsLoading[visionProviderId] ? (
-                        <option value="" disabled>加载中…</option>
-                      ) : (
-                        visionModels.map((m) => (
-                          <option key={m.id} value={m.id}>{m.name}</option>
-                        ))
-                      )}
-                    </select>
-                  </div>
-                </div>
-                <div className="pf-field">
-                  <label>文本大模型</label>
-                  <div className="pf-model-row">
-                    <select
-                      value={textProviderId}
-                      onChange={(e) => { setTextProviderId(e.target.value); setTextModelId('') }}
-                    >
+                    <select value={textProviderId} onChange={(e) => { setTextProviderId(e.target.value); setTextModelId('') }}>
                       <option value="">选择 provider</option>
                       {textProviders.map((p) => (
                         <option key={p.id} value={p.id}>{p.name}</option>
                       ))}
                     </select>
-                    <select
-                      value={textModelId}
-                      onChange={(e) => setTextModelId(e.target.value)}
-                      disabled={!textProviderId}
-                    >
+                    <select value={textModelId} onChange={(e) => setTextModelId(e.target.value)} disabled={!textProviderId}>
                       <option value="">选择模型</option>
                       {modelsLoading[textProviderId] ? (
                         <option value="" disabled>加载中…</option>
@@ -516,27 +478,302 @@ export function PreflightDrawer({
                       )}
                     </select>
                   </div>
-                </div>
+                </PFField>
+                {(kind === 'video' && (effState.summary as Record<string, unknown>)?.on && (effState.summary as Record<string, unknown>)?.summary_path === '视频模型直接分析') && (
+                  <PFField label="视频大模型" hint="路径 3 · 整段视频直送">
+                    <select className="pf-sel" value={models.video} onChange={e => setModels(s => ({ ...s, video: e.target.value }))}>
+                      <option value="">默认</option>
+                      <option value="Gemini 1.5 Pro · Google">Gemini 1.5 Pro · Google</option>
+                      <option value="Qwen-VL-Max · 阿里">Qwen-VL-Max · 阿里</option>
+                      <option value="GPT-4o · OpenAI">GPT-4o · OpenAI</option>
+                    </select>
+                  </PFField>
+                )}
               </>
             )}
-          </section>
+          </PFSection>
+
+          {/* ── Section 03: 任务勾选 ── */}
+          <PFSection num="03" title="任务勾选" sub={`Tasks · 已选 ${enabledCount} / ${groups.length} · 依赖级联自动锁定`}>
+            <PresetBar current={activePreset} onPick={applyPreset} />
+            <div style={{ height: 1, background: 'var(--line)', margin: '4px 0' }} />
+            <div style={{ display: 'grid', gap: 10 }}>
+              {groups.map(g => {
+                const st = (effState[g.id] as Record<string, unknown>) ?? {}
+                return (
+                  <PFTaskCard
+                    key={g.id}
+                    group={g}
+                    state={st}
+                    setState={(p) => setKindTask(g.id, p)}
+                    lockedReason={locks[g.id]}
+                    disabledReason={disabledReasons[g.id]}
+                  />
+                )
+              })}
+            </div>
+          </PFSection>
         </div>
 
+        {/* ── Footer ── */}
         <div className="pf-drawer-foot">
-          <button className="btn btn-ghost" onClick={onClose}>取消</button>
-          <button
-            className="wb-btn-run"
-            onClick={handleConfirm}
-            disabled={submitting}
-          >
-            {submitting ? (
-              <><Loader2 size={14} className="animate-spin" /> 创建中…</>
+          <div className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+            <span style={{ color: 'var(--accent-green)' }}>●</span> 配置已就绪 · {enabledCount} 项分析任务
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-ghost" onClick={onClose}>取消</button>
+            {mode === 'stage' ? (
+              <button className="wb-btn-run" onClick={handleSaveStaged}>
+                保存配置 & 返回
+              </button>
             ) : (
-              <>开始解析 <span className="iconwrap"><ArrowRight size={14} /></span></>
+              <button
+                className="wb-btn-run"
+                onClick={handleConfirm}
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <><Loader2 size={14} className="animate-spin" /> 创建中…</>
+                ) : (
+                  <>开始解析 <span className="iconwrap"><ArrowRight size={14} /></span></>
+                )}
+              </button>
             )}
-          </button>
+          </div>
         </div>
-      </div>
+      </aside>
     </>
+  )
+}
+
+/* ─── R8 Sub-components ─── */
+
+function PFSection({ num, title, sub, extra, children }: {
+  num: string
+  title: string
+  sub?: string
+  extra?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <section style={{ marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+          <span className="mono" style={{
+            fontSize: 10, padding: '3px 8px', borderRadius: 6,
+            background: 'var(--bg-sunken)', color: 'var(--ink-2)',
+            fontWeight: 600, letterSpacing: '0.08em',
+          }}>{num}</span>
+          <h4 style={{ margin: 0, fontFamily: 'var(--display)', fontSize: 22, fontWeight: 500 }}>{title}</h4>
+          {sub && <span className="mono" style={{ fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.06em' }}>{sub}</span>}
+        </div>
+        {extra}
+      </div>
+      <div style={{ display: 'grid', gap: 12 }}>{children}</div>
+    </section>
+  )
+}
+
+function PFGrid({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>{children}</div>
+  )
+}
+
+function PFField({ label, hint, children }: {
+  label: string
+  hint?: string
+  children: React.ReactNode
+}) {
+  return (
+    <label style={{ display: 'block' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
+        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink)' }}>{label}</span>
+        {hint && <span className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{hint}</span>}
+      </div>
+      {children}
+    </label>
+  )
+}
+
+function PresetBar({ current, onPick }: {
+  current: string | null
+  onPick: (preset: typeof PRESETS[number]) => void
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+      {PRESETS.map(p => {
+        const active = current === p.id
+        return (
+          <button key={p.id}
+            onClick={() => onPick(p)}
+            className="btn"
+            style={{
+              height: 28, padding: '0 14px', fontSize: 12, borderRadius: 99,
+              background: active ? 'var(--ink)' : 'var(--bg-sunken)',
+              color: active ? 'var(--bg)' : 'var(--ink-2)',
+              borderColor: active ? 'var(--ink)' : 'var(--line)',
+            }}>
+            {p.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function PFTaskCard({ group, state, setState, lockedReason, disabledReason }: {
+  group: { id: string; label: string; sub?: string; children?: { id: string; label: string; type: string; options?: string[]; default: unknown; unit?: string; whenParent?: string; whenValue?: string }[] }
+  state: Record<string, unknown>
+  setState: (patch: Record<string, unknown>) => void
+  lockedReason?: string
+  disabledReason?: string
+}) {
+  const on = !!state.on
+  const locked = !!lockedReason
+  const disabled = !!disabledReason
+  const cardBg = disabled ? 'var(--bg-sunken)'
+    : on ? 'var(--bg-elev)'
+    : 'transparent'
+  return (
+    <div style={{
+      border: '1px solid var(--line)',
+      borderRadius: 14,
+      padding: 14,
+      background: cardBg,
+      opacity: disabled ? 0.55 : 1,
+      transition: 'background 140ms ease, border-color 140ms ease, opacity 140ms ease',
+      borderColor: locked ? 'var(--accent)' : on ? 'var(--line-strong)' : 'var(--line)',
+    }}>
+      <label style={{
+        display: 'flex', alignItems: 'flex-start', gap: 12,
+        cursor: (locked || disabled) ? 'not-allowed' : 'pointer',
+      }}>
+        <div style={{
+          width: 22, height: 22, borderRadius: 7,
+          border: `2px solid ${on ? (locked ? 'var(--accent)' : 'var(--ink)') : 'var(--line-strong)'}`,
+          background: on ? (locked ? 'var(--accent)' : 'var(--ink)') : 'transparent',
+          display: 'grid', placeItems: 'center',
+          flexShrink: 0, marginTop: 2,
+          transition: 'all 140ms ease',
+          position: 'relative',
+        }}>
+          {on && !locked && <Check size={12} stroke="var(--bg)" strokeWidth={3} />}
+          {on && locked && (
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3">
+              <rect x="5" y="11" width="14" height="10" rx="2" />
+              <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+            </svg>
+          )}
+          <input type="checkbox" checked={on}
+            disabled={locked || disabled}
+            onChange={e => setState({ on: e.target.checked })}
+            style={{ position: 'absolute', opacity: 0, inset: 0, cursor: (locked || disabled) ? 'not-allowed' : 'pointer' }} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>{group.label}</span>
+            {locked && (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 7px', borderRadius: 99,
+                background: 'rgba(255,77,126,0.12)', color: 'var(--accent)',
+                fontSize: 10, fontFamily: 'var(--mono)', letterSpacing: '0.04em', fontWeight: 600,
+              }}>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                </svg>
+                依赖锁定
+              </span>
+            )}
+            {disabled && (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', padding: '2px 7px', borderRadius: 99,
+                background: 'var(--bg-sunken)', color: 'var(--ink-3)',
+                fontSize: 10, fontFamily: 'var(--mono)', letterSpacing: '0.04em',
+              }}>
+                条件不满足
+              </span>
+            )}
+          </div>
+          {group.sub && (
+            <div className="mono" style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 3, letterSpacing: '0.04em' }}>{group.sub}</div>
+          )}
+          {(lockedReason || disabledReason) && (
+            <div style={{ fontSize: 11, color: locked ? 'var(--accent)' : 'var(--ink-3)', marginTop: 5, lineHeight: 1.4 }}>
+              {lockedReason || disabledReason}
+            </div>
+          )}
+        </div>
+      </label>
+
+      {on && group.children && (
+        <div style={{
+          marginTop: 14, paddingTop: 14,
+          borderTop: '1px dashed var(--line)',
+          display: 'grid', gap: 10,
+        }}>
+          {group.children.map(c => {
+            if (c.whenParent && state[c.whenParent] !== c.whenValue) return null
+
+            if (c.type === 'radio') {
+              const val = state[c.id] ?? c.default
+              return (
+                <div key={c.id}>
+                  <div style={{ fontSize: 11, color: 'var(--ink-2)', marginBottom: 6, fontWeight: 500 }}>{c.label}</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {(c.options ?? []).map(o => {
+                      const active = val === o
+                      return (
+                        <button key={o} onClick={() => setState({ [c.id]: o })}
+                          style={{
+                            height: 28, padding: '0 12px',
+                            borderRadius: 8,
+                            border: `1px solid ${active ? 'var(--ink)' : 'var(--line)'}`,
+                            background: active ? 'var(--ink)' : 'var(--bg)',
+                            color: active ? 'var(--bg)' : 'var(--ink)',
+                            fontSize: 11, fontFamily: 'var(--mono)',
+                            cursor: 'pointer',
+                          }}>
+                          {o}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            }
+            if (c.type === 'check') {
+              return (
+                <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12 }}>
+                  <input type="checkbox" checked={!!state[c.id]} onChange={e => setState({ [c.id]: e.target.checked })}
+                    style={{ accentColor: 'var(--ink)', width: 14, height: 14 }} />
+                  <span style={{ color: 'var(--ink-2)' }}>{c.label}</span>
+                </label>
+              )
+            }
+            if (c.type === 'number') {
+              return (
+                <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 11, color: 'var(--ink-2)', minWidth: 60 }}>{c.label}</span>
+                  <input type="number" value={(state[c.id] ?? c.default) as number}
+                    onChange={e => setState({ [c.id]: Number(e.target.value) })}
+                    className="pf-inp" style={{ width: 80, height: 28, padding: '0 8px' }} />
+                  {c.unit && <span className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{c.unit}</span>}
+                </div>
+              )
+            }
+            if (c.type === 'text') {
+              return (
+                <div key={c.id}>
+                  <div style={{ fontSize: 11, color: 'var(--ink-2)', marginBottom: 6 }}>{c.label}</div>
+                  <input className="pf-inp" value={(state[c.id] ?? c.default) as string} onChange={e => setState({ [c.id]: e.target.value })} />
+                </div>
+              )
+            }
+            return null
+          })}
+        </div>
+      )}
+    </div>
   )
 }

@@ -140,6 +140,8 @@
 - [x] R4 PreflightDrawer 接管细粒度参数
 - [x] R5 端到端冒烟 6 条链接（含误判修复：createNoteTask material_type 分派 / note analyze 传 capture_params / 小红书 yt-dlp 缩略图兜底）
 - [x] R6 合并 main + 文档同步
+- [x] R7 输入流统一收尾：单 URL 多类型默认全勾 / stage 模式统一解析出口 / Hero 文案精简
+- [x] R8 PreflightDrawer Remix 1:1 复刻：media tabs / 任务卡片 / 级联锁定 / R8 tasks payload 落地
 
 ---
 
