@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Link2, Upload, Search, X, Check, Plus, ArrowRight, Layers,
 } from 'lucide-react'
@@ -6,7 +7,15 @@ import { toast } from 'sonner'
 import type { WorkspaceRecord } from '@/types/workspace'
 import { detectPlatform } from './platforms'
 import { normalizeMediaUrl } from '@/lib/url'
-import { listWorkspaces, createWorkspace, sniffUrl } from '@/services/workspaces'
+import {
+  listWorkspaces,
+  createWorkspace,
+  sniffUrl,
+  autoCreateWorkspace,
+  uploadWorkspaceItem,
+  savePreflight,
+  startItemPipeline,
+} from '@/services/workspaces'
 import type { SniffResult } from '@/services/workspaces'
 import { AddMaterialModal, type StagedConfig } from '@/components/workspace/AddMaterialModal'
 import { PreflightDrawer } from '@/pages/WorkbenchPage/PreflightDrawer'
@@ -21,6 +30,7 @@ interface ComposerProps {
 }
 
 export function Composer({ onTaskCreated }: ComposerProps) {
+  const navigate = useNavigate()
   const [url, setUrl] = useState('')
   const [uploadOpen, setUploadOpen] = useState(false)
 
@@ -31,8 +41,10 @@ export function Composer({ onTaskCreated }: ComposerProps) {
   const [sniffResult, setSniffResult] = useState<SniffResult | null>(null)
   const [preflightOpen, setPreflightOpen] = useState(false)
   const [preflightStaged, setPreflightStaged] = useState<StagedConfig | undefined>(undefined)
+  const [uploading, setUploading] = useState(false)
 
   const popRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const sniffTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   // Fetch workspaces on mount
@@ -109,21 +121,45 @@ export function Composer({ onTaskCreated }: ComposerProps) {
 
   const handleAdd = () => {
     if (!url.trim()) return
-    if (workspaceSel.length === 0) {
-      toast.error('请先选择工作空间')
-      setWsOpen(true)
-      return
-    }
     setUploadOpen(true)
   }
 
   const handleUploadClick = () => {
-    if (workspaceSel.length === 0) {
-      toast.error('请先选择工作空间')
-      setWsOpen(true)
-      return
+    fileInputRef.current?.click()
+  }
+
+  // 单文件上传流程：选择文件 → autoCreateWorkspace → upload → savePreflight → start → navigate
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const ws = await autoCreateWorkspace({ hint_text: file.name })
+      toast.info(`已自动创建工作空间「${ws.name}」`)
+      const updated = await uploadWorkspaceItem(ws.workspace_id, file, {
+        name: file.name,
+      })
+      const item = updated.items[updated.items.length - 1]
+      const itemId = item.item_id
+      await savePreflight(ws.workspace_id, itemId, {
+        background_overrides: {},
+        models: {},
+        tasks: {},
+      })
+      const { task_id } = await startItemPipeline(ws.workspace_id, itemId)
+      toast.success(`文件「${file.name}」已上传并开始分析`)
+      navigate(`/processing/${task_id}`, {
+        state: { url: file.name, workspaceId: ws.workspace_id, itemId },
+      })
+      handleAdded()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '上传失败'
+      toast.error(`文件上传失败: ${msg}`)
+    } finally {
+      setUploading(false)
+      // 重置 file input，允许再次选同一个文件
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
-    setUploadOpen(true)
   }
 
   const handleAdded = () => {
@@ -168,10 +204,22 @@ export function Composer({ onTaskCreated }: ComposerProps) {
           </div>
         )}
 
-        <button className="btn btn-ghost" title="上传本地文件" style={{ gap: 6 }} onClick={handleUploadClick}>
+        <button
+          className="btn btn-ghost"
+          title="上传本地文件"
+          style={{ gap: 6 }}
+          onClick={handleUploadClick}
+          disabled={uploading}
+        >
           <Upload size={15} />
-          上传
+          {uploading ? '上传中…' : '上传'}
         </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          style={{ display: 'none' }}
+          onChange={handleFileChange}
+        />
       </div>
 
       {/* Workspace assignment row */}

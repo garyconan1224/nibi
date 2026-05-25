@@ -3,13 +3,15 @@ import { useNavigate } from 'react-router-dom'
 import { X, ArrowRight, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useProviderStore } from '@/store/providerStore'
-import { useTaskStore } from '@/store/taskStore'
 import { useTemplateStore } from '@/store/templateStore'
-import { createNoteTask } from '@/services/pipeline'
-import type { NotePreflightOverrides } from '@/services/pipeline'
-import { autoCreateWorkspace } from '@/services/workspaces'
+import {
+  autoCreateWorkspace,
+  addWorkspaceItem,
+  savePreflight,
+  startItemPipeline,
+} from '@/services/workspaces'
 import type { SniffResult } from '@/services/workspaces'
-import type { ItemType } from '@/types/workspace'
+import type { ItemType, WorkspaceBackground } from '@/types/workspace'
 import type { StagedConfig } from '@/components/workspace/AddMaterialModal'
 import { FEATURES_BY_TYPE, type Feature } from '@/lib/featuresToSteps'
 import { OUTPUT_FORMAT_OPTIONS } from '@/lib/preflightTasks'
@@ -90,7 +92,6 @@ export function PreflightDrawer({
   const sc = stagedConfig
 
   const { providers, providerModels, fetchProviders, modelsLoading } = useProviderStore()
-  const addTask = useTaskStore((s) => s.addTask)
   const templateOptions = useTemplateStore((s) => s.getOptions)
   const fetchTemplates = useTemplateStore((s) => s.fetch)
 
@@ -154,7 +155,7 @@ export function PreflightDrawer({
 
   const typeLabel = (type: ItemType): string => ITEM_TYPE_LABELS[type]
 
-  // R4: start resolution via createNoteTask, using stagedConfig when onFineTune→drawer flow
+  // R4: 标准 workspace flow — autoCreateWorkspace → addWorkspaceItem → savePreflight → startItemPipeline → navigate
   const handleConfirm = async () => {
     setSubmitting(true)
     try {
@@ -172,59 +173,57 @@ export function PreflightDrawer({
 
       for (const itemType of typesToCreate) {
         try {
+          // 1. addWorkspaceItem
+          const ws = await addWorkspaceItem(wsId, {
+            type: itemType,
+            source: 'url',
+            source_value: url,
+            name: url,
+          })
+          const item = ws.items[ws.items.length - 1]
+          const itemId = item.item_id
+
+          // 2. build preflight config
           const features: Feature[] = stagedFeaturesForType(itemType).length > 0
             ? stagedFeaturesForType(itemType)
             : FEATURES_BY_TYPE[itemType].filter(f => f.defaultChecked).map(f => f.id)
 
-          const bg: Record<string, unknown> = {}
+          const bg: Partial<WorkspaceBackground> = {}
           if (contentType) bg.content_type = contentType
           if (purpose) bg.purpose = purpose
           if (topic) bg.topic = topic
 
-          const preflight: NotePreflightOverrides = {
-            models: {
-              ...(visionModelId && { vision: visionModelId }),
-              ...(textModelId && { text: textModelId }),
-            },
-          }
-          if (itemType === 'video') {
-            preflight.summary = {
-              path: summaryPath,
-              video_template: videoTemplate,
-              output_format: outputFormat,
-            }
-          }
-          if (itemType === 'text') {
-            preflight.text_rewrite = { enabled: textRewriteEnabled, style: textRewriteStyle }
-            preflight.text_translate = { enabled: textTranslateEnabled, target_lang: textTranslateLang }
-          }
-
-          const res = await createNoteTask({
-            url,
+          const tasks: Record<string, unknown> = {
             material_type: itemType,
             enabled_features: features,
-            background: bg as Record<string, string>,
-            workspace_id: wsId,
-            preflight,
+          }
+          for (const feat of features) {
+            tasks[feat] = true
+          }
+          if (itemType === 'video') {
+            tasks.summary_path = summaryPath
+            tasks.video_template = videoTemplate
+            tasks.output_format = outputFormat
+          }
+          if (itemType === 'text') {
+            tasks.text_rewrite = { enabled: textRewriteEnabled, style: textRewriteStyle }
+            tasks.text_translate = { enabled: textTranslateEnabled, target_lang: textTranslateLang }
+          }
+          const preflightModels: Record<string, string> = {}
+          if (visionModelId) preflightModels.vision = visionModelId
+          if (textModelId) preflightModels.text = textModelId
+
+          // 3. savePreflight
+          await savePreflight(wsId, itemId, {
+            background_overrides: bg,
+            models: preflightModels,
+            tasks,
           })
 
-          addTask({
-            task_id: res.task_id,
-            project_id: '',
-            task_type: res.task_type,
-            payload: {},
-            status: 'PENDING',
-            progress: 0,
-            log: [],
-            result: {},
-            error: '',
-            retry_of: '',
-            cancel_requested: false,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
+          // 4. startItemPipeline
+          const { task_id } = await startItemPipeline(wsId, itemId)
 
-          if (!firstTaskId) { firstTaskId = res.task_id; firstItemId = itemType }
+          if (!firstTaskId) { firstTaskId = task_id; firstItemId = itemId }
           successCount++
         } catch (e) {
           errors.push(`${typeLabel(itemType)}: ${e instanceof Error ? e.message : '创建失败'}`)

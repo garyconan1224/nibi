@@ -35,12 +35,20 @@ class TaskCreateRequest(BaseModel):
 
 
 @router.get("/tasks")
-def list_tasks(project_id: Optional[str] = None) -> List[Dict[str, Any]]:
-    """列出所有任务，可按 project_id 过滤。"""
+def list_tasks(
+    project_id: Optional[str] = None,
+    include_logs: bool = False,
+    include_result: bool = False,
+    limit: int = 50,
+) -> List[Dict[str, Any]]:
+    """列出任务，支持轻量模式（默认不含日志和结果，最多 50 条）。"""
     all_recs = _store.list_all()
     if project_id:
         all_recs = [r for r in all_recs if r.project_id == project_id]
-    return [r.to_dict() for r in all_recs]
+    all_recs.sort(key=lambda r: r.created_at, reverse=True)
+    if limit > 0:
+        all_recs = all_recs[:limit]
+    return [r.to_dict(include_logs=include_logs, include_result=include_result) for r in all_recs]
 
 
 @router.post("/tasks")

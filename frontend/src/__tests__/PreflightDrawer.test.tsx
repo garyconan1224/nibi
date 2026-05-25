@@ -3,23 +3,25 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PreflightDrawer } from '@/pages/WorkbenchPage/PreflightDrawer'
 
 const {
-  addTaskMock,
+  addWorkspaceItemMock,
   autoCreateWorkspaceMock,
-  createNoteTaskMock,
   errorToastMock,
   fetchProvidersMock,
   infoToastMock,
   navigateMock,
+  savePreflightMock,
+  startItemPipelineMock,
   successToastMock,
   warningToastMock,
 } = vi.hoisted(() => ({
-  addTaskMock: vi.fn(),
+  addWorkspaceItemMock: vi.fn(),
   autoCreateWorkspaceMock: vi.fn(),
-  createNoteTaskMock: vi.fn(),
   errorToastMock: vi.fn(),
   fetchProvidersMock: vi.fn(),
   infoToastMock: vi.fn(),
   navigateMock: vi.fn(),
+  savePreflightMock: vi.fn(),
+  startItemPipelineMock: vi.fn(),
   successToastMock: vi.fn(),
   warningToastMock: vi.fn(),
 }))
@@ -28,12 +30,11 @@ vi.mock('react-router-dom', () => ({
   useNavigate: () => navigateMock,
 }))
 
-vi.mock('@/services/pipeline', () => ({
-  createNoteTask: createNoteTaskMock,
-}))
-
 vi.mock('@/services/workspaces', () => ({
   autoCreateWorkspace: autoCreateWorkspaceMock,
+  addWorkspaceItem: addWorkspaceItemMock,
+  savePreflight: savePreflightMock,
+  startItemPipeline: startItemPipelineMock,
 }))
 
 vi.mock('@/store/providerStore', () => ({
@@ -43,11 +44,6 @@ vi.mock('@/store/providerStore', () => ({
     fetchProviders: fetchProvidersMock,
     modelsLoading: {},
   }),
-}))
-
-vi.mock('@/store/taskStore', () => ({
-  useTaskStore: (selector: (state: { addTask: typeof addTaskMock }) => unknown) =>
-    selector({ addTask: addTaskMock }),
 }))
 
 const fetchTemplatesMock = vi.fn()
@@ -84,37 +80,42 @@ const defaultProps = {
 
 describe('PreflightDrawer R4', () => {
   beforeEach(() => {
-    addTaskMock.mockReset()
+    addWorkspaceItemMock.mockReset()
     autoCreateWorkspaceMock.mockReset()
-    createNoteTaskMock.mockReset()
     errorToastMock.mockReset()
     fetchProvidersMock.mockReset()
     infoToastMock.mockReset()
     navigateMock.mockReset()
+    savePreflightMock.mockReset()
+    startItemPipelineMock.mockReset()
     successToastMock.mockReset()
     warningToastMock.mockReset()
   })
 
-  it('R4: 提交时调用 createNoteTask（替代旧三步流程）', async () => {
+  it('R4: 提交时走标准 workspace flow（add→savePreflight→start→navigate）', async () => {
     autoCreateWorkspaceMock.mockResolvedValue({
       workspace_id: 'ws-1',
       name: '自动工作空间',
     })
-    createNoteTaskMock.mockResolvedValue({ status: 'created', task_id: 'task-video', task_type: 'note' })
+    addWorkspaceItemMock.mockResolvedValue({
+      items: [{ item_id: 'item-1', type: 'video', source: 'url', source_value: 'https://example.com/post/abc' }],
+    })
+    savePreflightMock.mockResolvedValue({})
+    startItemPipelineMock.mockResolvedValue({ task_id: 'task-video', task_type: 'note' })
     render(<PreflightDrawer {...defaultProps} />)
 
     fireEvent.click(screen.getByRole('button', { name: /开始解析/ }))
 
     await waitFor(() => {
-      expect(createNoteTaskMock).toHaveBeenCalledTimes(1)
+      expect(startItemPipelineMock).toHaveBeenCalledTimes(1)
     })
-    expect(createNoteTaskMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        url: defaultProps.url,
-        material_type: 'video',
-        workspace_id: 'ws-1',
-      }),
-    )
+    expect(addWorkspaceItemMock).toHaveBeenCalledWith('ws-1', expect.objectContaining({
+      type: 'video',
+      source: 'url',
+      source_value: defaultProps.url,
+    }))
+    expect(savePreflightMock).toHaveBeenCalledTimes(1)
+    expect(startItemPipelineMock).toHaveBeenCalledWith('ws-1', 'item-1')
     expect(navigateMock).toHaveBeenCalledWith('/processing/task-video', expect.anything())
   })
 
@@ -123,7 +124,11 @@ describe('PreflightDrawer R4', () => {
       workspace_id: 'ws-1',
       name: '自动工作空间',
     })
-    createNoteTaskMock.mockResolvedValue({ status: 'created', task_id: 'task-image' })
+    addWorkspaceItemMock.mockResolvedValue({
+      items: [{ item_id: 'item-img', type: 'image' }, { item_id: 'item-txt', type: 'text' }],
+    })
+    savePreflightMock.mockResolvedValue({})
+    startItemPipelineMock.mockResolvedValue({ task_id: 'task-image' })
 
     render(
       <PreflightDrawer
@@ -143,14 +148,10 @@ describe('PreflightDrawer R4', () => {
     fireEvent.click(screen.getByRole('button', { name: /开始解析/ }))
 
     await waitFor(() => {
-      expect(createNoteTaskMock).toHaveBeenCalledTimes(2)
+      expect(startItemPipelineMock).toHaveBeenCalledTimes(2)
     })
-    expect(createNoteTaskMock).toHaveBeenCalledWith(
-      expect.objectContaining({ material_type: 'image' }),
-    )
-    expect(createNoteTaskMock).toHaveBeenCalledWith(
-      expect.objectContaining({ material_type: 'text' }),
-    )
+    expect(addWorkspaceItemMock).toHaveBeenCalledWith('ws-1', expect.objectContaining({ type: 'image' }))
+    expect(addWorkspaceItemMock).toHaveBeenCalledWith('ws-1', expect.objectContaining({ type: 'text' }))
   })
 
   it('R4: stagedConfig 的 background 预填表单字段', () => {
@@ -171,12 +172,16 @@ describe('PreflightDrawer R4', () => {
     expect((screen.getByDisplayValue('深度学习') as HTMLInputElement).value).toBe('深度学习')
   })
 
-  it('R4: 视频素材传入 preflight summary 配置', async () => {
+  it('R4: 视频素材传入 summary 配置到 preflight tasks', async () => {
     autoCreateWorkspaceMock.mockResolvedValue({
       workspace_id: 'ws-1',
       name: '自动工作空间',
     })
-    createNoteTaskMock.mockResolvedValue({ status: 'created', task_id: 'task-video', task_type: 'note' })
+    addWorkspaceItemMock.mockResolvedValue({
+      items: [{ item_id: 'item-1', type: 'video' }],
+    })
+    savePreflightMock.mockResolvedValue({})
+    startItemPipelineMock.mockResolvedValue({ task_id: 'task-video' })
     render(<PreflightDrawer {...defaultProps} />)
 
     // 切换到路径 1
@@ -184,16 +189,16 @@ describe('PreflightDrawer R4', () => {
     fireEvent.click(screen.getByRole('button', { name: /开始解析/ }))
 
     await waitFor(() => {
-      expect(createNoteTaskMock).toHaveBeenCalledTimes(1)
+      expect(savePreflightMock).toHaveBeenCalledTimes(1)
     })
 
-    expect(createNoteTaskMock).toHaveBeenCalledWith(
+    expect(savePreflightMock).toHaveBeenCalledWith(
+      'ws-1',
+      'item-1',
       expect.objectContaining({
-        preflight: expect.objectContaining({
-          summary: expect.objectContaining({
-            path: 'subtitle',
-            video_template: 'auto',
-          }),
+        tasks: expect.objectContaining({
+          summary_path: 'subtitle',
+          video_template: 'auto',
         }),
       }),
     )

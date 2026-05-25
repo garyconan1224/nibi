@@ -6,6 +6,7 @@ import json
 import os
 import tempfile
 import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -14,6 +15,8 @@ from backend.app.models.tasks import TaskLogEntry, TaskRecord
 from shared.config import ROOT_DIR
 
 TASK_STORE_PATH = ROOT_DIR / ".local" / "backend_tasks.json"
+MAX_LOG_ENTRIES = 500
+SAVE_DEBOUNCE_S = 0.5  # progress/download_speed 写入节流间隔
 
 
 def _now_iso() -> str:
@@ -26,6 +29,7 @@ class TaskStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self._records: Dict[str, TaskRecord] = {}
+        self._last_save_ts: float = 0.0
         self._load()
 
     def _load(self) -> None:
@@ -85,7 +89,16 @@ class TaskStore:
             for k, v in kwargs.items():
                 setattr(rec, k, v)
             rec.updated_at = _now_iso()
-            self._save()
+            # 节流：progress / download_speed 变更不触发全量写盘
+            # 仅 status / error / result / payload 等关键字段变化时落盘
+            _throttled = {"progress", "download_speed"}
+            if set(kwargs.keys()) - _throttled:
+                self._save()
+            else:
+                now = time.monotonic()
+                if now - self._last_save_ts >= SAVE_DEBOUNCE_S:
+                    self._save()
+                    self._last_save_ts = now
             return rec
 
     def append_log(self, task_id: str, message: str, *, level: str = "info") -> TaskRecord:
@@ -94,6 +107,8 @@ class TaskStore:
             if rec is None:
                 raise KeyError(f"task not found: {task_id}")
             rec.log.append(TaskLogEntry.create(message=message, level=level))  # type: ignore[arg-type]
+            if len(rec.log) > MAX_LOG_ENTRIES:
+                rec.log = rec.log[-MAX_LOG_ENTRIES:]
             rec.updated_at = _now_iso()
             self._save()
             return rec

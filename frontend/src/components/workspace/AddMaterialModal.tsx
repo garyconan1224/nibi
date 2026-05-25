@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Check,
   ChevronDown,
@@ -20,9 +21,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { FEATURES_BY_TYPE, type Feature } from '@/lib/featuresToSteps'
-import { createNoteTask } from '@/services/pipeline'
 import type { SniffResult } from '@/services/workspaces'
-import { sniffUrl } from '@/services/workspaces'
+import {
+  sniffUrl,
+  autoCreateWorkspace,
+  addWorkspaceItem,
+  savePreflight,
+  startItemPipeline,
+} from '@/services/workspaces'
 import type {
   ItemType,
   WorkspaceBackground,
@@ -95,6 +101,7 @@ export function AddMaterialModal({
   onAdded,
   onFineTune,
 }: AddMaterialModalProps) {
+  const navigate = useNavigate()
   // ── 类型选择 ──
   const propInitial = useMemo(() => resolveInitialTypes(sniffResult), [sniffResult])
   const [selectedTypes, setSelectedTypes] = useState<ItemType[]>(propInitial.types)
@@ -203,7 +210,7 @@ export function AddMaterialModal({
     setBgOverrides((prev) => ({ ...prev, [key]: value }))
   }
 
-  // ── 一键解析 ──
+  // ── 一键解析（标准 workspace flow）──
   const handleQuickSubmit = async () => {
     if (!effectiveUrl) {
       setError('请先输入素材链接')
@@ -213,53 +220,97 @@ export function AddMaterialModal({
       setError('请至少选择一种素材类型')
       return
     }
-    if (workspaceIds.length === 0) {
-      setError('请先选择工作空间')
-      return
-    }
     setSubmitting(true)
     setError(null)
 
-    const primaryWs = workspaceIds[0]
-    const merged: Partial<WorkspaceBackground> = {
-      ...mergedBg,
-      ...bgOverrides,
-    }
-    let succeeded = 0
-    const total = selectedTypes.length
-
-    for (const type of selectedTypes) {
-      try {
-        const enabledFeatures = Object.entries(features[type] ?? {})
-          .filter(([, v]) => v)
-          .map(([k]) => k as Feature)
-
-        await createNoteTask({
-          url: effectiveUrl,
-          material_type: type,
-          enabled_features: enabledFeatures,
-          background: merged,
-          workspace_id: primaryWs,
-        })
-        succeeded++
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : '创建失败'
-        toast.error(`${TYPE_META[type].label}任务创建失败: ${msg}`)
+    try {
+      // 1. 无选择时自动创建工作空间
+      let wsId = workspaceIds[0]
+      if (!wsId) {
+        const ws = await autoCreateWorkspace({ hint_url: effectiveUrl })
+        wsId = ws.workspace_id
+        toast.info(`已自动创建工作空间「${ws.name}」`)
       }
-    }
 
-    if (succeeded === total) {
-      toast.success(`${total} 个任务已入队`)
-    } else if (succeeded > 0) {
-      toast.warning(`已入队 ${succeeded}/${total}，部分失败请重试`)
-    } else {
-      toast.error('任务创建失败，请检查链接或后端状态后重试')
+      const effectiveBackground: Partial<WorkspaceBackground> = {
+        ...(mergedBg ?? {}),
+        ...bgOverrides,
+      }
+      let firstTaskId: string | null = null
+      let firstItemId: string | null = null
+      let succeeded = 0
+      const errors: string[] = []
+
+      for (const type of selectedTypes) {
+        try {
+          const enabledFeatures = Object.entries(features[type] ?? {})
+            .filter(([, v]) => v)
+            .map(([k]) => k as Feature)
+
+          // 2. addWorkspaceItem
+          const ws = await addWorkspaceItem(wsId, {
+            type,
+            source: 'url',
+            source_value: effectiveUrl,
+            name: effectiveSniff?.title ?? effectiveUrl,
+          })
+          const item = ws.items[ws.items.length - 1]
+          const itemId = item.item_id
+
+          // 3. savePreflight — 传递 features 和 background
+          const tasks: Record<string, unknown> = {}
+          for (const feat of enabledFeatures) {
+            tasks[feat] = true
+          }
+          if (type === 'video' || type === 'audio') {
+            tasks.material_type = type
+            tasks.enabled_features = enabledFeatures
+          }
+          await savePreflight(wsId, itemId, {
+            background_overrides: effectiveBackground,
+            models: {},
+            tasks,
+          })
+
+          // 4. startItemPipeline
+          const { task_id } = await startItemPipeline(wsId, itemId)
+
+          if (!firstTaskId) { firstTaskId = task_id; firstItemId = itemId }
+          succeeded++
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : '创建失败'
+          errors.push(`${TYPE_META[type].label}: ${msg}`)
+          toast.error(`${TYPE_META[type].label}任务创建失败: ${msg}`)
+        }
+      }
+
+      if (succeeded === 0) throw new Error('所有素材创建失败')
+
+      if (errors.length > 0) {
+        toast.warning(`已创建 ${succeeded}/${selectedTypes.length} 个素材`, {
+          description: errors.join('；'),
+        })
+      } else {
+        toast.success(
+          selectedTypes.length > 1 ? `已创建 ${succeeded} 个素材` : '任务已开始',
+          { description: effectiveUrl },
+        )
+      }
+
+      onAdded?.()
+      onOpenChange(false)
+      if (firstTaskId) {
+        navigate(`/processing/${firstTaskId}`, {
+          state: { url: effectiveUrl, workspaceId: wsId, itemId: firstItemId },
+        })
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '提交失败'
+      setError(msg)
+      toast.error(msg)
+    } finally {
       setSubmitting(false)
-      return
     }
-    onAdded?.()
-    onOpenChange(false)
-    setSubmitting(false)
   }
 
   // ── 细调 ──

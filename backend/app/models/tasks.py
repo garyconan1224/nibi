@@ -108,11 +108,23 @@ class TaskRecord:
     created_at: str = field(default_factory=_now_iso)
     updated_at: str = field(default_factory=_now_iso)
 
-    def to_dict(self) -> Dict[str, Any]:
-        """转换为字典格式"""
+    def to_dict(self, include_logs: bool = True, include_result: bool = True, log_tail: int = 0) -> Dict[str, Any]:
+        """转换为字典格式。
+
+        include_logs=False 时完全不序列化 log（轻量列表接口用）。
+        include_result=False 时返回空 result dict。
+        log_tail>0 时只保留最后 N 条日志。
+        """
         obj = asdict(self)
-        obj["log"] = [asdict(item) for item in self.log]
-        # 防御：即便某处误把 Enum 成员直接赋给 status，也保证外部 JSON 为纯字符串值
+        if include_logs:
+            entries = [asdict(item) for item in self.log]
+            if log_tail > 0 and len(entries) > log_tail:
+                entries = entries[-log_tail:]
+            obj["log"] = entries
+        else:
+            obj["log"] = []
+        if not include_result:
+            obj["result"] = {}
         obj["status"] = self.status.value if isinstance(self.status, TaskStatus) else str(self.status)
         return obj
 

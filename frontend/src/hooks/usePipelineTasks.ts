@@ -43,7 +43,12 @@ export const usePipelineTasks = (options: UsePipelineTasksOptions = {}) => {
   const fetchTasks = useCallback(async () => {
     try {
       const url = '/pipeline/tasks'
-      const params = projectId ? { project_id: projectId } : {}
+      const params: Record<string, string | boolean | number> = {
+        include_logs: false,
+        include_result: false,
+        limit: 50,
+      }
+      if (projectId) params.project_id = projectId
       // 后端 list_tasks 直接返回裸数组 [...], 不是 { data: [...] } 包装格式
       const resp = await http.get<TaskRecord[] | { data: TaskRecord[] }>(url, { params })
 
