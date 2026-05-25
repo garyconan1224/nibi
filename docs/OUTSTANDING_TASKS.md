@@ -2,17 +2,19 @@
 
 > 本文件是「下一步该做什么」的快照。写入前必须先 `git log --oneline -20` 对账，避免把已完成阶段当作待办。
 
-Last updated: 2026-05-24（**当前阶段 = Phase R 输入层重构**）
+Last updated: 2026-05-25（**当前阶段 = Phase R7/R8 merge 收口**）
 
 ---
 
 ## 🔴 当前阶段（一切让路）
 
-**Phase R — 首页输入层重构**（in_progress）— [`docs/plans/phase-r-input-refactor.md`](plans/phase-r-input-refactor.md)
+**Phase R + R7/R8 已完成，当前操作是把 `feat/phase-r8-preflight-remix` 本地 merge 入 `main`。**
 
-R 阶段完成并 merge 进 main 前，下方 P1 / 长期遗留 / 历史"推荐下一步"全部冻结，**不要并行启动**。R 子任务 R0~R6 与新增 R3.1 是真相源。
-
-- **当前下一步**：R4 PreflightDrawer 接管细粒度参数。R3.1 `AddMaterialModal` Remix 风格化已完成并写入 `CLAUDE.md` / `docs/DESIGN_SYSTEM.md`。
+- R0~R6 已完成：输入层重构、AddMaterialModal 4 步合一、PreflightDrawer 接管细粒度参数、端到端冒烟。
+- R7 已完成：输入流统一收尾。
+- R8 已完成：PreflightDrawer Remix 复刻 + R8 tasks payload 落地。
+- merge 前补丁已修复 stage 回写、视觉模型残留、路径 3 视频模型保存。
+- merge 后再决定下一阶段；不要 push origin，Push 策略仍暂缓到 `[D]` 开源准备。
 
 ---
 

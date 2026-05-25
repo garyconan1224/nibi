@@ -1,10 +1,12 @@
 ---
 name: phase-r7-input-flow-unify
-status: ready
+status: done
 branch: feat/phase-r7-input-flow-unify
 baseline_commit: e79a384
 owner: ds (claude code + ccswitch deepseek-v4-pro)
 created_date: 2026-05-25
+completed_date: 2026-05-25
+commits: docs + R7.1~R7.5, merged via feat/phase-r8-preflight-remix
 ---
 
 # Phase R7 — 输入流统一 + 1:1 复刻收尾
@@ -143,13 +145,13 @@ grep -rn "视觉大模型\|visual_model\|visualModel" frontend/src backend/app
 
 ## 收尾
 
-5 个 commit 全部完成后：
-1. `cd frontend && pnpm lint && pnpm test && pnpm build` 全过
-2. `.venv/bin/python -m pytest tests/backend -q` 后端冒烟
-3. 跑一次 `.venv/bin/python scripts/browser_smoke.py --url http://localhost:5175/workbench` 抓 JSON
-4. 把本文件 frontmatter status 改 `done`，填 `commits` / `completed_date`
-5. 在 `docs/COMPLETED_WORK.md` 追加一段
-6. **不要自动 merge 进 main**，停下来问用户授权
+5 个 commit 已完成。本阶段随 R8 分支一起收口并等待本地 merge 授权。
+
+验证记录：
+1. `cd frontend && pnpm test --run` 通过。
+2. `cd frontend && pnpm build` 通过。
+3. `.venv/bin/python -m pytest tests/backend -q` 通过。
+4. `pnpm lint` 仍被项目存量 baseline 拦截；R7/R8 改动文件已单独排查。
 
 ## 禁止事项
 

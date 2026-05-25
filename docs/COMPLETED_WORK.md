@@ -812,6 +812,37 @@ WorkspaceItem.tags = {
 
 ---
 
+## Phase R7/R8 — 输入流统一 + PreflightDrawer Remix 复刻
+
+**完成日期**：2026-05-25
+**分支**：feat/phase-r8-preflight-remix
+**提交**：
+- R7：`168e611`、`f0bcc94`、`4aa854e`、`23a5f28`、`e137b89`、`5d81753`
+- R8：`fb28790`、`e13400b`、`8e98c27`、`915ecef`、`aa592d5`、`cc89351`、`c061071`、`d68b1b1`
+- merge 前补丁：修复 stage 回写丢 R8 tasks/models、移除 PreflightDrawer 视觉模型残留、保存路径 3 `models.video`
+
+### 影响范围
+- 前端：`frontend/src/pages/WorkbenchPage/PreflightDrawer.tsx`、`frontend/src/pages/WorkbenchPage/preflightTasks.ts`、`frontend/src/components/workspace/AddMaterialModal.tsx`、`frontend/src/components/workspace/PreflightConfigPanel.tsx`、`frontend/src/pages/WorkbenchPage/Composer.tsx`、`frontend/src/pages/WorkbenchPage/Hero.tsx`、`frontend/src/pages/WorkbenchPage/workbench.css`
+- 测试：`frontend/src/__tests__/PreflightDrawer.test.tsx`、`frontend/src/__tests__/AddMaterialModal.test.tsx`、`frontend/src/__tests__/preflightTasks.test.ts`
+- 文档：`docs/plans/phase-r7-input-flow-unify.md`、`docs/plans/phase-r8-preflight-remix-replica.md`
+
+### 关键改动
+- **R7 输入流统一**：AddMaterialModal 单 URL 多类型默认全勾；Composer 传入 URL 时 modal 不再重复输入框；PreflightDrawer 增加 `mode="stage"`，从首页细调时只回写配置，不直接启动 pipeline。
+- **R8 PreflightDrawer 复刻**：新增 media kind tabs、编号 section、背景 5 字段、任务卡片、PresetBar、级联锁定规则、footer 状态 pill，并把任务子参数序列化进 `savePreflight({ tasks })`。
+- **merge 前修复**：stage 保存会回传 R8 `tasks/models`，AddMaterialModal 一键解析优先保存 staged tasks；执行模式使用级联后的 effective task state；路径 3 视频大模型写入 `models.video`。
+
+### 验证
+- `cd frontend && pnpm test --run`：8 files / 40 tests passed
+- `cd frontend && pnpm build`：passed
+- `.venv/bin/python -m pytest tests/backend -q`：310 passed / 2 skipped
+- `cd frontend && pnpm exec eslint <R7/R8 touched files>`：passed；`pnpm lint` 仍被项目存量 baseline 拦截
+
+### 留给后续的影响
+- R8 仍只负责 UI 和 payload 落地；后端真正消费所有新增子参数留到后续阶段。
+- `pnpm lint` baseline 需要单独技术债阶段处理，不能作为 R7/R8 merge 阻塞。
+
+---
+
 ## IP.7 PreflightDrawer 真接 workspace 流程 + 自动建空间
 
 **完成日期**：2026-05-20

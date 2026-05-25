@@ -49,6 +49,8 @@ const BG_PURPOSES = ['复刻参考', '竞品分析', '内容总结', '学习研�
 export interface StagedConfig {
   types: ItemType[]
   features: Partial<Record<ItemType, Record<string, boolean>>>
+  tasks?: Partial<Record<ItemType, Record<string, unknown>>>
+  models?: Record<string, string>
   background: Partial<WorkspaceBackground>
   workspaceIds: string[]
   urlValue?: string
@@ -270,18 +272,21 @@ export function AddMaterialModal({
           const item = ws.items[ws.items.length - 1]
           const itemId = item.item_id
 
-          // 3. savePreflight — 传递 features 和 background
-          const tasks: Record<string, unknown> = {}
+          // 3. savePreflight — fine-tune 回写时优先保留 R8 任务子参数
+          const stagedTasks = initialStaged?.tasks?.[type]
+          const tasks: Record<string, unknown> = stagedTasks
+            ? { ...stagedTasks }
+            : {}
           for (const feat of enabledFeatures) {
-            tasks[feat] = true
+            if (!stagedTasks) tasks[feat] = true
           }
-          if (type === 'video' || type === 'audio') {
+          if (type === 'video' || type === 'audio' || stagedTasks) {
             tasks.material_type = type
-            tasks.enabled_features = enabledFeatures
+            tasks.enabled_features = stagedTasks?.enabled_features ?? enabledFeatures
           }
           await savePreflight(wsId, itemId, {
             background_overrides: effectiveBackground,
-            models: {},
+            models: initialStaged?.models ?? {},
             tasks,
           })
 
@@ -331,6 +336,8 @@ export function AddMaterialModal({
     const staged: StagedConfig = {
       types: selectedTypes,
       features,
+      tasks: initialStaged?.tasks,
+      models: initialStaged?.models,
       background: bgOverrides,
       workspaceIds,
       urlValue: effectiveUrl,

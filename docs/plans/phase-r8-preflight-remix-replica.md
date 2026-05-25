@@ -1,10 +1,12 @@
 ---
 name: phase-r8-preflight-remix-replica
-status: ready
+status: done
 branch: feat/phase-r8-preflight-remix
 baseline_commit: 5d81753  # R7.5 之后
 owner: ds (claude code + ccswitch deepseek-v4-pro)
 created_date: 2026-05-25
+completed_date: 2026-05-25
+commits: docs + R8.1~R8.7 + follow-up merge blocker fix
 ---
 
 # Phase R8 — PreflightDrawer 1:1 复刻 Remix 设计稿
@@ -151,8 +153,8 @@ tasks: {
 
 ## 收尾
 
-7 个 commit 全部做完：
-1. 全套测试 + build
-2. 把本文件 frontmatter `status: done`，填 `commits` / `completed_date`
-3. `docs/COMPLETED_WORK.md` 追加
-4. 等用户授权 merge
+7 个 R8 commit 已完成，并补了 merge 前阻塞修复：
+1. stage 模式回写 R8 tasks/models，避免细调参数丢失。
+2. execute / modal 一键解析保存同一份 R8 tasks payload。
+3. 移除 PreflightDrawer 视觉大模型残留，路径 3 视频大模型写入 `models.video`。
+4. 全套验证见 `docs/COMPLETED_WORK.md` 的 R7/R8 记录。

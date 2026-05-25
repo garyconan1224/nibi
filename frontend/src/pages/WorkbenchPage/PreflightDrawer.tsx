@@ -35,6 +35,32 @@ const ITEM_TYPE_LABELS: Record<ItemType, string> = {
   image: '图片',
   text: '文字',
 }
+const TASK_TO_FEATURE: Record<MediaKind, Record<string, string>> = {
+  video: {
+    frame_prompt: 'visual_prompt',
+    summary: 'video_summary',
+    srt: 'subtitle_export',
+    music: 'music_analysis',
+  },
+  audio: {
+    asr: 'transcribe_summary',
+    voiceprint: 'speaker_diarize',
+    srt: 'subtitle_export',
+    music: 'music_analysis',
+  },
+  image: {
+    describe: 'describe',
+    ocr: 'ocr',
+    prompt: 'prompt',
+    assoc: 'assoc',
+  },
+  text: {
+    summary: 'summary_keypoints',
+    rewrite: 'rewrite',
+    translate: 'translate',
+    multi: 'multi_compare',
+  },
+}
 interface PreflightDrawerProps {
   open: boolean
   url: string
@@ -106,11 +132,7 @@ export function PreflightDrawer({
     terms: '',
     purpose: '',
   })
-  const [models, setModels] = useState({
-    vision: '',
-    text: '',
-    video: '',
-  })
+  const [models, setModels] = useState({ text: '', video: '' })
   const [tasks, setTasks] = useState(() => {
     const init: Record<MediaKind, Record<string, unknown>> = {} as Record<MediaKind, Record<string, unknown>>
     for (const k of Object.keys(TASK_GROUPS) as MediaKind[]) {
@@ -126,12 +148,63 @@ export function PreflightDrawer({
     if (open && providers.length === 0) fetchProviders()
   }, [open, providers.length, fetchProviders])
 
+  const hydrateTasks = (stagedTasks: StagedConfig['tasks'] | undefined) => {
+    const init: Record<MediaKind, Record<string, unknown>> = {} as Record<MediaKind, Record<string, unknown>>
+    for (const taskKind of Object.keys(TASK_GROUPS) as MediaKind[]) {
+      const defaults = buildInitialTasks(taskKind) as unknown as Record<string, unknown>
+      const staged = stagedTasks?.[taskKind]
+      if (!staged) {
+        init[taskKind] = defaults
+        continue
+      }
+
+      const next: Record<string, unknown> = { ...defaults }
+      const enabled = new Set((staged.enabled_features as string[] | undefined) ?? [])
+      for (const group of TASK_GROUPS[taskKind]) {
+        const current = (next[group.id] as Record<string, unknown>) ?? {}
+        const stagedGroup = staged[group.id]
+        next[group.id] = {
+          ...current,
+          ...(typeof stagedGroup === 'object' && stagedGroup !== null ? stagedGroup as Record<string, unknown> : {}),
+          on: enabled.has(group.id) || Boolean((stagedGroup as { on?: unknown } | undefined)?.on),
+        }
+      }
+      init[taskKind] = next
+    }
+    return init
+  }
+
+  const serializeTasksForType = (itemType: ItemType) => {
+    const taskKind = itemType as MediaKind
+    const raw = (tasks[taskKind] ?? {}) as TaskState
+    const effective = applyCascades(taskKind, raw, materialCount).state
+    const enabledFeatures = Object.entries(effective)
+      .filter(([, v]) => v.on)
+      .map(([k]) => k)
+    const tasksPayload: Record<string, unknown> = {
+      material_type: itemType,
+      enabled_features: enabledFeatures,
+    }
+    for (const [gid, gState] of Object.entries(effective)) {
+      tasksPayload[gid] = { ...gState }
+    }
+    return { taskKind, effective, enabledFeatures, tasksPayload }
+  }
+
+  const featureMapFromTasks = (taskKind: MediaKind, effective: TaskState) => {
+    const map: Record<string, boolean> = {}
+    for (const [taskId, featureId] of Object.entries(TASK_TO_FEATURE[taskKind])) {
+      map[featureId] = Boolean(effective[taskId]?.on)
+    }
+    return map
+  }
+
   // Reset form on open
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) {
       setTextProviderId('')
-      setTextModelId('')
+      setTextModelId(sc?.models?.text ?? '')
       setKind(kindFromType)
       setActivePreset(null)
       setBg({
@@ -141,11 +214,8 @@ export function PreflightDrawer({
         terms: '',
         purpose: sc?.background?.purpose ?? '',
       })
-      const init: Record<MediaKind, Record<string, unknown>> = {} as Record<MediaKind, Record<string, unknown>>
-      for (const k of Object.keys(TASK_GROUPS) as MediaKind[]) {
-        init[k] = buildInitialTasks(k) as unknown as Record<string, unknown>
-      }
-      setTasks(init)
+      setModels({ text: sc?.models?.text ?? '', video: sc?.models?.video ?? '' })
+      setTasks(hydrateTasks(sc?.tasks))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -237,22 +307,11 @@ export function PreflightDrawer({
           if (bg.purpose) bgPayload.purpose = bg.purpose
           if (bg.theme) bgPayload.topic = bg.theme
 
-          // R8: serialize task state for this material type
-          const taskKind = itemType as MediaKind
-          const kindTaskState = (tasks[taskKind] ?? {}) as Record<string, { on?: boolean; [k: string]: unknown }>
-          const enabledFeatures = Object.entries(kindTaskState)
-            .filter(([, v]) => v.on)
-            .map(([k]) => k)
-          const tasksPayload: Record<string, unknown> = {
-            material_type: itemType,
-            enabled_features: enabledFeatures,
-          }
-          for (const [gid, gState] of Object.entries(kindTaskState)) {
-            tasksPayload[gid] = { ...gState }
-          }
+          const { tasksPayload } = serializeTasksForType(itemType)
 
           const preflightModels: Record<string, string> = {}
           if (textModelId) preflightModels.text = textModelId
+          if (models.video) preflightModels.video = models.video
 
           await savePreflight(wsId, itemId, {
             background_overrides: bgPayload,
@@ -301,9 +360,22 @@ export function PreflightDrawer({
     if (bg.purpose) bgPayload.purpose = bg.purpose
     if (bg.theme) bgPayload.topic = bg.theme
 
+    const stagedTasks: StagedConfig['tasks'] = {}
+    const stagedFeatures: StagedConfig['features'] = {}
+    for (const itemType of typesToCreate) {
+      const { taskKind, effective, tasksPayload } = serializeTasksForType(itemType)
+      stagedTasks[itemType] = tasksPayload
+      stagedFeatures[itemType] = featureMapFromTasks(taskKind, effective)
+    }
+    const stagedModels: Record<string, string> = {}
+    if (textModelId) stagedModels.text = textModelId
+    if (models.video) stagedModels.video = models.video
+
     onSaveStaged?.({
       types: typesToCreate,
-      features: { ...sc?.features },
+      features: stagedFeatures,
+      tasks: stagedTasks,
+      models: stagedModels,
       background: bgPayload,
       workspaceIds: workspaceId ? [workspaceId] : [],
       urlValue: url,
@@ -387,13 +459,6 @@ export function PreflightDrawer({
               </div>
             ) : (
               <>
-                <PFField label="视觉大模型" hint="VLM · 截帧 / 图片分析">
-                  <select className="pf-sel" value={models.vision} onChange={e => setModels(s => ({ ...s, vision: e.target.value }))}>
-                    <option value="">默认</option>
-                    <option value="GPT-4o · OpenAI">GPT-4o · OpenAI</option>
-                    <option value="Claude 3.5 Sonnet · Anthropic">Claude 3.5 Sonnet · Anthropic</option>
-                  </select>
-                </PFField>
                 <PFField label="文本大模型" hint="LLM · 总结 / 归纳 / 对话">
                   <div className="pf-model-row">
                     <select value={textProviderId} onChange={(e) => { setTextProviderId(e.target.value); setTextModelId('') }}>
