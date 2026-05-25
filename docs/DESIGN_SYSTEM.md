@@ -2,7 +2,7 @@
 
 > **Token 定义**：`frontend/src/styles/design-tokens.css` / `docs/design/styles.css`
 > **设计规格来源**：`/Users/conan/Downloads/vidmirror (Remix)/system_design_v1.1.md` 与 `styles.css` 
-> **最后更新**：2026-05-23
+> **最后更新**：2026-05-24
 
 ---
 
@@ -110,7 +110,44 @@ Remix 规范采用了更为饱满圆滑的倒角：
 
 ---
 
-## 6. 默认预设与业务契约 (Presets & Contracts)
+## 6. 二级交互面板：Add Material Modal
+
+### 6.1 Source of Truth
+
+点击「添加素材」后出现的界面必须延续 Remix 原型的二级 modal 语法：
+
+- 结构来源：`/Users/conan/Downloads/vidmirror (Remix)/components/taskboard.jsx` 的 `AddMaterialModal`。
+- 样式来源：`/Users/conan/Downloads/vidmirror (Remix)/VidMirror.html` 的 `Modal`、`.type-card`、`.task-chip`、`.tc-box` 样式块。
+- 项目落地：`frontend/src/components/workspace/AddMaterialModal.tsx` 与承载该组件的 Workbench / Taskboard 页面。
+
+### 6.2 组件解剖
+
+- **Backdrop / Shell**: 使用 `modal-backdrop` 与 `modal`；宽屏目标宽度 `720px`，移动端使用 `max-width` 防溢出，超高内容只允许 modal 内部滚动。
+- **Header**: 使用 `m-head`；左侧为 `.eyebrow` 场景标签和 `.display` 标题，右侧为 ghost close action。
+- **Body Sections**: 使用 `m-body` + 多个 `m-section`，段落标题保留 ① / ② / ③ / ④ 的编号节奏。
+- **Type Cards**: 素材类型使用 `type-row` + `type-card[data-active]`；单类型 locked 态也应保持 card 视觉，不退回普通 chip。
+- **Input Source**: 输入源复用 `composer-url` 语言：platform icon、URL 文本/输入框、上传入口、`kw` 能力提示。
+- **Task Chips**: 一级分析任务使用 `task-chips` + `task-chip[data-on]` + `tc-box`，按类型分组但保持同一 chip 语言。
+- **Background Panel**: 背景信息展开后使用 `var(--bg-sunken)` 凹陷面板，字段标签用 `.mono`，选项使用 token 化 pill。
+- **Footer**: 使用 `m-foot`；左侧显示等宽状态摘要，右侧保留「细调…」和主 CTA「一键解析」。
+
+### 6.3 实现规则
+
+- 可使用 Radix/shadcn 提供焦点管理与无障碍行为，但可见样式不得停留在默认 Dialog / Button / Checkbox 外观。
+- 新增样式必须引用 `--bg`、`--bg-elev`、`--bg-sunken`、`--ink-*`、`--line*`、`--radius*`、`--shadow*`、`--accent*` 等 tokens。
+- 禁止在组件内新增 hardcoded hex / rgba / border / radius / shadow；若需要新的 backdrop alpha 或尺寸，应先补 token 或复用已有 Workbench modal token。
+- 任务、类型、背景字段的业务状态流不得因视觉改造而改名或重排 payload；UI 改造必须保持 R2/R3 已建立的 `selectedTypes`、`features`、`background`、`createNoteTask` 链路。
+
+### 6.4 R3.1 验收口径
+
+- 点击 Composer / Taskboard 的「添加素材」后，界面视觉上不再像默认 shadcn 弹窗，而是 Remix 720px 二级面板。
+- 类型、输入源、任务 chip、背景折叠、底部状态/CTA 五个区域均能在浅色和深色主题下保持 token 化一致性。
+- 混合类型 URL 可通过 active card 多选；单类型 sniff 显示 locked card；至少保留一个类型和一个任务项。
+- `pnpm build`、`pnpm test`、targeted eslint 通过，且无新增 `git diff --check` whitespace 问题。
+
+---
+
+## 7. 默认预设与业务契约 (Presets & Contracts)
 
 根据 `system_design_v1.1.md` §15，前端呈现和交互处理须遵循如下默认契约：
 

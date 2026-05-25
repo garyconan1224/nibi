@@ -712,15 +712,22 @@ class CaptureParams:
 
     @classmethod
     def from_dict(cls, data: Any) -> "CaptureParams":
-        """从前端 preflight.tasks.frame_prompts 字段安全构造。
+        """从前端 NotePreflightOverrides.frame_prompt 字段安全构造。
 
-        兼容老 boolean 形状（true → 默认值）和缺失字段。
+        前端字段：mode ("interval"|"ai_shot"), interval_sec, max_frames, frames_per_shot。
+        ai_shot 映射为 scene 模式。
+        兼容老字段名 capture_mode / scene_frames_per_shot 和 boolean 形状（true → 默认值）。
         """
         if not isinstance(data, dict):
             return cls()
-        mode = str(data.get("capture_mode") or "scene").lower()
-        if mode not in ("interval", "scene"):
-            mode = "scene"
+        # 兼容前端字段名 mode / frames_per_shot（优先级更高）
+        # 同时保留旧名 capture_mode / scene_frames_per_shot 作为 fallback
+        raw_mode = str(data.get("mode") or data.get("capture_mode") or "scene").lower()
+        if raw_mode in ("ai_shot",):
+            raw_mode = "scene"
+        if raw_mode not in ("interval", "scene"):
+            raw_mode = "scene"
+        mode = raw_mode
         try:
             interval = int(data.get("interval_sec") or 5)
         except (TypeError, ValueError):
@@ -730,7 +737,7 @@ class CaptureParams:
         except (TypeError, ValueError):
             max_f = 100
         try:
-            fps = int(data.get("scene_frames_per_shot") or 3)
+            fps = int(data.get("frames_per_shot") or data.get("scene_frames_per_shot") or 3)
         except (TypeError, ValueError):
             fps = 3
         if fps not in (2, 3):

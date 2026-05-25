@@ -1,35 +1,15 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import {
-  Link2, Upload, Search, X, Check, Plus, ArrowRight,
-  Download, Film, Mic, Eye, Cpu, Wand2, Layers,
+  Link2, Upload, Search, X, Check, Plus, ArrowRight, Layers,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import type { PipelineStep, QualityOption, FrameMode } from './types'
 import type { WorkspaceRecord } from '@/types/workspace'
 import { detectPlatform } from './platforms'
 import { normalizeMediaUrl } from '@/lib/url'
 import { listWorkspaces, createWorkspace, sniffUrl } from '@/services/workspaces'
 import type { SniffResult } from '@/services/workspaces'
-import { getPromptFormatsConfig } from '@/services/promptFormats'
-import type { PromptFormat } from '@/services/promptFormats'
-import { useProviderStore } from '@/store/providerStore'
-import { MixedContentModal } from './MixedContentModal'
-import { PreflightDrawer } from './PreflightDrawer'
-import { AddMaterialModal } from '@/components/workspace/AddMaterialModal'
-
-const PIPE_STEPS: PipelineStep[] = [
-  { n: '1', t: '下载',   s: 'Download',  tone: null,     defaultOn: true  },
-  { n: '2', t: '抽帧',   s: 'Frames',    tone: null,     defaultOn: true  },
-  { n: '3', t: '转录',   s: 'ASR',       tone: 'pink',   defaultOn: true  },
-  { n: '4', t: '视觉',   s: 'VLM',       tone: 'purple', defaultOn: true  },
-  { n: '5', t: '结构化', s: 'Summarize', tone: 'blue',   defaultOn: true  },
-  { n: '6', t: '分镜',   s: 'Storyboard',tone: 'amber',  defaultOn: false },
-  { n: '7', t: '切片',   s: 'Clips',     tone: null,     defaultOn: false },
-]
-
-const STEP_ICONS = [Download, Film, Mic, Eye, Cpu, Wand2, Layers]
-
-const QUALITY_OPTS: QualityOption[] = ['最高画质', '1080p', '720p', '仅音频']
+import { AddMaterialModal, type StagedConfig } from '@/components/workspace/AddMaterialModal'
+import { PreflightDrawer } from '@/pages/WorkbenchPage/PreflightDrawer'
 
 const WS_COLORS = [
   '#22c55e', '#f59e0b', '#a855f7', '#0ea5e9',
@@ -42,33 +22,18 @@ interface ComposerProps {
 
 export function Composer({ onTaskCreated }: ComposerProps) {
   const [url, setUrl] = useState('')
-  const [steps, setSteps] = useState(() => PIPE_STEPS.map((s) => s.defaultOn))
-  const [quality, setQuality] = useState<QualityOption>('1080p')
-  const [frameMode, setFrameMode] = useState<FrameMode>('A')
-  const [fps, setFps] = useState(2)
-  const [maxFrames, setMaxFrames] = useState(128)
-  const [asrModel, setAsrModel] = useState('')
-  const [visionModel, setVisionModel] = useState('')
-  const [textModel, setTextModel] = useState('')
-  const [mixedOpen, setMixedOpen] = useState(false)
-  const [mixedSel, setMixedSel] = useState<Record<string, boolean>>({})
-  const [preflightOpen, setPreflightOpen] = useState(false)
-  const [preflightTypes, setPreflightTypes] = useState<string[]>([])
   const [uploadOpen, setUploadOpen] = useState(false)
-  const [promptFormats, setPromptFormats] = useState<PromptFormat[]>([])
-  const [promptStyle, setPromptStyle] = useState('')
-
-  // F4.2: URL 内容类型嗅探结果
-  const [sniffResult, setSniffResult] = useState<SniffResult | null>(null)
 
   const [workspaces, setWorkspaces] = useState<WorkspaceRecord[]>([])
   const [workspaceSel, setWorkspaceSel] = useState<string[]>([])
   const [wsOpen, setWsOpen] = useState(false)
   const [wsQuery, setWsQuery] = useState('')
+  const [sniffResult, setSniffResult] = useState<SniffResult | null>(null)
+  const [preflightOpen, setPreflightOpen] = useState(false)
+  const [preflightStaged, setPreflightStaged] = useState<StagedConfig | undefined>(undefined)
 
   const popRef = useRef<HTMLDivElement>(null)
-
-  const { providers, providerModels, fetchProviders } = useProviderStore()
+  const sniffTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   // Fetch workspaces on mount
   useEffect(() => {
@@ -76,24 +41,6 @@ export function Composer({ onTaskCreated }: ComposerProps) {
       toast.error('加载工作空间列表失败，请检查后端是否已启动')
     })
   }, [])
-
-  // Fetch prompt formats on mount
-  useEffect(() => {
-    getPromptFormatsConfig()
-      .then((cfg) => {
-        setPromptFormats(cfg.formats)
-        // 默认选中第一个 active image format
-        if (cfg.active_image_ids.length > 0) setPromptStyle(cfg.active_image_ids[0])
-      })
-      .catch(() => {
-        toast.error('加载提示词格式配置失败')
-      })
-  }, [])
-
-  // Fetch providers on mount
-  useEffect(() => {
-    fetchProviders()
-  }, [fetchProviders])
 
   useEffect(() => {
     if (!wsOpen) return
@@ -109,34 +56,14 @@ export function Composer({ onTaskCreated }: ComposerProps) {
     [workspaces],
   )
 
+  const wsBackgrounds = useMemo(
+    () => Object.fromEntries(workspaces.map((w) => [w.workspace_id, w.background])),
+    [workspaces],
+  )
+
   const filteredWs = wsQuery
     ? workspaces.filter((w) => w.name.toLowerCase().includes(wsQuery.toLowerCase()))
     : workspaces
-
-  // Build model options from providerStore
-  const { asrOpts, visionOpts, textOpts } = useMemo(() => {
-    const asr: { label: string; value: string; combined: string }[] = []
-    const vision: { label: string; value: string; combined: string }[] = []
-    const text: { label: string; value: string; combined: string }[] = []
-    for (const p of providers) {
-      if (!p.enabled) continue
-      const models = providerModels[p.id]
-      if (!models?.length) continue
-      const caps = p.capabilities ?? []
-      for (const m of models) {
-        const entry = { label: m.name, value: m.id, combined: `${p.id}__${m.id}` }
-        if (caps.includes('asr') || caps.includes('audio')) asr.push(entry)
-        if (caps.includes('vision')) vision.push(entry)
-        if (caps.includes('chat') || caps.includes('text')) text.push(entry)
-      }
-    }
-    return { asrOpts: asr, visionOpts: vision, textOpts: text }
-  }, [providers, providerModels])
-
-  // Default model IDs (first available option for each)
-  const defaultAsrModel = asrOpts[0]?.value ?? ''
-  const defaultVisionModel = visionOpts[0]?.value ?? ''
-  const defaultTextModel = textOpts[0]?.value ?? ''
 
   const toggleWs = useCallback((id: string) =>
     setWorkspaceSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id])), [])
@@ -159,58 +86,35 @@ export function Composer({ onTaskCreated }: ComposerProps) {
 
   const normalizedUrl = useMemo(() => normalizeMediaUrl(url), [url])
   const platform = detectPlatform(normalizedUrl || url)
-  const isMixed = platform !== null && platform.types.length > 1
-  const showQualityRow = !platform || platform.types.includes('video')
 
-  // F4.2: debounce 500ms 后嗅探 URL 内容类型
-  useEffect(() => {
-    if (!normalizedUrl) {
-      setSniffResult(null)
-      return
-    }
-    // URL 变化时立即清空旧结果，避免旧 URL 的嗅探污染新 URL
+  const handleUrlChange = useCallback((value: string) => {
+    setUrl(value)
     setSniffResult(null)
-    let cancelled = false
-    const timer = setTimeout(async () => {
+  }, [])
+
+  // Debounced URL sniff
+  useEffect(() => {
+    if (!normalizedUrl) return
+    clearTimeout(sniffTimer.current)
+    sniffTimer.current = setTimeout(async () => {
       try {
         const result = await sniffUrl(normalizedUrl)
-        if (!cancelled) setSniffResult(result)
+        setSniffResult(result)
       } catch {
-        if (!cancelled) setSniffResult(null)
+        setSniffResult(null)
       }
     }, 500)
-    return () => { cancelled = true; clearTimeout(timer) }
+    return () => clearTimeout(sniffTimer.current)
   }, [normalizedUrl])
 
-  const toggle = (i: number) =>
-    setSteps((ss) => ss.map((v, j) => (j === i ? !v : v)))
-
-  const handleRun = () => {
+  const handleAdd = () => {
     if (!url.trim()) return
-    if (isMixed) {
-      // Initialize mixed selection with all types selected
-      const init: Record<string, boolean> = {}
-      for (const t of platform!.types) init[t] = true
-      setMixedSel(init)
-      setMixedOpen(true)
-    } else {
-      setPreflightTypes([])
-      setPreflightOpen(true)
+    if (workspaceSel.length === 0) {
+      toast.error('请先选择工作空间')
+      setWsOpen(true)
+      return
     }
-  }
-
-  const handleMixedConfirm = () => {
-    const types = Object.entries(mixedSel).filter(([, v]) => v).map(([k]) => k)
-    if (types.length === 0) return
-    setMixedOpen(false)
-    setPreflightTypes(types)
-    setPreflightOpen(true)
-  }
-
-  const handlePreflightCreated = () => {
-    setPreflightOpen(false)
-    setUrl('')
-    onTaskCreated?.()
+    setUploadOpen(true)
   }
 
   const handleUploadClick = () => {
@@ -222,18 +126,14 @@ export function Composer({ onTaskCreated }: ComposerProps) {
     setUploadOpen(true)
   }
 
-  const handleUploadAdded = () => {
+  const handleAdded = () => {
     setUploadOpen(false)
+    setUrl('')
     listWorkspaces().then(setWorkspaces).catch(() => {
       toast.error('刷新工作空间列表失败')
     })
     onTaskCreated?.()
   }
-
-  const metaText =
-    frameMode === 'A'
-      ? `按秒截帧 ${fps}s · ≤${maxFrames}帧`
-      : 'AI 镜头分析模式'
 
   return (
     <div className="composer">
@@ -254,7 +154,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
 
         <input
           value={url}
-          onChange={(e) => setUrl(e.target.value)}
+          onChange={(e) => handleUrlChange(e.target.value)}
           placeholder="粘贴 B站 / YouTube / 小红书 / 抖音 / 本地文件路径..."
         />
 
@@ -394,236 +294,45 @@ export function Composer({ onTaskCreated }: ComposerProps) {
         )}
       </div>
 
-      {/* Quality / frame mode row */}
-      {showQualityRow && (
-        <div className="composer-quality">
-          <span className="q-label">画质</span>
-          <div className="tw-segm">
-            {QUALITY_OPTS.map((q) => (
-              <button key={q} data-active={quality === q} onClick={() => setQuality(q)}>
-                {q}
-              </button>
-            ))}
-          </div>
-
-          <span className="seg-divider" />
-
-          <span className="q-label">抽帧</span>
-          {(['A', 'B'] as FrameMode[]).map((m) => (
-            <button
-              key={m}
-              className="tw-segm"
-              data-active={frameMode === m}
-              onClick={() => setFrameMode(m)}
-              style={{
-                height: 28,
-                padding: '0 10px',
-                fontSize: 11,
-                borderRadius: 7,
-                border: 'none',
-                background: frameMode === m ? 'var(--ink)' : 'transparent',
-                color: frameMode === m ? 'var(--bg)' : 'var(--ink-3)',
-                cursor: 'pointer',
-              }}
-            >
-              {m === 'A' ? 'A: 按秒截帧' : 'B: AI 镜头分析'}
-            </button>
-          ))}
-
-          {frameMode === 'A' && (
-            <>
-              <span className="q-unit">每</span>
-              <input
-                type="number"
-                min={1}
-                max={60}
-                value={fps}
-                onChange={(e) => setFps(Number(e.target.value))}
-              />
-              <span className="q-unit">秒 · 上限</span>
-              <input
-                type="number"
-                className="wide"
-                min={16}
-                max={512}
-                value={maxFrames}
-                onChange={(e) => setMaxFrames(Number(e.target.value))}
-              />
-              <span className="q-unit">帧</span>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* LLM options 4-column */}
-      <div className="composer-options">
-        <div className="opt-cell">
-          <div className="opt-label">ASR</div>
-          <div className="opt-value">
-            {asrOpts.length > 0 ? (
-              <select
-                value={asrModel || defaultAsrModel}
-                onChange={(e) => {
-                  const v = e.target.value
-                  const idx = v.indexOf('__')
-                  setAsrModel(idx >= 0 ? v.slice(idx + 2) : v)
-                }}
-              >
-                {asrOpts.map((o) => (
-                  <option key={o.combined} value={o.combined}>{o.label}</option>
-                ))}
-              </select>
-            ) : (
-              <span style={{ color: 'var(--ink-4)', fontSize: 13 }}>未配置</span>
-            )}
-          </div>
-        </div>
-        <div className="opt-cell">
-          <div className="opt-label">视觉 LLM</div>
-          <div className="opt-value">
-            {visionOpts.length > 0 ? (
-              <select
-                value={visionModel || defaultVisionModel}
-                onChange={(e) => {
-                  const v = e.target.value
-                  const idx = v.indexOf('__')
-                  setVisionModel(idx >= 0 ? v.slice(idx + 2) : v)
-                }}
-              >
-                {visionOpts.map((o) => (
-                  <option key={o.combined} value={o.combined}>{o.label}</option>
-                ))}
-              </select>
-            ) : (
-              <span style={{ color: 'var(--ink-4)', fontSize: 13 }}>未配置</span>
-            )}
-          </div>
-        </div>
-        <div className="opt-cell">
-          <div className="opt-label">文本 LLM</div>
-          <div className="opt-value">
-            {textOpts.length > 0 ? (
-              <select
-                value={textModel || defaultTextModel}
-                onChange={(e) => {
-                  const v = e.target.value
-                  const idx = v.indexOf('__')
-                  setTextModel(idx >= 0 ? v.slice(idx + 2) : v)
-                }}
-              >
-                {textOpts.map((o) => (
-                  <option key={o.combined} value={o.combined}>{o.label}</option>
-                ))}
-              </select>
-            ) : (
-              <span style={{ color: 'var(--ink-4)', fontSize: 13 }}>未配置</span>
-            )}
-          </div>
-        </div>
-        <div className="opt-cell">
-          <div className="opt-label">提示词风格</div>
-          <div className="opt-value">
-            {promptFormats.filter((f) => f.category === 'image').length > 0 ? (
-              <select
-                value={promptStyle}
-                onChange={(e) => setPromptStyle(e.target.value)}
-              >
-                {promptFormats
-                  .filter((f) => f.category === 'image')
-                  .map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name}
-                    </option>
-                  ))}
-              </select>
-            ) : (
-              <span style={{ color: 'var(--ink-4)', fontSize: 13 }}>未配置</span>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Pipeline pills */}
-      <div className="composer-pipeline">
-        <span className="pipe-label">Pipeline</span>
-        {PIPE_STEPS.map((step, i) => {
-          const Icon = STEP_ICONS[i]
-          return (
-            <button
-              key={i}
-              className="step-pill"
-              data-on={steps[i]}
-              data-tone={step.tone ?? undefined}
-              onClick={() => toggle(i)}
-            >
-              <span className="spn">{step.n}</span>
-              <Icon size={14} />
-              {step.t}
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 10, opacity: 0.5 }}>
-                {step.s}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-
       {/* Run row */}
       <div className="composer-run">
-        <div className="meta">
-          <span className="chip">
-            <span className="chip-dot" />
-            预计 ~ 4 min
-          </span>
-          <span style={{ opacity: 0.5 }}>·</span>
-          <span style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>{metaText}</span>
-        </div>
-        <button className="wb-btn-run" onClick={handleRun} disabled={!url.trim()}>
-          {isMixed ? '选择内容类型' : '开始解析'}
+        <button className="wb-btn-run" onClick={handleAdd} disabled={!url.trim()}>
+          添加素材
           <span className="iconwrap">
             <ArrowRight size={14} />
           </span>
         </button>
       </div>
 
-      {/* Mixed content modal */}
-      <MixedContentModal
-        open={mixedOpen}
-        platform={platform}
-        selected={mixedSel}
-        onToggle={(t) => setMixedSel((s) => ({ ...s, [t]: !s[t] }))}
-        onConfirm={handleMixedConfirm}
-        onClose={() => setMixedOpen(false)}
-      />
-
-      {/* Preflight drawer */}
-      <PreflightDrawer
-        open={preflightOpen}
-        url={normalizedUrl || url.trim()}
-        platformName={platform?.name ?? null}
-        selectedTypes={preflightTypes.length ? preflightTypes : undefined}
-        workspaceId={workspaceSel[0]}
-        sniffResult={sniffResult}
-        composerDefaults={{
-          quality,
-          frameMode,
-          fps,
-          maxFrames,
-          stepIds: PIPE_STEPS.filter((_, i) => steps[i]).map((s) => s.s.toLowerCase()),
-          asrModelId: asrModel || defaultAsrModel,
-          visionModelId: visionModel || defaultVisionModel,
-          textModelId: textModel || defaultTextModel,
-          promptStyle: promptStyle || 'midjourney_bilingual',
-        }}
-        onClose={() => setPreflightOpen(false)}
-        onCreated={handlePreflightCreated}
-      />
-
       {/* Upload modal */}
       <AddMaterialModal
         open={uploadOpen}
         onOpenChange={setUploadOpen}
-        workspaceId={workspaceSel[0] ?? ''}
-        onAdded={handleUploadAdded}
+        workspaceIds={workspaceSel}
+        workspaceBackgrounds={wsBackgrounds}
+        sniffResult={sniffResult}
+        urlValue={normalizedUrl || undefined}
+        onAdded={handleAdded}
+        onFineTune={(staged) => {
+          setUploadOpen(false)
+          setPreflightStaged(staged)
+          setPreflightOpen(true)
+        }}
+      />
+
+      {/* R4: PreflightDrawer via fine-tune */}
+      <PreflightDrawer
+        open={preflightOpen}
+        url={normalizedUrl || url}
+        platformName={platform?.name ?? null}
+        sniffResult={sniffResult}
+        workspaceId={workspaceSel[0]}
+        stagedConfig={preflightStaged}
+        onClose={() => setPreflightOpen(false)}
+        onCreated={() => {
+          setPreflightOpen(false)
+          handleAdded()
+        }}
       />
     </div>
   )

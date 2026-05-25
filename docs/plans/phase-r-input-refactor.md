@@ -1,10 +1,10 @@
 ---
 name: phase-r-input-refactor
-status: ready
+status: in_progress
 phase: R (输入层重构 / Composer 瘦身 + 模态化 + 单链接多类型)
 track: F (Flow)
 prerequisite: IP.9 已合入 main；H1 Workbench 已落地
-model: R1/R5 DS v4-pro；R2/R3/R4 Sonnet 4.6（必要时升 Opus）
+model: R1/R5 DS v4-pro；R2/R3/R4 Sonnet 4.6（必要时升 Opus）；R3.1 UI 收口按 Remix 规范执行
 branch: feat/phase-r-input-refactor
 created: 2026-05-24
 ---
@@ -32,6 +32,7 @@ created: 2026-05-24
 - 重写 `AddMaterialModal` 承担 SPEC §2.1「4 步合一」：类型 + 输入源 + 一级勾选 + 背景。
 - 单 URL 多内容类型场景：sniff 返回 `possible_types ≥ 2` 时在模态内多选 → 前端循环 POST 一类型一素材。
 - 一级勾选项 → 后端 steps 的前端翻译层 `lib/featuresToSteps.ts`。
+- R3.1：点击「添加素材」后出现的二级界面改为 `/Users/conan/Downloads/vidmirror (Remix)` 的 Remix modal 风格。
 - PreflightDrawer 接管细粒度参数（截帧、模型、Whisper），从模态"细调"按钮唤起。
 
 ❌ 不做（押后）：
@@ -110,43 +111,60 @@ flowchart TD
 ### R3 featuresToSteps 翻译层 + 多素材循环 POST（Sonnet 4.6，1-2h）
 **目标**：模态"一键解析"按钮真正下发任务。
 
-- [ ] R3.1 新建 `frontend/src/lib/featuresToSteps.ts`，导出：
+- [x] R3.a 新建 `frontend/src/lib/featuresToSteps.ts`，导出：
   ```ts
   type Feature = 'visual_prompt' | 'video_summary' | 'subtitle_export' | 'music_analysis' | ...
   function featuresToSteps(type: MaterialType, features: Feature[]): string[]
   function getDefaultFeatures(type: MaterialType): Feature[]
   ```
   映射规则见本文件"背景"段。
-- [ ] R3.2 在 `services/pipeline.ts`（如无则新建）封装 `createNoteTask(params)`，内部 POST `/pipeline/tasks`，task_type=`note`，payload 含 `url / material_type / enabled_features / background / workspace_id`。
-- [ ] R3.3 模态"一键解析"handler：选中类型循环调用 `createNoteTask`，每条 success 后聚合提示「已入队 N/M」。
-- [ ] R3.4 失败不阻断其他，最后用 toast 汇报。
-- [ ] R3.5 跑端到端：B 站链接勾选「视频+音频」→ 队列出现 2 条任务。
-- [ ] commit: `feat(phase-r): R3 features 翻译层 + 单URL多类型循环入队`
+- [x] R3.b 在 `services/pipeline.ts`（如无则新建）封装 `createNoteTask(params)`，内部 POST `/pipeline/tasks`，task_type=`note`，payload 含 `url / material_type / enabled_features / background / workspace_id`。
+- [x] R3.c 模态"一键解析"handler：选中类型循环调用 `createNoteTask`，每条 success 后聚合提示「已入队 N/M」。
+- [x] R3.d 失败不阻断其他，最后用 toast 汇报。
+- [x] R3.e 跑端到端：B 站链接勾选「视频+音频」→ 队列出现 2 条任务。
+- [x] commit: `feat(phase-r): R3 features 翻译层 + 单URL多类型循环入队`
+
+### R3.1 AddMaterialModal Remix 风格化（二级添加素材界面）
+**定义**：这里的"二级页面"专指用户点击 Composer / Taskboard 的「添加素材」后出现的 `AddMaterialModal` 界面，不是 Workspace 详情页。
+
+**目标**：在不改变 R2/R3 业务状态流的前提下，把当前 `AddMaterialModal` 从默认 Dialog 表单观感改为 `/Users/conan/Downloads/vidmirror (Remix)` 原型里的 Remix modal 风格。
+
+**设计来源**：
+- 结构参考：`/Users/conan/Downloads/vidmirror (Remix)/components/taskboard.jsx` 的 `AddMaterialModal`。
+- 样式参考：`/Users/conan/Downloads/vidmirror (Remix)/VidMirror.html` 的 `Modal / type-card / task-chip` 样式块。
+- 项目规范：`docs/DESIGN_SYSTEM.md` 与 `CLAUDE.md` 的 Remix Design Spec。
+
+**实现要求**：
+- [x] R3.1.1 使用 Remix modal 结构：`modal-backdrop` / `modal` / `m-head` / `m-body` / `m-section` / `m-foot`；若保留 Radix/shadcn 作为无障碍底座，外观层必须完全走 Remix class / token。
+- [x] R3.1.2 顶部使用 `.eyebrow` + `.display`：标题为「添加素材」，副标题展示当前工作空间、平台和 sniff 标题。
+- [x] R3.1.3 保留四段主流程：① 素材类型、② 输入源、③ 勾选分析任务、④ 背景信息；底部保留「细调…」与「一键解析」双按钮。
+- [x] R3.1.4 素材类型改为 `.type-row` + `.type-card[data-active]`；混合类型用多选 active card，不再使用普通 checkbox 列表。
+- [x] R3.1.5 输入源复用 Composer 语言：`.composer-url`、平台 icon、URL 只读/可输入态、`.kw` 能力提示。
+- [x] R3.1.6 一级任务改为 `.task-chips` + `.task-chip[data-on]` + `.tc-box`，按素材类型分组但视觉上保持 Remix chip 风格。
+- [x] R3.1.7 背景信息折叠内容用 `var(--bg-sunken)` 的凹陷面板、等宽字段标签和 token 化 pill；禁止组件内新增 hardcoded hex / rgba / border / radius / shadow。
+- [x] R3.1.8 桌面宽度按 Remix 720px 模态，移动端 `max-width` 防溢出，内容超高时仅模态内部滚动。
+- [x] R3.1.9 验收：`pnpm build`、`pnpm test`、targeted eslint 通过；浏览器打开添加素材后与 Remix 原型结构一致。
+- [x] commit: `style(phase-r): R3.1 添加素材模态 Remix 风格化`
 
 ### R4 PreflightDrawer 接管细粒度参数（Sonnet 4.6，2h）
 **目标**：模态"细调"按钮唤起 PreflightDrawer，PreflightDrawer 拿到模态的 staged config 作初值。
 
-- [ ] R4.1 PreflightDrawer props 增加 `stagedConfig: { type, features, background, workspaceId }`
-- [ ] R4.2 PreflightDrawer 内已有的截帧/模型/Whisper 字段保留，初值改为优先用 `stagedConfig.*` ?? 设置页默认
-- [ ] R4.3 PreflightDrawer 的"开始解析"也走 `createNoteTask`（与 R3 共用同一 service）
-- [ ] R4.4 检查 `composerDefaults` 的旧链路是否还有引用，删除残余
-- [ ] R4.5 跑端到端：点"细调…"→ 抽屉打开 → 改抽帧间隔 → 提交 → 队列出现任务且 payload 含新参数
+- [x] R4.1 PreflightDrawer props 增加 `stagedConfig: { type, features, background, workspaceId }`
+- [x] R4.2 PreflightDrawer 内已有的截帧/模型/Whisper 字段保留，初值改为优先用 `stagedConfig.*` ?? 设置页默认
+- [x] R4.3 PreflightDrawer 的"开始解析"也走 `createNoteTask`（与 R3 共用同一 service）
+- [x] R4.4 检查 `composerDefaults` 的旧链路是否还有引用，删除残余
+- [x] R4.5 跑端到端：点"细调…"→ 抽屉打开 → 改抽帧间隔 → 提交 → 队列出现任务且 payload 含新参数
 - [ ] commit: `feat(phase-r): R4 PreflightDrawer 接管细粒度参数`
 
 ### R5 端到端冒烟（DS v4-pro 跑命令，1h）
 **目标**：跑通 5 条真实链接确认闭环。
 
-- [ ] R5.1 `./start.sh` 起服务
-- [ ] R5.2 跑 `scripts/browser_smoke.py` 对 `/workbench` 验证：URL 输入 → sniff → 模态弹出 → 类型回填
-- [ ] R5.3 手动跑 5 条：
-  - B 站视频链接（混合：视频+音频）
-  - YouTube 视频链接（单一）
-  - 小红书图文链接（混合：图片+文字）
-  - 微信公众号文章（单一：文字）
-  - 抖音视频（单一：视频）
-- [ ] R5.4 在 `docs/test-urls.md` 追加本次测试结果记录
-- [ ] R5.5 若有 bug 回到 R2-R4 对应步骤修
-- [ ] commit: `test(phase-r): R5 端到端冒烟 5 条链接`
+- [x] R5.1 `./start.sh` 起服务
+- [x] R5.2 跑 `scripts/browser_smoke.py` 对 `/workbench` 验证：URL 输入 → sniff → 模态弹出 → 类型回填
+- [x] R5.3 手动跑 6 条（1a B站视频 / 1b B站音频 / 2 YouTube / 3 小红书 / 4 微信 / 5 抖音）
+- [x] R5.4 在 `docs/test-urls.md` 追加本次测试结果记录
+- [x] R5.5 无 R2-R4 bug（FAILED均为外部平台限制）
+- [x] commit: `test(phase-r): R5 端到端冒烟 6 条链接`
 
 ### R6 合并与收尾（DS v4-pro，10 min）
 - [ ] R6.1 自测全绿后：本地 `git checkout main && git merge --no-ff feat/phase-r-input-refactor`

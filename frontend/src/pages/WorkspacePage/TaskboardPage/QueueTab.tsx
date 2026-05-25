@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useTaskStore } from '@/store/taskStore'
 import { isTaskTerminal, getStatusText } from '@/types/task'
@@ -12,9 +13,17 @@ const STATE_DOT: Record<string, string> = {
  * Queue tab — 显示活跃任务（running / queued / failed）。
  * 设计稿来源：taskboard.jsx TBQueue（简化版，去掉系统检测和并行滑块）。
  */
-export function QueueTab() {
-  const tasks = useTaskStore((s) => s.tasks)
+interface QueueTabProps {
+  workspaceId: string
+}
+
+export function QueueTab({ workspaceId }: QueueTabProps) {
+  const allTasks = useTaskStore((s) => s.tasks)
   const retryTask = useTaskStore((s) => s.retryTask)
+  const tasks = useMemo(
+    () => allTasks.filter((t) => t.project_id === workspaceId),
+    [allTasks, workspaceId],
+  )
 
   const active = tasks.filter((t) => !isTaskTerminal(t.status))
   const errored = tasks.filter((t) => t.status === 'FAILED')

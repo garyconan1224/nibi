@@ -132,12 +132,13 @@
 - [x] IP.9.fix align Tier A UI with pipeline payloads
 
 **Phase R 输入层重构**（2026-05-24 启动）：Composer 瘦身 + AddMaterialModal 4 步合一 + 单链接多类型循环入队。详细计划：[docs/plans/phase-r-input-refactor.md](plans/phase-r-input-refactor.md)
-- [ ] R0 准备分支 `feat/phase-r-input-refactor`
-- [ ] R1 Composer 瘦身（删 6 块死 UI）
-- [ ] R2 AddMaterialModal 重写为 4 步合一统一入口
-- [ ] R3 featuresToSteps 翻译层 + 单 URL 多类型循环入队
-- [ ] R4 PreflightDrawer 接管细粒度参数
-- [ ] R5 端到端冒烟 5 条链接
+- [x] R0 准备分支 `feat/phase-r-input-refactor`
+- [x] R1 Composer 瘦身（删 6 块死 UI）
+- [x] R2 AddMaterialModal 重写为 4 步合一统一入口
+- [x] R3 featuresToSteps 翻译层 + 单 URL 多类型循环入队
+- [x] R3.1 AddMaterialModal Remix 风格化（点击添加素材后的二级界面）
+- [x] R4 PreflightDrawer 接管细粒度参数
+- [x] R5 端到端冒烟 6 条链接（含误判修复：createNoteTask material_type 分派 / note analyze 传 capture_params / 小红书 yt-dlp 缩略图兜底）
 - [ ] R6 合并 main + 文档同步
 
 ---

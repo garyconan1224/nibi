@@ -1,30 +1,25 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { WorkspaceItem, WorkspaceRecord } from '@/types/workspace'
 import { PreflightDrawer } from '@/pages/WorkbenchPage/PreflightDrawer'
 
 const {
   addTaskMock,
-  addWorkspaceItemMock,
   autoCreateWorkspaceMock,
+  createNoteTaskMock,
   errorToastMock,
   fetchProvidersMock,
   infoToastMock,
   navigateMock,
-  savePreflightMock,
-  startItemPipelineMock,
   successToastMock,
   warningToastMock,
 } = vi.hoisted(() => ({
   addTaskMock: vi.fn(),
-  addWorkspaceItemMock: vi.fn(),
   autoCreateWorkspaceMock: vi.fn(),
+  createNoteTaskMock: vi.fn(),
   errorToastMock: vi.fn(),
   fetchProvidersMock: vi.fn(),
   infoToastMock: vi.fn(),
   navigateMock: vi.fn(),
-  savePreflightMock: vi.fn(),
-  startItemPipelineMock: vi.fn(),
   successToastMock: vi.fn(),
   warningToastMock: vi.fn(),
 }))
@@ -33,11 +28,12 @@ vi.mock('react-router-dom', () => ({
   useNavigate: () => navigateMock,
 }))
 
+vi.mock('@/services/pipeline', () => ({
+  createNoteTask: createNoteTaskMock,
+}))
+
 vi.mock('@/services/workspaces', () => ({
-  addWorkspaceItem: addWorkspaceItemMock,
   autoCreateWorkspace: autoCreateWorkspaceMock,
-  savePreflight: savePreflightMock,
-  startItemPipeline: startItemPipelineMock,
 }))
 
 vi.mock('@/store/providerStore', () => ({
@@ -54,6 +50,20 @@ vi.mock('@/store/taskStore', () => ({
     selector({ addTask: addTaskMock }),
 }))
 
+const fetchTemplatesMock = vi.fn()
+
+vi.mock('@/store/templateStore', () => ({
+  useTemplateStore: (selector?: (s: Record<string, unknown>) => unknown) => {
+    const state = {
+      getOptions: () => ['auto'],
+      fetch: fetchTemplatesMock,
+      templates: [],
+      loading: false,
+    }
+    return selector ? selector(state) : state
+  },
+}))
+
 vi.mock('sonner', () => ({
   toast: {
     success: successToastMock,
@@ -62,48 +72,6 @@ vi.mock('sonner', () => ({
     info: infoToastMock,
   },
 }))
-
-function makeItem(overrides: Partial<WorkspaceItem>): WorkspaceItem {
-  return {
-    item_id: 'item-1',
-    type: 'video',
-    source: 'url',
-    source_value: 'https://example.com/source',
-    name: 'item',
-    status: 'pending',
-    preflight: {
-      background_overrides: {},
-      models: {},
-      tasks: {},
-    },
-    results: {},
-    related_task_ids: [],
-    tags: {},
-    created_at: '2026-05-22T00:00:00.000Z',
-    updated_at: '2026-05-22T00:00:00.000Z',
-    ...overrides,
-  }
-}
-
-function makeWorkspace(items: WorkspaceItem[]): WorkspaceRecord {
-  return {
-    workspace_id: 'ws-1',
-    name: '测试工作空间',
-    status: 'active',
-    trashed: false,
-    background: {
-      content_type: '',
-      participants: [],
-      topic: '',
-      glossary: [],
-      purpose: '',
-    },
-    items,
-    favorites: [],
-    created_at: '2026-05-22T00:00:00.000Z',
-    updated_at: '2026-05-22T00:00:00.000Z',
-  }
-}
 
 const defaultProps = {
   open: true,
@@ -114,50 +82,60 @@ const defaultProps = {
   onCreated: vi.fn(),
 }
 
-describe('PreflightDrawer F4.3', () => {
+describe('PreflightDrawer R4', () => {
   beforeEach(() => {
     addTaskMock.mockReset()
-    addWorkspaceItemMock.mockReset()
     autoCreateWorkspaceMock.mockReset()
+    createNoteTaskMock.mockReset()
     errorToastMock.mockReset()
     fetchProvidersMock.mockReset()
     infoToastMock.mockReset()
     navigateMock.mockReset()
-    savePreflightMock.mockReset()
-    startItemPipelineMock.mockReset()
     successToastMock.mockReset()
     warningToastMock.mockReset()
   })
 
-  it('优先使用用户在 mixed modal 里的单项选择，而不是 possible_types 全量拆分', async () => {
-    addWorkspaceItemMock.mockResolvedValue(
-      makeWorkspace([
-        makeItem({
-          item_id: 'item-image',
-          type: 'image',
-          source_value: defaultProps.url,
-          name: 'abc (图片)',
-        }),
-      ]),
-    )
-    savePreflightMock.mockResolvedValue(makeWorkspace([]))
-    startItemPipelineMock.mockResolvedValue({
-      workspace: makeWorkspace([]),
-      task_id: 'task-image',
-      task_type: 'image',
+  it('R4: 提交时调用 createNoteTask（替代旧三步流程）', async () => {
+    autoCreateWorkspaceMock.mockResolvedValue({
+      workspace_id: 'ws-1',
+      name: '自动工作空间',
     })
+    createNoteTaskMock.mockResolvedValue({ status: 'created', task_id: 'task-video', task_type: 'note' })
+    render(<PreflightDrawer {...defaultProps} />)
+
+    fireEvent.click(screen.getByRole('button', { name: /开始解析/ }))
+
+    await waitFor(() => {
+      expect(createNoteTaskMock).toHaveBeenCalledTimes(1)
+    })
+    expect(createNoteTaskMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: defaultProps.url,
+        material_type: 'video',
+        workspace_id: 'ws-1',
+      }),
+    )
+    expect(navigateMock).toHaveBeenCalledWith('/processing/task-video', expect.anything())
+  })
+
+  it('R4: 优先使用 stagedConfig.types 决定素材类型', async () => {
+    autoCreateWorkspaceMock.mockResolvedValue({
+      workspace_id: 'ws-1',
+      name: '自动工作空间',
+    })
+    createNoteTaskMock.mockResolvedValue({ status: 'created', task_id: 'task-image' })
 
     render(
       <PreflightDrawer
         {...defaultProps}
-        selectedTypes={['image']}
-        sniffResult={{
-          primary_type: 'image',
-          possible_types: ['image', 'text'],
-          platform: 'xiaohongshu',
-          title: null,
-          thumbnail: null,
-          content_type_header: 'text/html',
+        stagedConfig={{
+          types: ['image', 'text'],
+          features: {
+            image: { describe: true, ocr: false, prompt: true, assoc: false },
+            text: { summary_keypoints: true, rewrite: false, translate: false, multi_compare: false },
+          },
+          background: {},
+          workspaceIds: ['ws-1'],
         }}
       />,
     )
@@ -165,148 +143,53 @@ describe('PreflightDrawer F4.3', () => {
     fireEvent.click(screen.getByRole('button', { name: /开始解析/ }))
 
     await waitFor(() => {
-      expect(addWorkspaceItemMock).toHaveBeenCalledTimes(1)
+      expect(createNoteTaskMock).toHaveBeenCalledTimes(2)
     })
-    expect(addWorkspaceItemMock).toHaveBeenCalledWith('ws-1', expect.objectContaining({
-      type: 'image',
-      source_value: defaultProps.url,
-    }))
-    expect(startItemPipelineMock).toHaveBeenCalledTimes(1)
+    expect(createNoteTaskMock).toHaveBeenCalledWith(
+      expect.objectContaining({ material_type: 'image' }),
+    )
+    expect(createNoteTaskMock).toHaveBeenCalledWith(
+      expect.objectContaining({ material_type: 'text' }),
+    )
   })
 
-  it('多 item 创建时按类型和名称命中刚创建的素材，而不是复用第一个同 URL item', async () => {
-    const url = 'https://www.bilibili.com/video/BV1qA5j6jEJC'
-    addWorkspaceItemMock
-      .mockResolvedValueOnce(
-        makeWorkspace([
-          makeItem({
-            item_id: 'item-video',
-            type: 'video',
-            source_value: url,
-            name: 'BV1qA5j6jEJC (视频)',
-          }),
-        ]),
-      )
-      .mockResolvedValueOnce(
-        makeWorkspace([
-          makeItem({
-            item_id: 'item-video',
-            type: 'video',
-            source_value: url,
-            name: 'BV1qA5j6jEJC (视频)',
-          }),
-          makeItem({
-            item_id: 'item-audio',
-            type: 'audio',
-            source_value: url,
-            name: 'BV1qA5j6jEJC (音频)',
-          }),
-        ]),
-      )
-    savePreflightMock.mockResolvedValue(makeWorkspace([]))
-    startItemPipelineMock
-      .mockResolvedValueOnce({
-        workspace: makeWorkspace([]),
-        task_id: 'task-video',
-        task_type: 'download',
-      })
-      .mockResolvedValueOnce({
-        workspace: makeWorkspace([]),
-        task_id: 'task-audio',
-        task_type: 'audio',
-      })
-
+  it('R4: stagedConfig 的 background 预填表单字段', () => {
     render(
       <PreflightDrawer
         {...defaultProps}
-        url={url}
-        platformName="Bilibili"
-        sniffResult={{
-          primary_type: 'video',
-          possible_types: ['video', 'audio'],
-          platform: 'bilibili',
-          title: null,
-          thumbnail: null,
-          content_type_header: null,
+        stagedConfig={{
+          types: ['video'],
+          features: { video: { visual_prompt: true, video_summary: true, subtitle_export: true, music_analysis: false } },
+          background: { content_type: '课程', purpose: '内容学习', topic: '深度学习' },
+          workspaceIds: ['ws-1'],
         }}
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /开始解析/ }))
-
-    await waitFor(() => {
-      expect(addWorkspaceItemMock).toHaveBeenCalledTimes(2)
-    })
-
-    expect(savePreflightMock).toHaveBeenNthCalledWith(
-      1,
-      'ws-1',
-      'item-video',
-      expect.objectContaining({
-        tasks: expect.objectContaining({
-          summary: expect.objectContaining({ path: 'detailed' }),
-        }),
-      }),
-    )
-    expect(savePreflightMock).toHaveBeenNthCalledWith(
-      2,
-      'ws-1',
-      'item-audio',
-      expect.objectContaining({
-        tasks: {},
-      }),
-    )
-    expect(startItemPipelineMock).toHaveBeenNthCalledWith(1, 'ws-1', 'item-video')
-    expect(startItemPipelineMock).toHaveBeenNthCalledWith(2, 'ws-1', 'item-audio')
-    expect(navigateMock).toHaveBeenCalledWith('/processing/task-video', {
-      state: { url, workspaceId: 'ws-1', itemId: 'item-video' },
-    })
+    expect((screen.getByDisplayValue('课程') as HTMLSelectElement).value).toBe('课程')
+    expect((screen.getByDisplayValue('内容学习') as HTMLSelectElement).value).toBe('内容学习')
+    expect((screen.getByDisplayValue('深度学习') as HTMLInputElement).value).toBe('深度学习')
   })
 
-  it('路径 1 默认使用 auto 视频模板，触发后端自动检测', async () => {
-    addWorkspaceItemMock.mockResolvedValue(
-      makeWorkspace([
-        makeItem({
-          item_id: 'item-video',
-          type: 'video',
-          source_value: defaultProps.url,
-          name: 'abc',
-        }),
-      ]),
-    )
-    savePreflightMock.mockResolvedValue(makeWorkspace([]))
-    startItemPipelineMock.mockResolvedValue({
-      workspace: makeWorkspace([]),
-      task_id: 'task-video',
-      task_type: 'download',
+  it('R4: 视频素材传入 preflight summary 配置', async () => {
+    autoCreateWorkspaceMock.mockResolvedValue({
+      workspace_id: 'ws-1',
+      name: '自动工作空间',
     })
+    createNoteTaskMock.mockResolvedValue({ status: 'created', task_id: 'task-video', task_type: 'note' })
+    render(<PreflightDrawer {...defaultProps} />)
 
-    render(
-      <PreflightDrawer
-        {...defaultProps}
-        sniffResult={{
-          primary_type: 'video',
-          possible_types: ['video'],
-          platform: 'bilibili',
-          title: null,
-          thumbnail: null,
-          content_type_header: null,
-        }}
-      />,
-    )
-
+    // 切换到路径 1
     fireEvent.click(screen.getByLabelText(/路径 1：字幕直接总结/))
     fireEvent.click(screen.getByRole('button', { name: /开始解析/ }))
 
     await waitFor(() => {
-      expect(savePreflightMock).toHaveBeenCalledTimes(1)
+      expect(createNoteTaskMock).toHaveBeenCalledTimes(1)
     })
 
-    expect(savePreflightMock).toHaveBeenCalledWith(
-      'ws-1',
-      'item-video',
+    expect(createNoteTaskMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        tasks: expect.objectContaining({
+        preflight: expect.objectContaining({
           summary: expect.objectContaining({
             path: 'subtitle',
             video_template: 'auto',

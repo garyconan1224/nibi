@@ -90,6 +90,8 @@ git log --oneline -10
 
 **总体节奏**：F → V → A → T → I → R（先打通整体路径，再逐个深化分支，最后 R 收官）
 
+> 🔴 **当前阶段（2026-05-24 起）**：**Phase IR 首页输入层重构**（属 Track F 子项，但因横跨 Composer/Modal/Preflight 单独立项）。计划见 [`docs/plans/phase-r-input-refactor.md`](plans/phase-r-input-refactor.md)。IR 未完工前不要并行启动其他 track 的新 phase。
+
 ---
 
 ## 3. Track F：全流程（Flow）
@@ -535,7 +537,15 @@ chore/<cleanup-name>           # 清理 / 文档
 
 ## 11. 推荐执行顺序
 
+> ⚠️ **2026-05-24 插队**：**Phase IR 首页输入层重构**（in_progress，分支 `feat/phase-r-input-refactor`）暂时阻塞下方所有未完项。
+> - 计划：[`docs/plans/phase-r-input-refactor.md`](plans/phase-r-input-refactor.md)（R0~R6 子任务）
+> - 归属：Track F（修首页死按钮 / 三层配置压一层 / 单链接多类型循环入队）
+> - **命名提醒**：本文件 §8 的「Track R 复刻 / AI 导演 [C]」是另一回事，不要混淆——文件名 `phase-r-input-refactor` 里的 R 指 Refactor。
+> - IR 完成并 merge 进 main 后，再继续走下方顺序。
+
 ```
+IR 首页输入层重构                       ← 当前阶段 (in_progress)
+  ↓
 F1 流程缺口补齐 (IP.9 Tier A UI)        ← 已完成 (f33db14)
   ↓
 F1 Tier B 后端（路径 1 + 字幕清洗已完成；路径 3 Gemini 待用户拍板）

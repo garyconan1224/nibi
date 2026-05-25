@@ -4,18 +4,6 @@ export interface PlatformInfo {
   types: Array<'video' | 'audio' | 'image' | 'article'>
 }
 
-export type QualityOption = '最高画质' | '1080p' | '720p' | '仅音频'
-export type FrameMode = 'A' | 'B'
-export type PipelineTone = 'pink' | 'purple' | 'blue' | 'amber' | null
-
-export interface PipelineStep {
-  n: string
-  t: string
-  s: string
-  tone: PipelineTone
-  defaultOn: boolean
-}
-
 export interface TaskCard {
   id: string
   title: string
@@ -23,17 +11,4 @@ export interface TaskCard {
   type: string
   state: 'done' | 'running' | 'error' | 'cancelled' | 'queued'
   thumb?: string
-}
-
-/** Composer 高级参数打包，透传给 PreflightDrawer */
-export interface ComposerDefaults {
-  quality: QualityOption
-  frameMode: FrameMode
-  fps: number
-  maxFrames: number
-  stepIds: string[]
-  asrModelId: string
-  visionModelId: string
-  textModelId: string
-  promptStyle: string
 }

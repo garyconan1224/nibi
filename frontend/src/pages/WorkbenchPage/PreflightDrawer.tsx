@@ -1,28 +1,19 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { X, ArrowRight, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useProviderStore } from '@/store/providerStore'
 import { useTaskStore } from '@/store/taskStore'
 import { useTemplateStore } from '@/store/templateStore'
-import {
-  addWorkspaceItem,
-  autoCreateWorkspace,
-  savePreflight,
-  startItemPipeline,
-} from '@/services/workspaces'
+import { createNoteTask } from '@/services/pipeline'
+import type { NotePreflightOverrides } from '@/services/pipeline'
+import { autoCreateWorkspace } from '@/services/workspaces'
 import type { SniffResult } from '@/services/workspaces'
 import type { ItemType } from '@/types/workspace'
-import type { ComposerDefaults, QualityOption } from './types'
+import type { StagedConfig } from '@/components/workspace/AddMaterialModal'
+import { FEATURES_BY_TYPE, type Feature } from '@/lib/featuresToSteps'
 import { OUTPUT_FORMAT_OPTIONS } from '@/lib/preflightTasks'
 import type { RewriteStyle, VideoOutputFormat } from '@/lib/preflightTasks'
-
-const QUALITY_MAP: Record<QualityOption, string> = {
-  '最高画质': 'best',
-  '1080p': '1080',
-  '720p': '720',
-  '仅音频': 'audio',
-}
 
 const CONTENT_TYPES = ['课程', '会议', '宣传片', 'Vlog', '访谈', '纯音乐', '其他']
 const PURPOSES = ['复刻参考', '竞品分析', '内容学习', '其他']
@@ -47,12 +38,12 @@ interface PreflightDrawerProps {
   platformName: string | null
   /** 当混合内容场景下用户选了多种类型时传入 */
   selectedTypes?: string[]
-  /** Composer 高级参数默认值 */
-  composerDefaults?: ComposerDefaults
   /** F4.2: URL 嗅探结果——用于自动确定 item type */
   sniffResult?: SniffResult | null
   /** IP.6: 选中的工作空间 ID（简化方案：只传第一个） */
   workspaceId?: string
+  /** R4: 模态传入的 staged config，优先于设置页默认 */
+  stagedConfig?: StagedConfig
   onClose: () => void
   onCreated: () => void
 }
@@ -62,9 +53,9 @@ export function PreflightDrawer({
   url,
   platformName,
   selectedTypes,
-  composerDefaults,
   sniffResult,
   workspaceId,
+  stagedConfig,
   onClose,
   onCreated,
 }: PreflightDrawerProps) {
@@ -85,12 +76,18 @@ export function PreflightDrawer({
   const [textTranslateLang, setTextTranslateLang] = useState('en')
   const navigate = useNavigate()
 
-  // Track which Composer defaults have been applied
-  const appliedDefaultsRef = useRef({ vision: false, text: false, asr: false })
-  const cd = composerDefaults
-
   // F4.2: 组件级素材类型——嗅探结果优先，失败退化为 video
   const resolvedType = sniffResult?.primary_type ?? 'video'
+
+  // R4: 从 stagedConfig 提取 feature 列表
+  const stagedFeaturesForType = (type: ItemType): Feature[] => {
+    if (!stagedConfig?.features?.[type]) return []
+    return (Object.entries(stagedConfig.features[type]) as [Feature, boolean][])
+      .filter(([, enabled]) => enabled)
+      .map(([id]) => id)
+  }
+
+  const sc = stagedConfig
 
   const { providers, providerModels, fetchProviders, modelsLoading } = useProviderStore()
   const addTask = useTaskStore((s) => s.addTask)
@@ -105,27 +102,29 @@ export function PreflightDrawer({
     if (open) fetchTemplates()
   }, [open, fetchTemplates])
 
-  // Reset form when opened, applying Composer defaults as initial values
+  // Reset form when opened, R4: stagedConfig 优先，否则用设置页默认。
+  // react-hooks/set-state-in-effect: intentional reset-on-open pattern, consistent with codebase.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) {
-      appliedDefaultsRef.current = { vision: false, text: false, asr: false }
-      setContentType('')
-      setPurpose('')
-      setTopic('')
+      setContentType(sc?.background?.content_type ?? '')
+      setPurpose(sc?.background?.purpose ?? '')
+      setTopic(sc?.background?.topic ?? '')
       setVisionProviderId('')
       setTextProviderId('')
-      setVisionModelId(cd?.visionModelId ?? '')
-      setTextModelId(cd?.textModelId ?? '')
+      setVisionModelId('')
+      setTextModelId('')
       setSummaryPath('detailed')
       setVideoTemplate('auto')
       setOutputFormat('summary')
-      setTextRewriteEnabled(false)
+      setTextRewriteEnabled(sc?.features?.text?.rewrite ?? false)
       setTextRewriteStyle('formal')
-      setTextTranslateEnabled(false)
+      setTextTranslateEnabled(sc?.features?.text?.translate ?? false)
       setTextTranslateLang('en')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const enabledProviders = providers.filter((p) => p.enabled && p.has_api_key)
   const visionProviders = useMemo(
@@ -140,47 +139,11 @@ export function PreflightDrawer({
   const visionModels = visionProviderId ? (providerModels[visionProviderId] ?? []) : []
   const textModels = textProviderId ? (providerModels[textProviderId] ?? []) : []
 
-  // Reverse-lookup: find provider from default model ID, then set model when loaded
-  useEffect(() => {
-    if (!open || !cd || appliedDefaultsRef.current.vision) return
-    if (cd.visionModelId && !visionProviderId) {
-      const found = enabledProviders.find(
-        (p) => (providerModels[p.id] ?? []).some((m) => m.id === cd.visionModelId),
-      )
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- Two-step provider→model requires cascade
-      if (found) setVisionProviderId(found.id)
-    }
-    if (cd.visionModelId && visionProviderId && !visionModelId && !modelsLoading[visionProviderId]) {
-      if (visionModels.some((m) => m.id === cd.visionModelId)) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- Two-step provider→model requires cascade
-        setVisionModelId(cd.visionModelId)
-        appliedDefaultsRef.current.vision = true
-      }
-    }
-  }, [open, cd, visionProviderId, visionModelId, enabledProviders, providerModels, modelsLoading, visionModels])
-
-  useEffect(() => {
-    if (!open || !cd || appliedDefaultsRef.current.text) return
-    if (cd.textModelId && !textProviderId) {
-      const found = enabledProviders.find(
-        (p) => (providerModels[p.id] ?? []).some((m) => m.id === cd.textModelId),
-      )
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- Two-step provider→model requires cascade
-      if (found) setTextProviderId(found.id)
-    }
-    if (cd.textModelId && textProviderId && !textModelId && !modelsLoading[textProviderId]) {
-      if (textModels.some((m) => m.id === cd.textModelId)) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- Two-step provider→model requires cascade
-        setTextModelId(cd.textModelId)
-        appliedDefaultsRef.current.text = true
-      }
-    }
-  }, [open, cd, textProviderId, textModelId, enabledProviders, providerModels, modelsLoading, textModels])
-
   const normalizeItemType = (type: string): ItemType => ITEM_TYPE_ALIASES[type] ?? (type as ItemType)
 
-  // 用户在 mixed modal 的显式选择应当优先于嗅探建议。
+  // R4: stagedConfig.types 优先，否则退化为 selectedTypes → sniffResult → resolvedType
   const typesToCreate: ItemType[] = (() => {
+    if (sc?.types?.length) return sc.types
     const rawTypes = selectedTypes?.length
       ? selectedTypes
       : sniffResult?.possible_types?.length
@@ -191,30 +154,10 @@ export function PreflightDrawer({
 
   const typeLabel = (type: ItemType): string => ITEM_TYPE_LABELS[type]
 
+  // R4: start resolution via createNoteTask, using stagedConfig when onFineTune→drawer flow
   const handleConfirm = async () => {
     setSubmitting(true)
-    // shared across all items
-    const sharedPayload: Record<string, unknown> = {
-      content_type: contentType,
-      topic,
-      purpose,
-    }
-    if (cd) {
-      sharedPayload.quality = QUALITY_MAP[cd.quality] ?? cd.quality
-      sharedPayload.frame_mode = cd.frameMode
-      sharedPayload.frame_interval_sec = cd.fps
-      sharedPayload.max_frames = cd.maxFrames
-      sharedPayload.enabled_steps = cd.stepIds
-      sharedPayload.prompt_style = cd.promptStyle
-    }
-    const sharedModels = {
-      ...(visionModelId && { vision: visionModelId }),
-      ...(textModelId && { text: textModelId }),
-    }
-    const baseName = url.split('/').pop()?.split('?')[0] || url
-
     try {
-      // 1. workspace
       let wsId = workspaceId
       if (!wsId) {
         const ws = await autoCreateWorkspace({ hint_url: url })
@@ -222,7 +165,6 @@ export function PreflightDrawer({
         toast.info(`已自动创建工作空间「${ws.name}」`)
       }
 
-      // 2. for each type: create item → save preflight → start pipeline
       let firstTaskId: string | null = null
       let firstItemId: string | null = null
       let successCount = 0
@@ -230,57 +172,46 @@ export function PreflightDrawer({
 
       for (const itemType of typesToCreate) {
         try {
-          const itemName = typesToCreate.length > 1
-            ? `${baseName} (${typeLabel(itemType)})`
-            : baseName
-          const itemRes = await addWorkspaceItem(wsId, {
-            type: itemType,
-            source: 'url',
-            source_value: url,
-            name: itemName,
-          })
-          const matchingItems = [...itemRes.items].reverse()
-          const newItem = matchingItems.find((it) =>
-            it.source_value === url && it.type === itemType && it.name === itemName,
-          ) ?? matchingItems.find((it) =>
-            it.source_value === url && it.type === itemType,
-          )
-          const itemId = newItem?.item_id ?? itemRes.items[itemRes.items.length - 1]?.item_id
-          if (!itemId) throw new Error('创建素材失败')
+          const features: Feature[] = stagedFeaturesForType(itemType).length > 0
+            ? stagedFeaturesForType(itemType)
+            : FEATURES_BY_TYPE[itemType].filter(f => f.defaultChecked).map(f => f.id)
 
-          // type-specific tasks
-          const tasks: Record<string, unknown> = {}
+          const bg: Record<string, unknown> = {}
+          if (contentType) bg.content_type = contentType
+          if (purpose) bg.purpose = purpose
+          if (topic) bg.topic = topic
+
+          const preflight: NotePreflightOverrides = {
+            models: {
+              ...(visionModelId && { vision: visionModelId }),
+              ...(textModelId && { text: textModelId }),
+            },
+          }
           if (itemType === 'video') {
-            tasks.summary = {
-              enabled: true,
+            preflight.summary = {
               path: summaryPath,
-              depth: 'normal',
               video_template: videoTemplate,
               output_format: outputFormat,
             }
           }
           if (itemType === 'text') {
-            tasks.rewrite = {
-              enabled: textRewriteEnabled,
-              style: textRewriteStyle,
-            }
-            tasks.translate = {
-              enabled: textTranslateEnabled,
-              target_lang: textTranslateLang,
-            }
+            preflight.text_rewrite = { enabled: textRewriteEnabled, style: textRewriteStyle }
+            preflight.text_translate = { enabled: textTranslateEnabled, target_lang: textTranslateLang }
           }
 
-          await savePreflight(wsId, itemId, {
-            background_overrides: sharedPayload,
-            models: sharedModels,
-            tasks,
+          const res = await createNoteTask({
+            url,
+            material_type: itemType,
+            enabled_features: features,
+            background: bg as Record<string, string>,
+            workspace_id: wsId,
+            preflight,
           })
 
-          const startRes = await startItemPipeline(wsId, itemId)
           addTask({
-            task_id: startRes.task_id,
+            task_id: res.task_id,
             project_id: '',
-            task_type: startRes.task_type,
+            task_type: res.task_type,
             payload: {},
             status: 'PENDING',
             progress: 0,
@@ -293,7 +224,7 @@ export function PreflightDrawer({
             updated_at: new Date().toISOString(),
           })
 
-          if (!firstTaskId) { firstTaskId = startRes.task_id; firstItemId = itemId }
+          if (!firstTaskId) { firstTaskId = res.task_id; firstItemId = itemType }
           successCount++
         } catch (e) {
           errors.push(`${typeLabel(itemType)}: ${e instanceof Error ? e.message : '创建失败'}`)
