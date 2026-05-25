@@ -29,8 +29,7 @@ export function Hero({ backendUrl = '127.0.0.1:8000' }: HeroProps) {
       </h1>
 
       <p className="lede">
-        粘贴 B站 / YouTube / 小红书 / 抖音链接,或上传本地视频·图片·音频·文字 ——
-        VidMirror 自动识别类型,调用 AI 分析并提取画面提示词、字幕、风格参数,归入任务数据库。
+        粘贴链接或拖入文件 — VidMirror 自动识别类型并提取创作蓝图。
       </p>
     </section>
   )
