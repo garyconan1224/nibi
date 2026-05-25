@@ -75,6 +75,24 @@ def _is_douyin_url(url: str) -> bool:
     return any(d in u for d in ("douyin.com", "iesdouyin.com", "v.douyin", "dy.com"))
 
 
+def is_platform_url(url: str) -> bool:
+    """检测 URL 是否属于已知需要 yt-dlp 处理的视频平台。"""
+    if not url:
+        return False
+    u = url.lower()
+    needles = (
+        "bilibili.com", "b23.tv",
+        "youtube.com", "youtu.be",
+        "douyin.com", "iesdouyin.com", "v.douyin", "dy.com",
+        "kuaishou.com", "kwai.com",
+        "xiaohongshu.com", "xhslink.com",
+        "weibo.com", "weibo.cn",
+        "twitter.com", "x.com",
+        "tiktok.com",
+    )
+    return any(n in u for n in needles)
+
+
 def _bilibili_yt_dlp_extras() -> dict[str, Any]:
     ua = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
