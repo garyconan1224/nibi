@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, ArrowRight, Loader2, Settings } from 'lucide-react'
+import { X, ArrowRight, Loader2, Settings, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { useProviderStore } from '@/store/providerStore'
 import { useTemplateStore } from '@/store/templateStore'
@@ -207,6 +207,9 @@ export function PreflightDrawer({
   const groups = TASK_GROUPS[kind] ?? []
   const currentTasks = (tasks[kind] ?? {}) as Record<string, { on?: boolean; [k: string]: unknown }>
   const enabledCount = Object.values(currentTasks).filter(v => v && (v as { on?: boolean }).on).length
+
+  const setKindTask = (gid: string, patch: Record<string, unknown>) =>
+    setTasks(s => ({ ...s, [kind]: { ...s[kind], [gid]: { ...(s[kind]?.[gid] as Record<string, unknown> ?? {}), ...patch } } }))
 
   // ── Preset apply ──
   const applyPreset = useCallback((preset: typeof PRESETS[number]) => {
@@ -463,13 +466,12 @@ export function PreflightDrawer({
             <div style={{ height: 1, background: 'var(--line)', margin: '4px 0' }} />
             <div style={{ display: 'grid', gap: 10 }}>
               {groups.map(g => (
-                <div key={g.id} style={{
-                  border: '1px solid var(--line)', borderRadius: 14, padding: 14,
-                  background: currentTasks[g.id]?.on ? 'var(--bg-elev)' : 'transparent',
-                }}>
-                  <span style={{ fontSize: 14, fontWeight: 600 }}>{g.label}</span>
-                  {g.sub && <span className="mono" style={{ fontSize: 10, color: 'var(--ink-3)', marginLeft: 8 }}>{g.sub}</span>}
-                </div>
+                <PFTaskCard
+                  key={g.id}
+                  group={g}
+                  state={(currentTasks[g.id] as Record<string, unknown>) ?? {}}
+                  setState={(p) => setKindTask(g.id, p)}
+                />
               ))}
             </div>
           </PFSection>
@@ -705,6 +707,162 @@ function PresetBar({ current, onPick }: {
           </button>
         )
       })}
+    </div>
+  )
+}
+
+function PFTaskCard({ group, state, setState, lockedReason, disabledReason }: {
+  group: { id: string; label: string; sub?: string; children?: { id: string; label: string; type: string; options?: string[]; default: unknown; unit?: string; whenParent?: string; whenValue?: string }[] }
+  state: Record<string, unknown>
+  setState: (patch: Record<string, unknown>) => void
+  lockedReason?: string
+  disabledReason?: string
+}) {
+  const on = !!state.on
+  const locked = !!lockedReason
+  const disabled = !!disabledReason
+  const cardBg = disabled ? 'var(--bg-sunken)'
+    : on ? 'var(--bg-elev)'
+    : 'transparent'
+  return (
+    <div style={{
+      border: '1px solid var(--line)',
+      borderRadius: 14,
+      padding: 14,
+      background: cardBg,
+      opacity: disabled ? 0.55 : 1,
+      transition: 'background 140ms ease, border-color 140ms ease, opacity 140ms ease',
+      borderColor: locked ? 'var(--accent)' : on ? 'var(--line-strong)' : 'var(--line)',
+    }}>
+      <label style={{
+        display: 'flex', alignItems: 'flex-start', gap: 12,
+        cursor: (locked || disabled) ? 'not-allowed' : 'pointer',
+      }}>
+        <div style={{
+          width: 22, height: 22, borderRadius: 7,
+          border: `2px solid ${on ? (locked ? 'var(--accent)' : 'var(--ink)') : 'var(--line-strong)'}`,
+          background: on ? (locked ? 'var(--accent)' : 'var(--ink)') : 'transparent',
+          display: 'grid', placeItems: 'center',
+          flexShrink: 0, marginTop: 2,
+          transition: 'all 140ms ease',
+          position: 'relative',
+        }}>
+          {on && !locked && <Check size={12} stroke="var(--bg)" strokeWidth={3} />}
+          {on && locked && (
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3">
+              <rect x="5" y="11" width="14" height="10" rx="2" />
+              <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+            </svg>
+          )}
+          <input type="checkbox" checked={on}
+            disabled={locked || disabled}
+            onChange={e => setState({ on: e.target.checked })}
+            style={{ position: 'absolute', opacity: 0, inset: 0, cursor: (locked || disabled) ? 'not-allowed' : 'pointer' }} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>{group.label}</span>
+            {locked && (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 7px', borderRadius: 99,
+                background: 'rgba(255,77,126,0.12)', color: 'var(--accent)',
+                fontSize: 10, fontFamily: 'var(--mono)', letterSpacing: '0.04em', fontWeight: 600,
+              }}>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                </svg>
+                依赖锁定
+              </span>
+            )}
+            {disabled && (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', padding: '2px 7px', borderRadius: 99,
+                background: 'var(--bg-sunken)', color: 'var(--ink-3)',
+                fontSize: 10, fontFamily: 'var(--mono)', letterSpacing: '0.04em',
+              }}>
+                条件不满足
+              </span>
+            )}
+          </div>
+          {group.sub && (
+            <div className="mono" style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 3, letterSpacing: '0.04em' }}>{group.sub}</div>
+          )}
+          {(lockedReason || disabledReason) && (
+            <div style={{ fontSize: 11, color: locked ? 'var(--accent)' : 'var(--ink-3)', marginTop: 5, lineHeight: 1.4 }}>
+              {lockedReason || disabledReason}
+            </div>
+          )}
+        </div>
+      </label>
+
+      {on && group.children && (
+        <div style={{
+          marginTop: 14, paddingTop: 14,
+          borderTop: '1px dashed var(--line)',
+          display: 'grid', gap: 10,
+        }}>
+          {group.children.map(c => {
+            if (c.whenParent && state[c.whenParent] !== c.whenValue) return null
+
+            if (c.type === 'radio') {
+              const val = state[c.id] ?? c.default
+              return (
+                <div key={c.id}>
+                  <div style={{ fontSize: 11, color: 'var(--ink-2)', marginBottom: 6, fontWeight: 500 }}>{c.label}</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {(c.options ?? []).map(o => {
+                      const active = val === o
+                      return (
+                        <button key={o} onClick={() => setState({ [c.id]: o })}
+                          style={{
+                            height: 28, padding: '0 12px',
+                            borderRadius: 8,
+                            border: `1px solid ${active ? 'var(--ink)' : 'var(--line)'}`,
+                            background: active ? 'var(--ink)' : 'var(--bg)',
+                            color: active ? 'var(--bg)' : 'var(--ink)',
+                            fontSize: 11, fontFamily: 'var(--mono)',
+                            cursor: 'pointer',
+                          }}>
+                          {o}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            }
+            if (c.type === 'check') {
+              return (
+                <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12 }}>
+                  <input type="checkbox" checked={!!state[c.id]} onChange={e => setState({ [c.id]: e.target.checked })}
+                    style={{ accentColor: 'var(--ink)', width: 14, height: 14 }} />
+                  <span style={{ color: 'var(--ink-2)' }}>{c.label}</span>
+                </label>
+              )
+            }
+            if (c.type === 'number') {
+              return (
+                <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 11, color: 'var(--ink-2)', minWidth: 60 }}>{c.label}</span>
+                  <input type="number" value={(state[c.id] ?? c.default) as number}
+                    onChange={e => setState({ [c.id]: Number(e.target.value) })}
+                    className="pf-inp" style={{ width: 80, height: 28, padding: '0 8px' }} />
+                  {c.unit && <span className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{c.unit}</span>}
+                </div>
+              )
+            }
+            if (c.type === 'text') {
+              return (
+                <div key={c.id}>
+                  <div style={{ fontSize: 11, color: 'var(--ink-2)', marginBottom: 6 }}>{c.label}</div>
+                  <input className="pf-inp" value={(state[c.id] ?? c.default) as string} onChange={e => setState({ [c.id]: e.target.value })} />
+                </div>
+              )
+            }
+            return null
+          })}
+        </div>
+      )}
     </div>
   )
 }
