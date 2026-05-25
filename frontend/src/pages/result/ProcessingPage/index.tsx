@@ -91,17 +91,6 @@ export default function ProcessingPage() {
     return () => clearInterval(timer)
   }, [isActive])
 
-  // 任务完成后自动跳转结果总览页
-  useEffect(() => {
-    if (!isSuccess) return
-    if (!itemId) return // 没有 itemId 时不跳转（旧链接兼容）
-    const timer = setTimeout(() => {
-      const wid = workspaceId ?? 'default'
-      navigate(`/workspaces/${wid}/items/${itemId}/overview`, { replace: true })
-    }, 1500)
-    return () => clearTimeout(timer)
-  }, [isSuccess, workspaceId, itemId, navigate])
-
   const handleCancel = () => {
     if (taskId) cancelTask(taskId)
   }
@@ -230,7 +219,7 @@ export default function ProcessingPage() {
                       className="chip-dot"
                       style={{ background: 'var(--accent-green)' }}
                     />
-                    完成 · 自动跳转中…
+                    完成 · 点击查看结果
                   </span>
                 )}
               </div>
