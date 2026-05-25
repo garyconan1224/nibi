@@ -22,8 +22,9 @@ import {
   CONTENT_TYPES,
   PURPOSES,
   buildInitialTasks,
+  applyCascades,
 } from './preflightTasks'
-import type { MediaKind } from './preflightTasks'
+import type { MediaKind, TaskState } from './preflightTasks'
 
 const ITEM_TYPE_ALIASES: Record<string, ItemType> = {
   article: 'text',
@@ -50,6 +51,8 @@ interface PreflightDrawerProps {
   stagedConfig?: StagedConfig
   mode?: 'execute' | 'stage'
   onSaveStaged?: (staged: StagedConfig) => void
+  /** R8: 当前素材数量（级联用） */
+  materialCount?: number
   onClose: () => void
   onCreated: () => void
 }
@@ -87,6 +90,7 @@ export function PreflightDrawer({
   stagedConfig,
   mode = 'execute',
   onSaveStaged,
+  materialCount = 1,
   onClose,
   onCreated,
 }: PreflightDrawerProps) {
@@ -206,10 +210,20 @@ export function PreflightDrawer({
   // ── New: current kind task state & counts ──
   const groups = TASK_GROUPS[kind] ?? []
   const currentTasks = (tasks[kind] ?? {}) as Record<string, { on?: boolean; [k: string]: unknown }>
-  const enabledCount = Object.values(currentTasks).filter(v => v && (v as { on?: boolean }).on).length
+  // ── Cascade: compute effective state + lock/disabled reasons ──
+  const cascaded = applyCascades(kind, currentTasks as TaskState, materialCount)
+  const effState = cascaded.state
+  const locks = cascaded.locks
+  const disabledReasons = cascaded.disabled
+  const enabledCount = Object.values(effState).filter(v => v && v.on).length
 
-  const setKindTask = (gid: string, patch: Record<string, unknown>) =>
+  const setKindTask = (gid: string, patch: Record<string, unknown>) => {
+    // Block uncheck if locked-on by cascade
+    if (patch.on === false && locks[gid]) return
+    // Block check if disabled (e.g. multi compare with only 1 material)
+    if (patch.on === true && disabledReasons[gid]) return
     setTasks(s => ({ ...s, [kind]: { ...s[kind], [gid]: { ...(s[kind]?.[gid] as Record<string, unknown> ?? {}), ...patch } } }))
+  }
 
   // ── Preset apply ──
   const applyPreset = useCallback((preset: typeof PRESETS[number]) => {
@@ -465,14 +479,19 @@ export function PreflightDrawer({
             <PresetBar current={activePreset} onPick={applyPreset} />
             <div style={{ height: 1, background: 'var(--line)', margin: '4px 0' }} />
             <div style={{ display: 'grid', gap: 10 }}>
-              {groups.map(g => (
-                <PFTaskCard
-                  key={g.id}
-                  group={g}
-                  state={(currentTasks[g.id] as Record<string, unknown>) ?? {}}
-                  setState={(p) => setKindTask(g.id, p)}
-                />
-              ))}
+              {groups.map(g => {
+                const st = (effState[g.id] as Record<string, unknown>) ?? {}
+                return (
+                  <PFTaskCard
+                    key={g.id}
+                    group={g}
+                    state={st}
+                    setState={(p) => setKindTask(g.id, p)}
+                    lockedReason={locks[g.id]}
+                    disabledReason={disabledReasons[g.id]}
+                  />
+                )
+              })}
             </div>
           </PFSection>
 
