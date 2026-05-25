@@ -426,6 +426,31 @@
   word-break: break-all;
 }
 
+/* ─── TasksCard ─── */
+.vm-processing-scope .tasklet {
+  display: flex;
+  gap: 10px;
+}
+
+.vm-processing-scope .tasklet:hover {
+  background: var(--bg-sunken) !important;
+}
+
+.vm-processing-scope .tl-thumb {
+  width: 56px;
+  aspect-ratio: 16/9;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #000;
+}
+
+.vm-processing-scope .tl-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 /* ─── Responsive ─── */
 @media (max-width: 900px) {
   .vm-processing-scope .proc-wrap {

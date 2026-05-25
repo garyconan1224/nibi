@@ -10,6 +10,7 @@ import { categorizeError } from '@/lib/errorCategories'
 import MusicModeConfirmModal from '@/components/workspace/MusicModeConfirmModal'
 import { StepProgress } from './StepProgress'
 import SystemResourceCard from './SystemResourceCard'
+import TasksCard from './TasksCard'
 import { LiveLog } from './LiveLog'
 
 import './processing.css'
@@ -278,6 +279,7 @@ export default function ProcessingPage() {
         {/* Sidebar */}
         <aside className="proc-side">
           <SystemResourceCard etaSec={etaSec} />
+          <TasksCard currentTaskId={taskId} />
           <LiveLog logs={logs} />
         </aside>
       </div>
