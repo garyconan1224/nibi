@@ -66,12 +66,15 @@ const VideoDetail = ({ material, onBack, onAddFavorite }) => {
   const [promptStyle, setPromptStyle] = React.useState('mj');
   const [copied, setCopied]     = React.useState(false);
   const [favored, setFavored]   = React.useState({});
+  const [speed, setSpeed]       = React.useState(1);    // §5.4 [ / ] ×0.5 / ×2
+  const [toast, setToast]       = React.useState(null); // ephemeral hint above the player
+  const [showHints, setShowHints] = React.useState(false);
 
   const transcriptRef = React.useRef(null);
   const stripRef      = React.useRef(null);
   const promptZoneRef = React.useRef(null);
 
-  /* ── Simulated playback ── */
+  /* ── Simulated playback (×speed) ── */
   React.useEffect(() => {
     if (!playing) return;
     const t = setInterval(() => {
@@ -79,9 +82,9 @@ const VideoDetail = ({ material, onBack, onAddFavorite }) => {
         if (f >= VM_DATA.FRAMES.length - 1) { setPlaying(false); return f; }
         return f + 1;
       });
-    }, 1400);
+    }, Math.max(120, 1400 / speed));
     return () => clearInterval(t);
-  }, [playing]);
+  }, [playing, speed]);
 
   const frame  = VM_DATA.FRAMES[activeFrame];
   const prompt = VD_PROMPTS[activeFrame] || VD_PROMPTS[0];
@@ -147,6 +150,52 @@ const VideoDetail = ({ material, onBack, onAddFavorite }) => {
     ? JSON.stringify({ timestamp: frame.ts, title: frame.title, prompt_mj: prompt.mj, prompt_sd: prompt.sd, tags: prompt.tags }, null, 2)
     : (promptStyle === 'sd' ? prompt.sd : prompt.mj);
 
+  /* ─── §5.4 键盘快捷键 ───
+     Space play/pause · ←/→ -5/+5s · Shift+←/→ prev/next 镶头
+     [ / ] ×0.5 / ×2 · C 复制 · F 收藏 · 1/2/3 MJ/SD/JSON */
+  const flashToast = (msg) => {
+    setToast(msg);
+    clearTimeout(flashToast._t);
+    flashToast._t = setTimeout(() => setToast(null), 1200);
+  };
+  const jumpBySec = (delta) => {
+    const target = frame.sec + delta;
+    const nf = VM_DATA.FRAMES.reduce((best, f, fi) =>
+      Math.abs(f.sec - target) < Math.abs(VM_DATA.FRAMES[best].sec - target) ? fi : best, 0);
+    setActiveFrame(nf); setPlaying(false);
+  };
+  React.useEffect(() => {
+    const onKey = (e) => {
+      // Ignore when user is typing
+      const tag = (e.target && e.target.tagName) || '';
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return;
+      // Layout: "?" toggles hints panel
+      if (e.key === '?' || (e.shiftKey && e.key === '/')) { e.preventDefault(); setShowHints(s => !s); return; }
+      if (e.code === 'Space') { e.preventDefault(); setPlaying(p => !p); flashToast(playing ? '⏸ 暂停' : '▶ 播放'); return; }
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        if (e.shiftKey) { setActiveFrame(f => Math.max(0, f-1)); setPlaying(false); flashToast('← 上一镶头'); }
+        else            { jumpBySec(-5); flashToast('← -5s'); }
+        return;
+      }
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        if (e.shiftKey) { setActiveFrame(f => Math.min(VM_DATA.FRAMES.length-1, f+1)); setPlaying(false); flashToast('→ 下一镶头'); }
+        else            { jumpBySec(5); flashToast('→ +5s'); }
+        return;
+      }
+      if (e.key === '[') { e.preventDefault(); setSpeed(s => Math.max(0.25, +(s/2).toFixed(2))); flashToast('× 减速'); return; }
+      if (e.key === ']') { e.preventDefault(); setSpeed(s => Math.min(4,   +(s*2).toFixed(2))); flashToast('× 加速'); return; }
+      if (e.key === 'c' || e.key === 'C') { e.preventDefault(); handleCopy(); flashToast('C 复制提示词'); return; }
+      if (e.key === 'f' || e.key === 'F') { e.preventDefault(); handleFavorite(); flashToast('F 收藏当前帧'); return; }
+      if (e.key === '1') { e.preventDefault(); setPromptStyle('mj');   flashToast('1 · Midjourney');   return; }
+      if (e.key === '2') { e.preventDefault(); setPromptStyle('sd');   flashToast('2 · Stable Diffusion'); return; }
+      if (e.key === '3') { e.preventDefault(); setPromptStyle('json'); flashToast('3 · JSON');          return; }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [playing, frame.sec, promptText, favored, activeFrame]); // re-bind so closures stay fresh
+
   /* ── Render ── */
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', height: '100%', overflow: 'hidden' }}>
@@ -166,6 +215,18 @@ const VideoDetail = ({ material, onBack, onAddFavorite }) => {
             {material?.title || '大疆 Pocket 4 首发体验'}
           </span>
           <span className="kw mono" style={{ fontSize:10, flexShrink:0 }}>VIDEO · 6:42</span>
+          {speed !== 1 && (
+            <span className="kw mono" style={{ fontSize:10, flexShrink:0, background:'var(--accent)', color:'#fff', borderColor:'var(--accent)' }}>
+              ×{speed}
+            </span>
+          )}
+          <button className="btn btn-ghost" onClick={() => setShowHints(s => !s)}
+                  title="键盘快捷键 (?)"
+                  style={{ height:28, padding:'0 10px', fontSize:12, flexShrink:0,
+                           background: showHints ? 'var(--bg-sunken)' : 'transparent' }}>
+            <span style={{ fontFamily:'var(--mono)', fontSize:11, fontWeight:600 }}>?</span>
+            <span style={{ fontSize:11 }}>快捷键</span>
+          </button>
           <button className="btn btn-ghost" style={{ height:28, padding:'0 10px', fontSize:12, flexShrink:0 }}>
             <IcDownload size={13}/> .srt
           </button>
@@ -180,7 +241,53 @@ const VideoDetail = ({ material, onBack, onAddFavorite }) => {
         </div>
 
         {/* ── Video player ── */}
-        <div style={{ padding:'14px 20px 10px', flexShrink:0 }}>
+        <div style={{ padding:'14px 20px 10px', flexShrink:0, position:'relative' }}>
+          {/* §5.4 Ephemeral keyboard toast */}
+          {toast && (
+            <div style={{ position:'absolute', top:24, left:'50%', transform:'translateX(-50%)',
+                          padding:'7px 14px', borderRadius:99, background:'rgba(0,0,0,0.78)',
+                          color:'#fff', fontSize:12, fontFamily:'var(--mono)', letterSpacing:'0.04em',
+                          zIndex:10, pointerEvents:'none',
+                          backdropFilter:'blur(8px)' }}>
+              {toast}
+            </div>
+          )}
+          {/* §5.4 Keyboard hints panel */}
+          {showHints && (
+            <div style={{ position:'absolute', top:24, right:24, zIndex:10, width:260,
+                          background:'var(--bg-elev)', border:'1px solid var(--line)',
+                          borderRadius:14, boxShadow:'var(--shadow-lg)', padding:14,
+                          fontSize:12 }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+                            marginBottom:10, paddingBottom:8, borderBottom:'1px solid var(--line)' }}>
+                <span className="eyebrow">键盘快捷键 · §5.4</span>
+                <button className="btn btn-ghost" onClick={() => setShowHints(false)}
+                        style={{ width:22, height:22, padding:0, display:'grid', placeItems:'center' }}>
+                  <IcX size={12}/>
+                </button>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'auto 1fr', gap:'7px 12px', alignItems:'baseline' }}>
+                {[
+                  ['Space', '播放 / 暂停'],
+                  ['← / →', '后退 / 前进 5秒'],
+                  ['Shift+←/→', '上 / 下一镶头'],
+                  ['[ / ]', '×0.5 / ×2 倍速'],
+                  ['C', '复制当前帧提示词'],
+                  ['F', '收藏当前帧'],
+                  ['1 / 2 / 3', '切换 MJ / SD / JSON'],
+                  ['?', '切换本面板'],
+                ].map(([k, v]) => (
+                  <React.Fragment key={k}>
+                    <span className="mono" style={{ fontSize:10, padding:'2px 6px', borderRadius:5,
+                                                     background:'var(--bg-sunken)', color:'var(--ink)',
+                                                     border:'1px solid var(--line)', whiteSpace:'nowrap',
+                                                     fontWeight:600 }}>{k}</span>
+                    <span style={{ fontSize:12, color:'var(--ink-2)' }}>{v}</span>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          )}
           <div onClick={() => setPlaying(p => !p)}
                style={{ position:'relative', borderRadius:16, overflow:'hidden', cursor:'pointer',
                         background: frame.bg, aspectRatio:'16/9', maxHeight:260 }}>
@@ -224,23 +331,36 @@ const VideoDetail = ({ material, onBack, onAddFavorite }) => {
             </div>
             <div ref={stripRef}
                  style={{ display:'flex', gap:5, overflowX:'auto', paddingBottom:6 }}>
-              {VM_DATA.FRAMES.map((f, i) => (
-                <div key={i} onClick={() => { setActiveFrame(i); setPlaying(false); }}
+              {VM_DATA.FRAMES.map((f, i) => {
+                /* §13 · 仅当 material 标记了真实失败帧时才显示 retry 覆盖层 */
+                const failed = (material?.failed_frames || []).includes(i);
+                return (
+                <div key={i} onClick={() => { if (failed) return; setActiveFrame(i); setPlaying(false); }}
                      style={{
-                       flexShrink:0, width:96, borderRadius:8, overflow:'hidden', cursor:'pointer',
+                       flexShrink:0, width:96, borderRadius:8, overflow:'hidden',
+                       cursor: failed ? 'not-allowed' : 'pointer',
                        border:`2px solid ${i===activeFrame ? 'var(--accent)' : 'transparent'}`,
-                       background:'var(--bg-sunken)',
+                       background:'var(--bg-sunken)', position:'relative',
                        transform: i===activeFrame ? 'translateY(-2px)' : 'none',
                        transition:'border-color 140ms, transform 140ms',
                      }}>
                   <img src={`assets/frame_${f.ts.replace(/:/g,'_')}.svg`}
-                       style={{ width:'100%', aspectRatio:'16/9', objectFit:'cover', display:'block' }}/>
+                       style={{ width:'100%', aspectRatio:'16/9', objectFit:'cover', display:'block',
+                                opacity: failed ? 0.4 : 1 }}/>
                   <div className="mono" style={{ fontSize:9, color:'var(--ink-4)', padding:'3px 5px 0' }}>{f.ts}</div>
                   <div style={{ fontSize:10, padding:'1px 5px 5px', fontWeight: i===activeFrame ? 600 : 400,
                                 color: i===activeFrame ? 'var(--accent)' : 'var(--ink-2)',
                                 whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{f.title}</div>
+                  {failed && (
+                    <FailedFrameOverlay onRetry={() => {
+                      /* demo: blink + reset would happen here; just animate */
+                      const el = stripRef.current?.children[i];
+                      if (el) { el.style.animation = 'none'; setTimeout(() => el.style.animation = 'proc-blink 0.5s 2', 10); }
+                    }}/>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

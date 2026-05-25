@@ -68,7 +68,7 @@ const KVRow = ({ label, value, mono = false }) => (
 /* ═══════════════════════════════════════════
    ImageDetail
    ═══════════════════════════════════════════ */
-const ImageDetail = ({ material, onBack }) => {
+const ImageDetail = ({ material, onBack, onMultiCompare }) => {
   const [promptStyle, setPromptStyle] = React.useState('mj');
   const [copied, setCopied]     = React.useState(false);
   const [favored, setFavored]   = React.useState(false);
@@ -113,6 +113,13 @@ const ImageDetail = ({ material, onBack }) => {
             {material?.title || '海边日落参考图 · 9张'}
           </span>
           <span className="kw mono" style={{ fontSize: 10 }}>IMAGE · {batchImages.length} 张</span>
+          {batchImages.length >= 2 && onMultiCompare && (
+            <button className="btn" onClick={onMultiCompare}
+                    style={{ height:28, padding:'0 10px', fontSize:12, gap:5,
+                             background:'var(--bg-sunken)', borderColor:'var(--line-strong)' }}>
+              <IcCompare size={13}/>多图对比
+            </button>
+          )}
           <button className="btn btn-ghost" style={{ height: 28, padding: '0 10px', fontSize: 12 }}>
             <IcDownload size={13}/> OCR .txt
           </button>

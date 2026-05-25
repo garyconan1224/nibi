@@ -151,7 +151,7 @@ const renderTextMD = (md) => {
 /* ═══════════════════════════════════════════
    TextDetail
    ═══════════════════════════════════════════ */
-const TextDetail = ({ material, onBack }) => {
+const TextDetail = ({ material, onBack, onMultiCompare }) => {
   const [activeTab,    setActiveTab]    = React.useState('analysis');
   const [rewriteStyle, setRewriteStyle] = React.useState('formal');
   const [showTranslate, setShowTranslate] = React.useState(false);
@@ -195,6 +195,13 @@ const TextDetail = ({ material, onBack }) => {
             {material?.title || TEXT_DATA.title}
           </span>
           <span className="kw mono" style={{ fontSize: 10, flexShrink: 0 }}>TEXT · {TEXT_DATA.wordCount} 字</span>
+          {onMultiCompare && (
+            <button className="btn" onClick={onMultiCompare}
+                    style={{ height:28, padding:'0 10px', fontSize:12, gap:5, flexShrink:0,
+                             background:'var(--bg-sunken)', borderColor:'var(--line-strong)' }}>
+              <IcCompare size={13}/>多文对比 · 3 篇
+            </button>
+          )}
         </div>
 
         {/* Phase 3C — 7 维度标签 */}

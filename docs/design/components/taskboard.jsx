@@ -1,4 +1,5 @@
-/* Taskboard (v2.1) — 任务中心:素材 / 标签库 / 收藏 / 风格报告 / 对比 / 导出 / 版本 */
+/* Taskboard — 工作空间主页:素材 / 队列 / 导出 / AI 对话
+   复刻专项（标签库/收藏/风格报告/对比/版本）已迁出至 Director 路由 */
 
 const _typeIcon = { video: IcFilm, audio: IcMusic, image: IcImage, text: IcDoc };
 const _typeLabel = { video:'视频', audio:'音频', image:'图片', text:'文字' };
@@ -39,15 +40,9 @@ const Taskboard = ({ onAddMaterial, onOpenMaterial }) => {
   const [tab, setTab] = React.useState('materials');
   const cfg = VM_DATA.TASK_CONFIG || { name:'未命名任务', contentType:'—', people:'—', background:'—', terms:'—', purpose:'—' };
   const tabs = [
-    { id:'materials', l:'素材', en:'Materials',    ic: IcLayers,  n: (VM_DATA.MATERIALS||[]).length },
-    { id:'queue',     l:'队列', en:'Queue',        ic: IcList,    n: (VM_DATA.MATERIALS||[]).filter(m=>m.state==='running'||m.state==='queued'||m.state==='error').length },
-    { id:'tags',      l:'标签库', en:'Tag Library', ic: IcTag,     n: Object.values(VM_DATA.TAG_LIB||{}).flat().length },
-    { id:'favs',      l:'收藏夹', en:'Favorites',   ic: IcStar,    n: (VM_DATA.FAVORITES||[]).length },
-    { id:'style',     l:'风格报告', en:'Style Report', ic: IcSpark, n: null },
-    { id:'compare',   l:'对比', en:'Compare',      ic: IcCompare, n: null },
-    { id:'history',   l:'版本', en:'Versions',     ic: IcClock,   n: (VM_DATA.PROMPT_VERSIONS||[]).length },
-    { id:'export',    l:'导出', en:'Export',       ic: IcArchive, n: null },
-    { id:'chat',      l:'AI 对话', en:'Task Chat',  ic: IcSpark,   n: null },
+    { id:'materials', l:'素材', en:'Materials',   ic: IcLayers,  n: (VM_DATA.MATERIALS||[]).length },
+    { id:'export',    l:'导出', en:'Export',      ic: IcArchive, n: null },
+    { id:'chat',      l:'AI 对话', en:'Task Chat', ic: IcSpark,   n: null },
   ];
 
   return (
@@ -91,12 +86,6 @@ const Taskboard = ({ onAddMaterial, onOpenMaterial }) => {
       {/* ─── Content ─── */}
       <div className="tb-body">
         {tab==='materials' && <TBMaterials onAdd={onAddMaterial} onOpenMaterial={onOpenMaterial}/>}
-        {tab==='queue'     && <TBQueue/>}
-        {tab==='tags'      && <TBTags/>}
-        {tab==='favs'      && <TBFavorites/>}
-        {tab==='style'     && <TBStyle/>}
-        {tab==='compare'   && <TBCompare/>}
-        {tab==='history'   && <TBHistory/>}
         {tab==='export'    && <TBExport/>}
         {tab==='chat'      && <TaskChat/>}
       </div>
@@ -122,327 +111,6 @@ const TBMaterials = ({ onAdd, onOpenMaterial }) => {
                 return <span key={g} className="kw"><Ic size={11}/>{_typeLabel[g]}</span>;
               })}
             </div>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-};
-
-/* ─── Tag library ─── */
-const TBTags = () => {
-  const [filter, setFilter] = React.useState('all');
-  const all = Object.entries(VM_DATA.TAG_LIB);
-  return (
-    <>
-      <div className="tb-head-mini">
-        <div>
-          <div className="eyebrow">提示词维度 · 5类 · 共 {Object.values(VM_DATA.TAG_LIB).flat().length} 个标签</div>
-          <h2 className="display" style={{fontSize:28, margin:'4px 0 0'}}>标签库 · Prompt Tag Library</h2>
-        </div>
-        <div style={{display:'flex', gap:8}}>
-          <div className="tw-segm">
-            <button data-active={filter==='all'} onClick={()=>setFilter('all')}>全部</button>
-            <button data-active={filter==='auto'} onClick={()=>setFilter('auto')}>自动</button>
-            <button data-active={filter==='manual'} onClick={()=>setFilter('manual')}>手动</button>
-          </div>
-          <button className="btn"><IcPlus size={13}/>新标签</button>
-        </div>
-      </div>
-      <div className="tb-tag-grid">
-        {all.map(([dim, tags]) => (
-          <div key={dim} className="tag-col">
-            <div className="tag-col-h">
-              <span>{dim}</span>
-              <span className="mono" style={{fontSize:10, color:'var(--ink-3)'}}>{tags.length}</span>
-            </div>
-            <div className="tag-col-b">
-              {tags
-                .filter(t => filter==='all' || (filter==='auto'?t.auto:!t.auto))
-                .map(t => (
-                <div key={t.tag} className="tag-row" data-auto={t.auto}>
-                  <div className="tag-l">
-                    <span className="tag-name">{t.tag}</span>
-                    <span className={`tag-badge ${t.auto?'auto':'manual'}`}>{t.auto?'自动':'手动'}</span>
-                  </div>
-                  <div className="tag-r">
-                    <span className="tag-bar"><span style={{width:`${Math.min(100,t.count*8)}%`}}/></span>
-                    <span className="mono" style={{fontSize:11, color:'var(--ink-3)', minWidth:22, textAlign:'right'}}>{t.count}</span>
-                    <span className="mono" style={{fontSize:10, color:'var(--ink-4)'}}>{t.from.length}素材</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </>
-  );
-};
-
-/* ─── Favorites ─── */
-const TBFavorites = () => {
-  const [sel, setSel] = React.useState(VM_DATA.FAVORITES[0].id);
-  const cur = VM_DATA.FAVORITES.find(f=>f.id===sel) || VM_DATA.FAVORITES[0];
-  const f = VM_DATA.FRAMES[cur.thumb];
-  return (
-    <>
-      <div className="tb-head-mini">
-        <div>
-          <div className="eyebrow">参考帧 · 复刻清单 · {VM_DATA.FAVORITES.length} 条</div>
-          <h2 className="display" style={{fontSize:28, margin:'4px 0 0'}}>收藏夹 · Reference Frames</h2>
-        </div>
-        <button className="btn"><IcDownload size={13}/>导出收藏包</button>
-      </div>
-      <div className="fav-split">
-        <div className="fav-list">
-          {VM_DATA.FAVORITES.map(fv => {
-            const ff = VM_DATA.FRAMES[fv.thumb];
-            return (
-              <div key={fv.id} className="fav-item" data-active={fv.id===sel} onClick={()=>setSel(fv.id)}>
-                <div className="fav-th"><img src={`assets/frame_${ff.ts.replace(/:/g,'_')}.svg`}/></div>
-                <div className="fav-meta">
-                  <div className="fav-note">{fv.note}</div>
-                  <div className="mono" style={{fontSize:10, color:'var(--ink-3)'}}>{fv.material} · {fv.ts}</div>
-                </div>
-                <IcStar size={14} style={{color:'var(--accent-warm)', fill:'var(--accent-warm)'}}/>
-              </div>
-            );
-          })}
-        </div>
-        <div className="fav-detail">
-          <div className="fav-hero">
-            <img src={`assets/frame_${f.ts.replace(/:/g,'_')}.svg`}/>
-            <div className="fav-hero-ov">
-              <span className="mono">{cur.ts}</span>
-              <span>{cur.note}</span>
-            </div>
-          </div>
-          <div className="fav-prompt">
-            <div className="fp-head">
-              <span className="eyebrow">PROMPT · MIDJOURNEY</span>
-              <div style={{display:'flex', gap:6}}>
-                <button className="btn btn-ghost" style={{height:26, padding:'0 10px', fontSize:11}}>MJ</button>
-                <button className="btn btn-ghost" style={{height:26, padding:'0 10px', fontSize:11}}>SD</button>
-                <button className="btn btn-ghost" style={{height:26, padding:'0 10px', fontSize:11}}>JSON</button>
-              </div>
-            </div>
-            <div className="fp-text">{cur.prompt}</div>
-            <div className="fp-foot">
-              <button className="btn"><IcDownload size={13}/>复制</button>
-              <button className="btn"><IcEdit size={13}/>改版为 v4</button>
-              <button className="btn btn-primary"><IcWand size={13}/>送去生成</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-};
-
-/* ─── Style report ─── */
-const TBStyle = () => {
-  const r = VM_DATA.STYLE_REPORT;
-  return (
-    <>
-      <div className="tb-head-mini">
-        <div>
-          <div className="eyebrow">创作者风格提取 · 基于 {r.materials} 个素材 · {r.generated}</div>
-          <h2 className="display" style={{fontSize:34, margin:'4px 0 0'}}>{r.author} 的创作指纹</h2>
-        </div>
-        <div style={{display:'flex', gap:8}}>
-          <button className="btn"><IcDownload size={13}/>导出 MD</button>
-          <button className="btn btn-primary"><IcSpark size={13}/>重新生成</button>
-        </div>
-      </div>
-
-      <div className="style-grid">
-        {/* Word cloud */}
-        <div className="style-panel span-2">
-          <div className="sp-h"><span className="eyebrow">惯用词云</span><span className="mono" style={{fontSize:11, color:'var(--ink-3)'}}>{r.wordcloud.length} 高频词</span></div>
-          <div className="wordcloud">
-            {r.wordcloud.map((w,i) => (
-              <span key={w.w} className="wc-w" style={{fontSize:`${w.size}px`, color: i%3===0?'var(--accent)':i%3===1?'var(--accent-2)':'var(--ink)'}}>
-                {w.w}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Palette */}
-        <div className="style-panel">
-          <div className="sp-h"><span className="eyebrow">色彩偏好</span></div>
-          <div className="palette">
-            {r.palette.map((c,i)=>(
-              <div key={i} className="pal-sw" style={{background:c}}>
-                <span className="mono">{c}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Shots */}
-        <div className="style-panel">
-          <div className="sp-h"><span className="eyebrow">镜头习惯</span></div>
-          <div className="shots-bar">
-            {Object.entries(r.shots).map(([k,v],i) => {
-              const max = Math.max(...Object.values(r.shots));
-              return (
-                <div key={k} className="sb-item">
-                  <div className="sb-lab"><span>{k}</span><span className="mono" style={{color:'var(--ink-3)'}}>{v}</span></div>
-                  <div className="sb-bar"><span style={{width:`${(v/max)*100}%`, background:`hsl(${i*60}, 70%, 55%)`}}/></div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Music */}
-        <div className="style-panel">
-          <div className="sp-h"><span className="eyebrow">音乐偏好</span></div>
-          <div className="music-line">
-            <div><span className="mono eyebrow" style={{fontSize:9}}>BPM</span><div className="display" style={{fontSize:38}}>{r.music.bpm}</div></div>
-            <div><span className="mono eyebrow" style={{fontSize:9}}>KEYS</span><div style={{fontSize:18, fontWeight:600, marginTop:4}}>{r.music.keys.join(' · ')}</div></div>
-          </div>
-          <div style={{marginTop:12, display:'flex', gap:6, flexWrap:'wrap'}}>
-            {r.music.genres.map(g => <span key={g} className="kw">{g}</span>)}
-          </div>
-        </div>
-
-        {/* Advice */}
-        <div className="style-panel">
-          <div className="sp-h"><span className="eyebrow">复刻建议</span></div>
-          <ul className="advice">
-            {r.advice.map((a,i) => <li key={i}><span className="ad-n mono">{String(i+1).padStart(2,'0')}</span>{a}</li>)}
-          </ul>
-        </div>
-      </div>
-    </>
-  );
-};
-
-/* ─── Compare ─── */
-const TBCompare = () => {
-  const c = VM_DATA.COMPARE;
-  const refF = VM_DATA.FRAMES[c.reference.thumb];
-  const genF = VM_DATA.FRAMES[c.generated.thumb];
-  const [precision, setPrecision] = React.useState(c.precision);
-  return (
-    <>
-      <div className="tb-head-mini">
-        <div>
-          <div className="eyebrow">原作 vs 生成 · 差距分析</div>
-          <h2 className="display" style={{fontSize:28, margin:'4px 0 0'}}>对比报告 · Compare</h2>
-        </div>
-        <div style={{display:'flex', gap:8, alignItems:'center'}}>
-          <div className="tw-segm">
-            {['整体风格对比','构图细节对比','精细像素级对比'].map(p => (
-              <button key={p} data-active={precision===p} onClick={()=>setPrecision(p)}>{p.replace('对比','')}</button>
-            ))}
-          </div>
-          <button className="btn btn-primary"><IcSpark size={13}/>重新分析</button>
-        </div>
-      </div>
-
-      <div className="cmp-stage">
-        <div className="cmp-img">
-          <div className="cmp-label">原作 · Reference</div>
-          <img src={`assets/frame_${refF.ts.replace(/:/g,'_')}.svg`}/>
-          <div className="cmp-foot mono">{c.reference.label}</div>
-        </div>
-        <div className="cmp-score">
-          <div className="eyebrow" style={{marginBottom:4}}>SIMILARITY</div>
-          <div className="display cmp-num">{c.score}</div>
-          <div className="mono" style={{fontSize:10, color:'var(--ink-3)', letterSpacing:'0.12em'}}>/ 100</div>
-          <div className="cmp-ring">
-            <svg viewBox="0 0 80 80">
-              <circle cx="40" cy="40" r="34" stroke="var(--line-strong)" strokeWidth="3" fill="none"/>
-              <circle cx="40" cy="40" r="34" stroke="var(--accent)" strokeWidth="3" fill="none"
-                strokeDasharray={`${(c.score/100)*213} 213`} strokeLinecap="round" transform="rotate(-90 40 40)"/>
-            </svg>
-          </div>
-        </div>
-        <div className="cmp-img">
-          <div className="cmp-label">生成 · Generated</div>
-          <img src={`assets/frame_${genF.ts.replace(/:/g,'_')}.svg`}/>
-          <div className="cmp-foot mono">{c.generated.label}</div>
-        </div>
-      </div>
-
-      <div className="cmp-split">
-        <div className="cmp-panel">
-          <div className="eyebrow" style={{padding:'14px 18px 0'}}>维度差距</div>
-          <div className="cmp-deltas">
-            {c.deltas.map((d,i) => (
-              <div key={i} className="cmp-delta">
-                <div className="cd-l">
-                  <span className="cd-dim">{d.dim}</span>
-                  <span className="mono cd-pct" style={{color: d.match>=80?'var(--accent-green)':d.match>=70?'var(--accent-warm)':'var(--accent)'}}>{d.match}%</span>
-                </div>
-                <div className="cd-bar"><span style={{width:`${d.match}%`, background: d.match>=80?'var(--accent-green)':d.match>=70?'var(--accent-warm)':'var(--accent)'}}/></div>
-                <div className="cd-note">{d.note}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="cmp-panel">
-          <div className="eyebrow" style={{padding:'14px 18px 0'}}>提示词优化建议</div>
-          <ul className="advice" style={{padding:'12px 18px 18px'}}>
-            {c.suggestions.map((s,i) => <li key={i}><span className="ad-n mono">→</span>{s}</li>)}
-          </ul>
-          <div style={{padding:'0 18px 18px', display:'flex', gap:8}}>
-            <button className="btn"><IcEdit size={13}/>应用到 v4</button>
-            <button className="btn btn-primary"><IcWand size={13}/>再生成一轮</button>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-};
-
-/* ─── Prompt versions ─── */
-const TBHistory = () => {
-  const [sel, setSel] = React.useState(VM_DATA.PROMPT_VERSIONS.length-1);
-  const cur = VM_DATA.PROMPT_VERSIONS[sel];
-  return (
-    <>
-      <div className="tb-head-mini">
-        <div>
-          <div className="eyebrow">提示词迭代 · 霓虹 H 转场参考</div>
-          <h2 className="display" style={{fontSize:28, margin:'4px 0 0'}}>版本历史 · Prompt Versions</h2>
-        </div>
-        <div style={{display:'flex', gap:8}}>
-          <button className="btn"><IcCompare size={13}/>对比所选</button>
-          <button className="btn btn-primary"><IcPlus size={13}/>新版本</button>
-        </div>
-      </div>
-
-      <div className="ver-split">
-        <div className="ver-timeline">
-          {VM_DATA.PROMPT_VERSIONS.map((v, i) => (
-            <div key={v.v} className="ver-node" data-active={i===sel} onClick={()=>setSel(i)}>
-              <div className="vn-dot" data-active={v.active}/>
-              {i < VM_DATA.PROMPT_VERSIONS.length-1 && <div className="vn-line"/>}
-              <div className="vn-body">
-                <div className="vn-v">
-                  <span className="display" style={{fontSize:28}}>{v.v}</span>
-                  {v.active && <span className="kw" style={{background:'var(--ink)', color:'var(--bg)', border:'none'}}>当前</span>}
-                  <span className={`vn-by ${v.by}`}>{v.by==='auto'?'AUTO':'YOU'}</span>
-                </div>
-                <div className="mono" style={{fontSize:11, color:'var(--ink-3)'}}>{v.at}</div>
-                <div className="vn-note">{v.note}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="ver-view">
-          <div className="eyebrow" style={{marginBottom:8}}>{cur.v} · {cur.at}</div>
-          <div className="ver-text">{cur.text}</div>
-          <div style={{display:'flex', gap:8, marginTop:14, flexWrap:'wrap'}}>
-            <button className="btn"><IcDownload size={13}/>复制</button>
-            <button className="btn"><IcClock size={13}/>回退到此版本</button>
-            <button className="btn"><IcEdit size={13}/>以此为基础新建 v4</button>
-            <button className="btn btn-primary"><IcWand size={13}/>送去生成</button>
           </div>
         </div>
       </div>
@@ -617,13 +285,77 @@ const TBQueue = () => {
 };
 
 /* ─── Add material modal ─── */
-const AddMaterialModal = ({ open, onClose, onSubmit }) => {
-  const [type, setType] = React.useState('video');
+const AddMaterialModal = ({ open, onClose, onSubmit, onFineTune, urlValue, workspaceIds }) => {
   const [url, setUrl] = React.useState('');
-  const [tasks, setTasks] = React.useState({
-    '画面提示词': true, '视频文案总结': true, '字幕导出': false,
-    '音乐分析': false, '说话人区分': false,
-  });
+  // Accept url passed from Workbench composer
+  React.useEffect(() => { if (urlValue) setUrl(urlValue); }, [urlValue]);
+
+  // ── § 多类型选择 + 按类型勾选 features ──
+  const TASK_BY_TYPE = {
+    video: ['画面提示词','视频文案总结','字幕导出','音乐分析'],
+    audio: ['人声转写总结','说话人区分','音乐分析','音乐提示词'],
+    image: ['内容识别描述','OCR文字提取','画面提示词','联想总结'],
+    text:  ['摘要/要点/金句','联想归纳','改写/润色','多文对比'],
+  };
+  const typeOptions = [
+    { id:'video', l:'视频', en:'Video', ic:IcFilm  },
+    { id:'audio', l:'音频', en:'Audio', ic:IcMusic },
+    { id:'image', l:'图片', en:'Image', ic:IcImage },
+    { id:'text',  l:'文字', en:'Text',  ic:IcDoc   },
+  ];
+  // Auto-detect type set from URL (xhs can be video+image+text, weixin = text, etc.)
+  const TYPES_BY_HOST = {
+    'bilibili.com':   ['video'],
+    'youtube.com':    ['video'],
+    'youtu.be':       ['video'],
+    'douyin.com':     ['video'],
+    'kuaishou.com':   ['video'],
+    'xiaohongshu.com':['video','image','text'],
+    'weixin.qq.com':  ['text'],
+  };
+  const detectTypes = (u) => {
+    if (!u) return ['video'];
+    try {
+      const h = new URL(u).hostname.replace('www.','');
+      for (const k in TYPES_BY_HOST) if (h.includes(k)) return TYPES_BY_HOST[k];
+    } catch {}
+    return ['video'];
+  };
+  const initialDefaults = (typeList) => Object.fromEntries(
+    typeList.map(t => [t, Object.fromEntries(TASK_BY_TYPE[t].map((task, i) => [task, i < 2]))])
+  );
+
+  const [types, setTypes] = React.useState(['video']);
+  // tasks shape: { video: { '画面提示词': true, ... }, image: {...} }
+  const [tasks, setTasks] = React.useState(initialDefaults(['video']));
+
+  // On open: derive initial type set from URL & seed defaults
+  React.useEffect(() => {
+    if (!open) return;
+    const initial = detectTypes(urlValue || url);
+    setTypes(initial);
+    setTasks(initialDefaults(initial));
+  }, [open, urlValue]);
+
+  const toggleType = (id) => {
+    setTypes(prev => {
+      const isOn = prev.includes(id);
+      const next = isOn ? prev.filter(x => x !== id) : [...prev, id];
+      setTasks(prevTasks => {
+        const out = { ...prevTasks };
+        if (isOn) { delete out[id]; }
+        else { out[id] = Object.fromEntries(TASK_BY_TYPE[id].map((task, i) => [task, i < 2])); }
+        return out;
+      });
+      return next;
+    });
+  };
+  const toggleTask = (typeId, task) => setTasks(s => ({
+    ...s,
+    [typeId]: { ...(s[typeId]||{}), [task]: !(s[typeId]||{})[task] },
+  }));
+
+  const enabledCount = Object.values(tasks).reduce((sum, m) => sum + Object.values(m).filter(Boolean).length, 0);
   // ── §3.1 背景信息 ──
   const [bgOpen,    setBgOpen]    = React.useState(false);
   const [bgType,    setBgType]    = React.useState('宣传片');
@@ -632,19 +364,7 @@ const AddMaterialModal = ({ open, onClose, onSubmit }) => {
   const [bgTerms,   setBgTerms]   = React.useState('');
   const [bgPurpose, setBgPurpose] = React.useState('复刻参考');
 
-  const TASK_BY_TYPE = {
-    video: ['画面提示词','视频文案总结','字幕导出','音乐分析'],
-    audio: ['人声转写总结','说话人区分','音乐分析','音乐提示词'],
-    image: ['内容识别描述','OCR文字提取','画面提示词','联想总结'],
-    text:  ['摘要/要点/金句','联想归纳','改写/润色','多文对比'],
-  };
-  const typeOptions = [
-    { id:'video', l:'视频', en:'Video · URL/文件', ic:IcFilm  },
-    { id:'audio', l:'音频', en:'Audio · MP3/WAV',  ic:IcMusic },
-    { id:'image', l:'图片', en:'Image · 批量',      ic:IcImage },
-    { id:'text',  l:'文字', en:'Text · 链接/粘贴', ic:IcDoc   },
-  ];
-  const currentTasks = TASK_BY_TYPE[type];
+  const TASK_BY_TYPE_LEGACY = {};
 
   const BG_CONTENT_TYPES = ['课程','会议','宣传片','Vlog','访谈','纯音乐','新闻报道'];
   const BG_PURPOSES      = ['复刻参考','竞品分析','内容总结','学习研究'];
@@ -835,9 +555,11 @@ const AddMaterialModal = ({ open, onClose, onSubmit }) => {
             已勾选 {Object.values(tasks).filter(Boolean).length} 项 · 预计 ~ 4 min · 并行上限 3
           </span>
           <div style={{display:'flex', gap:8}}>
-            <button className="btn" onClick={onClose}>取消</button>
-            <button className="btn btn-primary" onClick={()=>onSubmit({type,url,tasks,bg:{bgType,bgPeople,bgContext,bgTerms,bgPurpose}})}>
-              <IcSpark size={13}/>加入任务并执行
+            <button className="btn" onClick={()=>onFineTune && onFineTune({type,url,tasks,bg:{bgType,bgPeople,bgContext,bgTerms,bgPurpose},workspaceIds})}>
+              <IcSliders size={13}/>细调…
+            </button>
+            <button className="btn btn-primary" onClick={()=>onSubmit({type,url,tasks,bg:{bgType,bgPeople,bgContext,bgTerms,bgPurpose},workspaceIds})}>
+              <IcSpark size={13}/>一键解析
             </button>
           </div>
         </div>

@@ -149,6 +149,10 @@ const AudioDetail = ({ material, onBack }) => {
   const [playProgress, setPlayProgress] = React.useState(0.28);
   const [playing,      setPlaying]      = React.useState(false);
   const trRef = React.useRef(null);
+  /* §6.3 · 说话人确认 */
+  const [calibOpen, setCalibOpen] = React.useState(false);
+  const [spkOverrides, setSpkOverrides] = React.useState({}); // { A: '张总', B: '李总', C: '' } after confirm
+  const calibrated = Object.keys(spkOverrides).length > 0;
 
   /* Simulate playback */
   React.useEffect(() => {
@@ -192,6 +196,7 @@ const AudioDetail = ({ material, onBack }) => {
     return s ? s.color : 'var(--ink-3)';
   };
   const spkName = (spk) => {
+    if (spkOverrides[spk]) return spkOverrides[spk];
     const s = AUDIO_DATA.speakers.find(s => s.id === spk);
     return s ? s.name : spk;
   };
@@ -322,7 +327,26 @@ const AudioDetail = ({ material, onBack }) => {
             {/* Speaker summary sidebar */}
             <div style={{ borderLeft: '1px solid var(--line)', padding: '14px 16px', overflowY: 'auto',
                           background: 'var(--bg-elev)' }}>
-              <div className="eyebrow" style={{ marginBottom: 14 }}>说话人分布</div>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 14 }}>
+                <div className="eyebrow">说话人分布</div>
+                <button onClick={() => setCalibOpen(true)}
+                        style={{
+                          display:'inline-flex', alignItems:'center', gap:5,
+                          padding:'4px 9px', borderRadius:99,
+                          background: calibrated ? 'var(--bg-sunken)' : 'rgba(255,184,76,0.14)',
+                          border:`1px solid ${calibrated ? 'var(--line)' : 'rgba(255,184,76,0.32)'}`,
+                          color: calibrated ? 'var(--ink-2)' : 'var(--accent-warm)',
+                          fontSize: 10.5, fontWeight: 500, cursor:'pointer',
+                          transition:'all 140ms',
+                        }}
+                        title="§6.3 · 试听示例 + 命名或标为未知">
+                  {!calibrated && (
+                    <span style={{ width:5, height:5, borderRadius:99, background:'var(--accent-warm)',
+                                    animation:'proc-blink 1.6s infinite' }}/>
+                  )}
+                  <span>{calibrated ? '✓ 已校准' : '校准说话人'}</span>
+                </button>
+              </div>
               {AUDIO_DATA.speakers.map(spk => {
                 const count = AUDIO_DATA.transcript.filter(l => l.spk === spk.id).length;
                 const pct = Math.round(count / AUDIO_DATA.transcript.length * 100);
@@ -334,8 +358,11 @@ const AudioDetail = ({ material, onBack }) => {
                         {spk.id}
                       </div>
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>{spk.name}</div>
-                        <div className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>{count} 段发言</div>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{spkName(spk.id)}</div>
+                        <div className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>
+                          {spkOverrides[spk.id] && <span style={{ color:'var(--accent-green)' }}>✓ </span>}
+                          {count} 段发言
+                        </div>
                       </div>
                       <span style={{ marginLeft: 'auto', fontFamily: 'var(--display)', fontSize: 22 }}>{pct}%</span>
                     </div>
@@ -430,6 +457,17 @@ const AudioDetail = ({ material, onBack }) => {
         )}
 
       </div>
+
+      {/* §6.3 · 说话人确认弹窗 */}
+      <SpeakerConfirmModal
+        open={calibOpen}
+        onClose={() => setCalibOpen(false)}
+        onConfirm={(rows) => {
+          const next = {};
+          rows.forEach(r => { next[r.id] = r.unknown ? '' : (r.name || ''); });
+          setSpkOverrides(next);
+          setCalibOpen(false);
+        }}/>
     </div>
   );
 };

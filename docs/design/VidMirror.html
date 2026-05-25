@@ -1692,9 +1692,126 @@
 .d-empty-s { font-size: 12px; line-height: 1.5; max-width: 280px; }
 .d-empty .btn { margin-top: 6px; }
 
-/* drawer keeps overflow visible for popovers */
-.drawer .d-body { overflow-y: auto; }
-.drawer .d-filter { overflow: visible; position: relative; z-index: 2; }
+/* ── §16.4 Density Scale ── */
+:root[data-density="compact"] { --d-card-pad: 0.85; --d-line-h: 0.92; }
+:root[data-density="cozy"]    { --d-card-pad: 1.00; --d-line-h: 1.00; }
+:root[data-density="roomy"]   { --d-card-pad: 1.15; --d-line-h: 1.08; }
+:root[data-density="roomy"] .mat-card .mat-body { padding: 17px 19px; }
+:root[data-density="roomy"] .stage    { padding: 17px 24px; }
+:root[data-density="compact"] .mat-card .mat-body { padding: 11px 13px; }
+:root[data-density="compact"] .stage  { padding: 11px 16px; }
+
+/* ── §2.3 Material card · top 4px color stripe by type ── */
+.mat-card { position: relative; }
+.mat-card[data-type]::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 4px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  z-index: 2; pointer-events: none;
+}
+.mat-card[data-type="video"]::before { background: var(--accent-2); }
+.mat-card[data-type="audio"]::before { background: var(--accent-green); }
+.mat-card[data-type="image"]::before { background: var(--accent-3); }
+.mat-card[data-type="text"]::before  { background: var(--ink-3); }
+.mat-card.mat-add::before { display: none; }
+.mat-card .mat-thumb { border-radius: 0; }
+
+/* ── §3.2 Export-source green button ── */
+.btn-export-src {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 28px; padding: 0 12px; border-radius: 99px;
+  background: rgba(34,211,154,0.10);
+  border: 1px solid rgba(34,211,154,0.38);
+  color: var(--accent-green); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all 140ms ease; flex-shrink: 0;
+  font-family: var(--sans);
+}
+.btn-export-src:hover {
+  background: var(--accent-green); color: #fff;
+  border-color: var(--accent-green);
+}
+.btn-export-src svg { flex-shrink: 0; }
+.btn-export-src .esrc-dot {
+  width: 6px; height: 6px; border-radius: 99px;
+  background: var(--accent-green);
+  box-shadow: 0 0 0 2px rgba(34,211,154,0.25);
+}
+.btn-export-src:hover .esrc-dot { background: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,0.35); }
+
+/* ── §3.1 Multi-URL stack ── */
+.composer-url[data-multi="true"] {
+  flex-direction: column; align-items: stretch; gap: 4px;
+}
+.composer-url[data-multi="true"] textarea {
+  flex: 1; min-height: 78px; max-height: 160px; resize: vertical;
+  background: transparent; border: none; outline: none;
+  font-family: var(--mono); font-size: 13px; line-height: 1.55;
+  color: var(--ink); padding: 4px 0;
+  width: 100%;
+}
+.composer-url[data-multi="true"] textarea::placeholder { color: var(--ink-4); }
+.composer-multi-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding-top: 8px; border-top: 1px dashed var(--line);
+  font-size: 11px; color: var(--ink-3); margin-top: 4px;
+}
+.composer-multi-bar .url-count {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 99px;
+  background: var(--ink); color: var(--bg);
+  font-family: var(--mono); font-size: 11px; font-weight: 600;
+}
+.composer-multi-bar .url-plat {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 99px;
+  background: var(--bg-sunken); border: 1px solid var(--line);
+  font-size: 11px; color: var(--ink-2);
+}
+.composer-multi-bar .url-plat-dot {
+  width: 6px; height: 6px; border-radius: 99px;
+}
+
+/* ─── Phase 4C: header bar with proper flex (audio/text detail) ─── */
+.detail-topbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 20px; flex-shrink: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-elev);
+}
+
+/* ── §15.5 Storage rules panel ── */
+.storage-rules {
+  background: var(--bg-elev); border: 1px solid var(--line);
+  border-radius: var(--radius); margin-top: 16px; overflow: hidden;
+}
+.sr-row {
+  display: grid; grid-template-columns: 200px 1fr 130px 90px;
+  align-items: center; gap: 18px;
+  padding: 18px 22px; border-top: 1px solid var(--line);
+}
+.sr-row:first-child { border-top: none; }
+.sr-row[data-disabled="true"] { opacity: 0.55; }
+.sr-name { display: flex; flex-direction: column; gap: 3px; }
+.sr-name-t { font-size: 14px; font-weight: 600; color: var(--ink); }
+.sr-name-k { font-family: var(--mono); font-size: 10px; color: var(--ink-4);
+             letter-spacing: 0.08em; text-transform: uppercase; }
+.sr-desc { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+.sr-days {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 5px 12px; border-radius: 99px;
+  background: var(--bg-sunken); border: 1px solid var(--line);
+  font-family: var(--mono); font-size: 13px; color: var(--ink);
+  width: fit-content;
+}
+.sr-days[data-never="true"] { background: rgba(255,77,126,0.08); color: var(--accent); border-color: rgba(255,77,126,0.25); }
+.sr-days input {
+  width: 38px; background: transparent; border: none; outline: none;
+  font: inherit; color: inherit; text-align: center;
+}
+.sr-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--ink-3);
+}
 </style>
 
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
@@ -1711,10 +1828,11 @@
 <script type="text/babel" src="components/item_tags.jsx"></script>
 <script type="text/babel" src="components/workbench.jsx"></script>
 <script type="text/babel" src="components/taskboard.jsx"></script>
-<script type="text/babel" src="components/materials.jsx"></script>
 <script type="text/babel" src="components/processing.jsx"></script>
 <script type="text/babel" src="components/results.jsx"></script>
 <script type="text/babel" src="components/storyboard.jsx"></script>
+<script type="text/babel" src="components/workspace_card.jsx"></script>
+<script type="text/babel" src="components/library.jsx"></script>
 <script type="text/babel" src="components/director.jsx"></script>
 <script type="text/babel" src="components/settings.jsx"></script>
 <script type="text/babel" src="components/task_chat.jsx"></script>
@@ -1723,6 +1841,10 @@
 <script type="text/babel" src="components/audio_detail.jsx"></script>
 <script type="text/babel" src="components/text_detail.jsx"></script>
 <script type="text/babel" src="components/preflight.jsx"></script>
+<script type="text/babel" src="components/errors.jsx"></script>
+<script type="text/babel" src="components/p1_features.jsx"></script>
+<script type="text/babel" src="components/multi_compare.jsx"></script>
+<script type="text/babel" src="components/speaker_confirm.jsx"></script>
 <script type="text/babel" src="components/overview.jsx"></script>
 
 <script type="text/babel">
@@ -1732,7 +1854,8 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "density": "compact",
   "accent": "lime",
   "layout": "stack",
-  "lang": "zh"
+  "lang": "zh",
+  "recentMode": "workspaces"
 }/*EDITMODE-END*/;
 
 const App = () => {
@@ -1745,12 +1868,26 @@ const App = () => {
   const [accent, setAccent] = React.useState(tweaks.accent);
   const [layout, setLayout] = React.useState(tweaks.layout);
   const [lang, setLang] = React.useState(tweaks.lang);
+  const [recentMode, setRecentMode] = React.useState(tweaks.recentMode || 'workspaces');
+  const [addMatSeed, setAddMatSeed] = React.useState(null);
+  const [preflightOpen, setPreflightOpen] = React.useState(false);
+  const [preflightSeed, setPreflightSeed] = React.useState(null);
   const [tweaksOpen, setTweaksOpen] = React.useState(false);
   const [tasksOpen, setTasksOpen] = React.useState(false);
   const [activeTask, setActiveTask] = React.useState(VM_DATA.TASKS[0].id);
   const [sbVariant, setSbVariant] = React.useState('A');
   const [addMatOpen, setAddMatOpen] = React.useState(false);
   const [activeMedia, setActiveMedia] = React.useState(null);
+  /* §11.3 · 当前 Processing 页正在查看的任务 id (可通过浮动面板切换) */
+  const [activeProcId, setActiveProcId] = React.useState(saved.activeProcId || 'm5');
+  /* §13 · 未配置模型拦截 */
+  const [modelsConfigured, setModelsConfigured] = React.useState(() => {
+    try { return JSON.parse(localStorage.getItem('vm-models-ok') ?? 'true'); } catch { return true; }
+  });
+  const [modelMissingOpen, setModelMissingOpen] = React.useState(false);
+  React.useEffect(() => { localStorage.setItem('vm-models-ok', JSON.stringify(modelsConfigured)); }, [modelsConfigured]);
+  /* §5.1 · 镶头确认中断点 */
+  const [shotConfirm, setShotConfirm] = React.useState(null); // { shots, framesPerShot, pendingCfg } | null
 
   // Simulate processing progress
   const [procProgress, setProcProgress] = React.useState(saved.procProgress ?? 0.42);
@@ -1771,13 +1908,21 @@ const App = () => {
 
   // Persist
   React.useEffect(() => {
-    localStorage.setItem('vm-state', JSON.stringify({ route, procProgress }));
-  }, [route, procProgress]);
+    localStorage.setItem('vm-state', JSON.stringify({ route, procProgress, activeProcId }));
+  }, [route, procProgress, activeProcId]);
   React.useEffect(() => {
-    const t = {theme, density, accent, layout, lang};
+    const t = {theme, density, accent, layout, lang, recentMode};
     localStorage.setItem('vm-tweaks', JSON.stringify(t));
     window.parent?.postMessage({ type: '__edit_mode_set_keys', edits: t }, '*');
-  }, [theme, density, accent, layout, lang]);
+  }, [theme, density, accent, layout, lang, recentMode]);
+
+  // §16.4 — density apply via data attr (CSS scales line-height / card padding)
+  React.useEffect(() => {
+    // Migrate legacy values: 'comfy' → 'cozy' (spec rename)
+    const next = density === 'comfy' ? 'cozy' : density;
+    if (next !== density) setDensity(next);
+    document.documentElement.setAttribute('data-density', next);
+  }, [density]);
 
   // Apply theme
   React.useEffect(() => {
@@ -1811,10 +1956,29 @@ const App = () => {
     return () => window.removeEventListener('message', handler);
   }, []);
 
-  const handleStart = () => { setProcProgress(0); setRoute('process'); };
+  const handleStart = (cfg) => {
+    if (!modelsConfigured) { setModelMissingOpen(true); return; }
+    /* §5.1 · AI 镶头模式 · 拦袭强制确认 */
+    const fp = cfg?.tasks?.frame_prompt;
+    if (fp && fp.on && fp.frame_mode === 'AI 镶头分析') {
+      const shotFrames = fp.shot_frames === '2 帧 · 首+尾' ? 2 : 3;
+      setShotConfirm({ shots: 42, framesPerShot: shotFrames, pendingCfg: cfg });
+      return;
+    }
+    setProcProgress(0); setRoute('process');
+  };
+  const confirmShots  = () => { setShotConfirm(null); setProcProgress(0); setRoute('process'); };
+  const adjustShots   = () => { setShotConfirm(null); setRoute('home'); };
   const handleProcDone = () => setRoute('results');
   const handlePick = (t) => { setActiveTask(t.id); setTasksOpen(false); setRoute('results'); };
+  const handleOpenWorkspace = (t) => { setActiveTask(t.id); setRoute('taskboard'); };
   const handleOpenMaterial = (m) => {
+    /* §11.3 · 进行中/排队/错误 → Processing；完成 → 类型详情页 */
+    if (m && (m.state === 'running' || m.state === 'queued' || m.state === 'error')) {
+      setActiveProcId(m.id);
+      setRoute('process');
+      return;
+    }
     setActiveMedia(m);
     const routeMap = { video:'video_detail', image:'image_detail', audio:'audio_detail', text:'text_detail' };
     setRoute(routeMap[m.type] || 'video_detail');
@@ -1822,17 +1986,30 @@ const App = () => {
 
   const mainContent = (() => {
     switch(route) {
-      case 'home': return <Workbench onStart={handleStart}/>;
+      case 'home': return <Workbench
+                                onAddMaterial={(seed) => { setAddMatSeed(seed||null); setAddMatOpen(true); }}
+                                onOpenWorkspace={handleOpenWorkspace}
+                                onOpenMaterial={handleOpenMaterial}
+                                onSeeAllWorkspaces={() => setRoute('library')}
+                                recentMode={recentMode}/>;
       case 'taskboard': return <Taskboard onAddMaterial={()=>setAddMatOpen(true)} onOpenMaterial={handleOpenMaterial}/>;
-      case 'materials': return <MatExplorer/>;
-      case 'process': return <Processing progress={procProgress} onDone={handleProcDone} onCancel={() => setRoute('home')}/>;
+      case 'process': return <Processing progress={procProgress} onDone={handleProcDone} onCancel={() => setRoute('home')}
+                                  currentTaskId={activeProcId} onSwitchTask={(id) => setActiveProcId(id)}/>;
       case 'results': return <Results layout={layout} onOpenStoryboard={() => setRoute('storyboard')}/>;
       case 'storyboard': return <Storyboard active={sbVariant} setActive={setSbVariant}/>;
       case 'video_detail': return <VideoDetail material={activeMedia} onBack={() => setRoute('taskboard')} onAddFavorite={() => {}}/>;
-      case 'image_detail': return <ImageDetail material={activeMedia} onBack={() => setRoute('taskboard')}/>;
+      case 'image_detail': return <ImageDetail material={activeMedia} onBack={() => setRoute('taskboard')} onMultiCompare={() => setRoute('multi_image')}/>;
       case 'audio_detail': return <AudioDetail material={activeMedia} onBack={() => setRoute('taskboard')}/>;
-      case 'text_detail':  return <TextDetail  material={activeMedia} onBack={() => setRoute('taskboard')}/>;
-      case 'library': return <Library/>;
+      case 'text_detail':  return <TextDetail  material={activeMedia} onBack={() => setRoute('taskboard')} onMultiCompare={() => setRoute('multi_text')}/>;
+      case 'multi_image':  return <MultiImageCompare onBack={() => setRoute('image_detail')}/>;
+      case 'multi_text':   return <MultiTextCompare onBack={() => setRoute('text_detail')}/>;
+      case 'library': return <Library
+                                  onPickTask={handleOpenWorkspace}
+                                  onPickItem={(libItem) => {
+                                    const real = VM_DATA.MATERIALS.find(m => m.id === libItem.item_id);
+                                    handleOpenMaterial(real || { ...libItem, id: libItem.item_id, title: libItem.name });
+                                  }}
+                                  onCreateTask={() => setAddMatOpen(true)}/>;
       case 'director': return <Director/>;
       case 'settings': return <Settings/>;
       case 'overview': return <OverviewCanvas setRoute={setRoute}/>;
@@ -1862,14 +2039,75 @@ const App = () => {
                    tasks={VM_DATA.TASKS} activeId={activeTask} onPick={handlePick}/>
 
       <AddMaterialModal open={addMatOpen} onClose={()=>setAddMatOpen(false)}
-                        onSubmit={()=>{ setAddMatOpen(false); setProcProgress(0); setRoute('process'); }}/>
+                        urlValue={addMatSeed?.url}
+                        workspaceIds={addMatSeed?.workspaceIds}
+                        onFineTune={(cfg)=>{
+                          setAddMatOpen(false);
+                          setPreflightSeed({ url: cfg.url || addMatSeed?.url, kind: cfg.type, bg: cfg.bg });
+                          setPreflightOpen(true);
+                        }}
+                        onSubmit={()=>{
+                          setAddMatOpen(false);
+                          if (!modelsConfigured) { setModelMissingOpen(true); return; }
+                          setProcProgress(0); setRoute('process');
+                        }}/>
+
+      {/* Preflight drawer (细调…) lifted from Workbench */}
+      <Preflight
+        open={preflightOpen}
+        onClose={() => setPreflightOpen(false)}
+        onStart={() => {
+          setPreflightOpen(false);
+          if (!modelsConfigured) { setModelMissingOpen(true); return; }
+          setProcProgress(0); setRoute('process');
+        }}
+        sourceUrl={preflightSeed?.url}
+        defaultKind={preflightSeed?.kind || 'video'}/>
+
+      {/* §13 · 未配置模型弹窗 */}
+      <ModelMissingDialog
+        open={modelMissingOpen}
+        onClose={() => setModelMissingOpen(false)}
+        onGoSettings={() => {
+          setModelMissingOpen(false);
+          setRoute('settings');
+          // demo: 打开弹窗后默认让模型变为“已配置” —— 下次点开始就会走通
+          setTimeout(() => setModelsConfigured(true), 600);
+        }}/>
+
+      {/* §5.1 · 镶头确认中断点 */}
+      <ShotConfirmModal
+        open={!!shotConfirm}
+        shots={shotConfirm?.shots || 0}
+        framesPerShot={shotConfirm?.framesPerShot || 3}
+        onClose={() => setShotConfirm(null)}
+        onConfirm={confirmShots}
+        onAdjust={adjustShots}/>
+
+      {/* §11.3 · 全局浮动「任务」面板 · 除 overview 外所有页面可见 (含 process，实现并存) */}
+      {!['overview'].includes(route) && (
+        <FloatingQueue
+          currentTaskId={route === 'process' ? activeProcId : null}
+          onSelectTask={(task) => {
+            /* 进行中/排队/错误 → 到 Processing 详情，并切换当前任务。已完成 → 素材详情页。 */
+            if (task.state === 'done') {
+              const real = VM_DATA.MATERIALS.find(m => m.id === task.id);
+              if (real) handleOpenMaterial(real);
+            } else {
+              setActiveProcId(task.id);
+              setRoute('process');
+            }
+          }}/>
+      )}
 
       <Tweaks open={tweaksOpen} onClose={() => setTweaksOpen(false)}
               theme={theme} setTheme={setTheme}
               density={density} setDensity={setDensity}
               accent={accent} setAccent={setAccent}
               layout={layout} setLayout={setLayout}
-              lang={lang} setLang={setLang}/>
+              lang={lang} setLang={setLang}
+              recentMode={recentMode} setRecentMode={setRecentMode}
+              modelsConfigured={modelsConfigured} setModelsConfigured={setModelsConfigured}/>
     </div>
   );
 };

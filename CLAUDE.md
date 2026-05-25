@@ -235,11 +235,11 @@ checkpoint 保持短小，只写：
 > **优先级（冲突仲裁，自上而下）**：
 > 1. `docs/SPEC.md`（**唯一标准**，产品需求级粒度）
 > 2. `docs/EXECUTION_PLAN.md`（工程执行计划——Phase 打勾 + 当前在哪步）
-> 3. `docs/design/`（**设计稿源文件**——19 个 jsx 组件 / VidMirror.html / styles.css / system_design_v1.1.md）
+> 3. `docs/design/`（**设计稿源文件**——25 个 jsx 组件 / VidMirror.html / styles.css / system_design_v1.1.md / check 截图 / uploads spec）；token 速查走 [`docs/DESIGN_TOKENS.md`](docs/DESIGN_TOKENS.md)
 > 4. 当前代码（与 spec 偏差时优先反映到 spec 或新建差异 phase）
 > 5. ~~`docs/archive/spec-v2.md`、`docs/archive/system_design_v3_final.md`、`docs/archive/plan-v1.md`、`docs/archive/design-spec-v1.md`~~ ⚠️ **已 DEPRECATED**，仅历史归档，不参与仲裁
 >
-> **设计稿路径**：`docs/design/`（19 个 jsx 组件 / VidMirror.html / styles.css / system_design_v1.1.md）。旧 `vidmirror-handoff/` 路径已废弃。
+> **设计稿路径**：`docs/design/`（2026-05-25 与 `/Users/conan/Downloads/vidmirror (Remix)` 同步；25 个 jsx 组件 / VidMirror.html / styles.css / system_design_v1.1.md / check 截图）。**所有 UI 改动以此为唯一真相源**，旧 `vidmirror-handoff/` 路径已废弃。AI 写 UI 前必须先读 [`docs/DESIGN_TOKENS.md`](docs/DESIGN_TOKENS.md)。
 >
 > **新会话启动必读顺序**：
 > ① [`docs/WORKFLOW.md`](docs/WORKFLOW.md)（总工作流 + 当前阶段，**第一份要读的**；具体流程图需求先读 `docs/flows/*.md`）
@@ -336,41 +336,32 @@ checkpoint 保持短小，只写：
 - 组件文件 PascalCase（`TaskCard.tsx`），hook 用 `useXxx`。
 - 错误用 toast 提示用户，不用 `alert()`。
 
-### 前端 UI 与设计规范 (Remix 版)
+### 前端 UI 与设计规范（Remix 版 · 唯一真相源）
 
-所有前端 UI 的开发和更新，必须严格遵循 `/Users/conan/Downloads/vidmirror (Remix)` 沉淀的 Remix 设计规范，禁止使用任何硬编码（magic values）的颜色或边框：
+> **铁律：写任何 UI 之前先读 [`docs/DESIGN_TOKENS.md`](docs/DESIGN_TOKENS.md)。**
+> 该文件是 ~200 行 token + class 速查；详细 spec 看 `docs/design/`（设计稿镜像，2026-05-25 起以 `/Users/conan/Downloads/vidmirror (Remix)` 同步入仓）。
 
-- **设计风格 (Vibe)**: Bold AI-creative vibe，极简的科技与艺术感。大字号 serif 衬线体标题配高饱和度 Accent 色块。
-- **颜色语义 (Semantic Colors)**:
-  - 紫色 (`--accent-2` / `#B84CFF`): 任务系统、视频模块、AI 分析层组件。
-  - 绿色 (`--accent-green` / `#22D39A`): 音频模块、可导出节点、完成/成功态。
-  - 蓝色 (`--accent-3` / `#3C77FB`): 图片模块、结构化层展示。
-  - 灰色 (`--ink-3` / `#6B6B6B`): 文字模块、系统处理节点、状态元信息。
-  - 橙色 (`--accent-warm` / `#FFB84C`): 用户决策节点、勾选面板、分镜。
-  - 红色 (`--accent` / `#FF4D7E`): 输入/输出层、入口/最终输出按钮。
-  - 深红 (`--accent-deep` / `#C8365A`): 复刻专项（Director）卡片或专属功能。
-- **背景与中性色 (Neutrals)**:
-  - 基础背景: `--bg` (Light: `#f6f5f0` / Dark: `#0d0c10`)
-  - 提升浮层 (卡片/弹窗): `--bg-elev` (Light: `#ffffff` / Dark: `#16151b`)
-  - 凹陷背景 (输入框/代码块): `--bg-sunken` (Light: `#efede6` / Dark: `#0a0a0d`)
-  - 文字等级: `--ink` (主文字)、`--ink-2` (正文)、`--ink-3` (辅助)、`--ink-4` (最淡元信息/占位符)
-  - 边框分割: `--line` (`rgba(0,0,0,0.08)` / `rgba(255,255,255,0.08)`)、`--line-strong` (Hover 态 border)
-- **字体栈 (Typography)**:
-  - Display: `Instrument Serif`, `Source Han Serif SC`, `Noto Serif SC`, Georgia, serif (对应 `.display` 类名)
-  - Sans (默认): `Inter`, `PingFang SC`, -apple-system, BlinkMacSystemFont, Arial, sans-serif
-  - Mono: `JetBrains Mono`, `SF Mono`, ui-monospace (对应 `.mono` / `.eyebrow` / `.kw`)
-- **圆角与阴影 (Radius & Shadow)**:
-  - 圆角: `--radius` (`18px` 默认卡片)、`--radius-sm` (`10px` 按钮/chip/kbd)、`--radius-lg` (`28px` Composer/Summary大容器)、`--radius-pill` (`99px` 胶囊按钮)
-  - 阴影: `--shadow-sm` (小卡片)、`--shadow-md` (Composer)、`--shadow-lg` (大悬浮面板)
-- **动效与交互 (Transitions)**:
-  - 动画加速曲线: `cubic-bezier(0.4, 0, 0.2, 1)`
-  - 过渡时间: 状态变更 120-220ms，抽屉/面板出入 280ms，进度条插值 400ms。避免不必要的装饰动效，切忌弹跳/overshoot。
-- **二级交互面板 / AddMaterialModal**:
-  - 用户点击「添加素材」后出现的界面属于 Remix modal，不是默认 shadcn/Radix 表单弹窗；可保留无障碍底座，但可见结构必须落在 Remix class vocabulary 上。
-  - 标准结构：`modal-backdrop` / `modal` / `m-head` / `m-body` / `m-section` / `m-foot`，标题区使用 `.eyebrow` + `.display`。
-  - 素材类型用 `.type-row` + `.type-card[data-active]`；分析任务用 `.task-chips` + `.task-chip[data-on]` + `.tc-box`；输入源复用 `.composer-url` 和 `.kw`。
-  - 背景信息折叠区必须使用 `var(--bg-sunken)` 凹陷面板、等宽字段标签和 token 化 pill；组件内不得新增 hardcoded hex / rgba / border / radius / shadow。
-  - 后续设置弹窗、Preflight 二级面板、任务配置面板若属于同类决策流，也应延续此 modal / section / chip 语法。
+**3 个权威路径**（按使用频率）：
+
+| 想做什么 | 看哪 |
+|---|---|
+| 写新 UI 前查 token / class 词典 | [`docs/DESIGN_TOKENS.md`](docs/DESIGN_TOKENS.md) ⭐ |
+| 看具体页面长什么样 | `docs/design/check/*.png`（10+ 张页面截图）|
+| 看组件 jsx 实现（19 个）| `docs/design/components/<page>.jsx` |
+| 看完整 CSS 152 个 class | `docs/design/styles.css` |
+| 看业务规则 / 状态机 / 级联 | `docs/design/system_design_v1.1.md` |
+| 浮动队列 §11.3 实现 | `docs/design/components/p1_features.jsx` L160-370 |
+| 前置配置 §4 实现 | `docs/design/components/preflight.jsx` |
+
+**5 条不可破铁律**（详见 `docs/DESIGN_TOKENS.md §8`）：
+
+1. **颜色 / 边框 / 圆角 / 阴影必须用 token**，禁止 hex / rgba / px 边框值（已命名常量例外，如 `99px` 胶囊）。
+2. **按业务语义选 accent**：音频→绿 `--accent-green`、视频→紫 `--accent-2`、图片→蓝 `--accent-3`、决策/确认→橙 `--accent-warm`、错误/输入输出→粉 `--accent`。不要按"哪个好看"挑。
+3. **modal 用 Remix 结构**：`modal-backdrop` + `modal` + `m-head/body/section/foot`，**不要套 shadcn `<Dialog>` 默认样式**（无障碍底座可保留，可见结构走 Remix class）。
+4. **写新组件先 grep `docs/design/components/`**：19 个 jsx 几乎覆盖所有页面。有现成的 → 1:1 复刻；无 → 找最近似的 class 词汇沿用，不要造新词。
+5. **新 class 命名跟现有体例**：组件前缀（`pf-` / `pp-` / `mat-` / `m-`）+ 部位词。不混 BEM / camelCase。
+
+**设计稿同步**：用户拿到 Remix 新版本时，按 `docs/DESIGN_TOKENS.md §10` 的 rsync 命令一次性同步到 `docs/design/`，并人工 review `DESIGN_TOKENS.md` 是否需要补 token / class。
 
 ### 业务规格与运行时交互契约 (Remix 版)
 

@@ -96,9 +96,56 @@ const TASK_GROUPS = {
   ],
 };
 
+/* ─── Cascade rules · spec §4.4 ─────────────────────────────────────
+   - 视频文案总结·路径2 (音视频合并) → 强制画面提示词
+   - 说话人区分 → 强制人声转写
+   - 字幕导出 ↔ 人声转写 (同勾同取)
+   - 多图/多文对比仅在素材 ≥2 时可选
+   返回 { state, locks } —— locks[gid] = { reason, paired } 时禁止取消勾选
+   ───────────────────────────────────────────────────────────────────── */
+function applyCascades(kind, raw, materialCount = 1) {
+  const s = JSON.parse(JSON.stringify(raw));
+  const locks = {};
+  const disabled = {};
+
+  if (kind === 'video' && s.summary) {
+    const path = s.summary.summary_path;
+    if (s.summary.on && path === '音视频合并 · 最详细') {
+      s.frame_prompt = { ...s.frame_prompt, on: true };
+      locks.frame_prompt = '路径 2 复用截帧 · 强制开启';
+    }
+  }
+  if (kind === 'audio') {
+    if (s.voiceprint && s.voiceprint.on) {
+      s.asr = { ...s.asr, on: true };
+      locks.asr = '说话人区分需要先转写';
+    }
+    if (s.srt && s.srt.on) {
+      if (!s.asr || !s.asr.on) {
+        s.asr = { ...s.asr, on: true };
+        locks.asr = '字幕导出需要转写';
+      }
+    }
+  }
+  if (kind === 'image' && s.compare) {
+    if (materialCount < 2) {
+      s.compare = { ...s.compare, on: false };
+      disabled.compare = `仅 ${materialCount} 张图片 · 至少需要 2 张`;
+    }
+  }
+  if (kind === 'text' && s.multi) {
+    if (materialCount < 2) {
+      s.multi = { ...s.multi, on: false };
+      disabled.multi = `仅 ${materialCount} 篇 · 至少需要 2 篇`;
+    }
+  }
+  return { state: s, locks, disabled };
+}
+
 /* ─── Preflight Drawer ─── */
-const Preflight = ({ open, onClose, onStart, sourceUrl, sourcePlatform, defaultKind='video' }) => {
+const Preflight = ({ open, onClose, onStart, sourceUrl, sourcePlatform, defaultKind='video', materialCount=1 }) => {
   const [kind, setKind] = React.useState(defaultKind);
+  const [activePreset, setActivePreset] = React.useState(null); // §15.2
   const [bg, setBg] = React.useState({
     contentType: '宣传片',
     people: 'Hugo · 影视飓风',
@@ -124,11 +171,35 @@ const Preflight = ({ open, onClose, onStart, sourceUrl, sourcePlatform, defaultK
   });
 
   const groups = TASK_GROUPS[kind] || [];
-  const enabledCount = Object.values(tasks[kind] || {}).filter(v => v.on).length;
+  /* Apply cascades: normalize state + collect lock reasons */
+  const cascaded = applyCascades(kind, tasks[kind] || {}, materialCount);
+  const effState = cascaded.state;
+  const locks    = cascaded.locks;     // forced-on (cannot uncheck)
+  const disabled = cascaded.disabled;  // forced-off (cannot check)
+  const enabledCount = Object.values(effState).filter(v => v && v.on).length;
 
-  const setTask = (gid, patch) => setTasks(s => ({
-    ...s, [kind]: { ...s[kind], [gid]: { ...s[kind][gid], ...patch } }
-  }));
+  const setTask = (gid, patch) => setTasks(s => {
+    // Block uncheck if this task is locked-on by a cascade
+    if (patch.on === false && locks[gid]) return s;
+    // Block check if disabled (e.g. multi compare with only 1 material)
+    if (patch.on === true && disabled[gid]) return s;
+    return { ...s, [kind]: { ...s[kind], [gid]: { ...s[kind][gid], ...patch } } };
+  });
+
+  /* §15.2 — Apply a preset: shallow-merge each group's patch into current tasks[kind] */
+  const applyPreset = (preset) => {
+    setActivePreset(preset.id);
+    if (preset.apply === null) return; // 自定义 — keep current
+    const patch = preset.apply[kind];
+    if (!patch) return;
+    setTasks(s => {
+      const next = { ...s[kind] };
+      Object.entries(patch).forEach(([gid, gp]) => {
+        next[gid] = { ...next[gid], ...gp };
+      });
+      return { ...s, [kind]: next };
+    });
+  };
 
   return (
     <>
@@ -221,12 +292,21 @@ const Preflight = ({ open, onClose, onStart, sourceUrl, sourcePlatform, defaultK
           </PFSection>
 
           {/* ─── Section 3: 任务勾选 ─── */}
-          <PFSection num="03" title="任务勾选" sub={`Tasks · 已选 ${enabledCount} / ${groups.length}`}>
+          <PFSection num="03" title="任务勾选" sub={`Tasks · 已选 ${enabledCount} / ${groups.length} · 依赖级联自动锁定`}>
+            <PresetBar kind={kind} current={activePreset} onPick={applyPreset}/>
+            <div style={{ height:1, background:'var(--line)', margin:'4px 0' }}/>
             <div style={{display:'grid', gap:10}}>
               {groups.map(g => {
-                const state = tasks[kind][g.id] || {};
+                const state = effState[g.id] || {};
                 return (
-                  <PFTaskCard key={g.id} group={g} state={state} setState={(p)=>setTask(g.id, p)}/>
+                  <PFTaskCard
+                    key={g.id}
+                    group={g}
+                    state={state}
+                    setState={(p)=>setTask(g.id, p)}
+                    lockedReason={locks[g.id]}
+                    disabledReason={disabled[g.id]}
+                  />
                 );
               })}
             </div>
@@ -290,33 +370,67 @@ const PFField = ({ label, hint, children }) => (
   </label>
 );
 
-const PFTaskCard = ({ group, state, setState }) => {
+const PFTaskCard = ({ group, state, setState, lockedReason, disabledReason }) => {
   const on = !!state.on;
+  const locked   = !!lockedReason;
+  const disabled = !!disabledReason;
+  const cardBg = disabled ? 'var(--bg-sunken)'
+               : on       ? 'var(--bg-elev)'
+               : 'transparent';
   return (
     <div style={{
       border:'1px solid var(--line)',
       borderRadius:14,
       padding:14,
-      background: on ? 'var(--bg-elev)' : 'transparent',
-      transition:'background 140ms ease, border-color 140ms ease',
-      borderColor: on ? 'var(--line-strong)' : 'var(--line)',
+      background: cardBg,
+      opacity: disabled ? 0.55 : 1,
+      transition:'background 140ms ease, border-color 140ms ease, opacity 140ms ease',
+      borderColor: locked ? 'var(--accent)' : on ? 'var(--line-strong)' : 'var(--line)',
+      position:'relative',
     }}>
-      <label style={{display:'flex', alignItems:'flex-start', gap:12, cursor:'pointer'}}>
+      <label style={{display:'flex', alignItems:'flex-start', gap:12,
+                     cursor: (locked || disabled) ? 'not-allowed' : 'pointer'}}>
         <div style={{
           width:22, height:22, borderRadius:7,
-          border:`2px solid ${on?'var(--ink)':'var(--line-strong)'}`,
-          background: on ? 'var(--ink)' : 'transparent',
+          border:`2px solid ${on?(locked?'var(--accent)':'var(--ink)'):'var(--line-strong)'}`,
+          background: on ? (locked?'var(--accent)':'var(--ink)') : 'transparent',
           display:'grid', placeItems:'center',
           flexShrink:0, marginTop:2,
           transition:'all 140ms ease',
+          position:'relative',
         }}>
-          {on && <IcCheck size={12} stroke="var(--bg)" sw={3}/>}
-          <input type="checkbox" checked={on} onChange={e=>setState({on:e.target.checked})}
-                 style={{position:'absolute', opacity:0}}/>
+          {on && !locked && <IcCheck size={12} stroke="var(--bg)" sw={3}/>}
+          {on && locked  && <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>}
+          <input type="checkbox" checked={on}
+                 disabled={locked || disabled}
+                 onChange={e=>setState({on:e.target.checked})}
+                 style={{position:'absolute', opacity:0, inset:0, cursor:(locked||disabled)?'not-allowed':'pointer'}}/>
         </div>
         <div style={{flex:1, minWidth:0}}>
-          <div style={{fontSize:14, fontWeight:600, color:'var(--ink)'}}>{group.label}</div>
+          <div style={{display:'flex', alignItems:'center', gap:6, flexWrap:'wrap'}}>
+            <span style={{fontSize:14, fontWeight:600, color:'var(--ink)'}}>{group.label}</span>
+            {locked && (
+              <span style={{display:'inline-flex', alignItems:'center', gap:3, padding:'2px 7px', borderRadius:99,
+                            background:'rgba(255,77,126,0.12)', color:'var(--accent)',
+                            fontSize:10, fontFamily:'var(--mono)', letterSpacing:'0.04em', fontWeight:600}}>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+                依赖锁定
+              </span>
+            )}
+            {disabled && (
+              <span style={{display:'inline-flex', alignItems:'center', padding:'2px 7px', borderRadius:99,
+                            background:'var(--bg-sunken)', color:'var(--ink-3)',
+                            fontSize:10, fontFamily:'var(--mono)', letterSpacing:'0.04em'}}>
+                条件不满足
+              </span>
+            )}
+          </div>
           {group.sub && <div className="mono" style={{fontSize:10, color:'var(--ink-3)', marginTop:3, letterSpacing:'0.04em'}}>{group.sub}</div>}
+          {(lockedReason || disabledReason) && (
+            <div style={{fontSize:11, color: locked?'var(--accent)':'var(--ink-3)', marginTop:5, lineHeight:1.4}}>
+              {lockedReason || disabledReason}
+            </div>
+          )}
         </div>
       </label>
 
