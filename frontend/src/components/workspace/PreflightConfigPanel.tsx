@@ -43,7 +43,7 @@ import { TaskDetails } from './PreflightTaskDetails'
  *
  * 三大区：
  *   1. 背景信息——内容类型 / 参与人员 / 主题 / 专有名词 / 分析目的
- *   2. 模型选择——视觉 / 文本 / 视频三类模型下拉，从已配置 provider 拉
+ *   2. 模型选择——文本 / 视频两类模型下拉，从已配置 provider 拉
  *   3. 任务勾选——按 item.type 显示不同的勾选项 + 子参数
  *
  * 用法：
@@ -93,10 +93,8 @@ export default function PreflightConfigPanel({
   const [purpose, setPurpose] = useState('')
 
   // ── 2. 模型选择 state ─────────────────────────────
-  const [visionProviderId, setVisionProviderId] = useState('')
   const [textProviderId, setTextProviderId] = useState('')
   const [videoProviderId, setVideoProviderId] = useState('')
-  const [visionModelId, setVisionModelId] = useState('')
   const [textModelId, setTextModelId] = useState('')
   const [videoModelId, setVideoModelId] = useState('')
 
@@ -136,13 +134,10 @@ export default function PreflightConfigPanel({
       }
       return ''
     }
-    const vId = item.preflight.models?.vision ?? ''
     const tId = item.preflight.models?.text ?? ''
     const vidId = item.preflight.models?.video ?? ''
-    setVisionModelId(vId)
     setTextModelId(tId)
     setVideoModelId(vidId)
-    setVisionProviderId(findProviderByModel(vId))
     setTextProviderId(findProviderByModel(tId))
     setVideoProviderId(findProviderByModel(vidId))
 
@@ -154,9 +149,6 @@ export default function PreflightConfigPanel({
   const topLevelTasks = useMemo(() => getTopLevelTasks(item.type), [item.type])
 
   const enabledProviders = providers.filter((p) => p.enabled && p.has_api_key)
-  const visionProviders = enabledProviders.filter((p) =>
-    (p.capabilities ?? []).includes('vision'),
-  )
   const textProviders = enabledProviders.filter((p) =>
     (p.capabilities ?? []).includes('chat'),
   )
@@ -172,7 +164,6 @@ export default function PreflightConfigPanel({
         purpose: purpose.trim(),
       },
       models: {
-        ...(visionModelId && { vision: visionModelId }),
         ...(textModelId && { text: textModelId }),
         ...(videoModelId && { video: videoModelId }),
       },
@@ -283,19 +274,6 @@ export default function PreflightConfigPanel({
             </div>
           ) : (
             <div className="space-y-3">
-              <ModelPicker
-                label="视觉大模型（截帧分析 / 图片分析）"
-                providers={visionProviders}
-                providerValue={visionProviderId}
-                modelValue={visionModelId}
-                onProviderChange={(pid) => {
-                  setVisionProviderId(pid)
-                  setVisionModelId('')
-                }}
-                onModelChange={setVisionModelId}
-                providerModels={providerModels}
-                modelsLoading={modelsLoading}
-              />
               <ModelPicker
                 label="文本大模型（总结 / 归纳 / 对话）"
                 providers={textProviders}

@@ -64,9 +64,7 @@ export function PreflightDrawer({
   const [contentType, setContentType] = useState('')
   const [purpose, setPurpose] = useState('')
   const [topic, setTopic] = useState('')
-  const [visionProviderId, setVisionProviderId] = useState('')
   const [textProviderId, setTextProviderId] = useState('')
-  const [visionModelId, setVisionModelId] = useState('')
   const [textModelId, setTextModelId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [summaryPath, setSummaryPath] = useState<SummaryPath>('detailed')
@@ -111,9 +109,7 @@ export function PreflightDrawer({
       setContentType(sc?.background?.content_type ?? '')
       setPurpose(sc?.background?.purpose ?? '')
       setTopic(sc?.background?.topic ?? '')
-      setVisionProviderId('')
       setTextProviderId('')
-      setVisionModelId('')
       setTextModelId('')
       setSummaryPath('detailed')
       setVideoTemplate('auto')
@@ -128,16 +124,11 @@ export function PreflightDrawer({
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const enabledProviders = providers.filter((p) => p.enabled && p.has_api_key)
-  const visionProviders = useMemo(
-    () => enabledProviders.filter((p) => (p.capabilities ?? []).includes('vision')),
-    [enabledProviders],
-  )
   const textProviders = useMemo(
     () => enabledProviders.filter((p) => (p.capabilities ?? []).includes('chat')),
     [enabledProviders],
   )
 
-  const visionModels = visionProviderId ? (providerModels[visionProviderId] ?? []) : []
   const textModels = textProviderId ? (providerModels[textProviderId] ?? []) : []
 
   const normalizeItemType = (type: string): ItemType => ITEM_TYPE_ALIASES[type] ?? (type as ItemType)
@@ -210,7 +201,6 @@ export function PreflightDrawer({
             tasks.text_translate = { enabled: textTranslateEnabled, target_lang: textTranslateLang }
           }
           const preflightModels: Record<string, string> = {}
-          if (visionModelId) preflightModels.vision = visionModelId
           if (textModelId) preflightModels.text = textModelId
 
           // 3. savePreflight
@@ -461,34 +451,6 @@ export function PreflightDrawer({
               </div>
             ) : (
               <>
-                <div className="pf-field">
-                  <label>视觉大模型</label>
-                  <div className="pf-model-row">
-                    <select
-                      value={visionProviderId}
-                      onChange={(e) => { setVisionProviderId(e.target.value); setVisionModelId('') }}
-                    >
-                      <option value="">选择 provider</option>
-                      {visionProviders.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                    <select
-                      value={visionModelId}
-                      onChange={(e) => setVisionModelId(e.target.value)}
-                      disabled={!visionProviderId}
-                    >
-                      <option value="">选择模型</option>
-                      {modelsLoading[visionProviderId] ? (
-                        <option value="" disabled>加载中…</option>
-                      ) : (
-                        visionModels.map((m) => (
-                          <option key={m.id} value={m.id}>{m.name}</option>
-                        ))
-                      )}
-                    </select>
-                  </div>
-                </div>
                 <div className="pf-field">
                   <label>文本大模型</label>
                   <div className="pf-model-row">
