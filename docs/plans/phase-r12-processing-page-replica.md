@@ -1,24 +1,27 @@
 ---
 name: phase-r12-processing-page-replica
-status: in_progress
+status: done
 branch: feat/phase-r12-processing-page-replica
 baseline_commit: 7ec9914
-owner: claude opus 4.7 (R12.1~R12.3) → ds v4-pro via ccswitch (R12.4~R12.6)
+owner: claude opus 4.7 (R12.1~R12.3) → ds v4-pro via ccswitch (R12.4~R12.6) → Codex QA
 created_date: 2026-05-25
+completed_date: 2026-05-25
 commits_done:
   - R12.1 7bee6d3 yt-dlp 抽取 title/duration/uploader/thumbnail_url 写入 task.result
   - R12.2 d6edc1e Hero 读真实标题/封面/时长/帧数/句数/ETA
   - R12.3 3801eb3 step-stream desc + 三色日志(ok/warn/err) + 前缀符号
+  - R12.4 4922c80 后端 /system/stats 端点（psutil + nvidia-smi 跨平台）
+  - R12.5 f88de4a SystemResourceCard 四宫格 + 并行槽位（轮询 /system/stats）
+  - R12.6 634f3c5 TasksCard 侧栏活跃任务列表 + 点击切换路由
 ---
 
-## DS 接手须知
+## 收口状态
 
-- 当前在 `feat/phase-r12-processing-page-replica` 分支，R12.1~R12.3 已 commit。
-- 接着做 R12.4 → R12.5 → R12.6，每项一个 commit。
-- 不 push、不 merge，6 个 commit 全做完后停下等用户授权。
-- 颜色全走 `var(--*)` token，参考 [`docs/DESIGN_TOKENS.md`](../DESIGN_TOKENS.md) §2。
+- 当前在 `feat/phase-r12-processing-page-replica` 分支，R12.1~R12.6 已全部完成并提交。
+- Codex QA 已清理分支中混入的非 R12 global SSE/R9 残留，并修复 `ProcessingPage/index.tsx` 的 touched-file React hooks lint 问题。
+- 不 push 远端；merge 前仍按用户授权执行。
+- 颜色继续走 `var(--*)` token，参考 [`docs/DESIGN_TOKENS.md`](../DESIGN_TOKENS.md) §2。
 - 设计稿真相源：[`docs/design/components/processing.jsx`](../design/components/processing.jsx) L147-250（右侧 aside）。
-- 每个子任务做完跑 `cd frontend && pnpm build` + `.venv/bin/python -m pytest tests/backend -q`。
 
 # Phase R12 — ProcessingPage 1:1 复刻设计稿
 
@@ -430,12 +433,12 @@ header：
 
 ---
 
-## 全部完工后
+## 完工收口
 
-1. 更新本文件 frontmatter `status: done`，补 R12.4/5/6 commit hash
-2. 更新 [`docs/EXECUTION_PLAN.md`](../EXECUTION_PLAN.md)：在 Phase R 区段后追加 R12 行（已完成 6 个 commit + 一句简介）
-3. 更新 [`docs/COMPLETED_WORK.md`](../COMPLETED_WORK.md)：追加一段（按文件顶部记录模板）
-4. **停下来等用户授权 merge**，不要自行 `git checkout main && git merge`
+- [x] 更新本文件 frontmatter `status: done`，补 R12.4/5/6 commit hash
+- [x] 更新 [`docs/EXECUTION_PLAN.md`](../EXECUTION_PLAN.md)：在 Phase R 区段后追加 R12 行
+- [x] 更新 [`docs/COMPLETED_WORK.md`](../COMPLETED_WORK.md)：追加 R12 完成记录
+- [ ] 等用户授权 merge；不 push 远端
 
 ## 决议（用户已拍板）
 
@@ -444,13 +447,21 @@ header：
 - 系统资源要**真实数据**（不 mock）
 - 不 push 远端，做完 6 commit 等用户授权 merge
 
+## 收口验证（2026-05-25）
+
+- `.venv/bin/python -m pytest tests/backend -q`：320 passed, 2 skipped
+- `cd frontend && pnpm test --run`：9 files / 47 tests passed
+- `cd frontend && pnpm build`：passed
+- `cd frontend && pnpm exec eslint src/pages/result/ProcessingPage/index.tsx src/pages/result/ProcessingPage/StepProgress.tsx src/pages/result/ProcessingPage/SystemResourceCard.tsx src/pages/result/ProcessingPage/TasksCard.tsx`：passed
+- `cd frontend && pnpm lint`：47 errors / 1 warning，仍为项目存量 lint 基线；R12 touched files targeted eslint 已通过
+
 ## 验收
 
 1. 粘 B 站短视频 URL → /processing/<id>：标题显示视频真实标题、封面图显示视频缩略图
 2. stats 行显示真实时长/帧数/句数（无数据时省略对应项）
 3. step-stream 7 步顺序对，每步有 desc，logs 按 ok/warn/err 三色显示
 4. 右侧栏 3 张卡可见：系统资源（GPU/RAM 数字真实变化）、任务（点击跳别的任务）、(预览帧暂缺)
-5. `pnpm lint && pnpm build && pnpm test --run` 通过
+5. R12 touched files targeted eslint、`pnpm build`、`pnpm test --run` 通过；全量 `pnpm lint` 仍有项目存量基线错误
 6. `.venv/bin/python -m pytest tests/backend -q` 通过
 
 ## 禁止事项

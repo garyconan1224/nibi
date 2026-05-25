@@ -21,6 +21,8 @@ interface LocationState {
   url?: string
 }
 
+const STUCK_MS = 10 * 60 * 1000
+
 export default function ProcessingPage() {
   const { taskId = '' } = useParams<{ taskId: string }>()
   const navigate = useNavigate()
@@ -44,32 +46,29 @@ export default function ProcessingPage() {
   const isSuccess = status === 'SUCCESS'
 
   // A3: 音乐模式确认弹窗
-  const [showMusicModal, setShowMusicModal] = useState(false)
-
-  useEffect(() => {
-    if (status === 'AWAITING_CONFIRM') {
-      setShowMusicModal(true)
-    }
-  }, [status])
+  const [dismissedMusicModalTaskId, setDismissedMusicModalTaskId] = useState<string | null>(null)
+  const showMusicModal = status === 'AWAITING_CONFIRM' && dismissedMusicModalTaskId !== taskId
 
   const handleMusicConfirmed = () => {
+    setDismissedMusicModalTaskId(taskId)
     toast.success('已切换为音乐分析模式，任务继续执行')
   }
 
   const handleMusicCancelled = () => {
+    setDismissedMusicModalTaskId(taskId)
     if (taskId) cancelTask(taskId)
     toast.info('任务已取消，可在素材设置中手动勾选「音乐分析」后重跑')
   }
 
   // F3.5: 任务卡住检测（非终结态 > 10 分钟无 updated_at 变化 → 警告）
-  const STUCK_MS = 10 * 60 * 1000
-  const lastActivityRef = useRef(Date.now())
+  const lastActivityRef = useRef<number | null>(null)
   const stuckToastedRef = useRef(false)
 
   useEffect(() => {
     if (!task?.updated_at) return
+    const currentActivity = lastActivityRef.current ?? 0
     lastActivityRef.current = Math.max(
-      lastActivityRef.current,
+      currentActivity,
       new Date(task.updated_at).getTime(),
     )
     // 有新活动时重置 toast 标记，以便下次卡住能再次提醒
@@ -78,8 +77,12 @@ export default function ProcessingPage() {
 
   useEffect(() => {
     if (!isActive) return
+    if (lastActivityRef.current == null) {
+      lastActivityRef.current = Date.now()
+    }
     const timer = setInterval(() => {
-      if (Date.now() - lastActivityRef.current > STUCK_MS && !stuckToastedRef.current) {
+      const lastActivity = lastActivityRef.current ?? Date.now()
+      if (Date.now() - lastActivity > STUCK_MS && !stuckToastedRef.current) {
         toast.warning('任务已超过 10 分钟无进度更新，可能已卡住。建议取消后重试。')
         stuckToastedRef.current = true
       }
@@ -287,7 +290,9 @@ export default function ProcessingPage() {
       {/* A3: VAD 无人声 → 音乐模式确认弹窗 */}
       <MusicModeConfirmModal
         open={showMusicModal}
-        onOpenChange={setShowMusicModal}
+        onOpenChange={(open) => {
+          setDismissedMusicModalTaskId(open ? null : taskId)
+        }}
         taskId={taskId}
         speechRatio={task?.result?.speech_ratio ?? 0}
         totalDuration={task?.result?.total_duration ?? 0}

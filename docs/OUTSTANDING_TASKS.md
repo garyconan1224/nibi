@@ -2,19 +2,22 @@
 
 > 本文件是「下一步该做什么」的快照。写入前必须先 `git log --oneline -20` 对账，避免把已完成阶段当作待办。
 
-Last updated: 2026-05-25（**当前阶段 = Phase R10/R11 merge 收口**）
+Last updated: 2026-05-25（**当前阶段 = Phase R12 merge 前收口**）
 
 ---
 
 ## 🔴 当前阶段（一切让路）
 
-**Phase R10 已完成 QA 修复，R11 设计同步分支待本地 merge 入 `main`。**
+**Phase R12 已在 `feat/phase-r12-processing-page-replica` 完成并通过验证，下一步是用户授权后本地 merge 到 `main`。不 push origin。**
 
 - R0~R6 已完成：输入层重构、AddMaterialModal 4 步合一、PreflightDrawer 接管细粒度参数、端到端冒烟。
 - R7 已完成：输入流统一收尾。
 - R8 已完成：PreflightDrawer Remix 复刻 + R8 tasks payload 落地。
 - R10 已完成：平台 URL 音频 hotfix + FloatingTaskQueue v2。
-- R11 是设计稿同步 / token 文档分支；不要 push origin，Push 策略仍暂缓到 `[D]` 开源准备。
+- R11 已完成并合入 local main：设计稿同步 / token 文档 canonicalize。
+- R12 已完成：ProcessingPage 真实标题/封面/stats、step-stream 日志、系统资源卡、任务侧栏卡。
+- R12 验证：后端 pytest 320 passed / 2 skipped；前端 vitest 47 passed；前端 build passed；R12 touched files targeted eslint passed。
+- `pnpm lint` 全量仍有 47 errors / 1 warning，属于项目存量 lint 基线。
 
 ---
 
@@ -29,7 +32,7 @@ Last updated: 2026-05-25（**当前阶段 = Phase R10/R11 merge 收口**）
 - **N7b/N8b UI 已就绪**，后端 handler 待实现：
   - N7b 路径 3（视频模型直接）— 依赖 Gemini / GPT-4o / Qwen-VL API 集成决策
   - N8b 音频 librosa 分析（6 维度切分）
-- **推荐下一步：F1.6 字幕清洗基础版**（4-6h，小米）— 路径 1 已能转写和总结，字幕清洗马上能增强它，ROI 比 Gemini 路径 3 更高
+- **推荐下一步：R12 本地 merge 收口** — 确认 `feat/phase-r12-processing-page-replica` 后 merge 到 local main；不 push origin。
 - Push 策略不变：所有 `git push origin` 暂缓到 `[D]` 开源准备阶段。
 
 ## P0 — 已知收口事项
@@ -40,7 +43,7 @@ Last updated: 2026-05-25（**当前阶段 = Phase R10/R11 merge 收口**）
 
 ## P1 — 可选下一步
 
-- **推荐 1：开源前仓库收口**：验证 `pnpm build` / 后端测试，修小型基线错误，整理 handoff 文档。
+- **推荐 1：开源前仓库收口**：验证 `pnpm build` / 后端测试，修剩余存量 lint 基线，整理 handoff 文档。
 - **推荐 2：.git 历史瘦身**：先备份 `.git`，再用 `git filter-repo` 移除历史大文件路径，完成后不 push。
 - **推荐 3：[D] 开源准备**：README、license、安全检查、CI、发布前清单。
 

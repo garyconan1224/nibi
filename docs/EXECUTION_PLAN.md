@@ -4,7 +4,7 @@
 >
 > **维护规则见 CLAUDE.md「项目执行计划维护流程」一节**。
 >
-> Last updated: 2026-05-18
+> Last updated: 2026-05-25
 
 ---
 
@@ -143,6 +143,8 @@
 - [x] R7 输入流统一收尾：单 URL 多类型默认全勾 / stage 模式统一解析出口 / Hero 文案精简
 - [x] R8 PreflightDrawer Remix 1:1 复刻：media tabs / 任务卡片 / 级联锁定 / R8 tasks payload 落地
 - [x] R10 平台 URL 音频抽取 hotfix + FloatingTaskQueue v2：yt-dlp bestaudio / 取消 / 重试 / FAILED 本地隐藏 / 批量操作
+- [x] R11 设计稿同步 canonicalize：设计 tokens / processing / library / taskboard / detail 组件源文件同步落盘
+- [x] R12 ProcessingPage 1:1 复刻：真实标题/封面/stats、step-stream 日志、系统资源卡、任务侧栏卡（`feat/phase-r12-processing-page-replica` 已完成，待用户授权本地 merge）
 
 ---
 
@@ -152,14 +154,15 @@
 - 阻塞 bug 修复：TaskRunner.append_log / PreflightDrawer 绕过桥接 ✅
 - 清理：H2.6 删旧 WorkspaceDetail（-680 行）✅
 
-**当前 main**：`f33db14` — UI ↔ 后端 100% 接通 + Flow Gaps 补齐
+**当前 local main**：`7ec9914` — R11 设计稿同步已合入；R12 分支已完成并等待本地 merge 授权。
 
 下一步候选（按 ROI 排序）：
-1. 🥇 **端到端冒烟测试**（用户自己跑，~30min）—— IP.7 修了阻塞 bug 但没真正粘 URL 走完链路
-2. 🥈 **[C] AI 导演模块**（4-7 天 Opus）—— 需先补设计稿 + 拍板生成模型 API
-3. 🥈 **[D] 开源准备**（2-3 天）—— 加密 / CI / push / 仓库整理
-4. 🥉 **N7b 后端** 视频总结路径 1/3 handler（UI 已就绪，依赖字幕抽取 + 视频大模型 API 决策）
-5. 🥉 **N8b 后端** 音频 librosa 分析（UI 已就绪）
+1. 🥇 **R12 本地 merge 收口**：确认 `feat/phase-r12-processing-page-replica` 后 merge 到 local main（不 push）
+2. 🥇 **端到端冒烟测试**（用户自己跑，~30min）—— 粘真实 URL 走 `/processing/<id>` 验证 R12 页面数据
+3. 🥈 **[C] AI 导演模块**（4-7 天 Opus）—— 需先补设计稿 + 拍板生成模型 API
+4. 🥈 **[D] 开源准备**（2-3 天）—— 加密 / CI / push / 仓库整理
+5. 🥉 **N7b 后端** 视频总结路径 1/3 handler（UI 已就绪，依赖字幕抽取 + 视频大模型 API 决策）
+6. 🥉 **N8b 后端** 音频 librosa 分析（UI 已就绪）
 
 延后子阶段：
 - **N7b 后端**（P2，8-12h）— UI 已就绪（IP.9.3），后端 handler 待实现
