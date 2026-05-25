@@ -450,6 +450,16 @@ export function PreflightDrawer({
                     </select>
                   </div>
                 </PFField>
+                {(kind === 'video' && (effState.summary as Record<string, unknown>)?.on && (effState.summary as Record<string, unknown>)?.summary_path === '视频模型直接分析') && (
+                  <PFField label="视频大模型" hint="路径 3 · 整段视频直送">
+                    <select className="pf-sel" value={models.video} onChange={e => setModels(s => ({ ...s, video: e.target.value }))}>
+                      <option value="">默认</option>
+                      <option value="Gemini 1.5 Pro · Google">Gemini 1.5 Pro · Google</option>
+                      <option value="Qwen-VL-Max · 阿里">Qwen-VL-Max · 阿里</option>
+                      <option value="GPT-4o · OpenAI">GPT-4o · OpenAI</option>
+                    </select>
+                  </PFField>
+                )}
               </>
             )}
           </PFSection>
