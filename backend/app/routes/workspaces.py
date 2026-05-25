@@ -135,6 +135,14 @@ def _on_download_success(completed_task: TaskRecord, runner) -> None:  # type: i
     if refs:
         _augment_video_analyze_payload(analyze_payload, refs[0][1])
 
+    # R13.1 继承 download 阶段 yt-dlp 抽取的视频元数据，供 ProcessingPage 在 analyze 阶段展示
+    _dl_result = completed_task.result or {}
+    for _key in ("video_title", "video_duration", "video_uploader", "video_thumbnail_url"):
+        if _dl_result.get(_key):
+            analyze_payload[_key] = _dl_result[_key]
+    if completed_task.payload.get("url"):
+        analyze_payload["source_url"] = completed_task.payload["url"]
+
     try:
         analyze_task = runner.create_task(project_id, "analyze", analyze_payload)
     except Exception:
