@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { X, ArrowRight, Loader2, Settings, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { useProviderStore } from '@/store/providerStore'
-import { useTemplateStore } from '@/store/templateStore'
 import {
   autoCreateWorkspace,
   addWorkspaceItem,
@@ -13,8 +12,6 @@ import {
 import type { SniffResult } from '@/services/workspaces'
 import type { ItemType, WorkspaceBackground } from '@/types/workspace'
 import type { StagedConfig } from '@/components/workspace/AddMaterialModal'
-import { OUTPUT_FORMAT_OPTIONS } from '@/lib/preflightTasks'
-import type { RewriteStyle, VideoOutputFormat } from '@/lib/preflightTasks'
 import {
   TASK_GROUPS,
   MEDIA_KINDS,
@@ -38,8 +35,6 @@ const ITEM_TYPE_LABELS: Record<ItemType, string> = {
   image: '图片',
   text: '文字',
 }
-type SummaryPath = 'subtitle' | 'detailed' | 'video_model'
-
 interface PreflightDrawerProps {
   open: boolean
   url: string
@@ -97,13 +92,6 @@ export function PreflightDrawer({
   const [textProviderId, setTextProviderId] = useState('')
   const [textModelId, setTextModelId] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [summaryPath, setSummaryPath] = useState<SummaryPath>('detailed')
-  const [videoTemplate, setVideoTemplate] = useState('auto')
-  const [outputFormat, setOutputFormat] = useState<VideoOutputFormat>('summary')
-  const [textRewriteEnabled, setTextRewriteEnabled] = useState(false)
-  const [textRewriteStyle, setTextRewriteStyle] = useState<RewriteStyle>('formal')
-  const [textTranslateEnabled, setTextTranslateEnabled] = useState(false)
-  const [textTranslateLang, setTextTranslateLang] = useState('en')
   const navigate = useNavigate()
 
   // ── New state (R8 Remix structure) ──
@@ -134,32 +122,16 @@ export function PreflightDrawer({
   const sc = stagedConfig
 
   const { providers, providerModels, fetchProviders, modelsLoading } = useProviderStore()
-  const templateOptions = useTemplateStore((s) => s.getOptions)
-  const fetchTemplates = useTemplateStore((s) => s.fetch)
-
   useEffect(() => {
     if (open && providers.length === 0) fetchProviders()
   }, [open, providers.length, fetchProviders])
-
-  useEffect(() => {
-    if (open) fetchTemplates()
-  }, [open, fetchTemplates])
 
   // Reset form on open
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) {
-      // old state
       setTextProviderId('')
       setTextModelId('')
-      setSummaryPath('detailed')
-      setVideoTemplate('auto')
-      setOutputFormat('summary')
-      setTextRewriteEnabled(sc?.features?.text?.rewrite ?? false)
-      setTextRewriteStyle('formal')
-      setTextTranslateEnabled(sc?.features?.text?.translate ?? false)
-      setTextTranslateLang('en')
-      // new state
       setKind(kindFromType)
       setActivePreset(null)
       setBg({
@@ -324,14 +296,6 @@ export function PreflightDrawer({
   }
 
   const handleSaveStaged = () => {
-    const features: StagedConfig['features'] = { ...sc?.features }
-    if (typesToCreate.includes('text') && (textRewriteEnabled || textTranslateEnabled)) {
-      features.text = {
-        ...(features.text ?? {}),
-        ...(textRewriteEnabled && { rewrite: true }),
-        ...(textTranslateEnabled && { translate: true }),
-      }
-    }
     const bgPayload: Partial<WorkspaceBackground> = {}
     if (bg.contentType) bgPayload.content_type = bg.contentType
     if (bg.purpose) bgPayload.purpose = bg.purpose
@@ -339,7 +303,7 @@ export function PreflightDrawer({
 
     onSaveStaged?.({
       types: typesToCreate,
-      features,
+      features: { ...sc?.features },
       background: bgPayload,
       workspaceIds: workspaceId ? [workspaceId] : [],
       urlValue: url,
@@ -484,138 +448,6 @@ export function PreflightDrawer({
               })}
             </div>
           </PFSection>
-
-          {/* ── Old ad-hoc sections (kept until R8.7) ── */}
-          {/* Section: Video summary path */}
-          {(selectedTypes?.length
-            ? selectedTypes.some((t) => t === '视频' || t === 'video')
-            : resolvedType === 'video') && (
-            <section className="pf-section">
-              <h4 className="pf-section-title">视频分析路径</h4>
-              <div className="pf-field">
-                <label>摘要方式</label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {([
-                    { value: 'subtitle', label: '路径 1：字幕直接总结', desc: '便宜快，适合口播/访谈' },
-                    { value: 'detailed', label: '路径 2：详细总结（套模板）', desc: '推荐 · 字幕 + 截帧画面合并分析' },
-                    { value: 'video_model', label: '路径 3：视频大模型直传', desc: '~$0.05/min，整段视频送大模型' },
-                  ] as const).map((opt) => (
-                    <label key={opt.value} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 12px', border: `1px solid ${summaryPath === opt.value ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 8, cursor: 'pointer', background: summaryPath === opt.value ? 'var(--accent-bg)' : 'transparent' }}>
-                      <input
-                        type="radio"
-                        name="summaryPath"
-                        value={opt.value}
-                        checked={summaryPath === opt.value}
-                        onChange={() => setSummaryPath(opt.value)}
-                        style={{ marginTop: 2 }}
-                      />
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 500 }}>{opt.label}</div>
-                        <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{opt.desc}</div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              {summaryPath === 'subtitle' && (
-                <>
-                  <div className="pf-field">
-                    <label>视频类型模板</label>
-                    <select value={videoTemplate} onChange={(e) => setVideoTemplate(e.target.value)}>
-                      {templateOptions().map((t) => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  </div>
-                  <div className="pf-field">
-                    <label>输出格式</label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {OUTPUT_FORMAT_OPTIONS.map((opt) => (
-                        <label
-                          key={opt.value}
-                          style={{
-                            display: 'flex', alignItems: 'flex-start', gap: 8,
-                            padding: '6px 10px',
-                            border: `1px solid ${outputFormat === opt.value ? 'var(--accent)' : 'var(--border)'}`,
-                            borderRadius: 6, cursor: 'pointer',
-                            background: outputFormat === opt.value ? 'var(--accent-bg)' : 'transparent',
-                          }}
-                        >
-                          <input
-                            type="radio"
-                            name="outputFormat"
-                            value={opt.value}
-                            checked={outputFormat === opt.value}
-                            onChange={() => setOutputFormat(opt.value)}
-                          />
-                          <div>
-                            <div style={{ fontSize: 13, fontWeight: 500 }}>{opt.label}</div>
-                            <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>{opt.desc}</div>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-            </section>
-          )}
-
-          {/* Section: Text processing options */}
-          {(selectedTypes?.length
-            ? selectedTypes.some((t) => t === '文字' || t === 'text')
-            : resolvedType === 'text') && (
-            <section className="pf-section">
-              <h4 className="pf-section-title">文本处理选项</h4>
-              <div className="pf-field">
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={textRewriteEnabled}
-                    onChange={(e) => setTextRewriteEnabled(e.target.checked)}
-                  />
-                  改写 / 润色
-                </label>
-                {textRewriteEnabled && (
-                  <select
-                    value={textRewriteStyle}
-                    onChange={(e) => setTextRewriteStyle(e.target.value as RewriteStyle)}
-                    style={{ marginTop: 6 }}
-                  >
-                    <option value="formal">正式</option>
-                    <option value="casual">口语</option>
-                    <option value="concise">简洁</option>
-                    <option value="rich">丰富</option>
-                  </select>
-                )}
-              </div>
-              <div className="pf-field">
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={textTranslateEnabled}
-                    onChange={(e) => setTextTranslateEnabled(e.target.checked)}
-                  />
-                  翻译
-                </label>
-                {textTranslateEnabled && (
-                  <select
-                    value={textTranslateLang}
-                    onChange={(e) => setTextTranslateLang(e.target.value)}
-                    style={{ marginTop: 6 }}
-                  >
-                    <option value="en">英文</option>
-                    <option value="ja">日文</option>
-                    <option value="ko">韩文</option>
-                    <option value="zh">中文</option>
-                    <option value="es">西班牙文</option>
-                    <option value="fr">法文</option>
-                    <option value="de">德文</option>
-                    <option value="ru">俄文</option>
-                    <option value="pt">葡萄牙文</option>
-                  </select>
-                )}
-              </div>
-            </section>
-          )}
         </div>
 
         {/* ── Footer ── */}
