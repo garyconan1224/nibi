@@ -1,10 +1,15 @@
 ---
 name: phase-r10-hotfix-and-queue-v2
-status: ready
+status: done
 branch: feat/phase-r10-hotfix-and-queue-v2
 baseline_commit: cd91447  # R9 merge 后的 main
 owner: ds (claude code + ccswitch deepseek-v4-pro)
 created_date: 2026-05-25
+completed_date: 2026-05-25
+commits:
+  - 62b4f27 docs(phase-r10): 平台 URL 音频抽取 hotfix + 悬浮队列 v2 执行计划
+  - ee204d6 fix(phase-r10): R10.0 audio_task 平台 URL 改用 yt-dlp 抽 bestaudio，修复 B 站 412 与同类拦截
+  - R10 completion: FloatingTaskQueue v2 视觉/取消/重试/隐藏/批量操作 + 回归测试
 ---
 
 # Phase R10 — 平台 URL 音频抽取 hotfix + 悬浮队列 v2
@@ -17,6 +22,16 @@ created_date: 2026-05-25
 |---|---|
 | R10.0 | **hotfix**：audio_task 平台 URL → yt-dlp bestaudio（修 B 站 412 / 其他平台同类问题） |
 | R10.1~R10.5 | 悬浮队列 v2：视觉精修 + 当前步骤 + 取消按钮 + 重试按钮 + 隐藏已终结 |
+
+---
+
+## 完成记录（2026-05-25）
+
+- R10.0 已修复平台 URL 音频任务：B 站 / YouTube / 抖音等平台 URL 改走 yt-dlp `bestaudio/best`，直链音频仍走 urllib。
+- R10.1~R10.5 已补齐：胶囊 mini ring、popover 聚合进度、stage 行、取消按钮、失败重试、FAILED 本地隐藏、footer 批量暂停/重试、当前 processing 任务高亮。
+- `查看全部` 指向现有 `/workspaces`，避免跳转未注册 `/taskboard`。
+- FAILED 本地隐藏通过 `hiddenTaskIds` 防止轮询把同一后端失败记录重新同步回来。
+- 验证：后端全量 `318 passed, 2 skipped`；前端全量 `47 passed`；前端 build passed；R10 touched files targeted eslint passed；完整 `pnpm lint` 仍是项目存量 `49 errors / 2 warnings`。
 
 ---
 

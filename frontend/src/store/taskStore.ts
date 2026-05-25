@@ -8,12 +8,14 @@ import { toast } from 'sonner'
 interface TaskStoreState {
   // 状态
   tasks: TaskRecord[]
+  hiddenTaskIds: string[]
   currentTaskId: string | null
   isPolling: boolean
 
   // 操作
   setTasks: (tasks: TaskRecord[]) => void
   addTask: (task: TaskRecord) => void
+  removeTask: (taskId: string) => void
   updateTask: (taskId: string, task: Partial<TaskRecord>) => void
   setCurrentTask: (taskId: string | null) => void
   setIsPolling: (isPolling: boolean) => void
@@ -29,6 +31,7 @@ export const useTaskStore = create<TaskStoreState>()(
   persist(
     (set, get) => ({
       tasks: [],
+      hiddenTaskIds: [],
       currentTaskId: null,
       isPolling: false,
 
@@ -37,17 +40,19 @@ export const useTaskStore = create<TaskStoreState>()(
       // 避免进行中的任务因一次空响应被清空。
       setTasks: (incoming) =>
         set((state) => {
+          const hiddenIds = new Set(state.hiddenTaskIds)
+          const visibleIncoming = incoming.filter((t) => !hiddenIds.has(t.task_id))
           if (incoming.length === 0) {
             // 后端返回空：仅保留本地非终结状态任务（下载中、等待中等）
             const activeLocally = state.tasks.filter((t) => !isTaskTerminal(t.status))
             return { tasks: activeLocally }
           }
           // 正常同步：以后端数据为准，同时将本地有但后端没有的非终结任务补回
-          const backendIds = new Set(incoming.map((t) => t.task_id))
+          const backendIds = new Set(visibleIncoming.map((t) => t.task_id))
           const localOnlyActive = state.tasks.filter(
             (t) => !backendIds.has(t.task_id) && !isTaskTerminal(t.status)
           )
-          return { tasks: [...incoming, ...localOnlyActive] }
+          return { tasks: [...visibleIncoming, ...localOnlyActive] }
         }),
 
       addTask: (task) =>
@@ -61,6 +66,14 @@ export const useTaskStore = create<TaskStoreState>()(
           }
           return { tasks: [task, ...state.tasks] }
         }),
+
+      removeTask: (taskId) =>
+        set((state) => ({
+          hiddenTaskIds: state.hiddenTaskIds.includes(taskId)
+            ? state.hiddenTaskIds
+            : [...state.hiddenTaskIds, taskId],
+          tasks: state.tasks.filter((t) => t.task_id !== taskId),
+        })),
 
       updateTask: (taskId, updates) =>
         set((state) => ({
@@ -118,8 +131,8 @@ export const useTaskStore = create<TaskStoreState>()(
       name: 'task-storage',
       partialize: (state) => ({
         tasks: state.tasks,
-      } as Pick<TaskStoreState, 'tasks'>),
+        hiddenTaskIds: state.hiddenTaskIds,
+      } as Pick<TaskStoreState, 'tasks' | 'hiddenTaskIds'>),
     }
   )
 )
-
