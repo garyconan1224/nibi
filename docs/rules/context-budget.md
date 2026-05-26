@@ -11,7 +11,7 @@
 ## 1. 文件读取
 
 1. **先用 `rg -n` / heading 搜索定位**，再读必要片段。
-2. `docs/SPEC.md`、`docs/ROADMAP.md`、`docs/AI_HANDOFF.md`、大 TSX 文件不要默认整文件读取；只有结构未知或需要全局重写时才全读。
+2. `docs/ROADMAP.md`、`docs/AI_HANDOFF.md`、大 TSX 文件不要默认整文件读取；`docs/SPEC.md` 只读入口索引，细节按需读 `docs/spec/*.md` 对应模块。
 3. compact/resume 后**不要重复读 unchanged 文件**；先看 `git diff -- <file>` 或用 `rg` 找刚改过的函数/组件。
 4. 流程图先读 `docs/flows/README.md` 和对应 `docs/flows/<track>.md`。源 PNG 只在 Markdown 缺失、hash 过期、需求冲突，或必须判断视觉布局/颜色/层级时读取；读取前先裁剪相关区域。
 5. 代码入口先看 `docs/AI_CODE_INDEX.md`。它是低 token 路线图，只给入口和关键词；真正修改前仍以实际代码为准。

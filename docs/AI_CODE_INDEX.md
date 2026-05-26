@@ -36,7 +36,7 @@
 |---|---|
 | 长期路线 | `docs/ROADMAP.md` |
 | 当前接力 | `docs/AI_HANDOFF.md` |
-| 产品规范 | `docs/SPEC.md` |
+| 产品规范 | `docs/SPEC.md` 入口索引 + `docs/spec/*.md` 模块 |
 | 流程图文本镜像 | `docs/flows/README.md` |
 | 短期 phase | `docs/plans/` |
 

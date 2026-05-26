@@ -40,7 +40,7 @@ git log --oneline -20            # 对账铁律：phase 文档不是事实来源
 1. `CLAUDE.md`（本文件）
 2. `~/.claude/projects/-Users-conan-Desktop-nibi/memory/MEMORY.md`（深度记忆索引 + 用户反馈历史）
 3. `docs/WORKFLOW.md`（主工作流总图）
-4. `docs/SPEC.md`（产品需求 8 模块——唯一标准；**按模块读，整文件 1139 行**）
+4. `docs/SPEC.md`（产品需求入口索引；细节按模块读 `docs/spec/*.md`）
 5. **`docs/ROADMAP.md`（长期升级路线图——§2 6-track 全景表 + §11 推荐顺序是"下一步做什么"的决策依据）**
 6. `docs/AI_HANDOFF.md`（上次会话留下的开工笔记）
 7. `docs/EXECUTION_PLAN.md`（短期 phase 进度对照——配合 git log 对账用）
@@ -109,12 +109,12 @@ git log --oneline -20            # 对账铁律：phase 文档不是事实来源
 
 ## 6. 唯一标准与冲突仲裁
 
-> 📌 **Single Source of Truth**：`docs/SPEC.md`
+> 📌 **Single Source of Truth**：`docs/SPEC.md` + `docs/spec/`
 > 2026-05-18 合并 v2 + v3 + 设计稿 + 现有代码 + 用户最新决议产出的 8 模块统一规范，**Phase 推进、设计落地、AI 协作决策都以本文件为准**。
 
 **优先级（冲突仲裁，自上而下）**：
 
-1. `docs/SPEC.md`（**唯一标准**，产品需求级粒度）
+1. `docs/SPEC.md` + `docs/spec/`（**唯一标准**，产品需求级粒度）
 2. `docs/EXECUTION_PLAN.md`（工程执行计划——Phase 打勾 + 当前在哪步）
 3. `docs/design/`（**设计稿源文件** 2026-05-25 同步；25 个 jsx + system_design_v1.1.md + check 截图）；token 速查走 [`docs/DESIGN_TOKENS.md`](docs/DESIGN_TOKENS.md)
 4. 当前代码（与 spec 偏差时优先反映到 spec 或新建差异 phase）
@@ -137,7 +137,7 @@ git log --oneline -20            # 对账铁律：phase 文档不是事实来源
 | 模型选择四档决策树（Opus / Sonnet / DS-pro / DS-flash） | [`docs/rules/model-strategy.md`](docs/rules/model-strategy.md) | 判断当前任务该用哪档模型时（一般用户决定，AI 仅在被问时查） |
 | 项目架构 / 后端 router / 前端路由 / 共享层 / 端口 / CodeGraph MCP / 常用命令 | [`docs/rules/project-map.md`](docs/rules/project-map.md) | 新人入门、改路由、找模块入口 |
 
-> 💡 **AI 使用方法**：每个文件顶部都有目录章节锚点。AI 应用 `rg -n "^#" docs/rules/<file>.md` 查目录，再 `sed -n` 读对应段落。**禁止整文件读取这些 rules 文件以外的大文件（SPEC.md / ROADMAP.md / 设计稿等）**。
+> 💡 **AI 使用方法**：每个文件顶部都有目录章节锚点。AI 应用 `rg -n "^#" docs/rules/<file>.md` 查目录，再 `sed -n` 读对应段落。**禁止整文件读取大文件（ROADMAP.md / 设计稿等）；SPEC 先读 `docs/SPEC.md` 索引，再读相关 `docs/spec/*.md` 模块。**
 
 ---
 

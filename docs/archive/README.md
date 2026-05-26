@@ -3,7 +3,7 @@
 > **这里的所有文件都已 DEPRECATED**，仅保留作为历史参考与决策溯源。
 > **不再维护、不参与冲突仲裁。**
 >
-> 当前真相源在 [`docs/SPEC.md`](../SPEC.md) + [`docs/EXECUTION_PLAN.md`](../EXECUTION_PLAN.md) + [`docs/WORKFLOW.md`](../WORKFLOW.md)。
+> 当前真相源在 [`docs/SPEC.md`](../SPEC.md) + [`docs/spec/`](../spec/) + [`docs/EXECUTION_PLAN.md`](../EXECUTION_PLAN.md) + [`docs/WORKFLOW.md`](../WORKFLOW.md)。
 
 ---
 
@@ -23,6 +23,12 @@
 | 文件 | 说明 |
 |---|---|
 | [`migration-plan-v1.md`](migration-plan-v1.md) | 2026-05-03 写的项目改造规划，引用了已迁移的 design_reference/ |
+
+### 旧设计上传快照
+
+| 目录 | 原位置 | 说明 |
+|---|---|---|
+| [`design-uploads-2026-05-25/`](design-uploads-2026-05-25/) | `docs/design/uploads/` | 设计工具上传原始快照，当前 canonical 设计源已整理到 `docs/design/components/`、`docs/design/styles.css`、`docs/design/system_design_v1.1.md` |
 
 ### 旧 Phase 文档（被 EXECUTION_PLAN.md 的 N1~N11 路线取代）
 

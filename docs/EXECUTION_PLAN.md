@@ -11,7 +11,7 @@
 ## 使用方法（每个新会话开始时跑一遍）
 
 1. 读本文件，找到第一个未打勾的子任务
-2. 如果是 N1~N11 阶段，读 `docs/SPEC.md` 对应模块理解产品需求
+2. 如果是 N1~N11 阶段，先读 `docs/SPEC.md` 索引，再读 `docs/spec/` 对应模块理解产品需求
 3. 如果该子任务有对应的 `docs/plans/<file>.md` 详细计划：
    - 若 `status: pending` 且操作步骤段是 `TODO` → 停下问用户「要先展开这个 phase 的具体执行计划吗？」
    - 若 `status: ready` 或 `in_progress` 且已有操作步骤 → 按里面的步骤执行

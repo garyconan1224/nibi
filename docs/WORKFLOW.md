@@ -16,7 +16,7 @@
 
 | 序 | 文件 | 角色 |
 |---|---|---|
-| **1** | [`docs/SPEC.md`](SPEC.md) | **产品需求规范**（8 模块 + 附录 C 执行路线），所有产品决议以此为准 |
+| **1** | [`docs/SPEC.md`](SPEC.md) + [`docs/spec/`](spec/) | **产品需求规范**（8 模块 + 附录 C 执行路线），所有产品决议以此为准 |
 | **2** | [`docs/EXECUTION_PLAN.md`](EXECUTION_PLAN.md) | **工程执行计划**（Phase 打勾 + 当前在哪一步） |
 | **3** | [`docs/design/`](design/) | **设计稿源文件**（VidMirror.html + 19 个 jsx 组件 + styles.css + v1.1 设计契约），视觉与交互细节以此为准 |
 | **4** | 当前工作目录代码 | 实际实现，与 spec 偏差时**优先反映到 spec 或新建差异 phase**，不静默修改代码 |
@@ -132,7 +132,7 @@ git log --oneline -5
 然后：
 1. 读本文档（WORKFLOW.md），知道总流程在哪
 2. 读 `docs/EXECUTION_PLAN.md`，找第一个未打勾的子任务
-3. 读 `docs/SPEC.md` 对应模块，理解产品需求
+3. 读 `docs/SPEC.md` 索引，再读 `docs/spec/` 对应模块，理解产品需求
 4. 读 `docs/design/components/<对应组件>.jsx`，理解视觉与交互
 5. 才能动手写代码
 
