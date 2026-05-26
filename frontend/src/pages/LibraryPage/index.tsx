@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Upload, Film, Music, ImageIcon, FileText, Trash2, CheckCircle, Circle } from 'lucide-react'
+import { Film, Music, ImageIcon, FileText, Trash2, CheckCircle, Circle, Plus } from 'lucide-react'
 import { fetchLibrary, deleteItem, batchDeleteItems, type LibraryItem, type LibraryResponse } from '@/services/library'
 import { useLibraryStore, type SortBy } from '@/store/libraryStore'
 import { FilterChips } from './FilterChips'
 import { SortMenu } from './SortMenu'
+import { ViewToggle } from './ViewToggle'
 import { ItemCard } from './ItemCard'
 import { WorkspaceCard } from './WorkspaceCard'
 import './library.css'
@@ -97,9 +98,9 @@ function formatDate(iso: string): string {
 
 const STATE_LABEL: Record<string, string> = {
   done: 'done',
-  processing: 'running',
-  pending: 'queued',
-  failed: 'error',
+  running: 'running',
+  queued: 'queued',
+  error: 'error',
 }
 
 const STATE_COLOR: Record<string, string> = {
@@ -121,7 +122,6 @@ export default function LibraryPage() {
   const selectedFilters = useLibraryStore((s) => s.selectedFilters)
   const sortBy = useLibraryStore((s) => s.sortBy)
   const viewMode = useLibraryStore((s) => s.viewMode)
-  const setViewMode = useLibraryStore((s) => s.setViewMode)
 
   const selectionKey = (wsId: string, itemId: string) => `${wsId}:${itemId}`
 
@@ -222,6 +222,18 @@ export default function LibraryPage() {
     if (!data || !showWorkspace) return null
     return data.workspaces
   }, [data, showWorkspace])
+
+  const chipCounts = useMemo(() => {
+    if (!data) return undefined
+    return {
+      all: data.items.length,
+      video: data.items.filter((i) => i.type === 'video').length,
+      audio: data.items.filter((i) => i.type === 'audio').length,
+      image: data.items.filter((i) => i.type === 'image').length,
+      text: data.items.filter((i) => i.type === 'text').length,
+      workspace: data.workspaces.length,
+    }
+  }, [data])
 
   const statLabel =
     showWorkspace && typeFilters.length === 0
@@ -389,10 +401,29 @@ export default function LibraryPage() {
         }}
       >
         <div>
-          <div className="eyebrow">LIBRARY · {statLabel}</div>
-          <h1 className="display" style={{ fontSize: 48, margin: '8px 0 6px' }}>
+          <div className="eyebrow">LIBRARY · {statLabel} · LOCAL</div>
+          <h1
+            className="display"
+            style={{
+              fontSize: 'clamp(56px, 7vw, 92px)',
+              lineHeight: 0.98,
+              margin: '10px 0 4px',
+              letterSpacing: '-0.02em',
+            }}
+          >
             资料库
           </h1>
+          <p
+            style={{
+              fontSize: 16,
+              color: 'var(--ink-3)',
+              maxWidth: 560,
+              margin: '12px 0 0',
+              lineHeight: 1.55,
+            }}
+          >
+            横切所有工作空间的素材池。按类型筛、按时长/状态排，找到该用的那一个。
+          </p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {/* 选择控制 */}
@@ -436,68 +467,23 @@ export default function LibraryPage() {
           <SortMenu />
 
           {/* grid/list 切换 */}
-          <div
-            style={{
-              display: 'flex',
-              gap: 4,
-              padding: 3,
-              background: 'var(--bg-sunken)',
-              borderRadius: 10,
-            }}
-          >
-            <button
-              onClick={() => setViewMode('grid')}
-              style={{
-                padding: '6px 10px',
-                borderRadius: 7,
-                fontSize: 12,
-                background: viewMode === 'grid' ? 'var(--bg-elev)' : 'transparent',
-                color: viewMode === 'grid' ? 'var(--ink)' : 'var(--ink-3)',
-                boxShadow: viewMode === 'grid' ? 'var(--shadow-sm)' : 'none',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-              title="网格视图"
-            >
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                <rect x="0.5" y="0.5" width="5" height="5" rx="1.5" fill="currentColor" />
-                <rect x="7.5" y="0.5" width="5" height="5" rx="1.5" fill="currentColor" />
-                <rect x="0.5" y="7.5" width="5" height="5" rx="1.5" fill="currentColor" />
-                <rect x="7.5" y="7.5" width="5" height="5" rx="1.5" fill="currentColor" />
-              </svg>
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              style={{
-                padding: '6px 10px',
-                borderRadius: 7,
-                fontSize: 12,
-                background: viewMode === 'list' ? 'var(--bg-elev)' : 'transparent',
-                color: viewMode === 'list' ? 'var(--ink)' : 'var(--ink-3)',
-                boxShadow: viewMode === 'list' ? 'var(--shadow-sm)' : 'none',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-              title="列表视图"
-            >
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                <rect x="0.5" y="0.5" width="12" height="2" rx="1" fill="currentColor" />
-                <rect x="0.5" y="5.5" width="12" height="2" rx="1" fill="currentColor" />
-                <rect x="0.5" y="10.5" width="12" height="2" rx="1" fill="currentColor" />
-              </svg>
-            </button>
-          </div>
+          <ViewToggle />
 
-          {/* 导入按钮占位 */}
-          <button className="btn btn-primary" style={{ opacity: 0.7, cursor: 'default' }}>
-            <Upload size={14} />
+          {/* 导入按钮 — 跳转工作台 */}
+          <button
+            className="btn btn-primary"
+            style={{ height: 32, fontSize: 12 }}
+            onClick={() => navigate('/')}
+            title="去工作台新建工作空间"
+          >
+            <Plus size={14} />
             导入
           </button>
         </div>
       </div>
 
       {/* ── Chip 筛选 ── */}
-      <FilterChips />
+      <FilterChips counts={chipCounts} />
 
       {/* ── 内容区 ── */}
       {loading && (
