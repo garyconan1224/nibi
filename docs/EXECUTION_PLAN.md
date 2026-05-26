@@ -4,7 +4,7 @@
 >
 > **维护规则见 CLAUDE.md「项目执行计划维护流程」一节**。
 >
-> Last updated: 2026-05-25
+> Last updated: 2026-05-26
 
 ---
 
@@ -16,6 +16,14 @@
    - 若 `status: pending` 且操作步骤段是 `TODO` → 停下问用户「要先展开这个 phase 的具体执行计划吗？」
    - 若 `status: ready` 或 `in_progress` 且已有操作步骤 → 按里面的步骤执行
 4. 每完成一个子任务，在本文件勾上对应方框，并按"流程"更新 `docs/COMPLETED_WORK.md`
+
+---
+
+## 当前执行入口（用户 2026-05-26 指定）
+
+> 这是当前插队执行项，放在总进度前面，避免新会话按旧的未完成 N7b/N8b 误开工。
+
+- [x] **L5 Library Remix Polish** — 保留当前 `/library` 真实功能，对齐最新 Remix 资料库设计稿（header / controls / item card / rich workspace card / empty state / delete feedback）。详细计划：[docs/plans/phase-l5-library-remix-polish.md](plans/phase-l5-library-remix-polish.md)。模型：DS v4-pro；分支：`feat/phase-l5-library-remix-polish`；不改 API/schema，不 push。
 
 ---
 
