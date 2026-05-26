@@ -394,6 +394,49 @@ def handle_download_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, An
     return result
 
 
+def _apply_ytdlp_metadata_to_task(
+    record: TaskRecord,
+    runner: TaskRunner,
+    dl_result: Dict[str, Any],
+) -> Dict[str, Any]:
+    """R13.6.1 把 yt-dlp 返回的 metadata 写进 task.result，并触发工作空间改名。
+
+    返回值：一个 dict，含本次要 merge 进 task.result 的 metadata 字段。
+    调用方负责把返回值 merge 到自己最终的 result dict 里。
+
+    副作用：
+    - 在 task.result 上即时 update（runner.store.update(..., result=...)）
+    - 调用 workspaces._maybe_rename_workspace_from_video_title 触发 workspace 改名（如适用）
+    """
+    meta: Dict[str, Any] = {}
+    for key in ("title", "duration", "uploader", "thumbnail_url"):
+        val = dl_result.get(key)
+        if not val:
+            continue
+        meta[f"video_{key}"] = val
+    if not meta:
+        return meta
+
+    # 即时写入 task.result，前端 SSE 下一帧就能看到
+    try:
+        current = dict(record.result or {})
+        current.update(meta)
+        runner.store.update(record.task_id, result=current)
+    except Exception:
+        pass  # 写失败不阻塞主流程
+
+    # 触发 workspace 改名（懒导入避免循环 import）
+    try:
+        from backend.app.routes.workspaces import (
+            _maybe_rename_workspace_from_video_title,
+        )
+        _maybe_rename_workspace_from_video_title(record, meta)
+    except Exception:
+        pass
+
+    return meta
+
+
 def _run_subtitle_summary(
     videos: List[Path],
     payload: Dict[str, Any],
