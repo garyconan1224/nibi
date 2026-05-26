@@ -1,32 +1,33 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-# 多媒体内容分析系统 — AI 协作规则
-
-> 这是项目级规则，会和 `~/.claude/CLAUDE.md` 全局规则一起生效。
-> Claude Code 启动时会自动读取本文件。
-> 项目根目录还有 `docs/archive/plan-v1.md`（阶段计划）和 `docs/archive/design-spec-v1.md`（系统设计）。
+> 本文件是 AI 协作的**入口铁律**。详细规则已拆到 [`docs/rules/`](docs/rules/README.md)，AI 用到时按需 `rg` / 片段读取。
+> 与全局 `~/.claude/CLAUDE.md` 一起生效。
 
 ---
 
-## 项目背景
+## 1. 项目背景
 
 - **后端**：Python 3.11 + FastAPI + SQLAlchemy + SQLite
 - **前端**：React 19 + TypeScript + Vite 6 + Tailwind 4
 - **使用对象**：本地优先的桌面创作者工具（非 SaaS）
-- **用户特征**：编程新手，需要每一步都解释清楚在做什么
+- **用户特征**：编程新手，**需要每一步都解释清楚在做什么**
+
+**当前主线**：FastAPI 后端 + React/Vite 前端。`app.py`、`pages/`、`src/vidmirror/ui/` 是 Streamlit legacy 兼容，**新功能不要加到这里**。
+**当前阶段**：F1（IP.9 流程缺口补齐）。H1~H5 + IP.1~IP.8 已合 main。具体 track 看 `docs/ROADMAP.md`。
 
 ---
 
-## 当前主线与接力边界
+## 2. 沟通规则（最重要）
 
-- 当前主线是 **FastAPI 后端 + React/Vite 前端**。
-- `app.py`、`pages/`、`src/vidmirror/ui/` 属于 Streamlit legacy compatibility path；除非用户明确要求维护旧入口，否则不要往这里加新产品功能。
-- 新会话开始时按下面**启动必读顺序**读，再判断任务边界。
-- 当前处于 **F1（IP.9 流程缺口补齐）**：H1~H5 + IP.1~IP.8 全部已合入 main。用户决议先打磨现有流程 + 落地流程图需求，再做 [C] / [D]。流程图已转成 `docs/flows/*.md` 文本镜像；Claude Code 终端先读 Markdown，必要时再回看 PNG。具体 track 看 `docs/ROADMAP.md`。
+1. **用中文回复**。
+2. **改代码前先解释**："我打算改哪几个文件、为什么这么改"。
+3. **改完后用 1-2 句总结**：刚才做了什么、产生了什么效果。
+4. **遇到术语简单说明**。第一次提到"中间件"、"依赖注入"、"hook" 等，附一句白话解释。
+5. **用户问"这是干什么的"时直接讲**，不要假设他都懂。
 
-### 启动必读顺序（每次新会话第一件事，按号码读）
+---
+
+## 3. 启动必读顺序（每次新会话第一件事）
 
 ```bash
 cd /Users/conan/Desktop/nibi
@@ -34,382 +35,33 @@ git status --short --branch
 git log --oneline -20            # 对账铁律：phase 文档不是事实来源，git log 才是
 ```
 
-1. `CLAUDE.md`（本文件——项目规则 / 模型策略 / git 行为）
+按号码读，**不要整文件 Read 大文件**（细则见 [`docs/rules/context-budget.md`](docs/rules/context-budget.md)）：
+
+1. `CLAUDE.md`（本文件）
 2. `~/.claude/projects/-Users-conan-Desktop-nibi/memory/MEMORY.md`（深度记忆索引 + 用户反馈历史）
 3. `docs/WORKFLOW.md`（主工作流总图）
-4. `docs/SPEC.md`（产品需求 8 模块——唯一标准）
-5. **`docs/ROADMAP.md`（长期升级路线图，2026-05-21 起的真相源——13 节结构，§2 6-track 全景表 + §11 推荐顺序是"下一步做什么"的决策依据）**
+4. `docs/SPEC.md`（产品需求 8 模块——唯一标准；**按模块读，整文件 1139 行**）
+5. **`docs/ROADMAP.md`（长期升级路线图——§2 6-track 全景表 + §11 推荐顺序是"下一步做什么"的决策依据）**
 6. `docs/AI_HANDOFF.md`（上次会话留下的开工笔记）
 7. `docs/EXECUTION_PLAN.md`（短期 phase 进度对照——配合 git log 对账用）
 8. `docs/OUTSTANDING_TASKS.md`（散落 TODO 速查）
 9. `AGENTS.md`（如适用，给其他 AI 工具的协议）
 
-> **读取方式**：启动必读不等于整文件全量 `Read`。这里的“读”指先用 `rg -n "^#|关键词"`、目录索引和小片段读取定位当前任务需要的段落；`docs/SPEC.md`、`docs/ROADMAP.md`、`docs/AI_HANDOFF.md` 这类大文件不要用无 offset/limit 的 `Read`。流程图相关任务先读 `docs/flows/*.md` 文本镜像，不要直接读 PNG；需要全局判断下一步时，至少检查 ROADMAP §2 和推荐顺序；需要产品仲裁时，再读 SPEC 对应模块。
+> ⚠️ **不要只看 AI_HANDOFF.md 拍脑袋给"下一步建议"**——它是局部视角。任何"做什么 / 选哪个路线"的判断必须先打开 ROADMAP.md §2 + §11。
 
-> ⚠️ **不要只看 AI_HANDOFF.md 拍脑袋给"下一步建议"**——它是局部视角。任何"做什么 / 选哪个路线"的判断必须先打开 ROADMAP.md §2（6-track 进度 F/V/A/T/I/R）+ §11（推荐顺序）。漏读 ROADMAP 是 2026-05-22 之前几次会话犯过的错。
+### 启动强制对账（铁律，违反过一次就出过事故）
 
----
+读完启动必读后，**必须立刻跑 `git log --oneline -20`**，把 `AI_HANDOFF.md` / `OUTSTANDING_TASKS.md` 里写的「下一步 Phase X」与 git 实际合并状态对照一次：
 
-## 常用命令
-
-### 一键启动（推荐日常用）
-```bash
-./start.sh
-```
-脚本会自动检测/安装 brew、Python 3.10+、ffmpeg、Node、pnpm，创建 `.venv`，装依赖，清端口，并行起后端 + 前端，日志写到 `.local/backend.log` 与 `.local/frontend.log`。
-
-### 单独启动（调试时用）
-```bash
-# 后端（默认 8000，改端口看 .env 里的 BACKEND_PORT）
-uvicorn backend.app.main:app --reload --port 8000
-
-# 前端（默认 5173，改端口看 .env 里的 VITE_PORT）
-cd frontend && pnpm dev
-```
-
-### 测试 / 检查
-```bash
-# 后端测试（CI 用同样命令）
-.venv/bin/python -m pytest tests/backend -q
-# 单文件 / 单用例
-.venv/bin/python -m pytest tests/backend/test_xxx.py -q
-.venv/bin/python -m pytest tests/backend/test_xxx.py::test_foo -q
-
-# 前端
-cd frontend && pnpm lint        # ESLint
-cd frontend && pnpm test        # vitest
-cd frontend && pnpm build       # tsc -b && vite build
-
-# 启动前自检（端口、依赖、.env）
-.venv/bin/python scripts/preflight_check.py
-
-# 端到端验收
-.venv/bin/python tests/e2e_qa.py
-
-# 浏览器结构化冒烟（优先于读取截图）
-.venv/bin/python scripts/browser_smoke.py --url http://localhost:${VITE_PORT:-5175}/library --library --screenshot /tmp/nibi-library.png
-.venv/bin/python scripts/browser_smoke.py --url http://localhost:${VITE_PORT:-5175}/taskboard --taskboard
-.venv/bin/python scripts/browser_smoke.py --url http://localhost:${VITE_PORT:-5175}/processing/<task_id> --processing
-```
-
-> 注：本仓库使用项目内 `.venv` 作为标准 Python 入口。新增后端测试时遵循「每个端点 1 个 happy path + 1 个错误路径」。
+- 若 git 显示某 phase 已有 commit 合入 main，而文档仍把它列为「下一步 / 待办」——**先停下来更新这两份文档，再向用户确认真正的下一步**，绝不能直接按文档动手。
+- 若 git log 与文档一致，再开工。
+- **phase 文档不是事实来源，git log 才是。** 这条规则的存在原因：2026-05-17 曾发生 AI 让用户重做已合并的 Phase 2C.1 的事故。
 
 ---
 
-## 上下文预算与验证替代方案
+## 4. 风险求证（必须停下来问用户的 6 种情况）
 
-本节只约束 Claude Code 终端版（含 ccswitch 接 DS）的执行方式；不要求 Codex、Claude Desktop 或其他工具照此限制。其他工具可以按各自能力选择更合适的验证方式。
-
-目标是保留能力但减少无效上下文。不要用“禁用工具”替代验证；要按下面顺序选最低成本且足够强的证据。
-
-### 文件读取
-
-1. 先用 `rg -n` / heading 搜索定位，再读必要片段。
-2. `docs/SPEC.md`、`docs/ROADMAP.md`、`docs/AI_HANDOFF.md`、大 TSX 文件不要默认整文件读取；只有结构未知或需要全局重写时才全读。
-3. compact/resume 后不要重复读 unchanged 文件；先看 `git diff -- <file>` 或用 `rg` 找刚改过的函数/组件。
-4. 流程图先读 `docs/flows/README.md` 和对应 `docs/flows/<track>.md`。源 PNG 只在 Markdown 缺失、hash 过期、需求冲突，或必须判断视觉布局/颜色/层级时读取；读取前先裁剪相关区域。
-5. 代码入口先看 `docs/AI_CODE_INDEX.md`。它是低 token 路线图，只给入口和关键词；真正修改前仍以实际代码为准。
-6. 单次读取硬规则：大于 300 行的文件禁止无 offset/limit 的 `Read`。先跑 `rg -n "函数名|组件名|关键词" <file>`，再用 `sed -n '起始,结束p' <file>` 或 `nl -ba <file> | sed -n '起始,结束p'` 读取目标段落上下约 80-160 行。只有要全局重写该文件、确认全文结构未知且无法用 `rg` 定位时，才允许整文件读取，并先说明原因。
-7. `/clear` 或 compact 后不要重新整读同一个大文件；先用 `git diff -- <file>`、`rg -n` 或 checkpoint 确认变化点。
-
-### 浏览器验证
-
-默认证据链：
-
-1. API/curl 数据检查。
-2. `scripts/browser_smoke.py` 输出 JSON：当前 URL、页面标题、按钮/tab/headings、console error、页面专属结构检查、可选截图文件路径。
-3. Playwright DOM 断言：点击、URL 跳转、元素数量、文本变化。
-4. 截图只作为产物保存路径，不要 `Read /tmp/*.png`。
-5. 只有用户要求视觉判断，或 DOM 断言无法说明布局/重叠/颜色问题时，才读取图片；读取前先截 viewport 或具体元素，避免 full-page 大图。
-
-### Skill 使用
-
-Skill 是能力入口，不是默认流程。需要浏览器、测试、设计、PDF 等专门流程时可以用 skill，但每个任务只调用一个最相关的 skill。Nibi 本地页面 QA 优先使用 `scripts/browser_smoke.py`；脚本覆盖不了的真实交互，再调用 `webapp-testing` 或 `playwright`。不要同时加载两个重叠 skill。
-
-### Agent / subagent 使用
-
-默认不要为小改动开 Agent。优先主上下文用 `rg`、小片段读取、直接编辑、项目测试解决。只有任务可并行拆分且返回结果会明显小于主上下文自己探索时，才开 Agent。
-
-开 Agent 时必须限制范围：只给一个明确问题、相关路径、输出上限；返回只要结论、`file:line` 证据、跑过的命令和下一步建议。不要让 Agent 返回完整文件、大段 diff、截图内容、全库扫描日志。一次默认最多 1 个 Agent；确实独立的调研最多 2 个。
-
-### 计划与输出预算
-
-简单任务不写长计划；中等任务计划最多 5 条。已写进 phase md / checklist 的计划，不要在回复里重复展开。工具输出只汇报关键结论、文件路径、行号和测试结果；不要粘完整 diff、完整 traceback、全量测试日志或 Agent 长报告。
-
-### `/clear` 接力
-
-用户会经常 `/clear`。Claude Code 终端在长任务、跨文件实现、或用户准备 `/clear` 前，维护本地 checkpoint：`.claude/current-task.md`。这个文件只放接力信息，不进 git。
-
-checkpoint 保持短小，只写：
-- 当前目标和分支状态
-- 已改文件
-- 已跑命令/测试及结果
-- 当前失败点或阻塞点
-- 下一步 1-3 个动作
-
-`/clear` 后恢复上下文时，先跑 git 状态检查，再读 `CLAUDE.md` 和 `.claude/current-task.md`；不要重新全量读取 `docs/AI_HANDOFF.md`、`docs/ROADMAP.md`、大 TSX 文件或源 PNG。
-
-### 会话边界
-
-一个会话只做一个明确子任务。完成子任务后先测试、总结、commit 或等用户确认，再开新会话继续下一项。不要把 L1/L2/L3、临时 debug、视觉 QA、文档同步连续塞进同一个上下文。
-
----
-
-## CodeGraph 语义检索 (MCP)
-
-本项目已初始化本地代码知识图谱 CodeGraph（已配置 `.gitignore` 过滤 `.codegraph/` 缓存）。
-
-### Claude Code 终端版接入步骤
-1. **添加 MCP 服务**：在终端运行以下命令，将 CodeGraph 注册到 Claude Code：
-   ```bash
-   claude mcp add codegraph npx -- -y @colbymchenry/codegraph serve --mcp
-   ```
-2. **验证状态**：运行以下命令确认已成功添加并处于可用状态：
-   ```bash
-   claude mcp list
-   ```
-3. **日常使用建议**：
-   - 寻找函数调用关系或评估改动影响时，鼓励优先使用 `codegraph_callers`、`codegraph_callees` 和 `codegraph_impact`，代替昂贵的全项目 grep 搜索与大文件 view 动作。
-   - 每次代码改动后，在终端运行 `npx @colbymchenry/codegraph sync`（或依靠其内置的文件监听器）以保持图谱数据最新。
-
----
-
-## 高层架构
-
-### 后端（`backend/app/`）
-- 入口 `backend/app/main.py`：模块顶层就 `load_dotenv` 根目录 `.env`（保证 router 模块导入时也能读到环境变量），挂 9 个 router：
-  - `/providers`（providers.py，模型供应商配置）
-  - `/pipeline`（pipeline.py，任务中心；含 SSE `…/events` 和 `…/ws`）
-  - `/transcript`（transcript.py，字幕/转写）
-  - `/rag`（rag.py，向量检索问答）
-  - `/workspaces`（workspaces.py，工作区/项目）
-  - `/admin`（admin.py）
-  - `/api`（notes.py，bilinote 兼容接口）
-  - 无前缀：`download_config.py`、`transcriber_config.py`
-- `lifespan` 钩子在启动时把 `.env` 里的 `SILICONFLOW_API_KEY` 自动 seed 成一个 ProviderProfile（写进 `shared/settings_store`）。
-- CORS 白名单通过 `_build_cors_origins()` 动态生成，优先级：`CORS_ALLOW_ORIGINS` > `VITE_PORT` 推导 > 5173 兜底。
-- 任务执行：`backend/app/services/task_runner.py` 是基于 `ThreadPoolExecutor` 的后台执行器，task 记录写 `task_store`；同 project + 同 URL 的下载任务做幂等去重；状态变化通过 SSE / WebSocket 推给前端。
-
-### 前后端共享层（`shared/`）
-- 这是 **FastAPI 后端 + React 前端 + Streamlit 旧前端 + 命令行脚本共用的代码**。改 `shared/` 里的东西会同时影响多个入口，先评估影响面。
-- 关键模块：`settings_store.py`（providers/global settings 持久化）、`api_key_resolver.py`（多源 API Key 优先级）、`knowledge_base.py`（RAG 索引）、`video_analyzer.py`（视频分析编排）、`video_download_ytdlp.py`（yt-dlp 封装）、`storyboard_generator.py`、`web_enrich.py`。
-
-### 前端（`frontend/src/`）
-- 路由：`router.tsx` 用 React Router v7 Data Router，**所有页面级组件都走 `React.lazy` 代码分割**（动手加新页面时记得也包一层 `withSuspense`）。
-- 状态：zustand，`store/` 下有 6 个 store：`configStore` / `modelStore` / `projectStore` / `providerStore` / `settingsShellStore` / `taskStore`。
-- 服务层：`services/client.ts` 封装 axios；`services/events.ts` 处理 SSE；其它对应后端各 router。
-- Vite 代理：`/api` 与 `/pipeline` 都被代理到后端（看 `vite.config.ts`），所以前端代码里写相对路径就行，不用拼 base URL。
-- 构建：`vite.config.ts` 用 rolldown `codeSplitting.groups` 手动拆 vendor chunk（react / radix / markmap / markdown 等），改依赖时如果引入了大包，考虑加进对应 group。
-- i18n：`locales/i18n.ts` + `i18next-parser.config.js`，文案改动后跑 `i18next-parser` 抽 key。
-
-### 运行时数据（`data/`，默认不应新增入库）
-- `cookies/`（B 站 cookies）、`videos/`（下载产物）、`json_data/`（分析结果）、`projects/` 和 `workspaces/`（工作区数据）。
-- 不要把这里的新文件 commit 进 git，也不要假设它在新机器上存在。已有 tracked 工作区 JSON 如需清理，应单独确认范围。
-
-### 端口与环境变量（关键约定）
-- 单一来源 `.env`，前后端都读它：`BACKEND_PORT`（默认 8000）、`VITE_PORT`（默认 5173）。
-- 前端编译时通过 `VITE_BACKEND_BASE_URL` 知道后端地址（`start.sh` 启前端前会注入）。
-- README、`.env.example` 和 `start.sh` 应保持同一默认端口；如本机 `.env` 覆盖端口，**以 `.env` 实际值为准**。
-
-### 双前端并存（legacy 兼容期）
-- `frontend/`（React，推荐 / 默认入口）
-- `app.py` + `pages/`（Streamlit，legacy 入口，**新功能不要往这边加**）
-
----
-
-## 沟通规则（最重要）
-
-1. **用中文回复**。
-2. **改代码前先解释**："我打算改哪几个文件、为什么这么改"。
-3. **改完后用 1-2 句总结**：刚才做了什么、产生了什么效果。
-4. **遇到术语简单说明**。第一次提到"中间件"、"依赖注入"、"hook"等概念，要附一句白话解释。
-5. **用户问"这是干什么的"时直接讲**，不要假设他都懂。
-
----
-
-## 计划与边界
-
-> 📌 **唯一标准（Single Source of Truth）**：`docs/SPEC.md`
-> 这是 2026-05-18 合并 v2 + v3 + 设计稿 + 现有代码 + 用户最新决议产出的 8 模块统一规范，是当前所有产品决议的最终仲裁。**Phase 推进、设计落地、AI 协作决策都以本文件为准**。
->
-> **优先级（冲突仲裁，自上而下）**：
-> 1. `docs/SPEC.md`（**唯一标准**，产品需求级粒度）
-> 2. `docs/EXECUTION_PLAN.md`（工程执行计划——Phase 打勾 + 当前在哪步）
-> 3. `docs/design/`（**设计稿源文件**——25 个 jsx 组件 / VidMirror.html / styles.css / system_design_v1.1.md / check 截图 / uploads spec）；token 速查走 [`docs/DESIGN_TOKENS.md`](docs/DESIGN_TOKENS.md)
-> 4. 当前代码（与 spec 偏差时优先反映到 spec 或新建差异 phase）
-> 5. ~~`docs/archive/spec-v2.md`、`docs/archive/system_design_v3_final.md`、`docs/archive/plan-v1.md`、`docs/archive/design-spec-v1.md`~~ ⚠️ **已 DEPRECATED**，仅历史归档，不参与仲裁
->
-> **设计稿路径**：`docs/design/`（2026-05-25 与 `/Users/conan/Downloads/vidmirror (Remix)` 同步；25 个 jsx 组件 / VidMirror.html / styles.css / system_design_v1.1.md / check 截图）。**所有 UI 改动以此为唯一真相源**，旧 `vidmirror-handoff/` 路径已废弃。AI 写 UI 前必须先读 [`docs/DESIGN_TOKENS.md`](docs/DESIGN_TOKENS.md)。
->
-> **新会话启动必读顺序**：
-> ① [`docs/WORKFLOW.md`](docs/WORKFLOW.md)（总工作流 + 当前阶段，**第一份要读的**；具体流程图需求先读 `docs/flows/*.md`）
-> ② [`docs/SPEC.md`](docs/SPEC.md)（产品需求 8 模块）
-> ③ [`docs/EXECUTION_PLAN.md`](docs/EXECUTION_PLAN.md)（找未打勾子任务）
-> ④ [`AGENTS.md`](AGENTS.md)
-> ⑤ [`docs/AI_HANDOFF.md`](docs/AI_HANDOFF.md)（上次会话留下的开工笔记）
->
-> 📋 **项目执行计划维护流程（任何 AI 工具开新会话都要遵守）**：
-> 1. 读完 `docs/EXECUTION_PLAN.md`，找第一个未打勾（`- [ ]`）的子任务
-> 2. 打开对应 `docs/plans/<file>.md` 详细计划：
->    - 若 `status: pending` 且操作步骤段是 `TODO: 进入此阶段时再展开` → **停下问用户「要先展开这个 phase 的具体执行计划吗？」**，**不要自作主张展开**
->    - 若 `status: ready` 或 `in_progress` 且已有操作步骤 → 按里面的步骤执行
-> 3. 每完成一个子任务，**同时**更新三处：
->    - ① `docs/EXECUTION_PLAN.md` 把对应方框从 `- [ ]` 改成 `- [x]`
->    - ② 该 phase md 的 frontmatter：`status: done` + 填 `commits` / `completed_date` / `actual_hours`
->    - ③ `docs/COMPLETED_WORK.md` 追加一段（按文件顶部"记录模板"格式）
-> 4. **不要跳着做**：当前 phase 所有子任务全部打勾后，再进下一个 phase。如果用户明确要求跳，照办，但要在 COMPLETED_WORK.md 注明"跳过原因"
-> 5. **本流程与"启动强制对账"配合**：先 git log 对账 → 再读 EXECUTION_PLAN → 找未打勾项
->
-> ⚠️ **启动强制对账（铁律，违反过一次就出过事故）**：读完启动必读 5 件套后，**必须立刻跑 `git log --oneline -20`**，把 `AI_HANDOFF.md` / `OUTSTANDING_TASKS.md` 里写的「下一步 Phase X」与 git 实际合并状态对照一次。规则：
-> - 若 git 显示某 phase 已有 commit 合入 main，而文档仍把它列为「下一步 / 待办」——**先停下来更新这两份文档，再向用户确认真正的下一步**，绝不能直接按文档动手。
-> - 若 git log 与文档一致，再开工。
-> - 这条规则的存在原因：2026-05-17 曾发生 AI 让用户重做已合并的 Phase 2C.1 的事故，根因就是 AI_HANDOFF / OUTSTANDING_TASKS 是手工快照、滞后于 git。**phase 文档不是事实来源，git log 才是。**
-
-> 🚀 **Phase 启动速查**（开工前对照 `docs/EXECUTION_PLAN.md` + 「模型选择策略」章）：
-> - **当前阶段：N11 后收口决策点**。`[A]` 现状同步与 `[B]` N1~N11 落地差异已完成。
-> - **可选下一步**：`.git` 历史瘦身（需用户明确授权）/ `N1b` / `N7b` / `N8b` / `[C] AI 导演` / `[D] 开源准备`。
-> - **[C] AI 导演**：需先补完整 director 设计，再进入实现。
-> - **简单阶段**（N1 / N2 / N3 / N11 等纯前后端 CRUD）：⭐ DS v4-pro（Claude Code + ccswitch，便宜）/ Sonnet 4.6，不开 worktree
-> - **复杂阶段**（N5 Preflight 抽屉子参数细化 / N6 任务级 LLM 对话 + RAG / N7 视频镜头分析）：Opus 4.7 + 新 worktree（`feat/phase<N>-<短名>` 分支）
-> - **决策速查**：复杂/SSE/状态机/加密 → Opus；中等多文件 CRUD → Sonnet；git/测试/文档/模板 → DS v4-pro（ccswitch）；单行 typo → DS v4-flash（ccswitch）/ Haiku
-
-> ⚠️ **重要**：本文档与历史 `docs/archive/plan-v1.md` / `docs/archive/spec-v2.md` 已不再一致——以本文档为准。
-> - 当历史文件与现实代码冲突时，**以代码 + 合并 spec + WORKFLOW.md 为准**。
-> - 旧 phase 编号（1A~3E / 4~10）已**完成或归档**，N1~N11 主线也已完成；后续只做明确选中的拆出子阶段或 `[C] / [D]`。
-
-1. 新会话开始时**先扫 `git status --short --branch` + `git log --oneline -5`** 确认现状，再读 `WORKFLOW.md` → `SPEC.md` → `EXECUTION_PLAN.md`。
-2. **一个会话只做一个明确的子任务**，做完就停。
-3. 子任务完成后**主动提醒用户**：「子任务 X 完成，建议 git commit 后开新会话做下一个」。
-4. **不要主动跨子任务工作**，即使你觉得"顺手就改了"——这破坏了用户的 git 颗粒度。
-5. **不要主动写用户没要求的功能**。如果觉得需要，先问。
-
----
-
-## Git 行为（强制）
-
-1. **每个子任务完成后立即 commit**，不要堆积多个子任务到一个 commit。
-2. **Commit 信息格式**：
-   ```
-   <type>(<phase>): <子任务编号> <一句话描述>
-   ```
-   - type 选一个：`feat` | `fix` | `refactor` | `docs` | `test` | `chore`
-   - 例：`feat(phase-n1): N1.3 添加 trashed 状态字段`
-3. **修上一次 commit 的小问题用 `git commit --amend`**，不要新建一个 fixup commit。
-4. **永远不在 main 分支直接改代码**。新 Phase 开始时先 `git checkout -b feat/phase-n1`。
-5. **Phase 完成时只提醒打 tag，不自动打 tag**。让用户自己决定何时打。
-
-### ⚠️ Push 策略（2026-05-18 调整）
-
-**暂缓所有 `git push origin` 操作**，等做到 **[D] 开源准备阶段** 才开始统一推送：
-
-- ❌ 不要主动 `git push origin main`
-- ❌ 不要主动 `git push origin <feature-branch>` 提交 PR
-- ❌ 不要为修 CI 而 push 触发 GitHub Actions
-- ✅ 所有 commit 都留在 local main 或本地 feature 分支
-- ✅ feature 分支完成后**本地 merge 进 local main**（不走 PR）
-- ✅ local main 会越来越领先 origin/main，**这是预期状态**
-- ✅ 到 [D] 阶段统一做一次完整 push + 仓库整理
-
-**原因**：开源前 origin 状态不需要保持同步，本地 commit 历史是真相源；过早暴露半成品仓库 / 跑 CI 都是浪费。
-
-**例外**（必须先问用户授权）：
-- 用户明确说"现在推一次"
-- 临时需要从其他机器拉代码做协作（罕见，问清楚再做）
-
-**已存在的远端分支处理**：
-- `docs/spec-merged` 分支已 push（含 PR #1）—— 不再追加 push，PR 留着或关闭由用户决定
-- 不主动 `git push --delete` 清理远端分支
-- 后续若再被迫 push（如手机端备份），先问用户
-
----
-
-## 代码风格
-
-### 后端（Python）
-- 严格遵循 PEP 8。
-- 所有函数必须带类型注解（`def foo(x: int) -> str`）。
-- public 函数必须带 docstring（一行也行，但要有）。
-- 异常用自定义类 + 全局 exception handler，不要在路由里直接 try/except。
-
-### 前端（TypeScript / React）
-- 严格 TypeScript，**禁止使用 `any`**。
-- 组件文件 PascalCase（`TaskCard.tsx`），hook 用 `useXxx`。
-- 错误用 toast 提示用户，不用 `alert()`。
-
-### 前端 UI 与设计规范（Remix 版 · 唯一真相源）
-
-> **铁律：写任何 UI 之前先读 [`docs/DESIGN_TOKENS.md`](docs/DESIGN_TOKENS.md)。**
-> 该文件是 ~200 行 token + class 速查；详细 spec 看 `docs/design/`（设计稿镜像，2026-05-25 起以 `/Users/conan/Downloads/vidmirror (Remix)` 同步入仓）。
-
-**3 个权威路径**（按使用频率）：
-
-| 想做什么 | 看哪 |
-|---|---|
-| 写新 UI 前查 token / class 词典 | [`docs/DESIGN_TOKENS.md`](docs/DESIGN_TOKENS.md) ⭐ |
-| 看具体页面长什么样 | `docs/design/check/*.png`（10+ 张页面截图）|
-| 看组件 jsx 实现（19 个）| `docs/design/components/<page>.jsx` |
-| 看完整 CSS 152 个 class | `docs/design/styles.css` |
-| 看业务规则 / 状态机 / 级联 | `docs/design/system_design_v1.1.md` |
-| 浮动队列 §11.3 实现 | `docs/design/components/p1_features.jsx` L160-370 |
-| 前置配置 §4 实现 | `docs/design/components/preflight.jsx` |
-
-**5 条不可破铁律**（详见 `docs/DESIGN_TOKENS.md §8`）：
-
-1. **颜色 / 边框 / 圆角 / 阴影必须用 token**，禁止 hex / rgba / px 边框值（已命名常量例外，如 `99px` 胶囊）。
-2. **按业务语义选 accent**：音频→绿 `--accent-green`、视频→紫 `--accent-2`、图片→蓝 `--accent-3`、决策/确认→橙 `--accent-warm`、错误/输入输出→粉 `--accent`。不要按"哪个好看"挑。
-3. **modal 用 Remix 结构**：`modal-backdrop` + `modal` + `m-head/body/section/foot`，**不要套 shadcn `<Dialog>` 默认样式**（无障碍底座可保留，可见结构走 Remix class）。
-4. **写新组件先 grep `docs/design/components/`**：19 个 jsx 几乎覆盖所有页面。有现成的 → 1:1 复刻；无 → 找最近似的 class 词汇沿用，不要造新词。
-5. **新 class 命名跟现有体例**：组件前缀（`pf-` / `pp-` / `mat-` / `m-`）+ 部位词。不混 BEM / camelCase。
-
-**设计稿同步**：用户拿到 Remix 新版本时，按 `docs/DESIGN_TOKENS.md §10` 的 rsync 命令一次性同步到 `docs/design/`，并人工 review `DESIGN_TOKENS.md` 是否需要补 token / class。
-
-### 业务规格与运行时交互契约 (Remix 版)
-
-开发后端或前端业务流程代码时，必须严格参考并实现以下交互逻辑和默认阈值限制：
-
-1. **全局状态机与跃迁逻辑**:
-   - 任务状态：`draft` (无素材) -> `active` (至少一个素材在排队或处理中) -> `done` (全部素材 done 或 failed 且用户已知会) -> `archived` (归档)。
-   - 素材状态：`pending` -> `downloading` (仅链接素材) -> `probing` (探测格式/时长/字幕轨) -> `processing` (跑 pipeline 阶段) -> `done` 或 `failed`。
-   - 素材一旦到 `done` 状态，结果直接写入数据库，**不再因前置配置变更而自动重跑**。重新运行必须由用户显式触发新建作业。
-2. **前置配置依赖级联 (重要，前端必须联动限制，后端必须校验)**:
-   - 字段上限：说话人最多 `12` 人且名字限制 `16` 字；主题背景限制 `200` 字；专有名词最多 `30` 个且每个限制 `24` 字。
-   - 配置联动级联：
-     - 若勾选「视频文案总结 - 路径 2 (音视频合并)」，**必须且自动勾选「画面提示词生成」**（需截帧画面），且在前端禁用取消勾选。
-     - 若勾选「说话人音色区分」，**必须且自动勾选「人声转写」**。
-     - 「生成字幕文件」强制依赖「人声转写」。
-     - 「多图 / 多文对比」仅在一次性上传素材数 $\ge 2$ 时可选，否则置灰禁用。
-3. **视频处理分支参数**:
-   - 模式 A (按秒截帧)：默认间隔 `2秒`，最大上限 `60帧`。使用 pHash 汉明距离 $\le 6$ 过滤相似帧。
-   - 模式 B (AI 镜头)：镜头切换判定 SSIM $< 0.55$。2 帧模式取首尾，3 帧模式取首中尾。
-   - 总结三路径：
-     - 路径 1 (字幕直接总结)：仅通过字幕文本 LLM 生成。
-     - 路径 2 (音视频合并)：字幕 ↔ 帧描述时间戳对齐，送大模型。
-     - 路径 3 (视频模型直跑)：直接送视觉/视频大模型（如 Gemini 1.5 Pro / GPT-4o），不进行额外抽帧。
-4. **音频处理分支参数**:
-   - VAD 人声检测分叉：
-     - 人声占比 $\ge 15\%$：执行完整人声处理（Whisper ASR + 说话人声纹聚类）。
-     - $5\% \le$ 人声占比 $< 15\%$：弹窗/气泡提示「人声较少，是否仅分析音乐？」。
-     - 人声占比 $< 5\%$：默认按纯音乐路径处理。
-5. **处理阶段可跳过策略 (Resiliency)**:
-   - 顺序：`download` -> `probe` -> `frames` -> `asr` -> `vlm` -> `sum` -> `store`。
-   - `download` 与 `probe` 失败直接终止作业。
-   - `frames`（截帧）可跳过，跳过后总结退化为路径 1。
-   - `asr`（转写）可跳过，跳过后总结跳过文本分析。
-   - `vlm`（视觉分析）单帧失败不终止任务，对应帧标记「分析失败」。
-   - `sum` 与 `store` 不可跳过。
-6. **存储与自动清理策略**:
-   - 截帧、临时转码文件、临时提取音频等中间产物：默认保留 `14天`，归档任务保留 `3天`。
-   - 原始文件与 AI 文本分析结果：永久保留，直至用户手动删除任务。
-
-### 通用
-- **单文件不超过 200 行**，超过就拆分。
-- 不要写注释解释"代码在做什么"（让代码本身可读）。注释只用于解释"为什么这么做"。
-
----
-
-## 风险与求证（重要）
-
-下列情况**必须停下来问用户**，不要自己决定：
+下列情况**绝不能自己决定**：
 
 1. 需要安装新的依赖包（pip install / npm install 一个新东西）。
 2. 修改 plan.md 里没有的子任务。
@@ -419,105 +71,14 @@ checkpoint 保持短小，只写：
 6. 跨 5 个以上文件的改动。
 
 **求证模板**：
+
 > 我在做 X.Y 时发现实际情况是 ABC，与 plan.md 里写的 DEF 不一致。
 > 我想到两个方案：
 > 1. 方案 A（修改 plan.md，按现实走）
 > 2. 方案 B（保留 plan.md，把代码调整回去）
 > 你想怎么处理？
 
----
-
-## 模型选择策略（四档决策树）
-
-用户同时使用 **桌面 Claude Code**（按额度计费的 Opus / Sonnet / Haiku）和 **Claude Code + ccswitch 接 DeepSeek**（DS，按量计费但比 Claude 便宜）。ccswitch 是透明中转代理：在 Claude Code 里选 Sonnet/Opus 角色 → ccswitch 自动路由到 `deepseek-v4-pro`；选 Haiku 角色 → 路由到 `deepseek-v4-flash`。按以下顺序判断，命中即停：
-
-### 档 1 — Opus 4.7（桌面，付费）：复杂阶段 + 升级触发
-任一命中即用：
-- Phase 1D / 1F / 1G（跨后端+前端+状态机的复杂阶段）
-- 跨文件改动 ≥ 5
-- schema 迁移 + 老数据兼容
-- 加密 / 鉴权 / API key
-- SSE / WebSocket / 状态机一致性
-- 三轨时间轴 / RAG 检索逻辑设计
-- AI 自己说"不太确定哪个方案对"
-
-### 档 2 — Sonnet 4.6（桌面，付费）：中等复杂多文件
-- 多文件 CRUD（3–5 个文件）
-- 组件级前端开发（新建 React 组件 + 接 API）
-- 需要严谨业务理解但不烧脑的任务
-- Phase 1B / 1C / 1E 的前端部分
-
-### 档 3 — DS v4-pro（Claude Code + ccswitch，⭐便宜优先）：简单任务默认
-**这一档是日常默认**。在 Claude Code 里选 Sonnet 或 Opus 角色，ccswitch 自动路由到 `deepseek-v4-pro`。能用就用，不要因为"DS 可能不够强"而升到桌面 Sonnet 浪费 Claude 付费额度。
-- git 操作（add / commit / merge / branch / push / 清理 worktree）
-- 跑终端命令验证（pytest happy path、pnpm build、curl 测接口、启动 dev server）
-- 文档改写（README / docs/*.md / 注释润色 / CLAUDE.md 维护）
-- 模板代码（pytest happy path、CRUD 路由骨架、Pydantic schema）
-- CSS token 翻译、Tailwind 配置调整
-- 重复性改写（i18n key 抽取、批量 import 修改）
-- 单文件简单查询 / 解释代码
-- 查文档（fastapi / vite / tailwind 用法）
-
-DS 的工具能力：Bash / Read / Write / Edit / Grep / Glob 全套都能用，可独立完成 git 提交、跑测试、改文件。
-
-**DS v4-pro 不擅长 → 升档 1 Opus**：跨 5+ 文件架构、复杂状态机推理、加密鉴权细节、RAG / SSE 一致性。
-
-### 档 4 — DS v4-flash / Haiku 4.5：极简兜底
-- 单行修改 / typo
-- 短得不值得用 pro 的任务（< 2 分钟）
-- 优先 **DS v4-flash**（Claude Code 里选 Haiku 角色，ccswitch 中转到 `deepseek-v4-flash`，比桌面 Haiku 更便宜）；DS 不可用时再用桌面 Haiku 4.5
-
-> ⚠️ **不要让 v4-flash 当日常默认**：它对应原 Haiku 档，能力弱，多文件 CRUD / 组件级前端会翻车。日常默认必须 v4-pro。
-
----
-
-## 测试要求
-
-- 每个 API 端点必须有至少 1 个 pytest 测试：
-  - happy path 测一次
-  - 一个常见错误情况（404 / 422）测一次
-- 前端组件不强制写单测，但**关键交互必须手动跑一遍并给出结构化证据**：
-  - 删除/重置等不可逆操作
-  - 表单校验
-  - 异步状态切换（loading / 成功 / 失败）
-  - 优先输出 Playwright/`scripts/browser_smoke.py` 的 JSON 结果（URL、DOM 数量、console error、按钮/状态文本）。截图可以保存并报告路径；只有视觉问题才读取截图内容。
-- **手动冒烟测试 URL 清单**：`docs/test-urls.md`——覆盖 Bilibili / YouTube / 小红书 / 抖音 / 微信公众号 / 本地文件，共 10 条，验证 pipeline 和结果展示时直接用
-
----
-
-## 工具串行交接（不再多 agent 并发）
-
-> **协作模式**：用户**单 agent 串行**工作 —— 一次只在一个 AI 工具里做一个子任务，做完 commit + merge 进 main 之后再换另一个工具继续。**不再多个 AI 同时改同一个项目**，所以历史上的「多 agent 防撞规则」整体作废。
-
-### 每次会话开始的启动检查（精简版）
-
-```bash
-git status --short --branch       # 必须 clean（或只有本次任务相关改动）
-git log --oneline -5              # 看 main 上次留到哪
-git branch --show-current         # 确认当前分支
-```
-
-**三种情况必须停下来问用户**：
-1. 工作区有未提交改动，且看上去**不属于本次说好的子任务**（很可能是上次换工具时漏 commit 的工作）。
-2. main 最近 commit 与你认知的"上次留下的状态"对不上（可能你正在覆盖别的工具刚做的工作）。
-3. 当前分支不是预期分支（比如想做 1F 却在某个旧 worktree 分支上）。
-
-### 分支生命周期（简化）
-
-1. **开工**：复杂阶段（`docs/archive/spec-v2.md` §3 标"是"的）开 `feat/<编号>-<短名>` 或 `claude-official/<task>` 都行，由用户选；简单阶段直接打 main。
-2. **收工**：commit 后通知用户 merge，**不自行 merge 到 main**（破坏性操作仍需用户授权）。
-3. **完工后**：用户决定何时把旧分支删掉（参考 main 上已合并的分支即可安全 `git branch -d`）。
-
-### 不要做的事
-
-- ❌ 不要 cherry-pick / rebase 旧 worktree 上的 commit，除非用户明确指令（很可能是历史遗留实验，不一定有价值）。
-- ❌ 不要主动 push 占座 —— 串行模式不需要。
-- ❌ 不要在没看清 diff 的情况下删未合并分支（即便它"看起来是旧的"）。
-- ❌ 不要因为分支名带 `claude-official/` 或 `codex/` 就推断它属于不同 agent —— 这是历史命名残留，不再有职责区分。
-
----
-
-## 不要做的事
+### 不要做的事（红线）
 
 - ❌ 不要主动重构无关代码（哪怕你觉得它写得丑）。
 - ❌ 不要改 `.env` 或 `.env.example` 内容（除非新增字段并明确告诉用户）。
@@ -525,14 +86,68 @@ git branch --show-current         # 确认当前分支
 - ❌ 不要安装/卸载全局软件。
 - ❌ 不要把 API key、密码写进代码或 commit 进 git。
 - ❌ 不要在不告知用户的情况下修改 git 历史（rebase、amend 主线 commit 等）。
+- ❌ 不要主动 `git push origin`（开源前暂缓所有 push，详见 [`docs/rules/git-workflow.md`](docs/rules/git-workflow.md) §push）。
+- ❌ 不要在 `docs/archive/`、`docs/conversation-inputs/` 目录搜索/读取（归档，已废弃）。
 
 ---
 
-## 当用户卡住时
+## 5. 项目执行计划维护流程（任何 AI 工具开新会话都要遵守）
 
-如果用户说"跑不起来"、"报错了"、"看不懂"等：
+1. 读完 `docs/EXECUTION_PLAN.md`，找第一个未打勾（`- [ ]`）的子任务。
+2. 打开对应 `docs/plans/<file>.md` 详细计划：
+   - 若 `status: pending` 且操作步骤段是 `TODO: 进入此阶段时再展开` → **停下问用户「要先展开这个 phase 的具体执行计划吗？」**，**不要自作主张展开**。
+   - 若 `status: ready` 或 `in_progress` 且已有操作步骤 → 按里面的步骤执行。
+3. 每完成一个子任务，**同时**更新三处：
+   - ① `docs/EXECUTION_PLAN.md` 把对应方框从 `- [ ]` 改成 `- [x]`
+   - ② 该 phase md 的 frontmatter：`status: done` + 填 `commits` / `completed_date` / `actual_hours`
+   - ③ `docs/COMPLETED_WORK.md` 追加一段（按文件顶部"记录模板"格式）
+4. **不要跳着做**：当前 phase 所有子任务全部打勾后，再进下一个 phase。如果用户明确要求跳，照办，但要在 COMPLETED_WORK.md 注明"跳过原因"。
+5. **一个会话只做一个明确的子任务**，做完就停 + 提醒用户 commit + 建议开新会话做下一个。
+6. **不要主动跨子任务工作**，即使你觉得"顺手就改了"——这破坏了用户的 git 颗粒度。
 
-1. **先让他贴完整报错信息**，不要凭直觉猜。
-2. **再让他描述他做了哪一步**（运行了什么命令、改了哪个文件）。
-3. **再给方案**。如果是新手常见错误（比如忘了 activate venv、端口占用、CORS），用一句话点破。
-4. **修复后总结**："这个错的根因是 X，下次看到 Y 现象就是这个问题"。
+---
+
+## 6. 唯一标准与冲突仲裁
+
+> 📌 **Single Source of Truth**：`docs/SPEC.md`
+> 2026-05-18 合并 v2 + v3 + 设计稿 + 现有代码 + 用户最新决议产出的 8 模块统一规范，**Phase 推进、设计落地、AI 协作决策都以本文件为准**。
+
+**优先级（冲突仲裁，自上而下）**：
+
+1. `docs/SPEC.md`（**唯一标准**，产品需求级粒度）
+2. `docs/EXECUTION_PLAN.md`（工程执行计划——Phase 打勾 + 当前在哪步）
+3. `docs/design/`（**设计稿源文件** 2026-05-25 同步；25 个 jsx + system_design_v1.1.md + check 截图）；token 速查走 [`docs/DESIGN_TOKENS.md`](docs/DESIGN_TOKENS.md)
+4. 当前代码（与 spec 偏差时优先反映到 spec 或新建差异 phase）
+5. ~~`docs/archive/*`、`docs/conversation-inputs/*`~~ ⚠️ **已 DEPRECATED**，仅历史归档，**不参与仲裁、不在此搜索**
+
+**设计稿路径**：`docs/design/`（2026-05-25 与 `/Users/conan/Downloads/vidmirror (Remix)` 同步）。**所有 UI 改动以此为唯一真相源**，旧 `vidmirror-handoff/` 路径已废弃。AI 写 UI 前必须先读 [`docs/DESIGN_TOKENS.md`](docs/DESIGN_TOKENS.md) 和 [`docs/rules/code-style.md`](docs/rules/code-style.md) §UI。
+
+---
+
+## 7. 规则索引（详细规则按需查阅）
+
+下面这张表是 AI 工作时的"查询手册"。**不要预读，用到时才读对应片段**。
+
+| 主题 | 详细规则文件 | 何时打开 |
+|---|---|---|
+| 上下文预算 / 读文件策略 / skill / agent / `/clear` 接力 | [`docs/rules/context-budget.md`](docs/rules/context-budget.md) | 准备读大文件、开 agent、被 compact 之后 |
+| Git 行为 / commit 颗粒度 / 分支策略 / push 暂缓 / 工具串行交接 | [`docs/rules/git-workflow.md`](docs/rules/git-workflow.md) | 准备 commit、merge、新开会话前 |
+| Python / TypeScript 代码风格、UI 设计规范、测试要求 | [`docs/rules/code-style.md`](docs/rules/code-style.md) | 写代码 / 改 UI / 加测试前 |
+| 业务规格契约：状态机、级联依赖、阈值、可跳过策略、清理策略 | [`docs/rules/business-contract.md`](docs/rules/business-contract.md) | 改 pipeline、前置配置、状态流转、阈值时 |
+| 模型选择四档决策树（Opus / Sonnet / DS-pro / DS-flash） | [`docs/rules/model-strategy.md`](docs/rules/model-strategy.md) | 判断当前任务该用哪档模型时（一般用户决定，AI 仅在被问时查） |
+| 项目架构 / 后端 router / 前端路由 / 共享层 / 端口 / CodeGraph MCP / 常用命令 | [`docs/rules/project-map.md`](docs/rules/project-map.md) | 新人入门、改路由、找模块入口 |
+
+> 💡 **AI 使用方法**：每个文件顶部都有目录章节锚点。AI 应用 `rg -n "^#" docs/rules/<file>.md` 查目录，再 `sed -n` 读对应段落。**禁止整文件读取这些 rules 文件以外的大文件（SPEC.md / ROADMAP.md / 设计稿等）**。
+
+---
+
+## 8. AI 自检清单（每次回复前快速过一遍）
+
+- [ ] 用户是新手编程小白 → 回复有没有解释术语？
+- [ ] 改代码前有没有先说"我打算改什么、为什么"？
+- [ ] 改完有没有 1-2 句总结？
+- [ ] 本次改动涉及 §4 的 6 种情况吗？涉及就停下来问。
+- [ ] 是不是"一个会话一个子任务"？还是想顺手多做？
+- [ ] 准备读的大文件有没有用 `rg` 先定位再读片段？
+- [ ] 准备 commit 时分支对吗？commit 信息格式对吗？
+- [ ] 没有按 §4 红线做任何危险操作？

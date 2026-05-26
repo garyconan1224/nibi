@@ -1,70 +1,54 @@
 # Codex Global Rules
 
-## Core Behavior
-
-- Think before coding. State assumptions when they affect architecture, data, security, or user-visible behavior.
-- If a request is ambiguous in a high-risk way, present the tradeoff instead of silently choosing one path.
-- Prefer the simplest solution that fully solves the problem.
-- Make surgical changes. Avoid refactoring unrelated code.
-- Match the codebase's existing style and structure unless there is a strong reason not to.
-- Clean up only what your own change makes unnecessary.
-
-## Project Line
-
-- The active product line is **FastAPI + React/Vite**.
-- `app.py`, `pages/`, and `src/vidmirror/ui/` are **legacy Streamlit compatibility paths**. Do not add new product work there unless the user explicitly asks for legacy maintenance.
-- Runtime data does not belong in git. Keep cookies, local databases, sqlite files, zip exports, downloaded media, logs, and local env files out of commits.
-
-## Collaboration Handoff
-
-**Required reading order at the start of every session** (single source of truth as of 2026-05-18):
-
-1. [`docs/WORKFLOW.md`](docs/WORKFLOW.md) — Master workflow, current phase, design-vs-code decisions per phase
-2. [`docs/SPEC.md`](docs/SPEC.md) — Product specification (8 modules, product-requirement granularity)
-3. [`docs/EXECUTION_PLAN.md`](docs/EXECUTION_PLAN.md) — Engineering plan (Phase checkboxes, current step)
-4. [`docs/design/`](docs/design/) — Design source files (19 jsx components, VidMirror.html, styles.css, v1.1 design contract)
-5. `docs/AI_HANDOFF.md` / `docs/OUTSTANDING_TASKS.md` — Session-level handoff notes (if present)
-
-**Deprecated, do not read for current decisions**:
-- `docs/archive/spec-v2.md` (replaced by `docs/SPEC.md`)
-- `docs/archive/system_design_v3_final.md`
-- `docs/archive/plan-v1.md`, `docs/archive/design-spec-v1.md`
-
-When a task explicitly needs the user flowcharts, use [`docs/flows/README.md`](docs/flows/README.md) and the relevant `docs/flows/*.md` text mirror first. Only read `docs/conversation-inputs/2026-05-18-spec-merge/*.png` when visual layout or stale mirror verification is required.
-
-**Current phase**: N11 后收口决策点。`[A]` 现状同步与 `[B]` N1~N11 spec-gap landing 均已完成；下一步只能在 `.git` 历史瘦身、拆出子阶段 `N1b / N7b / N8b`、`[C]` AI 导演、`[D]` 开源准备之间选择。
-
-Keep each turn scoped to one clear task. If a request starts to expand into product design plus implementation, separate the decision step from the coding step.
+> **Primary rules live in [`CLAUDE.md`](CLAUDE.md) and [`docs/rules/`](docs/rules/README.md)**.
+> This file only contains **Codex-specific role boundaries**. Read CLAUDE.md first, then apply the constraints below.
 
 ---
 
-## Codex 职责边界（重要，必读）
+## Required Reading Order (Same as Claude)
 
-本项目中 **Codex 只承担检查、测试、分支比较和下一步建议**，不写新业务功能。
+Follow [`CLAUDE.md` §3 Startup Reading](CLAUDE.md#3-启动必读顺序每次新会话第一件事). Specifically:
 
-### Codex 可以做的事
+1. `CLAUDE.md` — Project rules, model strategy, git behavior
+2. `docs/WORKFLOW.md` — Master workflow + current phase
+3. `docs/SPEC.md` — Product specification (8 modules, single source of truth)
+4. `docs/ROADMAP.md` — Long-term roadmap (§2 6-track table + §11 recommended order)
+5. `docs/AI_HANDOFF.md` — Last session handoff notes
+6. `docs/EXECUTION_PLAN.md` — Phase progress (cross-check with `git log`)
 
-- 运行测试：`pytest tests/backend -q`、`cd frontend && pnpm test`
-- 比较分支 diff：`git diff main..<branch>` 并给出文字评审
-- 检查 lint 和 build：`pnpm lint`、`pnpm build`
-- 读取 `docs/AI_HANDOFF.md`、`docs/OUTSTANDING_TASKS.md` 后给出下一步建议
-- 发现并报告潜在问题（bug、类型错误、遗漏测试），但**不自行修复**
-- 比较多个 agent 分支，指出差异，交由用户决定采用哪一份
+**Deprecated, do not read for current decisions**: `docs/archive/*`, `docs/conversation-inputs/*`.
 
-### Codex 不可以做的事
+**Startup Reconciliation (Iron Rule)**: After reading the above, **immediately run `git log --oneline -20`** and reconcile with `AI_HANDOFF.md` / `OUTSTANDING_TASKS.md`. `git log` is the only source of absolute truth — phase docs lag behind. See [`CLAUDE.md` §3](CLAUDE.md#3-启动必读顺序每次新会话第一件事).
 
-- ❌ **不写新业务功能**（API 端点、前端页面、数据模型等）
-- ❌ 不在 `main` 分支直接提交代码
-- ❌ 不 apply / cherry-pick 其他 agent 的 stash 或 commit
-- ❌ 不把另一个 agent 的 worktree 分支当作 main 来 rebase
-- ❌ 不在检测到同主题 worktree 时继续实现——先报告，等用户决定
+---
 
-### Codex 分支前缀
+## Codex Role Boundary (Important, MUST read)
 
-- 检查任务：`codex/qa-<task>`（例：`codex/qa-phase1d`）
-- 审查任务：`codex/review-<task>`（例：`codex/review-upload-endpoint`）
+**In this project, Codex is only responsible for inspection, testing, branch comparison, and next-step suggestions. It does NOT write new business features.**
 
-### 启动检查（每次会话必须先跑）
+### Codex Can Do
+
+- Run tests: `pytest tests/backend -q`, `cd frontend && pnpm test`
+- Compare branch diffs: `git diff main..<branch>` with textual review
+- Lint and build checks: `pnpm lint`, `pnpm build`
+- Read `docs/AI_HANDOFF.md`, `docs/OUTSTANDING_TASKS.md` and suggest next steps
+- Find and report potential issues (bugs, type errors, missing tests) — **but do not auto-fix**
+- Compare multiple agent branches, point out differences, let the user decide which to adopt
+
+### Codex Must NOT Do
+
+- ❌ **Write new business features** (API endpoints, frontend pages, data models, etc.)
+- ❌ Commit directly to the `main` branch
+- ❌ Apply / cherry-pick another agent's stash or commit
+- ❌ Treat another agent's worktree branch as `main` for rebasing
+- ❌ Continue implementing when same-topic worktrees are detected — report first, wait for the user
+
+### Codex Branch Prefixes
+
+- Inspection task: `codex/qa-<task>` (e.g., `codex/qa-phase1d`)
+- Review task: `codex/review-<task>` (e.g., `codex/review-upload-endpoint`)
+
+### Startup Check (Run Every Session)
 
 ```bash
 git fetch --all --prune
@@ -73,48 +57,40 @@ git log --oneline -5
 git branch --show-current
 ```
 
-**单 agent 串行原则（2026-05-18 起）**：项目已不再多 agent 并发。如果 `git status` 显示工作区有未提交改动且不属于本次任务，或当前分支与预期不符，**立刻停下问用户**，不要继续。
+**Single-Agent Serial Principle (since 2026-05-18)**: This project no longer runs agents in parallel. If `git status` shows uncommitted changes that don't belong to the current task, or the current branch doesn't match expectations — **stop immediately and ask the user**, do not continue.
 
-### 发现冲突时的报告模板
+### Conflict Report Template
 
-> 启动检查发现 [描述冲突，例如"工作区有未提交改动疑似上次未 commit 完"]。
-> 我只能做检查，不会继续写功能。
-> 请你决定：A（先处理未提交改动）/ B（让我对比 diff 并报告）。
+> Startup check found [describe the conflict, e.g., "uncommitted changes that look like leftover work from last session"].
+> I can only inspect, not write features.
+> Please choose: A (handle uncommitted changes first) / B (let me compare diff and report).
 
-## Push Policy (2026-05-18)
+---
 
-**All `git push origin` operations are deferred** until phase [D] open-source preparation. See `CLAUDE.md` § "Push Policy" for details.
+## Push Policy
 
-- ❌ Do not push to origin on your own (no `git push origin main`, no PR creation, no triggering CI)
+**All `git push origin` operations are deferred** until phase [D] open-source preparation. See [`docs/rules/git-workflow.md` §2](docs/rules/git-workflow.md#2-push-策略2026-05-18-调整) for full details.
+
+- ❌ Do not push to origin on your own
 - ✅ Keep all commits on local main / local feature branches
-- ✅ Merge feature branches into local main directly (no PR flow)
-- ✅ local main intentionally diverges from origin/main—this is expected state until [D] phase
 - ✅ Exception: ask the user explicitly if you think a push is needed
 
-## Quality And Risk
+---
 
-- Avoid speculative abstractions, optionality, and future-proofing that were not requested.
-- Preserve correctness first for database, auth, permissions, and validation logic.
-- Keep communication concrete, scoped, and honest about uncertainty.
+## Other Rules (Defer to CLAUDE.md / docs/rules/)
 
-## Verification
+| Topic | Where |
+|---|---|
+| Communication style (Chinese, explain-before-act) | [`CLAUDE.md` §2](CLAUDE.md#2-沟通规则最重要) |
+| Risk gating (6 must-ask cases + red lines) | [`CLAUDE.md` §4](CLAUDE.md#4-风险求证必须停下来问用户的-6-种情况) |
+| Code style (Python / TS / UI) | [`docs/rules/code-style.md`](docs/rules/code-style.md) |
+| Business contract (state machines, thresholds, skip strategy) | [`docs/rules/business-contract.md`](docs/rules/business-contract.md) |
+| Project architecture / commands / MCP | [`docs/rules/project-map.md`](docs/rules/project-map.md) |
+| Context budget / `/clear` handoff | [`docs/rules/context-budget.md`](docs/rules/context-budget.md) |
 
-- Turn vague tasks into verifiable goals.
-- For bug fixes, define how the bug is reproduced or detected.
-- For behavior changes, add or update the narrowest useful test when a test pattern exists.
-- Before finishing, verify with the strongest available signal available in context.
-- If something was not verified, say so clearly.
+---
 
-## Web Defaults
-
-- For React and Next.js work, prefer framework-native patterns over custom infrastructure.
-- Respect server/client boundaries in Next.js.
-- Keep components focused and avoid unnecessary prop drilling or effect-heavy state flow.
-- Handle loading, empty, error, and success states cleanly.
-- **Remix Design Spec**: UI modifications and component generation must strictly adhere to the Remix tokens in `docs/DESIGN_SYSTEM.md`. Hardcoded color/border values are prohibited; always use the predefined CSS variable system.
-- **Runtime & Business Specs**: Align both frontend logic and backend services with the dependencies (e.g., summary path 2 forces frame analysis), VAD thresholds, state transitions, and step skip rules documented in `CLAUDE.md`.
-
-## Skill Index
+## Skill Index (Codex-specific)
 
 - Core behavior: `karpathy-guidelines`, `test-driven-development`
 - Web and full-stack: `next-best-practices`, `vercel-react-best-practices`, `vercel-composition-patterns`
@@ -122,6 +98,8 @@ git branch --show-current
 - Testing and tooling: `webapp-testing`, `playwright`
 - Document and media workflows: `pdf`, `remotion-best-practices`
 
-## Imported Claude Cowork project instructions
+---
+
+## Imported Claude Cowork Project Instructions
 
 多媒体内容分析系统
