@@ -148,28 +148,50 @@ export function PreflightDrawer({
     if (open && providers.length === 0) fetchProviders()
   }, [open, providers.length, fetchProviders])
 
-  const hydrateTasks = (stagedTasks: StagedConfig['tasks'] | undefined) => {
+  const hydrateTasks = (stagedTasks: StagedConfig['tasks'] | undefined, scope?: StagedConfig['analysisScope']) => {
     const init: Record<MediaKind, Record<string, unknown>> = {} as Record<MediaKind, Record<string, unknown>>
     for (const taskKind of Object.keys(TASK_GROUPS) as MediaKind[]) {
       const defaults = buildInitialTasks(taskKind) as unknown as Record<string, unknown>
       const staged = stagedTasks?.[taskKind]
       if (!staged) {
         init[taskKind] = defaults
-        continue
+      } else {
+        const next: Record<string, unknown> = { ...defaults }
+        const enabled = new Set((staged.enabled_features as string[] | undefined) ?? [])
+        for (const group of TASK_GROUPS[taskKind]) {
+          const current = (next[group.id] as Record<string, unknown>) ?? {}
+          const stagedGroup = staged[group.id]
+          next[group.id] = {
+            ...current,
+            ...(typeof stagedGroup === 'object' && stagedGroup !== null ? stagedGroup as Record<string, unknown> : {}),
+            on: enabled.has(group.id) || Boolean((stagedGroup as { on?: unknown } | undefined)?.on),
+          }
+        }
+        init[taskKind] = next
       }
 
-      const next: Record<string, unknown> = { ...defaults }
-      const enabled = new Set((staged.enabled_features as string[] | undefined) ?? [])
-      for (const group of TASK_GROUPS[taskKind]) {
-        const current = (next[group.id] as Record<string, unknown>) ?? {}
-        const stagedGroup = staged[group.id]
-        next[group.id] = {
-          ...current,
-          ...(typeof stagedGroup === 'object' && stagedGroup !== null ? stagedGroup as Record<string, unknown> : {}),
-          on: enabled.has(group.id) || Boolean((stagedGroup as { on?: unknown } | undefined)?.on),
+      // 分析范围覆盖：确保 summary_path 和关键 task 的 on/off 与 scope 一致
+      if (taskKind === 'video' && scope) {
+        const entry = init[taskKind] as Record<string, unknown>
+        const summaryGroup = (entry.summary as Record<string, unknown>)
+        if (summaryGroup) {
+          if (scope === 'visual_only') {
+            summaryGroup.on = true
+            summaryGroup.summary_path = '只看画面'
+            const fp = (entry.frame_prompt as Record<string, unknown>)
+            if (fp) fp.on = true
+            const srt = (entry.srt as Record<string, unknown>)
+            if (srt) srt.on = false
+          } else if (scope === 'av_combined') {
+            summaryGroup.on = true
+            summaryGroup.summary_path = '音视频综合'
+            const fp = (entry.frame_prompt as Record<string, unknown>)
+            if (fp) fp.on = true
+            const srt = (entry.srt as Record<string, unknown>)
+            if (srt) srt.on = true
+          }
         }
       }
-      init[taskKind] = next
     }
     return init
   }
@@ -177,7 +199,7 @@ export function PreflightDrawer({
   const serializeTasksForType = (itemType: ItemType) => {
     const taskKind = itemType as MediaKind
     const raw = (tasks[taskKind] ?? {}) as TaskState
-    const effective = applyCascades(taskKind, raw, materialCount).state
+    const effective = applyCascades(taskKind, raw, materialCount, sc?.analysisScope).state
     const enabledFeatures = Object.entries(effective)
       .filter(([, v]) => v.on)
       .map(([k]) => k)
@@ -205,7 +227,14 @@ export function PreflightDrawer({
     if (open) {
       setTextProviderId('')
       setTextModelId(sc?.models?.text ?? '')
-      setKind(kindFromType)
+      // analysisScope 决定默认 kind
+      if (sc?.analysisScope === 'audio_only') {
+        setKind('audio')
+      } else if (sc?.analysisScope === 'visual_only' || sc?.analysisScope === 'av_combined') {
+        setKind('video')
+      } else {
+        setKind(kindFromType)
+      }
       setActivePreset(null)
       setBg({
         contentType: sc?.background?.content_type ?? '',
@@ -215,7 +244,7 @@ export function PreflightDrawer({
         purpose: sc?.background?.purpose ?? '',
       })
       setModels({ text: sc?.models?.text ?? '', video: sc?.models?.video ?? '' })
-      setTasks(hydrateTasks(sc?.tasks))
+      setTasks(hydrateTasks(sc?.tasks, sc?.analysisScope))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
@@ -231,6 +260,10 @@ export function PreflightDrawer({
   const normalizeItemType = (type: string): ItemType => ITEM_TYPE_ALIASES[type] ?? (type as ItemType)
 
   const typesToCreate: ItemType[] = (() => {
+    if (sc?.analysisScope) {
+      const scopeItemType: ItemType = sc.analysisScope === 'audio_only' ? 'audio' : 'video'
+      return [scopeItemType]
+    }
     if (sc?.types?.length) return sc.types
     const rawTypes = selectedTypes?.length
       ? selectedTypes
@@ -246,7 +279,7 @@ export function PreflightDrawer({
   const groups = TASK_GROUPS[kind] ?? []
   const currentTasks = (tasks[kind] ?? {}) as Record<string, { on?: boolean; [k: string]: unknown }>
   // ── Cascade: compute effective state + lock/disabled reasons ──
-  const cascaded = applyCascades(kind, currentTasks as TaskState, materialCount)
+  const cascaded = applyCascades(kind, currentTasks as TaskState, materialCount, sc?.analysisScope)
   const effState = cascaded.state
   const locks = cascaded.locks
   const disabledReasons = cascaded.disabled
@@ -379,6 +412,7 @@ export function PreflightDrawer({
       background: bgPayload,
       workspaceIds: workspaceId ? [workspaceId] : [],
       urlValue: url,
+      analysisScope: sc?.analysisScope,
     })
   }
 
@@ -506,8 +540,8 @@ export function PreflightDrawer({
                     group={g}
                     state={st}
                     setState={(p) => setKindTask(g.id, p)}
-                    lockedReason={locks[g.id]}
-                    disabledReason={disabledReasons[g.id]}
+                    locks={locks}
+                    disabledReasons={disabledReasons}
                   />
                 )
               })}
@@ -622,15 +656,17 @@ function PresetBar({ current, onPick }: {
   )
 }
 
-function PFTaskCard({ group, state, setState, lockedReason, disabledReason }: {
+function PFTaskCard({ group, state, setState, locks, disabledReasons }: {
   group: { id: string; label: string; sub?: string; children?: { id: string; label: string; type: string; options?: string[]; default: unknown; unit?: string; whenParent?: string; whenValue?: string }[] }
   state: Record<string, unknown>
   setState: (patch: Record<string, unknown>) => void
-  lockedReason?: string
-  disabledReason?: string
+  locks: Record<string, string>
+  disabledReasons: Record<string, string>
 }) {
   const on = !!state.on
+  const lockedReason = locks[group.id]
   const locked = !!lockedReason
+  const disabledReason = disabledReasons[group.id]
   const disabled = !!disabledReason
   const cardBg = disabled ? 'var(--bg-sunken)'
     : on ? 'var(--bg-elev)'
@@ -717,6 +753,8 @@ function PFTaskCard({ group, state, setState, lockedReason, disabledReason }: {
 
             if (c.type === 'radio') {
               const val = state[c.id] ?? c.default
+              const childLockKey = `${group.id}.${c.id}`
+              const childLocked = !!locks[childLockKey]
               return (
                 <div key={c.id}>
                   <div style={{ fontSize: 11, color: 'var(--ink-2)', marginBottom: 6, fontWeight: 500 }}>{c.label}</div>
@@ -724,7 +762,9 @@ function PFTaskCard({ group, state, setState, lockedReason, disabledReason }: {
                     {(c.options ?? []).map(o => {
                       const active = val === o
                       return (
-                        <button key={o} onClick={() => setState({ [c.id]: o })}
+                        <button key={o}
+                          onClick={() => { if (!childLocked) setState({ [c.id]: o }) }}
+                          disabled={childLocked}
                           style={{
                             height: 28, padding: '0 12px',
                             borderRadius: 8,
@@ -732,13 +772,17 @@ function PFTaskCard({ group, state, setState, lockedReason, disabledReason }: {
                             background: active ? 'var(--ink)' : 'var(--bg)',
                             color: active ? 'var(--bg)' : 'var(--ink)',
                             fontSize: 11, fontFamily: 'var(--mono)',
-                            cursor: 'pointer',
+                            cursor: childLocked ? 'not-allowed' : 'pointer',
+                            opacity: childLocked ? 0.5 : 1,
                           }}>
                           {o}
                         </button>
                       )
                     })}
                   </div>
+                  {childLocked && (
+                    <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 4 }}>{locks[childLockKey]}</div>
+                  )}
                 </div>
               )
             }

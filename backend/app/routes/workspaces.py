@@ -87,17 +87,62 @@ def _copy_task_config(
         payload[payload_key] = value
 
 
+def normalize_video_summary_path(raw: str) -> str:
+    """规范化前端 summary_path 值为 pipeline 可识别的 canonical 值。"""
+    if not raw:
+        return ""
+    mapping: Dict[str, str] = {
+        # 字幕路径
+        "字幕直接总结": "subtitle",
+        "只听字幕/音频转写": "subtitle",
+        "subtitle": "subtitle",
+        # 音视频综合路径
+        "音视频合并 · 最详细": "av_combined",
+        "音视频综合": "av_combined",
+        "detailed": "av_combined",
+        "av_combined": "av_combined",
+        # 只看画面路径
+        "只看画面": "visual_only",
+        "visual_only": "visual_only",
+        # 视频模型直传（保留未来项）
+        "视频模型直接分析": "video_model",
+        "video_model": "video_model",
+    }
+    return mapping.get(raw.strip(), raw.strip())
+
+
+def _adapt_r8_frame_prompt(frame_prompt: Dict[str, Any]) -> Dict[str, Any]:
+    """R8 preflightTasks 字段名 -> CaptureParams 可读字段名。"""
+    adapted = dict(frame_prompt)
+    if "frame_mode" in adapted and "mode" not in adapted:
+        raw_mode = str(adapted.pop("frame_mode"))
+        mode_map = {"按秒截帧": "interval", "AI 镜头分析": "ai_shot"}
+        adapted["mode"] = mode_map.get(raw_mode, raw_mode)
+    if "sec_per_frame" in adapted and "interval_sec" not in adapted:
+        adapted["interval_sec"] = adapted.pop("sec_per_frame")
+    if "shot_frames" in adapted and "frames_per_shot" not in adapted:
+        raw = str(adapted.pop("shot_frames"))
+        # "2 帧 · 首+尾" -> 2, "3 帧 · 首+中+尾" -> 3
+        try:
+            adapted["frames_per_shot"] = int(raw[0])
+        except (ValueError, IndexError):
+            pass
+    return adapted
+
+
 def _augment_video_analyze_payload(payload: Dict[str, Any], item: WorkspaceItem) -> None:
     """Copy video preflight params used by the current analyze pipeline."""
     tasks = item.preflight.tasks or {}
     frame_prompts_params = tasks.get("frame_prompt")
     if isinstance(frame_prompts_params, dict):
-        payload["frame_prompt"] = frame_prompts_params
+        payload["frame_prompt"] = _adapt_r8_frame_prompt(frame_prompts_params)
 
     summary_params = tasks.get("summary")
     if isinstance(summary_params, dict):
-        if summary_params.get("path"):
-            payload["summary_path"] = summary_params["path"]
+        # 兼容 R8 summary.summary_path 和旧 summary.path
+        raw_path = summary_params.get("summary_path") or summary_params.get("path")
+        if raw_path:
+            payload["summary_path"] = normalize_video_summary_path(str(raw_path))
         if summary_params.get("video_template"):
             payload["video_template"] = summary_params["video_template"]
         if summary_params.get("output_format"):
@@ -1353,22 +1398,34 @@ def start_item_pipeline(workspace_id: str, item_id: str) -> Dict[str, Any]:
 def _video_result_has_real_data(results: Dict[str, Any]) -> bool:
     """判断 item.results 里是否已经有可用的数据。
 
-    两种情况视为有真数据：
-    1. 路径 2（detailed）：frames list + transcript list 都存在
-    2. N7b 路径 1（subtitle）：summary_path='subtitle' 且 summary 或 transcript 非空
+    四种路径的真数据判定：
+    1. subtitle：summary_path='subtitle' 且 summary 或 transcript 非空
+    2. visual_only：frames 非空 list（无需 transcript）
+    3. av_combined：frames 非空 list + (transcript 非空 list 或 summary 非空)
+    4. 默认（detailed / VLM）：frames list + transcript list 都存在
     """
     if not isinstance(results, dict):
         return False
+    summary_path = results.get("summary_path", "")
     # N7b 路径 1：字幕直接总结
-    if results.get("summary_path") == "subtitle":
+    if summary_path == "subtitle":
         transcript = results.get("transcript")
         has_transcript = (
             bool(transcript.strip()) if isinstance(transcript, str) else bool(transcript)
         )
-        if results.get("summary") or has_transcript:
-            return True
-        return False
-    # 路径 2：帧分析 + 转写
+        return bool(results.get("summary") or has_transcript)
+    # visual_only：只看画面，只需 frames
+    if summary_path == "visual_only":
+        frames = results.get("frames")
+        return bool(frames) and isinstance(frames, list) and len(frames) > 0
+    # av_combined：音视频综合，需要 frames + (transcript 或 summary)
+    if summary_path == "av_combined":
+        frames = results.get("frames")
+        transcript = results.get("transcript")
+        has_frames = bool(frames) and isinstance(frames, list) and len(frames) > 0
+        has_transcript = isinstance(transcript, list) and len(transcript) > 0
+        return has_frames and (has_transcript or bool(results.get("summary")))
+    # 默认路径（detailed / VLM）：帧分析 + 转写
     frames = results.get("frames")
     transcript = results.get("transcript")
     return bool(frames) and isinstance(frames, list) and isinstance(transcript, list)
@@ -1397,6 +1454,10 @@ def _materialize_video_results_from_analyze(
         results.setdefault("frames", [])
         results.setdefault("transcript", results.get("transcript") or [])
         return results
+    # visual_only：只看画面，transcript 始终为空
+    if results.get("summary_path") == "visual_only":
+        results.setdefault("frames", [])
+        results.setdefault("transcript", [])
     json_outputs = results.get("json_outputs") or []
     if not json_outputs:
         return results
@@ -1508,8 +1569,8 @@ def get_item_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
             break
     v_results = _materialize_video_results_from_analyze(v_results, preferred_basenames=preferred_basenames)
 
-    # N7b 路径 1：规范化 transcript 为数组（前端 VideoResult.transcript 期望 array）
-    if v_results.get("summary_path") == "subtitle":
+    # N7b / av_combined：规范化 transcript 为数组（前端 VideoResult.transcript 期望 array）
+    if v_results.get("summary_path") in ("subtitle", "av_combined"):
         raw_transcript = v_results.get("transcript")
         if isinstance(raw_transcript, str):
             v_results["transcript"] = (
@@ -1519,6 +1580,10 @@ def get_item_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
             )
         elif not isinstance(raw_transcript, list):
             v_results["transcript"] = []
+        v_results.setdefault("frames", [])
+    # visual_only：确保 transcript 为空数组，frames 从 json_outputs 物化
+    if v_results.get("summary_path") == "visual_only":
+        v_results.setdefault("transcript", [])
         v_results.setdefault("frames", [])
 
     if _video_result_has_real_data(v_results):

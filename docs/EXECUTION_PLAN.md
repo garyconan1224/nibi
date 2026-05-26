@@ -195,6 +195,19 @@
 
 用户决定：**不按 SemVer 节奏自动打 tag**。Tag 等到「功能都差不多」时统一打，**那时就是开源时刻**。在那之前每个 Phase 完成只 commit，不 tag。
 
+- [x] **R14** 多类型去重 UX（`feat/phase-r14-multi-type-dedup-ux`）
+- [x] **R15** Library + Remix 体验打磨（`feat/phase-l5-library-remix-polish`）
+- [x] **R16** ProcessingPage 音频流程打磨
+  - [x] R16.1 音频封面兜底 + music badge
+  - [x] R16.2 音频任务跳过 FRAMES/VLM 步骤
+  - [x] R16.3 ProcessingPage 长任务列表可滚动
+- [x] **R17** AddMaterial 弹窗：分析范围与任务勾选/细调联动（`feat/phase-r17-add-material-scope-features`）
+  - [x] R17.1 `featuresToSteps.ts` 新增 `FEATURES_BY_SCOPE` 映射
+  - [x] R17.2 AddMaterialModal chips 按 scope 过滤 + 切 scope 清状态 + submit 防御过滤
+  - [x] R17.3 `preflightTasks.ts` `applyCascades` 增 scope 参数 + visual_only/av_combined 级联
+  - [x] R17.4 PreflightDrawer 透传 scope
+  - [x] R17.5 新增单测 5 个（AddMaterialModal ×3 + preflightTasks ×2）
+
 ---
 
 ## 归档说明

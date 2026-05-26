@@ -20,7 +20,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { FEATURES_BY_TYPE, type Feature } from '@/lib/featuresToSteps'
+import { FEATURES_BY_SCOPE, FEATURES_BY_TYPE, type Feature } from '@/lib/featuresToSteps'
 import type { SniffResult } from '@/services/workspaces'
 import {
   sniffUrl,
@@ -30,6 +30,7 @@ import {
   startItemPipeline,
 } from '@/services/workspaces'
 import type {
+  AnalysisScope,
   ItemType,
   WorkspaceBackground,
 } from '@/types/workspace'
@@ -44,6 +45,14 @@ const TYPE_META: Record<ItemType, { icon: typeof FileVideo; label: string; sub: 
 const BG_CONTENT_TYPES = ['课程', '会议', '宣传片', 'Vlog', '访谈', '纯音乐', '新闻报道']
 const BG_PURPOSES = ['复刻参考', '竞品分析', '内容总结', '学习研究']
 
+// ── Analysis Scope ─────────────────────────────────────────
+
+const SCOPE_META: Record<AnalysisScope, { icon: typeof FileVideo; label: string; sub: string; itemType: ItemType }> = {
+  audio_only:  { icon: FileAudio, label: '只听音频', sub: '抽取音频 · 转写 · 音乐分析', itemType: 'audio' },
+  visual_only: { icon: FileVideo, label: '只看画面', sub: '截帧 · VLM 视觉分析 · 无 ASR', itemType: 'video' },
+  av_combined: { icon: Sparkles,  label: '音视频综合', sub: 'ASR 转写 + 截帧 VLM + 合并总结', itemType: 'video' },
+}
+
 // ── Props ──────────────────────────────────────────────────
 
 export interface StagedConfig {
@@ -54,6 +63,7 @@ export interface StagedConfig {
   background: Partial<WorkspaceBackground>
   workspaceIds: string[]
   urlValue?: string
+  analysisScope?: AnalysisScope
 }
 
 interface AddMaterialModalProps {
@@ -110,6 +120,7 @@ export function AddMaterialModal({
   // ── 类型选择 ──
   const propInitial = useMemo(() => resolveInitialTypes(sniffResult), [sniffResult])
   const [selectedTypes, setSelectedTypes] = useState<ItemType[]>(propInitial.types)
+  const [analysisScope, setAnalysisScope] = useState<AnalysisScope>('av_combined')
 
   // ── Feature 勾选（按类型）──
   const [features, setFeatures] = useState<Record<ItemType, Record<string, boolean>>>(
@@ -138,6 +149,7 @@ export function AddMaterialModal({
   const sniffTypes = useMemo(() => getSniffTypes(effectiveSniff), [effectiveSniff])
   const effectiveInitial = useMemo(() => resolveInitialTypes(effectiveSniff), [effectiveSniff])
   const typeLocked = sniffTypes.length === 1
+  const showScopeCards = sniffTypes.includes('video') && sniffTypes.includes('audio')
 
   // ── open / sniff / initialStaged 变化时重置类型与 features ──
   useEffect(() => {
@@ -152,10 +164,12 @@ export function AddMaterialModal({
         ...(initialStaged.features ?? {}),
       })
       setBgOverrides(initialStaged.background ?? {})
+      if (initialStaged.analysisScope) setAnalysisScope(initialStaged.analysisScope)
     } else {
       setSelectedTypes(types)
       setFeatures(buildDefaults(types))
       setBgOverrides({})
+      setAnalysisScope('av_combined')
     }
     setBgOpen(false)
     setError(null)
@@ -231,12 +245,17 @@ export function AddMaterialModal({
       setError('请先输入素材链接')
       return
     }
-    if (selectedTypes.length === 0) {
+    if (!showScopeCards && selectedTypes.length === 0) {
       setError('请至少选择一种素材类型')
       return
     }
     setSubmitting(true)
     setError(null)
+
+    // 分析范围模式下确定创建类型列表
+    const typesToCreate: { type: ItemType; summaryPath?: string }[] = showScopeCards
+      ? [{ type: SCOPE_META[analysisScope].itemType, summaryPath: analysisScope }]
+      : selectedTypes.map((t) => ({ type: t }))
 
     try {
       // 1. 无选择时自动创建工作空间
@@ -256,11 +275,12 @@ export function AddMaterialModal({
       let succeeded = 0
       const errors: string[] = []
 
-      for (const type of selectedTypes) {
+      for (const { type, summaryPath } of typesToCreate) {
         try {
+          const allowed = showScopeCards ? new Set(FEATURES_BY_SCOPE[analysisScope]) : null
           const enabledFeatures = Object.entries(features[type] ?? {})
-            .filter(([, v]) => v)
-            .map(([k]) => k as Feature)
+            .filter(([id, on]) => on && (!allowed || allowed.has(id as Feature)))
+            .map(([id]) => id)
 
           // 2. addWorkspaceItem
           const ws = await addWorkspaceItem(wsId, {
@@ -283,6 +303,17 @@ export function AddMaterialModal({
           if (type === 'video' || type === 'audio' || stagedTasks) {
             tasks.material_type = type
             tasks.enabled_features = stagedTasks?.enabled_features ?? enabledFeatures
+          }
+          // analysisScope → canonical summary_path
+          if (summaryPath === 'visual_only') {
+            tasks.summary = { on: true, summary_path: '只看画面' }
+            tasks.frame_prompt = { ...(tasks.frame_prompt as Record<string, unknown> || {}), on: true }
+          } else if (summaryPath === 'av_combined') {
+            tasks.summary = { on: true, summary_path: '音视频综合' }
+            tasks.frame_prompt = { ...(tasks.frame_prompt as Record<string, unknown> || {}), on: true }
+            tasks.srt = { ...(tasks.srt as Record<string, unknown> || {}), on: true }
+          } else if (summaryPath === 'audio_only') {
+            tasks.material_type = 'audio'
           }
           await savePreflight(wsId, itemId, {
             background_overrides: effectiveBackground,
@@ -341,12 +372,13 @@ export function AddMaterialModal({
       background: bgOverrides,
       workspaceIds,
       urlValue: effectiveUrl,
+      analysisScope: showScopeCards ? analysisScope : undefined,
     }
     onFineTune?.(staged)
   }
 
   // ── 派生值 ──
-  const hasContent = effectiveUrl.length > 0 && selectedTypes.length > 0
+  const hasContent = effectiveUrl.length > 0 && (showScopeCards || selectedTypes.length > 0)
   const enabledCount = useMemo(() => {
     let n = 0
     for (const t of selectedTypes) {
@@ -408,31 +440,60 @@ export function AddMaterialModal({
             <div className="modal-error">{error}</div>
           )}
 
-          {/* ① 素材类型 */}
+          {/* ① 素材类型 / 分析范围 */}
           <div className="m-section">
-            <div className="eyebrow" style={{ marginBottom: 10 }}>① 素材类型</div>
-            <div className="type-row">
-              {ALL_TYPES.map((t) => {
-                const meta = TYPE_META[t]
-                const Icon = meta.icon
-                const active = selectedTypes.includes(t)
-                const selectable = isTypeSelectable(t)
-                return (
-                  <button
-                    key={t}
-                    type="button"
-                    className="type-card"
-                    data-active={active ? 'true' : 'false'}
-                    onClick={() => selectable && toggleType(t)}
-                    disabled={!selectable}
-                  >
-                    <Icon size={22} />
-                    <div className="tc-l">{meta.label}</div>
-                    <div className="mono tc-en">{meta.sub}</div>
-                  </button>
-                )
-              })}
+            <div className="eyebrow" style={{ marginBottom: 10 }}>
+              {showScopeCards ? '① 分析范围 · 三选一' : '① 素材类型'}
             </div>
+            {showScopeCards ? (
+              <div className="type-row">
+                {(Object.entries(SCOPE_META) as [AnalysisScope, typeof SCOPE_META[AnalysisScope]][]).map(([scope, meta]) => {
+                  const Icon = meta.icon
+                  const active = analysisScope === scope
+                  return (
+                    <button
+                      key={scope}
+                      type="button"
+                      className="type-card"
+                      data-active={active ? 'true' : 'false'}
+                      onClick={() => {
+                        setAnalysisScope(scope)
+                        setSelectedTypes([meta.itemType])
+                        // 切换 scope 必清 features，避免隐藏 chip 状态泄漏到后端
+                        setFeatures({} as Record<ItemType, Record<string, boolean>>)
+                      }}
+                    >
+                      <Icon size={22} />
+                      <div className="tc-l">{meta.label}</div>
+                      <div className="mono tc-en">{meta.sub}</div>
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="type-row">
+                {ALL_TYPES.map((t) => {
+                  const meta = TYPE_META[t]
+                  const Icon = meta.icon
+                  const active = selectedTypes.includes(t)
+                  const selectable = isTypeSelectable(t)
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      className="type-card"
+                      data-active={active ? 'true' : 'false'}
+                      onClick={() => selectable && toggleType(t)}
+                      disabled={!selectable}
+                    >
+                      <Icon size={22} />
+                      <div className="tc-l">{meta.label}</div>
+                      <div className="mono tc-en">{meta.sub}</div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           {/* ② 输入源 */}
@@ -481,7 +542,10 @@ export function AddMaterialModal({
               {selectedTypes.map((type) => {
                 const meta = TYPE_META[type]
                 const Icon = meta.icon
-                const typeFeatures = FEATURES_BY_TYPE[type]
+                const baseFeatures = FEATURES_BY_TYPE[type]
+                const typeFeatures = showScopeCards
+                  ? baseFeatures.filter(f => FEATURES_BY_SCOPE[analysisScope].includes(f.id))
+                  : baseFeatures
                 return (
                   <div key={type} style={{ marginBottom: 10 }}>
                     <div
@@ -659,7 +723,9 @@ export function AddMaterialModal({
         <div className="m-foot">
           <span className="mono modal-foot-status">
             <span className="chip-dot" style={{ marginRight: 6 }} />
-            已勾选 {enabledCount} 项 · {selectedTypes.length} 种素材类型
+            {showScopeCards
+              ? `${SCOPE_META[analysisScope].label} · ${SCOPE_META[analysisScope].sub}`
+              : `已勾选 ${enabledCount} 项 · ${selectedTypes.length} 种素材类型`}
           </span>
           <div className="modal-actions">
             <button

@@ -1,4 +1,4 @@
-import type { ItemType } from '@/types/workspace'
+import type { AnalysisScope, ItemType } from '@/types/workspace'
 
 // ── Feature 定义（SPEC §2.6 一级勾选项）─────────────────────
 
@@ -86,4 +86,11 @@ export function getDefaultFeatures(type: ItemType): Feature[] {
 /** 返回某类型所有可用的 feature ID 列表 */
 export function getAllFeatures(type: ItemType): Feature[] {
   return FEATURES_BY_TYPE[type].map((f) => f.id)
+}
+
+/** 分析范围 → 允许的 feature 子集 */
+export const FEATURES_BY_SCOPE: Record<AnalysisScope, Feature[]> = {
+  audio_only: ['transcribe_summary', 'speaker_diarize', 'subtitle_export', 'music_analysis'],
+  visual_only: ['visual_prompt', 'video_summary'],
+  av_combined: ['visual_prompt', 'video_summary', 'subtitle_export', 'music_analysis'],
 }

@@ -11,27 +11,44 @@ function makeState(kind: MediaKind, overrides: Record<string, Partial<{ on: bool
 }
 
 describe('applyCascades', () => {
-  it('video: 路径 2 (音视频合并) → 强制 frame_prompt on + locked', () => {
+  it('video: 音视频综合 → 强制 frame_prompt on + srt on + locked', () => {
     const state = makeState('video', {
       frame_prompt: { on: false },
-      summary: { on: true, summary_path: '音视频合并 · 最详细' },
+      srt: { on: false },
+      summary: { on: true, summary_path: '音视频综合' },
     })
     const { state: eff, locks } = applyCascades('video', state)
     expect(eff.frame_prompt.on).toBe(true)
-    expect(locks.frame_prompt).toBe('路径 2 复用截帧 · 强制开启')
+    expect(eff.srt.on).toBe(true)
+    expect(locks.frame_prompt).toBe('音视频综合需要截帧 · 强制开启')
+    expect(locks.srt).toBe('音视频综合需要字幕/转写 · 强制开启')
   })
 
-  it('video: 路径 1 (字幕总结) 不触发级联', () => {
+  it('video: 只看画面 → 强制 frame_prompt on + srt disabled', () => {
     const state = makeState('video', {
       frame_prompt: { on: false },
-      summary: { on: true, summary_path: '字幕直接总结' },
+      srt: { on: true },
+      summary: { on: true, summary_path: '只看画面' },
+    })
+    const { state: eff, locks, disabled } = applyCascades('video', state)
+    expect(eff.frame_prompt.on).toBe(true)
+    expect(locks.frame_prompt).toBe('只看画面需要截帧 · 强制开启')
+    expect(eff.srt.on).toBe(false)
+    expect(disabled.srt).toBe('只看画面模式不分析音频')
+  })
+
+  it('video: 只听字幕/音频转写 不触发级联', () => {
+    const state = makeState('video', {
+      frame_prompt: { on: false },
+      srt: { on: false },
+      summary: { on: true, summary_path: '只听字幕/音频转写' },
     })
     const { state: eff, locks } = applyCascades('video', state)
     expect(eff.frame_prompt.on).toBe(false)
     expect(locks.frame_prompt).toBeUndefined()
   })
 
-  it('video: 路径 3 (视频模型直跑) 不触发级联', () => {
+  it('video: 视频模型直接分析 不触发级联', () => {
     const state = makeState('video', {
       summary: { on: true, summary_path: '视频模型直接分析' },
     })
@@ -114,11 +131,26 @@ describe('applyCascades', () => {
 
   it('不修改原始引用 (structuredClone)', () => {
     const state = makeState('video', {
-      summary: { on: true, summary_path: '音视频合并 · 最详细' },
+      summary: { on: true, summary_path: '音视频综合' },
     })
     const snapshot = state.summary.on
     applyCascades('video', state)
     expect(state.summary.on).toBe(snapshot)
+  })
+
+  it('applyCascades(video, visual_only) 禁用 srt 和 music', () => {
+    const init = buildInitialTasks('video')
+    const { state, disabled } = applyCascades('video', init, 1, 'visual_only')
+    expect(disabled.srt).toBeTruthy()
+    expect(disabled.music).toBeTruthy()
+    expect(state.summary.summary_path).toBe('只看画面')
+  })
+
+  it('applyCascades(video, av_combined) 锁定 summary_path = 音视频综合', () => {
+    const init = buildInitialTasks('video')
+    const { state } = applyCascades('video', init, 1, 'av_combined')
+    expect(state.summary.summary_path).toBe('音视频综合')
+    expect(state.summary.on).toBe(true)
   })
 })
 
@@ -136,6 +168,7 @@ describe('buildInitialTasks', () => {
     const tasks = buildInitialTasks('video')
     expect(tasks.frame_prompt.frame_mode).toBe('AI 镜头分析')
     expect(tasks.frame_prompt.shot_frames).toBe('3 帧 · 首+中+尾')
+    expect(tasks.summary.summary_path).toBe('音视频综合')
   })
 
   it('audio 初始化 4 个任务', () => {

@@ -1,5 +1,7 @@
 /* Preflight task groups + cascade rules — 1:1 replicas from Remix preflight.jsx */
 
+import type { AnalysisScope } from '@/types/workspace'
+
 export type MediaKind = 'video' | 'audio' | 'image' | 'text'
 
 export interface TaskChild {
@@ -60,10 +62,10 @@ export const TASK_GROUPS: Record<MediaKind, TaskGroup[]> = {
       ],
     },
     {
-      id: 'summary', label: '视频文案总结', sub: '字幕 · 音视频合并 · 视频模型', default: true,
+      id: 'summary', label: '视频文案总结', sub: '只看画面 · 字幕转写 · 音视频综合 · 视频模型', default: true,
       children: [
-        { id: 'summary_path', label: '总结路径', type: 'radio', options: ['字幕直接总结', '音视频合并 · 最详细', '视频模型直接分析'], default: '音视频合并 · 最详细' },
-        { id: 'summary_depth', label: '总结深度', type: 'radio', options: ['简洁', '详细', '带画面引用'], default: '详细', whenParent: 'summary_path', whenValue: '音视频合并 · 最详细' },
+        { id: 'summary_path', label: '总结路径', type: 'radio', options: ['只看画面', '只听字幕/音频转写', '音视频综合', '视频模型直接分析'], default: '音视频综合' },
+        { id: 'summary_depth', label: '总结深度', type: 'radio', options: ['简洁', '详细', '带画面引用'], default: '详细', whenParent: 'summary_path', whenValue: '音视频综合' },
       ],
     },
     { id: 'music', label: '音乐分析', sub: 'BPM / 调性 / 乐器 / 提示词', default: false,
@@ -130,7 +132,8 @@ export const TASK_GROUPS: Record<MediaKind, TaskGroup[]> = {
 }
 
 /* ─── Cascade rules · spec §4.4 ─────────────────────────────────────
-   - 视频文案总结·路径2 (音视频合并) → 强制画面提示词
+   - 音视频综合 → 强制画面提示词 + 字幕导出
+   - 只看画面 → 强制画面提示词，禁用字幕导出
    - 说话人区分 → 强制人声转写
    - 字幕导出 ↔ 人声转写 (同勾同取)
    - 多图/多文对比仅在素材 ≥2 时可选
@@ -140,16 +143,46 @@ export function applyCascades(
   kind: MediaKind,
   raw: TaskState,
   materialCount = 1,
+  scope?: AnalysisScope,
 ): CascadeResult {
   const s = structuredClone(raw)
   const locks: Record<string, string> = {}
   const disabled: Record<string, string> = {}
 
+  if (kind === 'video' && scope) {
+    if (scope === 'visual_only') {
+      if (s.summary) {
+        s.summary = { ...s.summary, summary_path: '只看画面' }
+        locks['summary.summary_path'] = '只看画面模式 · 路径已锁定'
+      }
+      if (s.srt) { s.srt = { ...s.srt, on: false }; disabled.srt = '只看画面无 ASR' }
+      if (s.music) { s.music = { ...s.music, on: false }; disabled.music = '只看画面不分析音频' }
+    }
+    if (scope === 'av_combined') {
+      if (s.summary) {
+        s.summary = { ...s.summary, on: true, summary_path: '音视频综合' }
+        locks['summary.summary_path'] = '音视频综合 · 路径已锁定'
+      }
+    }
+  }
+
   if (kind === 'video' && s.summary) {
     const path = s.summary.summary_path as string | undefined
-    if (s.summary.on && path === '音视频合并 · 最详细') {
+    if (s.summary.on && path === '音视频综合') {
       s.frame_prompt = { ...s.frame_prompt, on: true }
-      locks.frame_prompt = '路径 2 复用截帧 · 强制开启'
+      locks.frame_prompt = '音视频综合需要截帧 · 强制开启'
+      if (s.srt) {
+        s.srt = { ...s.srt, on: true }
+        locks.srt = '音视频综合需要字幕/转写 · 强制开启'
+      }
+    }
+    if (s.summary.on && path === '只看画面') {
+      s.frame_prompt = { ...s.frame_prompt, on: true }
+      locks.frame_prompt = '只看画面需要截帧 · 强制开启'
+      if (s.srt) {
+        s.srt = { ...s.srt, on: false }
+        disabled.srt = '只看画面模式不分析音频'
+      }
     }
   }
   if (kind === 'audio') {

@@ -625,12 +625,107 @@ def _run_subtitle_summary(
     }
 
 
+def _collect_frame_descriptions(json_paths: list) -> str:
+    """从 VLM 视觉数据 JSON 文件中收集所有帧描述文本。"""
+    import json as _json
+    lines: list[str] = []
+    for jp in json_paths:
+        try:
+            with open(jp, "r", encoding="utf-8") as f:
+                data = _json.load(f)
+        except Exception:
+            continue
+        for frame in data.get("frames", []):
+            desc = frame.get("description_zh") or frame.get("description") or ""
+            ts = frame.get("timestamp", "")
+            if desc.strip():
+                lines.append(f"[{ts}] {desc.strip()}")
+    return "\n".join(lines)
+
+
+def _generate_combined_summary(
+    api_key: str,
+    text_model: str,
+    transcript_text: str,
+    frame_descriptions: str,
+    payload: Dict[str, Any],
+    runner: Any,
+    task_id: str,
+) -> str:
+    """用 transcript + 帧描述 生成音视频合并总结。"""
+    if not api_key or not text_model:
+        return ""
+    if not transcript_text.strip() and not frame_descriptions.strip():
+        return ""
+
+    template = str(payload.get("video_template") or "").strip()
+    depth = str(payload.get("summary_depth") or "详细").strip()
+    output_format = str(payload.get("output_format") or "").strip()
+
+    prompt = _build_combined_summary_prompt(
+        transcript_text=transcript_text,
+        frame_descriptions=frame_descriptions,
+        video_template=template,
+        summary_depth=depth,
+        output_format=output_format,
+    )
+
+    try:
+        registry = create_default_registry()
+        settings = load_settings()
+        profile = registry.resolve_default_profile(settings, "chat")
+        provider = registry.build(profile)
+
+        resp = provider.chat(ChatRequest(
+            model=text_model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+        ))
+        return resp.strip()
+    except Exception as e:
+        runner.append_log(task_id, f"⚠️ combined summary 生成失败: {e}")
+        return ""
+
+
+def _build_combined_summary_prompt(
+    transcript_text: str,
+    frame_descriptions: str,
+    video_template: str,
+    summary_depth: str,
+    output_format: str,
+) -> str:
+    """构建音视频合并总结 prompt。"""
+    parts: list[str] = []
+    parts.append("你是一个专业的视频内容分析师。请根据以下音频转写文本和画面描述，生成一份综合性的视频总结。")
+
+    if video_template and video_template != "auto":
+        parts.append(f"视频类型：{video_template}")
+    if summary_depth:
+        depth_map = {"简洁": "请生成简洁的要点总结，控制在 300 字以内。",
+                      "详细": "请生成详细的总结，包含关键观点、论据和细节。",
+                      "带画面引用": "请生成详细总结，并在关键观点处引用对应的画面描述。"}
+        parts.append(depth_map.get(summary_depth, depth_map["详细"]))
+    if output_format:
+        parts.append(f"输出格式要求：{output_format}")
+
+    if transcript_text.strip():
+        parts.append(f"\n## 音频转写文本\n\n{transcript_text[:8000]}")
+    if frame_descriptions.strip():
+        parts.append(f"\n## 画面描述\n\n{frame_descriptions[:8000]}")
+
+    parts.append("\n请生成综合总结：")
+    return "\n".join(parts)
+
+
 def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     payload = record.payload
     task_id = record.task_id
     settings = load_settings()
     api_key = str(payload.get("api_key") or "").strip() or settings.openai_api_key.strip()
     summary_path = str(payload.get("summary_path") or "").strip()
+    if summary_path == "video_model":
+        raise ValueError("video_model 路径尚未实现，请选择其他分析范围（visual_only / subtitle / av_combined）")
+    # subtitle 路径不需要 API key（仅规则清洗即可运行），其他路径需要
     if not api_key and summary_path != "subtitle":
         raise ValueError("analyze requires api_key in payload or settings")
     vision_model = str(payload.get("vision_model") or "").strip() or settings.vision_model
@@ -658,31 +753,81 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
     if not videos:
         raise ValueError(f"no videos found in {project_video_dir}")
 
-    # N7b path 1 is ASR/text-only. It must not require vision analysis or an API key
-    # when only rule-based transcript cleanup is available.
-    if summary_path == "subtitle":
+    # N7b path 1 (subtitle): ASR/text-only, no VLM frame analysis needed
+    # av_combined: ASR first, then VLM, then combined LLM summary
+    if summary_path in ("subtitle", "av_combined"):
         runner.set_progress(record.task_id, 0.1, f"Found {len(videos)} videos")
-        result: Dict[str, Any] = {
-            "json_outputs": [],
-            "json_output_basenames": [],
-            "json_output_dir": str(project_json_dir.resolve()),
-        }
-        result.update(
-            _run_subtitle_summary(
-                videos=videos,
-                payload=payload,
-                task_id=task_id,
-                text_model=text_model,
-                api_key=api_key,
-                project_video_dir=project_video_dir,
-                project_json_dir=project_json_dir,
-                runner=runner,
-            )
+        subtitle_result = _run_subtitle_summary(
+            videos=videos,
+            payload=payload,
+            task_id=task_id,
+            text_model=text_model,
+            api_key=api_key,
+            project_video_dir=project_video_dir,
+            project_json_dir=project_json_dir,
+            runner=runner,
         )
-        runner.set_progress(record.task_id, 1.0, "Analysis finished")
-        return result
+        if summary_path == "subtitle":
+            result: Dict[str, Any] = {
+                "json_outputs": [],
+                "json_output_basenames": [],
+                "json_output_dir": str(project_json_dir.resolve()),
+            }
+            result.update(subtitle_result)
+            runner.set_progress(record.task_id, 1.0, "Analysis finished")
+            return result
 
-    # N7: 从 payload 读 frame_prompt 子参数（截帧模式 / 间隔 / 最大帧数 / 每镜头帧数）
+        # av_combined: 先拿 transcript，再跑 VLM 帧分析，最后合并总结
+        runner.append_log(task_id, "🎬 av_combined: ASR 完成，开始 VLM 帧分析…")
+        runner.set_progress(record.task_id, 0.3, "VLM frame analysis starting")
+        frame_prompts = payload.get("frame_prompt")
+        capture_params = CaptureParams.from_dict(frame_prompts) if frame_prompts is not None else None
+        state = run_batch_analysis(
+            api_key=api_key,
+            video_paths=videos,
+            vision_model=vision_model,
+            text_model=text_model,
+            auto_sync_json=True,
+            target_json_dir=project_json_dir,
+            capture_params=capture_params,
+        )
+        while not state.finished:
+            if runner.is_cancel_requested(record.task_id):
+                break
+            time.sleep(0.3)
+        runner.set_progress(record.task_id, 0.7, "Generating combined summary")
+
+        # 收集帧描述
+        json_paths = sorted(project_json_dir.glob("*_视觉数据.json"))
+        frame_descriptions = _collect_frame_descriptions(json_paths)
+
+        # 合并总结：transcript + frame descriptions → LLM
+        transcript_text = subtitle_result.get("transcript_text", "")
+        combined_summary = _generate_combined_summary(
+            api_key=api_key,
+            text_model=text_model,
+            transcript_text=transcript_text,
+            frame_descriptions=frame_descriptions,
+            payload=payload,
+            runner=runner,
+            task_id=task_id,
+        )
+
+        av_result: Dict[str, Any] = {
+            "summary_path": "av_combined",
+            "json_outputs": [str(p.resolve()) for p in json_paths],
+            "json_output_basenames": [p.name for p in json_paths],
+            "json_output_dir": str(project_json_dir.resolve()),
+            "transcript": subtitle_result.get("transcript", []),
+            "transcript_text": transcript_text,
+            "summary": combined_summary or subtitle_result.get("summary", ""),
+            "duration_sec": subtitle_result.get("duration_sec", 0),
+        }
+        runner.set_progress(record.task_id, 1.0, "av_combined analysis finished")
+        return av_result
+
+    # N7 VLM 路径（含 visual_only 和默认 detailed）
+    runner.set_progress(record.task_id, 0.1, f"Found {len(videos)} videos")
     frame_prompts = payload.get("frame_prompt")
     capture_params = CaptureParams.from_dict(frame_prompts) if frame_prompts is not None else None
     if capture_params is not None:
@@ -694,7 +839,6 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
             f"frames_per_shot={capture_params.frames_per_shot}"
         )
 
-    runner.set_progress(record.task_id, 0.1, f"Found {len(videos)} videos")
     state = run_batch_analysis(
         api_key=api_key,
         video_paths=videos,
@@ -747,6 +891,8 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
     }
     if frames:
         result["frames"] = frames
+    if summary_path == "visual_only":
+        result["summary_path"] = "visual_only"
 
     runner.set_progress(record.task_id, 1.0, "Analysis finished")
     return result

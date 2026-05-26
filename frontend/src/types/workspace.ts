@@ -1,6 +1,9 @@
 // 与后端 backend/app/models/workspace.py 对齐的类型定义
 
 export type ItemType = 'video' | 'audio' | 'image' | 'text'
+
+/** 分析范围：仅对 sniff 同时返回 video+audio 时生效 */
+export type AnalysisScope = 'audio_only' | 'visual_only' | 'av_combined'
 export type ItemSource = 'url' | 'local'
 export type ItemStatus = 'pending' | 'processing' | 'done' | 'failed'
 export type WorkspaceStatus = 'active' | 'processing' | 'analyzed' | 'archived'
