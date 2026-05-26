@@ -333,6 +333,9 @@ def run_ytdlp_download(
     progress_callback: Callable[[float, str], None] | None = None,
     # 实时下载速度回调（字符串形式，例如 "1.23MiB/s"），供上层写入任务状态供前端展示
     speed_callback: Callable[[str], None] | None = None,
+    # R15 在 yt-dlp 第一次拿到 info_dict（progress_hook 收到 info_dict 时）即时回调元数据，
+    # 让上层在下载完成前就能把视频标题/封面写进 task.result，前端立刻显示真实标题
+    info_callback: Callable[[dict[str, Any]], None] | None = None,
     # 阶段 3(M3)新增:来自 AppSettings.download / 前端 configStore。
     # 默认值沿用旧硬编码,使现有调用点在不传这些参数时行为完全不变。
     filename_template: str = "%(title)s.%(ext)s",
@@ -392,6 +395,26 @@ def run_ytdlp_download(
     }
 
     def _hook(d: dict[str, Any]) -> None:
+        # R15 在第一次收到 info_dict 时把元数据即时上报给上层（不等下载完成）
+        if info_callback and not task_state.get("_meta_emitted"):
+            _info = d.get("info_dict") or {}
+            # playlist / multi-entry 取首条
+            if "entries" in _info and _info.get("entries"):
+                _first = _info["entries"][0] or {}
+                _info = {**_info, **_first}
+            _title = _info.get("title") or ""
+            if _title:
+                try:
+                    info_callback({
+                        "title": _title,
+                        "duration": _info.get("duration") or 0,
+                        "uploader": _info.get("uploader") or _info.get("channel") or "",
+                        "thumbnail_url": _info.get("thumbnail") or "",
+                    })
+                    task_state["_meta_emitted"] = True
+                except Exception:
+                    pass  # 回调失败不影响下载
+
         if d.get("status") == "downloading":
             pct = _clean_ansi(d.get("_percent_str", "0%")).strip()
             speed = _clean_ansi(d.get("_speed_str", "N/A")).strip()

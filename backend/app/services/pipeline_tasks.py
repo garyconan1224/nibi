@@ -368,6 +368,9 @@ def handle_download_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, An
         progress_callback=lambda p, msg: runner.set_progress(record.task_id, p, msg),
         # 将 yt-dlp 捕获的实时速度写入 task.result["download_speed"]，前端订阅展示
         speed_callback=lambda s: runner.set_download_speed(record.task_id, s),
+        # R15 yt-dlp 拿到 info_dict 时即时回调，把 title/cover 写进 task.result；
+        # ProcessingPage 在下载中就能显示真实标题（不再等下载完成才看到）
+        info_callback=lambda meta: _apply_ytdlp_metadata_to_task(record, runner, meta),
         **dl_kwargs,
     )
     if not out.get("ok"):
@@ -888,6 +891,8 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             progress_callback=lambda p, msg: runner.set_progress(task_id, 0.02 + p * 0.28, msg),
             # note 流水线下载阶段同样上报实时速度
             speed_callback=lambda s: runner.set_download_speed(task_id, s),
+            # R15 下载中就把视频标题/封面回写到 task.result，前端立即可见
+            info_callback=lambda meta: _apply_ytdlp_metadata_to_task(record, runner, meta),
             **dl_kwargs,
         )
         if not out.get("ok"):
@@ -2030,6 +2035,8 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 format_selector="bestaudio/best",
                 log=lambda m: runner.append_log(task_id, m),
                 progress_callback=lambda p, msg: runner.set_progress(task_id, 0.05 + p * 0.1, msg),
+                # R15 audio 任务也在下载中就回写标题，让 ProcessingPage 立刻显示真实名字
+                info_callback=lambda meta: _apply_ytdlp_metadata_to_task(record, runner, meta),
             )
             if not result.get("ok"):
                 raise RuntimeError(f"音频下载失败（yt-dlp）：{result.get('error', '未知错误')}")
