@@ -1,59 +1,13 @@
 import { useNavigate } from 'react-router-dom'
-import { Film, Music, ImageIcon, FileText, Trash2, CheckCircle, Circle } from 'lucide-react'
 import type { LibraryItem } from '@/services/library'
-
-const TYPE_ICON: Record<string, typeof Film> = {
-  video: Film,
-  audio: Music,
-  image: ImageIcon,
-  text: FileText,
-}
-
-const STATE_LABEL: Record<string, string> = {
-  done: 'done',
-  processing: 'running',
-  pending: 'queued',
-  failed: 'error',
-}
-
-const STATE_COLOR: Record<string, string> = {
-  done: 'var(--accent-green)',
-  running: 'var(--ink)',
-  error: 'var(--accent)',
-  queued: 'var(--ink-4)',
-}
-
-function primaryStatusToState(raw: string | null): string {
-  if (!raw) return 'queued'
-  const s = raw.toUpperCase()
-  if (s === 'SUCCESS') return 'done'
-  if (s === 'FAILED' || s === 'CANCELLED') return 'error'
-  if (s === 'QUEUED') return 'queued'
-  return 'running'
-}
-
-function extractDomain(src: string): string {
-  if (!src) return ''
-  try {
-    const u = new URL(src)
-    const host = u.hostname.replace(/^www\./, '')
-    const path = u.pathname.replace(/\/$/, '')
-    const seg = path.split('/').pop() || ''
-    if (seg && seg.length < 24) return `${host}${path}`
-    return `${host}${path.slice(0, 24)}…`
-  } catch {
-    // local file
-    const parts = src.replace(/\\/g, '/').split('/')
-    return parts[parts.length - 1] || src.slice(0, 40)
-  }
-}
-
-function formatDuration(sec: number | null): string | null {
-  if (sec == null || sec <= 0) return null
-  const m = Math.floor(sec / 60)
-  const s = Math.floor(sec % 60)
-  return `${m}:${String(s).padStart(2, '0')}`
-}
+import {
+  TYPE_ICON,
+  STATE_COLOR,
+  STATE_LABEL,
+  primaryStatusToState,
+  formatDuration,
+  extractDomain,
+} from './libraryHelpers'
 
 interface ItemCardProps {
   item: LibraryItem
@@ -68,10 +22,10 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
   const state = primaryStatusToState(item.primary_task_status)
   const stateColor = STATE_COLOR[state] || STATE_COLOR.queued
   const stateLabel = STATE_LABEL[state] || 'queued'
-  const Icon = TYPE_ICON[item.type] || FileText
+  const Icon = TYPE_ICON[item.type] || TYPE_ICON.text
   const dur = formatDuration(item.duration_seconds)
+  const hasDur = item.duration_seconds != null && item.duration_seconds > 0
   const srcLabel = extractDomain(item.source_value)
-  const showOverlay = selectMode
 
   const handleCardClick = () => {
     if (selectMode && onToggleSelect) {
@@ -84,32 +38,44 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
   return (
     <div
       className="ex-card"
-      style={{ position: 'relative' }}
+      style={{
+        borderColor: selected ? 'var(--ink)' : 'var(--line)',
+      }}
       onClick={handleCardClick}
     >
+      {/* ── Thumbnail 16/9 ── */}
       <div className="ex-thumb">
         {item.thumbnail ? (
           <img src={item.thumbnail} alt={item.name} />
         ) : (
-          <Icon size={28} strokeWidth={1.2} />
+          <Icon size={32} strokeWidth={1.2} style={{ color: 'rgba(255,255,255,0.45)' }} />
         )}
-        {/* 状态徽标 */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 8,
-            left: 8,
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 5,
-            padding: '3px 8px',
-            borderRadius: 99,
-            background: 'rgba(0,0,0,0.6)',
-            fontSize: 10,
-            color: '#fff',
-            fontFamily: 'var(--mono)',
-          }}
-        >
+
+        {/* running progress bar */}
+        {state === 'running' && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 3,
+              background: 'rgba(255,255,255,0.18)',
+            }}
+          >
+            <div
+              style={{
+                height: '100%',
+                width: '40%',
+                background: 'var(--accent-3)',
+                transition: 'width 400ms',
+              }}
+            />
+          </div>
+        )}
+
+        {/* state badge — top-left */}
+        <div className="ex-badge">
           <span
             style={{
               width: 5,
@@ -120,76 +86,61 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
           />
           {stateLabel}
         </div>
-        {/* 右上角操作区 */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 8,
-            right: 8,
-            display: 'flex',
-            gap: 6,
-            alignItems: 'center',
-          }}
-        >
-          {/* 勾选框 */}
-          {showOverlay && (
+
+        {/* top-right */}
+        <div className="ex-top-right">
+          {selectMode ? (
             <span
               onClick={(e) => {
                 e.stopPropagation()
                 onToggleSelect?.(item.item_id, item.workspace_id)
               }}
-              style={{ cursor: 'pointer', display: 'flex', color: '#fff' }}
-            >
-              {selected ? <CheckCircle size={18} /> : <Circle size={18} style={{ opacity: 0.5 }} />}
-            </span>
-          )}
-          {/* 删除按钮 */}
-          {onDelete && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onDelete(item)
-              }}
+              className="ex-select-dot"
               style={{
-                background: 'rgba(0,0,0,0.45)',
-                border: 'none',
-                borderRadius: 6,
-                padding: '4px 6px',
-                cursor: 'pointer',
-                color: 'rgba(255,255,255,0.7)',
-                display: 'flex',
-                opacity: 0,
-                transition: 'opacity 120ms',
-              }}
-              className="ex-delete-btn"
-              title="删除"
-            >
-              <Trash2 size={14} />
-            </button>
-          )}
-          {/* 时长角标 */}
-          {dur && !showOverlay && (
-            <span
-              style={{
-                padding: '2px 6px',
-                borderRadius: 6,
-                background: 'rgba(0,0,0,0.55)',
-                fontSize: 10,
-                color: 'rgba(255,255,255,0.8)',
-                fontFamily: 'var(--mono)',
+                background: selected ? '#fff' : 'rgba(0,0,0,0.5)',
+                color: selected ? 'var(--ink)' : '#fff',
+                borderColor: selected ? '#fff' : 'rgba(255,255,255,0.6)',
               }}
             >
-              {dur}
+              {selected && (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+              )}
             </span>
+          ) : (
+            <>
+              <button
+                className="ex-delete-btn"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete?.(item)
+                }}
+                title="删除"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
+                </svg>
+              </button>
+              {hasDur && (
+                <span className="ex-dur-badge">{dur}</span>
+              )}
+            </>
           )}
         </div>
       </div>
+
+      {/* ── Meta ── */}
       <div className="ex-meta">
-        <div className="ex-title" title={item.name}>
-          {item.name || '未命名'}
+        <div className="ex-title-row">
+          <Icon size={14} strokeWidth={1.5} style={{ color: 'var(--ink-3)', flexShrink: 0, marginTop: 2 }} />
+          <span className="ex-title" title={item.name}>
+            {item.name || '未命名'}
+          </span>
         </div>
-        <div className="ex-sub">
-          {srcLabel} · {item.type}
+        <div className="ex-sub-row">
+          <span className="ex-src-label">{srcLabel}</span>
+          <span className="ex-ws-name">{item.workspace_name}</span>
         </div>
       </div>
     </div>
