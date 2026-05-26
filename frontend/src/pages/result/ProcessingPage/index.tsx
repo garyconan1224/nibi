@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { ArrowRight, RotateCcw, X } from 'lucide-react'
+import { ArrowRight, Music, RotateCcw, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { useTaskStore } from '@/store/taskStore'
@@ -103,6 +103,9 @@ export default function ProcessingPage() {
 
   const result = task?.result ?? {} as Record<string, unknown>
   const payload = task?.payload ?? {} as Record<string, unknown>
+  const taskType: string = task?.task_type ?? ''
+  const isAudioTask = taskType === 'audio'
+  const isNoteTask = taskType === 'note'
   // R13.2 标题/封面/时长来源优先级：result（直接来源）→ payload（从 download 继承）→ fallback
   const url = (task?.payload?.url as string) ?? (payload.source_url as string) ?? state?.url ?? ''
   const platform = platformPrefixFromUrl(url)
@@ -134,7 +137,7 @@ export default function ProcessingPage() {
           {/* Hero */}
           <div className="proc-hero">
             <div className="thumb">
-              {coverUrl && (
+              {coverUrl ? (
                 <img
                   src={coverUrl}
                   alt={title}
@@ -144,13 +147,46 @@ export default function ProcessingPage() {
                     (e.target as HTMLImageElement).style.display = 'none'
                   }}
                 />
+              ) : (
+                isAudioTask && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Music size={32} style={{ color: 'var(--ink-4)' }} />
+                  </div>
+                )
               )}
               {!isFailed && !isCancelled && (
                 <div className="live">● LIVE</div>
               )}
+              {isAudioTask && coverUrl && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: 8,
+                    right: 8,
+                    width: 28,
+                    height: 28,
+                    borderRadius: 8,
+                    background: 'rgba(0,0,0,0.7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backdropFilter: 'blur(4px)',
+                  }}
+                >
+                  <Music size={14} color="#fff" />
+                </div>
+              )}
             </div>
             <div className="info">
-              <div className="eyebrow">PROCESSING · {taskId.slice(0, 8)}</div>
+              <div className="eyebrow">{isAudioTask ? 'AUDIO' : 'PROCESSING'} · {taskId.slice(0, 8)}</div>
               <div className="title">
                 {platform && <span style={{ color: 'var(--ink-3)', fontWeight: 400, marginRight: 10 }}>{platform} ·</span>}
                 {title}

@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { Music } from 'lucide-react'
 import { useTaskStore } from '@/store/taskStore'
 import { isTaskTerminal } from '@/types/task'
 
@@ -53,6 +54,7 @@ export default function TasksCard({ currentTaskId }: TasksCardProps) {
           t.task_id.slice(0, 8)
         const coverUrl: string = (result.video_thumbnail_url as string) || ''
         const isActive = t.task_id === currentTaskId
+        const isAudio = t.task_type === 'audio'
 
         return (
           <div
@@ -73,24 +75,49 @@ export default function TasksCard({ currentTaskId }: TasksCardProps) {
               gap: 10,
             }}
           >
-            <div className="tl-thumb">
+            <div className="tl-thumb" style={{ position: 'relative' }}>
               {coverUrl ? (
-                <img
-                  src={coverUrl}
-                  alt=""
-                  referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none'
-                  }}
-                />
+                <>
+                  <img
+                    src={coverUrl}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none'
+                    }}
+                  />
+                  {isAudio && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: 3,
+                        right: 3,
+                        width: 18,
+                        height: 18,
+                        borderRadius: 6,
+                        background: 'rgba(0,0,0,0.65)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Music size={10} color="#fff" />
+                    </div>
+                  )}
+                </>
               ) : (
                 <div
                   style={{
                     background: 'var(--bg-sunken)',
                     width: '100%',
                     height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
-                />
+                >
+                  {isAudio && <Music size={18} style={{ color: 'var(--ink-4)' }} />}
+                </div>
               )}
             </div>
             <div className="tl-body" style={{ flex: 1, minWidth: 0 }}>
