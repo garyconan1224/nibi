@@ -1,37 +1,19 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Film, Music, ImageIcon, FileText, Trash2, CheckCircle, Circle, Plus } from 'lucide-react'
+import { Trash2, Plus } from 'lucide-react'
 import { fetchLibrary, deleteItem, batchDeleteItems, type LibraryItem, type LibraryResponse } from '@/services/library'
 import { useLibraryStore, type SortBy } from '@/store/libraryStore'
 import { FilterChips } from './FilterChips'
 import { SortMenu } from './SortMenu'
 import { ViewToggle } from './ViewToggle'
 import { ItemCard } from './ItemCard'
+import { ListView } from './ListView'
 import { WorkspaceCard } from './WorkspaceCard'
+import {
+  STATE_ORDER,
+  primaryStatusToState,
+} from './libraryHelpers'
 import './library.css'
-
-const TYPE_ICON: Record<string, typeof Film> = {
-  video: Film,
-  audio: Music,
-  image: ImageIcon,
-  text: FileText,
-}
-
-const STATE_ORDER: Record<string, number> = {
-  error: 0,
-  running: 1,
-  queued: 2,
-  done: 3,
-}
-
-function primaryStatusToState(raw: string | null): string {
-  if (!raw) return 'queued'
-  const s = raw.toUpperCase()
-  if (s === 'SUCCESS') return 'done'
-  if (s === 'FAILED' || s === 'CANCELLED') return 'error'
-  if (s === 'QUEUED') return 'queued'
-  return 'running'
-}
 
 function sortItems(items: LibraryItem[], sortBy: SortBy): LibraryItem[] {
   const arr = [...items]
@@ -78,36 +60,6 @@ function sortItems(items: LibraryItem[], sortBy: SortBy): LibraryItem[] {
     default:
       return arr
   }
-}
-
-function formatDuration(sec: number | null): string {
-  if (sec == null || sec <= 0) return '--'
-  const m = Math.floor(sec / 60)
-  const s = Math.floor(sec % 60)
-  return `${m}:${String(s).padStart(2, '0')}`
-}
-
-function formatDate(iso: string): string {
-  try {
-    const d = new Date(iso)
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-  } catch {
-    return iso.slice(0, 16)
-  }
-}
-
-const STATE_LABEL: Record<string, string> = {
-  done: 'done',
-  running: 'running',
-  queued: 'queued',
-  error: 'error',
-}
-
-const STATE_COLOR: Record<string, string> = {
-  done: 'var(--accent-green)',
-  running: 'var(--ink)',
-  error: 'var(--accent)',
-  queued: 'var(--ink-4)',
 }
 
 export default function LibraryPage() {
@@ -240,154 +192,9 @@ export default function LibraryPage() {
       ? `${filteredWorkspaces?.length ?? 0} WORKSPACES`
       : `${filteredItems.length} ITEMS`
 
-  const renderGridView = (items: LibraryItem[]) => (
-    <div className="ex-grid">
-      {items.map((item) => (
-        <ItemCard
-          key={item.item_id}
-          item={item}
-          selected={selectedSet.has(selectionKey(item.workspace_id, item.item_id))}
-          selectMode={selectMode}
-          onToggleSelect={toggleSelect}
-          onDelete={handleDeleteOne}
-        />
-      ))}
-    </div>
-  )
-
-  const renderListView = (items: LibraryItem[]) => (
-    <div
-      style={{
-        borderRadius: 'var(--radius)',
-        border: '1px solid var(--line)',
-        overflow: 'hidden',
-      }}
-    >
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-        <thead>
-          <tr
-            style={{
-              background: 'var(--bg-sunken)',
-              fontFamily: 'var(--mono)',
-              fontSize: 10.5,
-              letterSpacing: '0.06em',
-              color: 'var(--ink-3)',
-              textTransform: 'uppercase',
-            }}
-          >
-            {selectMode && (
-              <th style={{ padding: '8px 14px', textAlign: 'left', fontWeight: 500, width: 36 }}></th>
-            )}
-            <th style={{ padding: '8px 14px', textAlign: 'left', fontWeight: 500 }}>名称</th>
-            <th style={{ padding: '8px 14px', textAlign: 'left', fontWeight: 500 }}>类型</th>
-            <th style={{ padding: '8px 14px', textAlign: 'left', fontWeight: 500 }}>状态</th>
-            <th style={{ padding: '8px 14px', textAlign: 'left', fontWeight: 500 }}>时长</th>
-            <th style={{ padding: '8px 14px', textAlign: 'left', fontWeight: 500 }}>创建时间</th>
-            <th style={{ padding: '8px 14px', textAlign: 'left', fontWeight: 500, width: 36 }}></th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => {
-            const Icon = TYPE_ICON[item.type] || FileText
-            const state = primaryStatusToState(item.primary_task_status)
-            const stateLabel = STATE_LABEL[state] || 'queued'
-            const stateColor = STATE_COLOR[state] || STATE_COLOR.queued
-            return (
-              <tr
-                key={item.item_id}
-                onClick={() => {
-                  if (selectMode) {
-                    toggleSelect(item.item_id, item.workspace_id)
-                  } else {
-                    navigate(`/workspaces/${item.workspace_id}/items/${item.item_id}/overview`)
-                  }
-                }}
-                style={{
-                  cursor: 'pointer',
-                  borderTop: '1px solid var(--line)',
-                  transition: 'background 120ms',
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = 'var(--bg-sunken)'
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = ''
-                }}
-              >
-                {selectMode && (
-                  <td style={{ padding: '10px 14px' }} onClick={(e) => e.stopPropagation()}>
-                    <span
-                      onClick={() => toggleSelect(item.item_id, item.workspace_id)}
-                      style={{ cursor: 'pointer', display: 'flex', color: 'var(--ink-3)' }}
-                    >
-                      {selectedSet.has(selectionKey(item.workspace_id, item.item_id))
-                        ? <CheckCircle size={16} style={{ color: 'var(--ink)' }} />
-                        : <Circle size={16} />}
-                    </span>
-                  </td>
-                )}
-                <td style={{ padding: '10px 14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Icon size={16} strokeWidth={1.3} style={{ color: 'var(--ink-3)', flexShrink: 0 }} />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {item.name || '未命名'}
-                    </span>
-                  </div>
-                </td>
-                <td style={{ padding: '10px 14px', color: 'var(--ink-3)', fontFamily: 'var(--mono)', fontSize: 11 }}>
-                  {item.type}
-                </td>
-                <td style={{ padding: '10px 14px' }}>
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 5,
-                      fontSize: 11,
-                      fontFamily: 'var(--mono)',
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 5,
-                        height: 5,
-                        borderRadius: 99,
-                        background: stateColor,
-                        flexShrink: 0,
-                      }}
-                    />
-                    {stateLabel}
-                  </span>
-                </td>
-                <td style={{ padding: '10px 14px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-3)' }}>
-                  {formatDuration(item.duration_seconds)}
-                </td>
-                <td style={{ padding: '10px 14px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--ink-3)' }}>
-                  {formatDate(item.created_at)}
-                </td>
-                <td style={{ padding: '10px 14px' }} onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={() => handleDeleteOne(item)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: 'var(--ink-4)',
-                      display: 'flex',
-                      padding: 2,
-                    }}
-                    title="删除"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
-  )
+  const handleOpenItem = useCallback((item: LibraryItem) => {
+    navigate(`/workspaces/${item.workspace_id}/items/${item.item_id}/overview`)
+  }, [navigate])
 
   return (
     <div style={{ padding: '28px 32px', overflow: 'auto', height: '100%' }}>
@@ -513,12 +320,21 @@ export default function LibraryPage() {
                 </div>
               )}
               <div
-                className={viewMode === 'grid' ? 'ex-grid' : undefined}
+                className="ex-grid"
                 style={{ marginBottom: typeFilters.length > 0 ? 28 : 0 }}
               >
-                {filteredWorkspaces.map((ws) => (
-                  <WorkspaceCard key={ws.workspace_id} workspace={ws} />
-                ))}
+                {filteredWorkspaces.map((ws) => {
+                  const wsItems = data.items.filter(
+                    (it) => it.workspace_id === ws.workspace_id,
+                  )
+                  return (
+                    <WorkspaceCard
+                      key={ws.workspace_id}
+                      workspace={ws}
+                      items={wsItems}
+                    />
+                  )
+                })}
               </div>
             </>
           )}
@@ -538,9 +354,28 @@ export default function LibraryPage() {
                     : '没有匹配的素材'}
                 </div>
               ) : viewMode === 'list' ? (
-                renderListView(filteredItems)
+                <ListView
+                  items={filteredItems}
+                  selectMode={selectMode}
+                  selectedSet={selectedSet}
+                  selectionKey={selectionKey}
+                  onToggle={toggleSelect}
+                  onOpen={handleOpenItem}
+                  onDelete={handleDeleteOne}
+                />
               ) : (
-                renderGridView(filteredItems)
+                <div className="ex-grid">
+                  {filteredItems.map((item) => (
+                    <ItemCard
+                      key={item.item_id}
+                      item={item}
+                      selected={selectedSet.has(selectionKey(item.workspace_id, item.item_id))}
+                      selectMode={selectMode}
+                      onToggleSelect={toggleSelect}
+                      onDelete={handleDeleteOne}
+                    />
+                  ))}
+                </div>
               )}
             </>
           )}

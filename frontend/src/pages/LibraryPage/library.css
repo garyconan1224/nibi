@@ -14,7 +14,7 @@
   border: 1px solid var(--line);
   overflow: hidden;
   cursor: pointer;
-  transition: transform 160ms ease, box-shadow 160ms ease;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 120ms ease;
 }
 
 .ex-card:hover {
@@ -22,6 +22,7 @@
   box-shadow: var(--shadow-md);
 }
 
+/* ── Thumbnail ── */
 .ex-thumb {
   aspect-ratio: 16/9;
   background: #111;
@@ -39,32 +40,228 @@
   object-fit: cover;
 }
 
-.ex-meta {
-  padding: 12px 14px;
+/* ── Badge (top-left status) ── */
+.ex-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
+  font-size: 10px;
+  color: #fff;
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
 }
 
-.ex-meta .ex-title {
-  font-size: 13px;
+/* ── Top-right controls ── */
+.ex-top-right {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* ── Selection dot ── */
+.ex-select-dot {
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 99px;
+  border: 1.5px solid;
+  transition: all 120ms;
+}
+
+/* ── Delete button ── */
+.ex-delete-btn {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  border: none;
+  border-radius: 7px;
+  padding: 4px 5px;
+  cursor: pointer;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transition: opacity 140ms, background 120ms;
+}
+
+.ex-card:hover .ex-delete-btn {
+  opacity: 1;
+}
+
+.ex-delete-btn:hover {
+  background: var(--accent) !important;
+}
+
+/* ── Duration badge ── */
+.ex-dur-badge {
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  font-size: 10px;
+  color: #fff;
+  font-family: var(--mono);
+}
+
+/* ── Meta ── */
+.ex-meta {
+  padding: 12px 14px 14px;
+}
+
+.ex-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.ex-title-row .ex-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
   font-weight: 500;
-  line-height: 1.3;
-  margin-bottom: 4px;
+  line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.ex-meta .ex-sub {
+.ex-sub-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
   font-family: var(--mono);
   font-size: 10.5px;
   color: var(--ink-3);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.04em;
 }
 
-/* 卡片悬停时显示删除按钮 */
-.ex-card:hover .ex-delete-btn {
-  opacity: 1 !important;
+.ex-src-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
 }
-.ex-delete-btn:hover {
-  color: var(--accent) !important;
-  background: rgba(0,0,0,0.65) !important;
+
+.ex-ws-name {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+/* ── Workspace Card (L5.3 rich design) ── */
+.ws-card {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  cursor: pointer;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  outline: none;
+}
+
+.ws-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--line-strong);
+}
+
+.ws-card-body {
+  padding: 18px 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.ws-title {
+  font-size: 15.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--ink);
+}
+
+.ws-thumb-cell {
+  flex: 1;
+  aspect-ratio: 16/10;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-sunken);
+}
+
+.ws-thumb-more {
+  flex: 1;
+  aspect-ratio: 16/10;
+  border-radius: 8px;
+  background: var(--bg-sunken);
+  border: 1px dashed var(--line-strong);
+  display: grid;
+  place-items: center;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.ws-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+/* ── Empty states ── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  gap: 12px;
+  color: var(--ink-3);
+}
+
+.empty-state-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: var(--bg-sunken);
+  display: grid;
+  place-items: center;
+  color: var(--ink-4);
+}
+
+.empty-state-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.empty-state-desc {
+  font-size: 13px;
+  color: var(--ink-3);
+  max-width: 320px;
+  line-height: 1.55;
 }
