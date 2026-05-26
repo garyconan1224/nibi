@@ -2030,6 +2030,10 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             )
             if not result.get("ok"):
                 raise RuntimeError(f"音频下载失败（yt-dlp）：{result.get('error', '未知错误')}")
+
+            # R13.6.2 把 yt-dlp 元数据回写到 task.result，让 ProcessingPage 在 audio 阶段显示真实标题
+            _apply_ytdlp_metadata_to_task(record, runner, result)
+
             audio_local_path = Path(result["save_path"])
             audio_filename = audio_local_path.name
             audio_bytes = audio_local_path.read_bytes()
