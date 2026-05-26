@@ -198,7 +198,7 @@ export default function ProcessingPage() {
                     <strong>{durationLabel}</strong> 时长
                   </span>
                 )}
-                {framesCount > 0 && (
+                {framesCount > 0 && !isAudioTask && (
                   <span>
                     <strong>{framesCount}</strong> 帧
                   </span>
@@ -304,6 +304,7 @@ export default function ProcessingPage() {
             <StepProgress
               currentStatus={status}
               progress={progress}
+              taskType={taskType}
               taskLogs={logs}
             />
           )}

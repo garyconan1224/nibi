@@ -4,7 +4,26 @@ import {
 import type { TaskStatus } from '@/types/task'
 import { PROCESSING_STAGES } from '@/types/task'
 
-const STAGE_ICONS = [Download, Search, Subtitles, Image, Eye, BookMarked, Database]
+const STAGE_ICON_MAP: Record<string, typeof Download> = {
+  DOWNLOAD: Download,
+  PROBE: Search,
+  ASR: Subtitles,
+  FRAMES: Image,
+  VLM: Eye,
+  SUM: BookMarked,
+  STORE: Database,
+}
+
+// R16.2 各任务类型应跳过的阶段（不显示在步骤流里）
+const SKIP_STAGES_BY_TYPE: Record<string, string[]> = {
+  audio: ['FRAMES', 'VLM'],
+  note: ['PROBE', 'FRAMES', 'VLM', 'ASR'],
+}
+
+function visibleStages(taskType: string): typeof PROCESSING_STAGES {
+  const skip = new Set(SKIP_STAGES_BY_TYPE[taskType] ?? [])
+  return PROCESSING_STAGES.filter((s) => !skip.has(s.id))
+}
 
 // R12.3 各阶段简短描述（对齐 design/components/processing.jsx LOGS_BY 旁的 desc）
 const STAGE_DESC: Record<string, string> = {
@@ -20,6 +39,7 @@ const STAGE_DESC: Record<string, string> = {
 interface StepProgressProps {
   currentStatus: string
   progress: number
+  taskType: string
   taskLogs: Array<{ ts: string; level: string; message: string }>
 }
 
@@ -33,17 +53,17 @@ interface StepWithState {
   pct: number
 }
 
-function deriveSteps(currentStatus: string, progress: number): StepWithState[] {
-  const statusOrder = PROCESSING_STAGES.map((s) => s.id)
-  const currentIdx = statusOrder.indexOf(currentStatus as TaskStatus)
+function deriveSteps(currentStatus: string, progress: number, taskType: string): StepWithState[] {
+  const stages = visibleStages(taskType)
+  const stageIds = stages.map((s) => s.id)
+  const currentIdx = stageIds.indexOf(currentStatus as TaskStatus)
 
-  return PROCESSING_STAGES.map((stage, i) => {
-    const stageIdx = statusOrder.indexOf(stage.id)
+  return stages.map((stage) => {
+    const stageIdx = stageIds.indexOf(stage.id)
     let state: StepState
     let pct: number
 
     if (currentIdx < 0) {
-      // 终结态或未知：根据 progress 判断
       if (progress >= 1) {
         state = 'done'
         pct = 1
@@ -62,7 +82,8 @@ function deriveSteps(currentStatus: string, progress: number): StepWithState[] {
       pct = 0
     }
 
-    return { ...stage, icon: STAGE_ICONS[i], state, pct }
+    const icon = STAGE_ICON_MAP[stage.id] ?? Download
+    return { ...stage, icon, state, pct }
   })
 }
 
@@ -96,8 +117,8 @@ function getLogsForStage(
     })
 }
 
-export function StepProgress({ currentStatus, progress, taskLogs }: StepProgressProps) {
-  const steps = deriveSteps(currentStatus, progress)
+export function StepProgress({ currentStatus, progress, taskType, taskLogs }: StepProgressProps) {
+  const steps = deriveSteps(currentStatus, progress, taskType)
 
   return (
     <div className="step-stream">
