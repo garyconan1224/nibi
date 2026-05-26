@@ -163,15 +163,11 @@ def _on_download_success(completed_task: TaskRecord, runner) -> None:  # type: i
         except Exception:
             pass  # 写失败不阻断（X.1 桥仍能通过 download task 显示最终状态）
 
-        # R13.4 把自动生成的 workspace 名回写为「平台 · 视频标题」
-        _yt_title = (completed_task.result or {}).get("video_title") or _title
-        if _yt_title and _is_auto_generated_workspace_name(ws.name):
-            try:
-                _platform = _platform_prefix_from_url(completed_task.payload.get("url") or "")
-                _new_ws_name = f"{_platform} · {_yt_title}" if _platform else _yt_title
-                _store.update(ws.workspace_id, name=_new_ws_name)
-            except Exception:
-                pass
+    # R13.6.1 用共享工具触发 workspace 改名（替代 R13.4 内联逻辑）
+    _meta = dict(completed_task.result or {})
+    if not _meta.get("video_title") and _title:
+        _meta["video_title"] = _title
+    _maybe_rename_workspace_from_video_title(completed_task, _meta)
 
 
 _pipeline_runner.register_success_callback("download", _on_download_success)
@@ -643,6 +639,33 @@ def _generate_workspace_name(hint_url: str | None, hint_text: str | None) -> str
         hostname = hostname.capitalize()
     ts = datetime.now(timezone.utc).strftime("%m%d-%H%M")
     return f"{hostname} · {ts}" if hostname else f"工作空间 · {ts}"
+
+
+def _maybe_rename_workspace_from_video_title(
+    record,
+    meta: Dict[str, Any],
+) -> None:
+    """R13.6.1 把 yt-dlp 拿到的视频标题回写到关联的自动建空间。
+
+    任何 handler（download/audio/note）拿到 metadata 后都能调这个工具。
+    """
+    video_title = (meta or {}).get("video_title") or ""
+    if not video_title:
+        return
+    url = record.payload.get("url") or record.payload.get("source") or ""
+    platform = _platform_prefix_from_url(url) if url else ""
+    new_ws_name = f"{platform} · {video_title}" if platform else video_title
+
+    for ws in _store.list_all():
+        if not _is_auto_generated_workspace_name(ws.name):
+            continue
+        for item in ws.items:
+            if record.task_id in item.related_task_ids:
+                try:
+                    _store.update(ws.workspace_id, name=new_ws_name)
+                except Exception:
+                    pass
+                break
 
 
 def _is_auto_generated_workspace_name(name: str) -> bool:

@@ -4,7 +4,68 @@
 >
 > **维护规则**：每完成一个子任务，在本文件**追加**一段（不删旧记录），格式见下方"记录模板"。
 >
-> Last updated: 2026-05-25 (Phase R12 ProcessingPage 1:1 replica)
+> Last updated: 2026-05-26 (Phase R13.6 metadata coverage hotfix)
+
+---
+
+## Phase R13.6 — yt-dlp metadata 覆盖到 audio/note handler
+
+**完成日期**：2026-05-26
+**模型 / 工具**：DS v4-pro via ccswitch
+**分支**：feat/phase-r13.6-metadata-coverage-hotfix
+**提交**：
+- R13.6.1：`9099a31` feat(phase-r13.6): 抽出 _apply_ytdlp_metadata_to_task + 共享 workspace 改名工具
+- R13.6.2：`111f9f8` feat(phase-r13.6): handle_audio_task 回写 yt-dlp metadata
+- R13.6.3：`2870cce` feat(phase-r13.6): handle_note_task download 步骤回写 yt-dlp metadata
+
+### 问题
+R13 只覆盖了 download → analyze 路径（_on_download_success 回调），但 audio/note handler 各自独立调用 yt-dlp，metadata 没有回写 task.result。用户实测：同 URL 多类型全勾后，audio 任务在 vlm 阶段显示 `bilibili · www.bilibili.com`（hostname fallback）。
+
+### 影响范围
+- **后端 pipeline_tasks.py**：新增 `_apply_ytdlp_metadata_to_task(record, runner, dl_result)` 共享工具；handle_audio_task、handle_note_task 调用 yt-dlp 后各加一行调用
+- **后端 workspaces.py**：新增 `_maybe_rename_workspace_from_video_title(record, meta)` 共享工具；`_on_download_success` 内联逻辑改为调共享函数
+- **测试**：新增 3 个测试文件（test_apply_ytdlp_metadata.py / test_audio_task_metadata.py / test_note_task_metadata.py）共 5 个用例
+
+### 关键改动
+- `_apply_ytdlp_metadata_to_task`：提取 dl_result 的 title/duration/uploader/thumbnail_url → 映射为 video_* key → 写入 runner.store + 触发 workspace 改名
+- `_maybe_rename_workspace_from_video_title`：独立扫描 workspace items，找到引用 task_id 的自动生成 workspace 后改名
+- audio handler L2032：yt-dlp bestaudio 返回后立即回写 metadata
+- note handler L895：download 步骤 yt-dlp 返回后立即回写 metadata
+- text/image handler 暂不处理（text 走 fetch_text 无 yt-dlp；image 无标题概念）
+
+### 验证
+- `.venv/bin/python -m pytest tests/backend -q`：327 passed / 2 skipped
+- `cd frontend && pnpm build`：passed
+- 原有 R13.4 测试、R13.1 测试全部通过（向后兼容）
+
+---
+
+## Phase R13 — ProcessingPage 元数据贯通 + 体验修复
+
+**完成日期**：2026-05-25
+**模型 / 工具**：DS v4-pro via ccswitch
+**分支**：feat/phase-r13-processing-metadata-followup
+**Commit**：5388b3d / dbe603a / d22212f / 95d4f7e / 62b9924 → merge e117f6e
+
+### 影响范围
+- **后端 pipeline_tasks.py**：_run_download_step 在 yt-dlp 后抽取 video_title/duration/uploader/thumbnail_url 写入 result
+- **后端 workspaces.py**：_on_download_success R13.1 把 metadata copy 到 analyze.payload；R13.4 改 workspace name
+- **前端 ProcessingPage**：R13.2 Hero 兜底读 payload.video_title；R13.3 标题加平台前缀；R13.5 取消自动跳转
+
+### 关键改动
+- R13.1：download SUCCESS → enqueue analyze 时把 video_* field copy 到 analyze payload
+- R13.2：ProcessingPage title 优先 result.video_title，回退 payload.video_title（analyze 阶段用）
+- R13.3：前端 `platformPrefixFromUrl()` + 后端 `_platform_prefix_from_url()` 双端覆盖 6 个平台
+- R13.4：download 完成后扫描 workspace items，把自动生成名改写为「平台 · 视频标题」
+- R13.5：取消 SSE.task_done → 自动跳转，改为"已完成，查看结果"按钮手动触发
+
+### 为什么这么做
+- analyze task 是 download 的派生任务，yt-dlp metadata 只在 download result 里，analyze handler 拿不到 → R13.1 通过 payload 桥接
+- ProcessingPage 通过 SSE 展示进度，analyze 阶段需要 payload 里的 metadata 才能显示标题 → R13.2
+- 用户期望看到「bilibili · 视频名」而非「www.bilibili.com」→ R13.3/R13.4
+
+### 留给后续的影响
+- 仅覆盖 video(URL)→download→analyze 路径，audio/note handler 未处理 → R13.6 补齐
 
 ---
 

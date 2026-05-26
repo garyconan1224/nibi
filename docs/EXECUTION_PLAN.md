@@ -145,6 +145,17 @@
 - [x] R10 平台 URL 音频抽取 hotfix + FloatingTaskQueue v2：yt-dlp bestaudio / 取消 / 重试 / FAILED 本地隐藏 / 批量操作
 - [x] R11 设计稿同步 canonicalize：设计 tokens / processing / library / taskboard / detail 组件源文件同步落盘
 - [x] R12 ProcessingPage 1:1 复刻：真实标题/封面/stats、step-stream 日志、系统资源卡、任务侧栏卡（`feat/phase-r12-processing-page-replica` 已完成，待用户授权本地 merge）
+- [x] **R13** ProcessingPage 元数据贯通 + 体验修复（`feat/phase-r13-processing-metadata-followup`）
+  - [x] R13.1 download SUCCESS 时把 yt-dlp metadata 复制到 analyze.payload
+  - [x] R13.2 ProcessingPage 兜底读 payload.video_title 以支持 analyze 阶段
+  - [x] R13.3 标题加平台前缀（bilibili · 视频名 格式）
+  - [x] R13.4 download 完成后回写自动建空间名为「平台 · 视频标题」
+  - [x] R13.5 取消 ProcessingPage 自动跳转，改为按钮触发
+- [x] **R13.6** yt-dlp metadata 覆盖到 audio/note handler（`feat/phase-r13.6-metadata-coverage-hotfix`）
+  - [x] R13.6.1 抽出共享工具 `_apply_ytdlp_metadata_to_task` + workspace 改名工具
+  - [x] R13.6.2 handle_audio_task 调用共享工具回写 metadata
+  - [x] R13.6.3 handle_note_task download 步骤调用共享工具回写 metadata
+  - [x] R13.6.4 全套验证 + 文档同步（单测 327 pass / build OK）
 
 ---
 
