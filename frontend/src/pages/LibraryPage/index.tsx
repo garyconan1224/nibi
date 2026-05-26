@@ -248,23 +248,21 @@ export default function LibraryPage() {
                   <button className="btn" style={{ fontSize: 12, height: 32 }} onClick={clearSelection}>
                     取消
                   </button>
-                  {selectedSet.size > 0 && (
-                    <button
-                      className="btn"
-                      style={{
-                        fontSize: 12,
-                        height: 32,
-                        color: 'var(--accent)',
-                        borderColor: 'var(--accent)',
-                        opacity: deleting ? 0.5 : 1,
-                      }}
-                      onClick={handleBatchDelete}
-                      disabled={deleting}
-                    >
-                      <Trash2 size={13} />
-                      删除 ({selectedSet.size})
-                    </button>
-                  )}
+                  <button
+                    className="btn"
+                    style={{
+                      fontSize: 12,
+                      height: 32,
+                      color: selectedSet.size > 0 ? 'var(--accent)' : 'var(--ink-4)',
+                      borderColor: selectedSet.size > 0 ? 'var(--accent)' : 'var(--line)',
+                      opacity: deleting || selectedSet.size === 0 ? 0.5 : 1,
+                    }}
+                    onClick={handleBatchDelete}
+                    disabled={deleting || selectedSet.size === 0}
+                  >
+                    <Trash2 size={13} />
+                    删除 {selectedSet.size > 0 ? `(${selectedSet.size})` : ''}
+                  </button>
                 </>
               ) : (
                 <button className="btn" style={{ fontSize: 12, height: 32 }} onClick={enterSelectMode}>
