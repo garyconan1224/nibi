@@ -45,13 +45,13 @@ export default function TasksCard({ currentTaskId }: TasksCardProps) {
       )}
 
       {activeTasks.map((t) => {
-        const result = t.result ?? {}
+        const result = t.result ?? {} as Record<string, unknown>
         const title: string =
-          result.video_title ||
-          t.payload?.title ||
-          t.payload?.url ||
+          (result.video_title as string) ||
+          (t.payload?.title as string) ||
+          (t.payload?.url as string) ||
           t.task_id.slice(0, 8)
-        const coverUrl: string = result.video_thumbnail_url || ''
+        const coverUrl: string = (result.video_thumbnail_url as string) || ''
         const isActive = t.task_id === currentTaskId
 
         return (

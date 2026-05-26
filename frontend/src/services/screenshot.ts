@@ -19,7 +19,7 @@ export async function fetchScreenshotConfig(): Promise<ScreenshotConfigResponse>
   try {
     const res = await http.get<ScreenshotConfigResponse>('/screenshot_config')
     return res.data
-  } catch (err) {
+  } catch (_err) {
     // 如果端点不存在，返回默认值
     return {
       default_interval: 6,

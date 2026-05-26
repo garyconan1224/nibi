@@ -101,18 +101,18 @@ export default function ProcessingPage() {
 
   const categorized = categorizeError(task?.error)
 
-  const result = task?.result ?? {}
+  const result = task?.result ?? {} as Record<string, unknown>
   const payload = task?.payload ?? {} as Record<string, unknown>
   // R13.2 标题/封面/时长来源优先级：result（直接来源）→ payload（从 download 继承）→ fallback
-  const url = task?.payload?.url ?? (payload.source_url as string) ?? state?.url ?? ''
+  const url = (task?.payload?.url as string) ?? (payload.source_url as string) ?? state?.url ?? ''
   const platform = platformPrefixFromUrl(url)
   const safeHostname = (() => {
     if (!url) return '任务'
     try { return new URL(url).hostname } catch { return '任务' }
   })()
-  const title: string = result.video_title || (payload.video_title as string) || (task?.payload?.title as string) || safeHostname
-  const coverUrl: string = result.video_thumbnail_url || (payload.video_thumbnail_url as string) || ''
-  const durationSec: number = Number(result.video_duration || payload.video_duration) || 0
+  const title: string = (result.video_title as string) || (payload.video_title as string) || (task?.payload?.title as string) || safeHostname
+  const coverUrl: string = (result.video_thumbnail_url as string) || (payload.video_thumbnail_url as string) || ''
+  const durationSec: number = Number((result.video_duration as number) || (payload.video_duration as number)) || 0
   const fmtDuration = (sec: number) => {
     if (!sec) return ''
     const m = Math.floor(sec / 60)
@@ -120,8 +120,8 @@ export default function ProcessingPage() {
     return `${m}:${s.toString().padStart(2, '0')}`
   }
   const durationLabel = fmtDuration(durationSec)
-  const framesCount: number = Number(result.frames_count) || 0
-  const asrSegments: number = Number(result.asr_segments) || 0
+  const framesCount: number = Number(result.frames_count as number) || 0
+  const asrSegments: number = Number(result.asr_segments as number) || 0
   // ETA = 剩余时间估算（基于 progress）；任务无总时长信息时不显示
   const etaSec = durationSec && progress > 0 && progress < 1
     ? Math.max(0, Math.round(durationSec * (1 - progress) / progress))
@@ -288,8 +288,8 @@ export default function ProcessingPage() {
           setDismissedMusicModalTaskId(open ? null : taskId)
         }}
         taskId={taskId}
-        speechRatio={task?.result?.speech_ratio ?? 0}
-        totalDuration={task?.result?.total_duration ?? 0}
+        speechRatio={(task?.result?.speech_ratio as number) ?? 0}
+        totalDuration={(task?.result?.total_duration as number) ?? 0}
         onConfirmed={handleMusicConfirmed}
         onCancelled={handleMusicCancelled}
       />

@@ -1,0 +1,317 @@
+
+> frontend@0.3.0 lint /Users/conan/Desktop/nibi/frontend
+> eslint .
+
+
+/Users/conan/Desktop/nibi/frontend/src/components/ui/badge.tsx
+  38:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+/Users/conan/Desktop/nibi/frontend/src/components/ui/button.tsx
+  64:18  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+/Users/conan/Desktop/nibi/frontend/src/components/workspace/MusicModeConfirmModal.tsx
+  50:14  error  '_err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/conan/Desktop/nibi/frontend/src/components/workspace/PreflightConfigPanel.tsx
+  123:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/conan/Desktop/nibi/frontend/src/components/workspace/PreflightConfigPanel.tsx:123:5
+  121 |     if (!open) return
+  122 |     const bg = item.preflight.background_overrides ?? {}
+> 123 |     setContentType(bg.content_type ?? '')
+      |     ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  124 |     setParticipants((bg.participants ?? []).join(', '))
+  125 |     setTopic(bg.topic ?? '')
+  126 |     setGlossary((bg.glossary ?? []).join(', '))  react-hooks/set-state-in-effect
+
+/Users/conan/Desktop/nibi/frontend/src/hooks/useDirtyGuard.ts
+  66:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/conan/Desktop/nibi/frontend/src/hooks/useDirtyGuard.ts:66:5
+  64 |   // 上游 initial 引用变化时同步基线（常见于异步加载完成首次落 store）
+  65 |   useEffect(() => {
+> 66 |     setBaseline(initial)
+     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  67 |   }, [initial])
+  68 |
+  69 |   const dirtyMap = useMemo(() => {  react-hooks/set-state-in-effect
+
+/Users/conan/Desktop/nibi/frontend/src/pages/FavoritesPage/FavoritesPage.tsx
+  77:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/conan/Desktop/nibi/frontend/src/pages/FavoritesPage/FavoritesPage.tsx:77:5
+  75 |
+  76 |   useEffect(() => {
+> 77 |     reload()
+     |     ^^^^^^ Avoid calling setState() directly within an effect
+  78 |   }, [])
+  79 |
+  80 |   const favorites = useMemo(() => collectFavorites(workspaces), [workspaces])  react-hooks/set-state-in-effect
+
+/Users/conan/Desktop/nibi/frontend/src/pages/SettingPage/DownloadSettingsPage.tsx
+  45:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/conan/Desktop/nibi/frontend/src/pages/SettingPage/DownloadSettingsPage.tsx:45:5
+  43 |   // 基线刷新：仅在 store 侧值变化时同步
+  44 |   useEffect(() => {
+> 45 |     setDraft((prev) =>
+     |     ^^^^^^^^ Avoid calling setState() directly within an effect
+  46 |       JSON.stringify(prev) === JSON.stringify(baseline) ? prev : baseline,
+  47 |     )
+  48 |   }, [baseline])  react-hooks/set-state-in-effect
+
+/Users/conan/Desktop/nibi/frontend/src/pages/SettingPage/ModelManagementPage.tsx
+  83:21  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/conan/Desktop/nibi/frontend/src/pages/SettingPage/ModelManagementPage.tsx:83:21
+  81 |   }
+  82 |
+> 83 |   useEffect(() => { fetchProviders() }, [])
+     |                     ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  84 |
+  85 |   /* ── 展开/收起并加载模型 ── */
+  86 |   const toggleProvider = async (id: string) => {  react-hooks/set-state-in-effect
+  83:41  warning  React Hook useEffect has a missing dependency: 'fetchProviders'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           react-hooks/exhaustive-deps
+
+/Users/conan/Desktop/nibi/frontend/src/pages/SettingPage/NetworkSettingsPage.tsx
+  51:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/conan/Desktop/nibi/frontend/src/pages/SettingPage/NetworkSettingsPage.tsx:51:5
+  49 |   // 基线刷新：仅在 store 侧值变化时同步（避免本地草稿被外部回填覆盖）
+  50 |   useEffect(() => {
+> 51 |     setDraft((prev) =>
+     |     ^^^^^^^^ Avoid calling setState() directly within an effect
+  52 |       prev.httpProxy === baseline.httpProxy &&
+  53 |       prev.poToken === baseline.poToken &&
+  54 |       prev.visitorData === baseline.visitorData &&  react-hooks/set-state-in-effect
+
+/Users/conan/Desktop/nibi/frontend/src/pages/SettingPage/ProvidersManagementPage.tsx
+  135:10  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/conan/Desktop/nibi/frontend/src/pages/SettingPage/ProvidersManagementPage.tsx:135:10
+  133 |   }
+  134 |   useEffect(() => {
+> 135 |     void fetchProviders()
+      |          ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  136 |     // eslint-disable-next-line react-hooks/exhaustive-deps
+  137 |   }, [])
+  138 |  react-hooks/set-state-in-effect
+
+/Users/conan/Desktop/nibi/frontend/src/pages/SettingPage/TranscriberPage.tsx
+  125:5   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/conan/Desktop/nibi/frontend/src/pages/SettingPage/TranscriberPage.tsx:125:5
+  123 |   useEffect(() => {
+  124 |     if (draft.type !== 'fast-whisper') return
+> 125 |     refreshModelStatuses()
+      |     ^^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  126 |   }, [draft.type, refreshModelStatuses])
+  127 |
+  128 |   // 任一模型正在下载（pending_mb > 0）时启动 3 秒轮询；全部稳定后停止  react-hooks/set-state-in-effect
+  139:5   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/conan/Desktop/nibi/frontend/src/pages/SettingPage/TranscriberPage.tsx:139:5
+  137 |   // 基线刷新：仅在 store 侧值变化时同步
+  138 |   useEffect(() => {
+> 139 |     setDraft((prev) =>
+      |     ^^^^^^^^ Avoid calling setState() directly within an effect
+  140 |       JSON.stringify(prev) === JSON.stringify(baseline) ? prev : baseline,
+  141 |     )
+  142 |   }, [baseline])                           react-hooks/set-state-in-effect
+  230:7   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/conan/Desktop/nibi/frontend/src/pages/SettingPage/TranscriberPage.tsx:230:7
+  228 |     if (draft.type === 'mlx-whisper' && !isMac) {
+  229 |       toast.warning(t('transcriber.mlxNotAvailable'))
+> 230 |       patch({ type: 'fast-whisper' })
+      |       ^^^^^ Avoid calling setState() directly within an effect
+  231 |     }
+  232 |   }, [isMac, draft.type, t, patch])
+  233 |            react-hooks/set-state-in-effect
+  306:72  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @typescript-eslint/no-explicit-any
+  414:85  error  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @typescript-eslint/no-explicit-any
+
+/Users/conan/Desktop/nibi/frontend/src/pages/SettingPage/TrashPage.tsx
+  38:10  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/conan/Desktop/nibi/frontend/src/pages/SettingPage/TrashPage.tsx:38:10
+  36 |
+  37 |   useEffect(() => {
+> 38 |     void reload()
+     |          ^^^^^^ Avoid calling setState() directly within an effect
+  39 |   }, [reload])
+  40 |
+  41 |   const handleRestore = async (wsId: string) => {  react-hooks/set-state-in-effect
+
+/Users/conan/Desktop/nibi/frontend/src/pages/StoryboardPage/index.tsx
+  67:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/conan/Desktop/nibi/frontend/src/pages/StoryboardPage/index.tsx:67:5
+  65 |   useEffect(() => {
+  66 |     if (!workspaceId) return
+> 67 |     setLoading(true)
+     |     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  68 |     getWorkspace(workspaceId)
+  69 |       .then((w) => {
+  70 |         setWorkspace(w)  react-hooks/set-state-in-effect
+
+/Users/conan/Desktop/nibi/frontend/src/pages/WorkspacePage/WorkspaceList.tsx
+  98:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/conan/Desktop/nibi/frontend/src/pages/WorkspacePage/WorkspaceList.tsx:98:5
+   96 |
+   97 |   useEffect(() => {
+>  98 |     refresh()
+      |     ^^^^^^^ Avoid calling setState() directly within an effect
+   99 |   }, [])
+  100 |
+  101 |   const handleCreate = async () => {  react-hooks/set-state-in-effect
+
+/Users/conan/Desktop/nibi/frontend/src/pages/result/AudioResultPage.tsx
+  170:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/conan/Desktop/nibi/frontend/src/pages/result/AudioResultPage.tsx:170:7
+  168 |   useEffect(() => {
+  169 |     if (result?.music_mode) {
+> 170 |       setActiveTab('music')
+      |       ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  171 |     }
+  172 |   }, [result?.music_mode])
+  173 |                 react-hooks/set-state-in-effect
+  177:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/conan/Desktop/nibi/frontend/src/pages/result/AudioResultPage.tsx:177:7
+  175 |   useEffect(() => {
+  176 |     if (result?.speaker_map) {
+> 177 |       setSpeakerMap(result.speaker_map)
+      |       ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  178 |     }
+  179 |   }, [result?.speaker_map])
+  180 |  react-hooks/set-state-in-effect
+
+/Users/conan/Desktop/nibi/frontend/src/router.tsx
+   6:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+   7:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  10:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  13:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  16:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  19:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  20:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  21:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  22:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  25:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  26:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  27:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  28:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  29:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  30:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  31:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  32:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  33:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  34:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  35:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  36:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  37:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  38:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+  41:7  error  Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option  react-refresh/only-export-components
+
+/Users/conan/Desktop/nibi/frontend/src/services/screenshot.ts
+  22:12  error  'err' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/conan/Desktop/nibi/frontend/src/types/task.ts
+  29:27  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  33:26  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+✖ 48 problems (47 errors, 1 warning)
+
+ ELIFECYCLE  Command failed with exit code 1.

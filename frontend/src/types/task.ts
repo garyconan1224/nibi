@@ -26,11 +26,11 @@ export interface TaskRecord {
   task_id: string
   project_id: string
   task_type: string                    // download|analyze|create|storyboard|note
-  payload: Record<string, any>
+  payload: Record<string, unknown>
   status: string                       // TaskStatus 值
   progress: number                     // 0.0 ~ 1.0
   log: TaskLogEntry[]
-  result: Record<string, any>
+  result: Record<string, unknown>
   error: string
   retry_of: string
   cancel_requested: boolean

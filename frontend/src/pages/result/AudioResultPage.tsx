@@ -167,6 +167,7 @@ export default function AudioResultPage() {
   // A3: music_mode → 默认切到音乐分析 tab
   useEffect(() => {
     if (result?.music_mode) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveTab('music')
     }
   }, [result?.music_mode])

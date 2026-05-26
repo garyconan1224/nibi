@@ -95,7 +95,7 @@ export function QueueTab({ workspaceId }: QueueTabProps) {
               <div className="qp-dot" data-state={isFailed ? 'error' : isQueued ? 'queued' : 'running'} />
               <div className="qp-t">
                 <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {t.payload?.name ?? t.task_type}
+                  {(t.payload?.name as string) ?? t.task_type}
                 </div>
                 <div className="mono" style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>
                   {getStatusText(t.status)}{t.error ? ` · ${t.error}` : ''}
