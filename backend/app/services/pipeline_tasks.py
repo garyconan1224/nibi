@@ -894,6 +894,9 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             err = (out.get("error_full") or out.get("error") or "download failed").strip()
             raise RuntimeError(f"下载失败: {err}")
 
+        # R13.6.3 把 yt-dlp 元数据回写到 task.result（note task 也走这条路径）
+        _apply_ytdlp_metadata_to_task(record, runner, out)
+
         download_save_path = str(out.get("save_path") or "")
         completed_steps.append("download")
         _persist_intermediate(runner, task_id, {
