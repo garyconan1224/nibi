@@ -72,7 +72,7 @@ export function ListView({ items, selectMode, selectedSet, selectionKey, onToggl
 
             return (
               <tr
-                key={item.item_id}
+                key={`${item.workspace_id}:${item.item_id}`}
                 onClick={() => (selectMode ? onToggle(item.item_id, item.workspace_id) : onOpen(item))}
                 style={{
                   cursor: 'pointer',

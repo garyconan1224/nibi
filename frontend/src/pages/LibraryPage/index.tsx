@@ -381,7 +381,7 @@ export default function LibraryPage() {
                 <div className="ex-grid">
                   {filteredItems.map((item) => (
                     <ItemCard
-                      key={item.item_id}
+                      key={`${item.workspace_id}:${item.item_id}`}
                       item={item}
                       selected={selectedSet.has(selectionKey(item.workspace_id, item.item_id))}
                       selectMode={selectMode}

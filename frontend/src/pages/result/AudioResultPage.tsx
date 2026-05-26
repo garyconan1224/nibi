@@ -175,6 +175,7 @@ export default function AudioResultPage() {
   // A2: initialize speaker_map from result
   useEffect(() => {
     if (result?.speaker_map) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSpeakerMap(result.speaker_map)
     }
   }, [result?.speaker_map])
