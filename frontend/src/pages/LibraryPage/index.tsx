@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Trash2, Plus } from 'lucide-react'
+import { Trash2, Plus, Inbox, Filter } from 'lucide-react'
+import { toast } from 'sonner'
 import { fetchLibrary, deleteItem, batchDeleteItems, type LibraryItem, type LibraryResponse } from '@/services/library'
 import { useLibraryStore, type SortBy } from '@/store/libraryStore'
 import { FilterChips } from './FilterChips'
@@ -140,13 +141,15 @@ export default function LibraryPage() {
   }, [filteredItems])
 
   const handleDeleteOne = useCallback(async (item: LibraryItem) => {
-    const ok = window.confirm(`确定删除「${item.name || '未命名'}」？`)
+    const label = item.name || '未命名'
+    const ok = window.confirm(`确定删除「${label}」？`)
     if (!ok) return
     try {
       await deleteItem(item.workspace_id, item.item_id)
+      toast.success(`已删除「${label}」`)
       load()
     } catch {
-      alert('删除失败，请重试')
+      toast.error('删除失败，请重试')
     }
   }, [load])
 
@@ -161,10 +164,11 @@ export default function LibraryPage() {
         return { workspace_id: ws, item_id: rest.join(':') }
       })
       await batchDeleteItems(items)
+      toast.success(`已删除 ${selectedSet.size} 个素材`)
       setSelectedSet(new Set())
       load()
     } catch {
-      alert('批量删除失败，请重试')
+      toast.error('批量删除失败，请重试')
     } finally {
       setDeleting(false)
     }
@@ -294,18 +298,18 @@ export default function LibraryPage() {
 
       {/* ── 内容区 ── */}
       {loading && (
-        <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
+        <div className="empty-state">
           <div className="spinner" />
-          <span className="ml-3">加载资料库…</span>
+          <div className="empty-state-desc">加载资料库…</div>
         </div>
       )}
 
       {error && (
-        <div
-          className="flex items-center justify-center py-20 text-sm"
-          style={{ color: 'var(--accent)' }}
-        >
-          {error}
+        <div className="empty-state" style={{ color: 'var(--accent)' }}>
+          <div className="empty-state-title">{error}</div>
+          <button className="btn" style={{ marginTop: 8, fontSize: 12 }} onClick={load}>
+            重试
+          </button>
         </div>
       )}
 
@@ -348,10 +352,20 @@ export default function LibraryPage() {
                 </div>
               )}
               {filteredItems.length === 0 ? (
-                <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
-                  {showAll && data.items.length === 0
-                    ? '暂无内容，去工作台添加素材吧'
-                    : '没有匹配的素材'}
+                <div className="empty-state">
+                  <div className="empty-state-icon">
+                    <Inbox size={24} strokeWidth={1.5} />
+                  </div>
+                  <div className="empty-state-title">
+                    {showAll && data.items.length === 0
+                      ? '暂无素材'
+                      : '没有匹配的素材'}
+                  </div>
+                  <div className="empty-state-desc">
+                    {showAll && data.items.length === 0
+                      ? '去工作台添加素材，或粘贴一个链接开始吧'
+                      : '试试切换筛选条件或清除 chip'}
+                  </div>
                 </div>
               ) : viewMode === 'list' ? (
                 <ListView
@@ -384,8 +398,14 @@ export default function LibraryPage() {
             typeFilters.length === 0 &&
             filteredWorkspaces &&
             filteredWorkspaces.length === 0 && (
-              <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
-                没有匹配的工作空间
+              <div className="empty-state">
+                <div className="empty-state-icon">
+                  <Filter size={24} strokeWidth={1.5} />
+                </div>
+                <div className="empty-state-title">没有工作空间</div>
+                <div className="empty-state-desc">
+                  还没有创建任何工作空间，去首页导入素材开始吧
+                </div>
               </div>
             )}
         </>
