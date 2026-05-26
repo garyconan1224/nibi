@@ -1,6 +1,6 @@
 ---
 name: phase-r13.6-metadata-coverage-hotfix
-status: ready
+status: done
 branch: feat/phase-r13.6-metadata-coverage-hotfix
 baseline_commit: e117f6e  # R13 merge 之后
 owner: ds v4-pro via ccswitch
