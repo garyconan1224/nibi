@@ -207,6 +207,10 @@
   - [x] R17.3 `preflightTasks.ts` `applyCascades` 增 scope 参数 + visual_only/av_combined 级联
   - [x] R17.4 PreflightDrawer 透传 scope
   - [x] R17.5 新增单测 5 个（AddMaterialModal ×3 + preflightTasks ×2）
+- [x] **R18** 主 chip 重构（visual=1 / audio=2 / av+⭐综合）+ PreflightDrawer 细调（9 种总结模板 + 字幕精修 + 截帧细调挪位）— `docs/plans/phase-r18-preflight-drawer-templates.md`，owner: xiaomi mimo v2.5-pro，~8h
+- [ ] **R18.1** 本地 ASR（fast-whisper + mlx-whisper 兜底）+ 任务失败弹窗 + 模型下载进度 — `docs/plans/phase-r18.1-local-asr-and-failure-popup.md`，owner: xiaomi mimo v2.5-pro，~8h
+- [ ] **R19** 综合笔记 av_synthesis pipeline + Markdown 导出（骨架 C，无 OCR）— `docs/plans/phase-r19-av-synthesis-notes.md`，owner: xiaomi mimo v2.5-pro，~10h
+- [ ] **R20**（押后）综合笔记多格式导出：PDF / Word / Obsidian Vault — 等 R19 跑通后展开
 
 ---
 

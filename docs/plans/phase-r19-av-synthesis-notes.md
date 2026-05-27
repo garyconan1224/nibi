@@ -2,11 +2,12 @@
 phase: R19
 title: 综合笔记 av_synthesis · 图文教学笔记 pipeline + Markdown 导出
 status: ready
-owner: deepseek v4-pro（spike 阶段需用户/Opus 把关公式 OCR 决策）
-estimated_hours: 12
+owner: xiaomi mimo v2.5-pro
+estimated_hours: 10
 depends_on:
-  - R17（chip 新 id av_synthesis 必须先有）
-  - R18（总结模板 9 种必须先有，本期 lecture 模板会被用）
+  - R18 已合（含 chip 重构 § 0，引入 av_synthesis id；含 lecture 模板）
+decisions:
+  - 公式/代码 OCR：方案 C（跳过，让 LLM 从转写+VLM 描述推断），不做 spike
 related_spec:
   - docs/spec/04-pipeline-tasks.md
   - docs/spec/05-result-pages.md
@@ -73,7 +74,11 @@ print("hello")
 
 ## 修改清单
 
-### 0. Spike：公式 / 代码 OCR 评估（必须先做）
+### 0. ~~Spike：公式 / 代码 OCR 评估~~ → 用户已拍板方案 C（跳过 OCR）
+
+不做 spike，不集成 pix2tex / PaddleOCR 公式检测。关键帧只走基础 VLM 描述，LLM 在生成笔记时若识别出公式/代码内容（从转写或 VLM 描述里），用 markdown 代码块或 `$…$` 包裹即可。本期不追求公式渲染精度。
+
+<details><summary>原 spike 内容（保留备忘，不执行）</summary>
 
 1h 内确认以下其一：
 - A) **pix2tex**（开源）能识别公式 LaTeX，集成成本可接受 → 加进 pipeline
@@ -81,6 +86,8 @@ print("hello")
 - C) 完全跳过：关键帧 OCR 只走 PaddleOCR 拿纯文字，公式 / 代码不特殊处理（LLM 自己从转写里推断）
 
 **默认推方案 B**（成本最低），spike 后写一段决策结论在本文件末尾「Spike 结论」一节，用户/Opus 确认后再继续。
+
+</details>
 
 ### 1. 后端：新 task 类型 `av_synthesis`
 
