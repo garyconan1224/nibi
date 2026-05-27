@@ -156,6 +156,24 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
           <span className="ex-src-label">{srcLabel}</span>
           <span className="ex-ws-name">{item.workspace_name}</span>
         </div>
+        {(() => {
+          const chips: string[] = []
+          if (item.results_summary.has_transcript) chips.push('转写')
+          if (item.has_chapters) chips.push('章节')
+          if (item.type === 'video' && (item.frames_count ?? 0) > 0) chips.push(`${item.frames_count} 帧`)
+          if (item.has_subtitle) chips.push('字幕')
+          if (item.results_summary.has_summary) chips.push('摘要')
+          if (item.type === 'image' && item.results_summary.has_summary) chips.push('提示词')
+          const visible = chips.slice(0, 3)
+          if (visible.length === 0) return null
+          return (
+            <div className="ex-chip-row">
+              {visible.map((c) => (
+                <span key={c} className="ex-chip">{c}</span>
+              ))}
+            </div>
+          )
+        })()}
       </div>
     </div>
   )
