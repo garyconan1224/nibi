@@ -627,6 +627,17 @@ def _sync_item_with_tasks(item: WorkspaceItem) -> Optional[Dict[str, Any]]:
     return overlay
 
 
+def _task_failed_response(item: WorkspaceItem) -> Optional[Dict[str, Any]]:
+    """R18.1.2: 若 item 最新任务已 FAILED，返回 task_failed 响应；否则返回 None。"""
+    if not item.related_task_ids:
+        return None
+    latest_tid = item.related_task_ids[-1]
+    task = _pipeline_runner.store.get(latest_tid)
+    if task is not None and task.status == TaskStatus.FAILED.value:
+        return {"source": "task_failed", "task_id": task.task_id, "error": task.error or "未知错误"}
+    return None
+
+
 def _enrich_workspace(rec: WorkspaceRecord) -> Dict[str, Any]:
     """把 WorkspaceRecord.to_dict() 合并上 Phase 1A 派生字段后返回。
 
@@ -848,6 +859,10 @@ def _item_thumbnail(item: WorkspaceItem, results: dict = None) -> Optional[str]:
             return path
         except (ValueError, OSError):
             return path
+    # 第三级：yt-dlp 拿到的远端封面 URL（audio 任务 / video 任务都可能有）
+    vt = results.get("video_thumbnail_url")
+    if vt and isinstance(vt, str) and vt.startswith(("http://", "https://")):
+        return vt
     return None
 
 
@@ -896,6 +911,20 @@ def get_library(include_trashed: bool = False) -> Dict[str, Any]:
                 item_status = overlay["status"]
 
             results = (overlay.get("results") if overlay else None) or item.results or {}
+            display_name = (
+                str(results.get("video_title") or "").strip()
+                or item.name
+                or ""
+            )
+            audio_nature = None
+            if item.type == "audio":
+                music_mode = results.get("music_mode")
+                has_music = results.get("music")
+                has_speech = (results.get("vad") or {}).get("has_speech")
+                if music_mode or (has_music and not has_speech):
+                    audio_nature = "music"
+                elif has_speech:
+                    audio_nature = "speech"
             items_out.append({
                 "item_id": item.item_id,
                 "workspace_id": rec.workspace_id,
@@ -903,7 +932,7 @@ def get_library(include_trashed: bool = False) -> Dict[str, Any]:
                 "type": item.type,
                 "source": item.source,
                 "source_value": item.source_value,
-                "name": item.name,
+                "name": display_name,
                 "status": item_status,
                 "created_at": item.created_at,
                 "updated_at": item.updated_at,
@@ -914,6 +943,11 @@ def get_library(include_trashed: bool = False) -> Dict[str, Any]:
                     "has_transcript": bool(results.get("transcript")),
                 },
                 "primary_task_status": _item_primary_task_status(item),
+                "uploader": str(results.get("video_uploader") or "") or None,
+                "has_subtitle": bool(results.get("subtitle_paths")),
+                "has_chapters": bool(results.get("chapters") or (results.get("av_synthesis") or {}).get("chapters")),
+                "frames_count": len(results.get("frames") or []) if item.type == "video" else 0,
+                "audio_nature": audio_nature,
             })
 
     return {"items": items_out, "workspaces": workspaces_out}
@@ -1570,6 +1604,11 @@ def get_item_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
             detail=f"item type {item.type!r} has no video result (only 'video' supported in Phase 1G)",
         )
 
+    # R18.1.2: 任务已失败时直接返回 task_failed，不回落 demo
+    failed = _task_failed_response(item)
+    if failed is not None:
+        return failed
+
     # X.1 bridge: check task results overlay so video_result sees real data
     v_overlay = _sync_item_with_tasks(item)
     v_results = dict(v_overlay.get("results", {})) if v_overlay and v_overlay.get("results") else dict(item.results or {})
@@ -1688,6 +1727,11 @@ def get_image_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
             status_code=400,
             detail=f"item type {item.type!r} has no image result (only 'image' supported in Phase 1H)",
         )
+
+    # R18.1.2: 任务已失败时直接返回 task_failed，不回落 demo
+    failed = _task_failed_response(item)
+    if failed is not None:
+        return failed
 
     # X.1 bridge: merge task results overlay so image_result sees real data
     overlay = _sync_item_with_tasks(item)
@@ -1904,6 +1948,11 @@ def get_audio_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
             detail=f"item type {item.type!r} has no audio result (only 'audio' supported)",
         )
 
+    # R18.1.2: 任务已失败时直接返回 task_failed，不回落 demo
+    failed = _task_failed_response(item)
+    if failed is not None:
+        return failed
+
     # X.1 bridge: overlay task results so audio_result sees real data
     a_overlay = _sync_item_with_tasks(item)
     results = dict(a_overlay.get("results", {})) if a_overlay and a_overlay.get("results") else dict(item.results or {})
@@ -1966,6 +2015,11 @@ def get_text_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
             status_code=400,
             detail=f"item type {item.type!r} has no text result (only 'text' supported)",
         )
+
+    # R18.1.2: 任务已失败时直接返回 task_failed
+    failed = _task_failed_response(item)
+    if failed is not None:
+        return failed
 
     # 优先从 item.results 读取
     results = item.results or {}
