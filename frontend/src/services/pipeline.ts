@@ -1,6 +1,6 @@
 import type { Feature } from '@/lib/featuresToSteps'
 import { featuresToSteps } from '@/lib/featuresToSteps'
-import type { TaskCreateRequest, TaskCreateResponse } from '@/types/task'
+import type { TaskCreateRequest, TaskCreateResponse, TaskRecord } from '@/types/task'
 import type { ItemType, WorkspaceBackground } from '@/types/workspace'
 import { http } from './client'
 
@@ -37,6 +37,15 @@ export async function createPipelineTask(
 ): Promise<TaskCreateResponse> {
   const res = await http.post<TaskCreateResponse>(PIPELINE_TASKS_URL, req)
   return res.data
+}
+
+/** GET /pipeline/tasks/{task_id}，用于详情页补拉单个任务的完整 result/log。 */
+export async function getPipelineTask(taskId: string): Promise<TaskRecord> {
+  const res = await http.get<TaskRecord | { data: TaskRecord }>(`${PIPELINE_TASKS_URL}/${taskId}`)
+  const raw = res.data
+  return raw && typeof raw === 'object' && 'task_id' in raw
+    ? raw as TaskRecord
+    : (raw as { data: TaskRecord }).data
 }
 
 /**

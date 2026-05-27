@@ -105,6 +105,34 @@
   animation: vm-pulse 1.2s infinite;
 }
 
+/* Audio badge — 左下角胶囊标签 */
+.vm-processing-scope .proc-hero .thumb .thumb-audio-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  z-index: 2;
+  backdrop-filter: blur(4px);
+}
+
+/* Audio 蒙层 — 渐变叠加让封面区一眼区分 audio vs video */
+.vm-processing-scope .proc-hero .thumb .thumb-audio-mask {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 50%, rgba(0, 0, 0, 0.45) 100%);
+  z-index: 1;
+  pointer-events: none;
+}
+
 @keyframes vm-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }

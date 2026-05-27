@@ -16,6 +16,11 @@ export interface LibraryItem {
   thumbnail: string | null
   results_summary: { has_summary: boolean; has_transcript: boolean }
   primary_task_status: string | null
+  uploader?: string | null
+  has_subtitle?: boolean
+  has_chapters?: boolean
+  frames_count?: number
+  audio_nature?: 'speech' | 'music' | null
 }
 
 export interface LibraryWorkspace {

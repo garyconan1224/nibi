@@ -7,6 +7,20 @@ interface TasksCardProps {
   currentTaskId: string
 }
 
+function titleFromFilename(filename: unknown): string {
+  const raw = typeof filename === 'string' ? filename.trim() : ''
+  if (!raw) return ''
+  const name = raw.split('/').pop() || raw
+  return name.replace(/\.[^.]+$/, '')
+}
+
+function audioThumbnailFromResult(result: Record<string, unknown>, audio?: Record<string, unknown>): string {
+  const projectId = typeof result.project_id === 'string' ? result.project_id.trim() : ''
+  const filename = typeof audio?.filename === 'string' ? audio.filename.trim() : ''
+  if (!projectId || !filename) return ''
+  return `/static/workspaces/${projectId}/audio/${titleFromFilename(filename)}.jpg`
+}
+
 function dotColor(status: string): string {
   if (status === 'SUCCESS') return 'var(--accent-green)'
   if (status === 'FAILED') return 'var(--accent)'
@@ -47,12 +61,21 @@ export default function TasksCard({ currentTaskId }: TasksCardProps) {
 
       {activeTasks.map((t) => {
         const result = t.result ?? {} as Record<string, unknown>
+        const payload = t.payload ?? {} as Record<string, unknown>
+        const resultAudio = result.audio as Record<string, unknown> | undefined
         const title: string =
           (result.video_title as string) ||
-          (t.payload?.title as string) ||
-          (t.payload?.url as string) ||
+          (resultAudio?.title as string) ||
+          titleFromFilename(resultAudio?.filename) ||
+          (payload.title as string) ||
+          (payload.url as string) ||
+          (payload.source as string) ||
           t.task_id.slice(0, 8)
-        const coverUrl: string = (result.video_thumbnail_url as string) || ''
+        const coverUrl: string =
+          (result.video_thumbnail_url as string) ||
+          (result.cover_thumbnail as string) ||
+          audioThumbnailFromResult(result, resultAudio) ||
+          ''
         const isActive = t.task_id === currentTaskId
         const isAudio = t.task_type === 'audio'
 

@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import type { LibraryItem } from '@/services/library'
+import { Mic, Music } from 'lucide-react'
 import {
   TYPE_ICON,
   STATE_COLOR,
@@ -46,9 +47,22 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
       {/* ── Thumbnail 16/9 ── */}
       <div className="ex-thumb">
         {item.thumbnail ? (
-          <img src={item.thumbnail} alt={item.name} />
+          <img src={item.thumbnail} alt={item.name} referrerPolicy="no-referrer" />
         ) : (
           <Icon size={32} strokeWidth={1.2} style={{ color: 'rgba(255,255,255,0.45)' }} />
+        )}
+
+        {/* type badge — top-left */}
+        <span className={`ex-type-badge ex-type-badge--${item.type}`}>
+          {item.type.toUpperCase()}
+        </span>
+
+        {/* audio nature badge — bottom-left */}
+        {item.type === 'audio' && item.audio_nature && (
+          <span className="ex-nature-badge">
+            {item.audio_nature === 'speech' ? <Mic size={12} /> : <Music size={12} />}
+            {item.audio_nature === 'speech' ? '人声' : '音乐'}
+          </span>
         )}
 
         {/* running progress bar */}
@@ -142,6 +156,24 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
           <span className="ex-src-label">{srcLabel}</span>
           <span className="ex-ws-name">{item.workspace_name}</span>
         </div>
+        {(() => {
+          const chips: string[] = []
+          if (item.results_summary.has_transcript) chips.push('转写')
+          if (item.has_chapters) chips.push('章节')
+          if (item.type === 'video' && (item.frames_count ?? 0) > 0) chips.push(`${item.frames_count} 帧`)
+          if (item.has_subtitle) chips.push('字幕')
+          if (item.results_summary.has_summary) chips.push('摘要')
+          if (item.type === 'image' && item.results_summary.has_summary) chips.push('提示词')
+          const visible = chips.slice(0, 3)
+          if (visible.length === 0) return null
+          return (
+            <div className="ex-chip-row">
+              {visible.map((c) => (
+                <span key={c} className="ex-chip">{c}</span>
+              ))}
+            </div>
+          )
+        })()}
       </div>
     </div>
   )

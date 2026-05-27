@@ -47,12 +47,28 @@ export const useTaskStore = create<TaskStoreState>()(
             const activeLocally = state.tasks.filter((t) => !isTaskTerminal(t.status))
             return { tasks: activeLocally }
           }
-          // 正常同步：以后端数据为准，同时将本地有但后端没有的非终结任务补回
+          // 正常同步：以后端数据为准，同时将本地有但后端没有的非终结任务补回。
+          // 列表接口 include_result=false / include_logs=false 返回的 result/log
+          // 是 lite 占位（{} / []），不能洗掉本地已有的丰富字段（SSE 填进来的）。
+          const existingById = new Map(state.tasks.map((t) => [t.task_id, t]))
+          const mergedIncoming = visibleIncoming.map((t) => {
+            const existing = existingById.get(t.task_id)
+            if (!existing) return t
+            return {
+              ...existing,
+              ...t,
+              result:
+                t.result && Object.keys(t.result).length > 0
+                  ? t.result
+                  : existing.result,
+              log: t.log && t.log.length > 0 ? t.log : existing.log,
+            }
+          })
           const backendIds = new Set(visibleIncoming.map((t) => t.task_id))
           const localOnlyActive = state.tasks.filter(
             (t) => !backendIds.has(t.task_id) && !isTaskTerminal(t.status)
           )
-          return { tasks: [...visibleIncoming, ...localOnlyActive] }
+          return { tasks: [...mergedIncoming, ...localOnlyActive] }
         }),
 
       addTask: (task) =>

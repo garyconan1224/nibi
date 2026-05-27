@@ -1,14 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { ArrowRight, Music, RotateCcw, X } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Music, RotateCcw, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { useTaskStore } from '@/store/taskStore'
 import { useTaskSse } from '@/hooks/useTaskSse'
 import { isTaskTerminal, getStatusText } from '@/types/task'
+import { getPipelineTask } from '@/services/pipeline'
 import { categorizeError } from '@/lib/errorCategories'
 import { platformPrefixFromUrl } from '@/lib/platformPrefix'
 import MusicModeConfirmModal from '@/components/workspace/MusicModeConfirmModal'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import { StepProgress } from './StepProgress'
 import SystemResourceCard from './SystemResourceCard'
 import TasksCard from './TasksCard'
@@ -24,6 +34,20 @@ interface LocationState {
 
 const STUCK_MS = 10 * 60 * 1000
 
+function titleFromFilename(filename: unknown): string {
+  const raw = typeof filename === 'string' ? filename.trim() : ''
+  if (!raw) return ''
+  const name = raw.split('/').pop() || raw
+  return name.replace(/\.[^.]+$/, '')
+}
+
+function audioThumbnailFromResult(result: Record<string, unknown>, audio?: Record<string, unknown>): string {
+  const projectId = typeof result.project_id === 'string' ? result.project_id.trim() : ''
+  const filename = typeof audio?.filename === 'string' ? audio.filename.trim() : ''
+  if (!projectId || !filename) return ''
+  return `/static/workspaces/${projectId}/audio/${titleFromFilename(filename)}.jpg`
+}
+
 export default function ProcessingPage() {
   const { taskId = '' } = useParams<{ taskId: string }>()
   const navigate = useNavigate()
@@ -33,11 +57,31 @@ export default function ProcessingPage() {
   const itemId = state?.itemId
 
   const task = useTaskStore((s) => s.getTask(taskId))
+  const addTask = useTaskStore((s) => s.addTask)
+  const updateTask = useTaskStore((s) => s.updateTask)
   const cancelTask = useTaskStore((s) => s.cancelTask)
   const retryTask = useTaskStore((s) => s.retryTask)
 
   const isActive = task ? !isTaskTerminal(task.status) : false
   useTaskSse(taskId, isActive)
+
+  useEffect(() => {
+    if (!taskId) return
+    let cancelled = false
+    getPipelineTask(taskId)
+      .then((fresh) => {
+        if (cancelled) return
+        if (useTaskStore.getState().getTask(fresh.task_id)) {
+          updateTask(fresh.task_id, fresh)
+        } else {
+          addTask(fresh)
+        }
+      })
+      .catch(() => {
+        // 详情补拉失败时保留本地 store，避免打断正在看的页面。
+      })
+    return () => { cancelled = true }
+  }, [taskId, addTask, updateTask])
 
   const progress = task?.progress ?? 0
   const status = task?.status ?? 'PENDING'
@@ -49,6 +93,17 @@ export default function ProcessingPage() {
   // A3: 音乐模式确认弹窗
   const [dismissedMusicModalTaskId, setDismissedMusicModalTaskId] = useState<string | null>(null)
   const showMusicModal = status === 'AWAITING_CONFIRM' && dismissedMusicModalTaskId !== taskId
+
+  // R18.1.3: 任务失败弹窗
+  const [showFailModal, setShowFailModal] = useState(false)
+  const prevStatusRef = useRef(status)
+  useEffect(() => {
+    // 状态刚变为 FAILED 时自动弹窗
+    if (status === 'FAILED' && prevStatusRef.current !== 'FAILED') {
+      setShowFailModal(true)
+    }
+    prevStatusRef.current = status
+  }, [status])
 
   const handleMusicConfirmed = () => {
     setDismissedMusicModalTaskId(taskId)
@@ -105,16 +160,40 @@ export default function ProcessingPage() {
   const payload = task?.payload ?? {} as Record<string, unknown>
   const taskType: string = task?.task_type ?? ''
   const isAudioTask = taskType === 'audio'
-  // R13.2 标题/封面/时长来源优先级：result（直接来源）→ payload（从 download 继承）→ fallback
-  const url = (task?.payload?.url as string) ?? (payload.source_url as string) ?? state?.url ?? ''
+  // R13.2/R18.1 标题/封面/时长来源优先级：result（直接来源）→ payload（从 download 继承）→ fallback
+  const resultAudio = result.audio as Record<string, unknown> | undefined
+  const url =
+    (task?.payload?.url as string) ??
+    (payload.source as string) ??
+    (payload.source_url as string) ??
+    (result.source as string) ??
+    state?.url ??
+    ''
   const platform = platformPrefixFromUrl(url)
   const safeHostname = (() => {
     if (!url) return '任务'
     try { return new URL(url).hostname } catch { return '任务' }
   })()
-  const title: string = (result.video_title as string) || (payload.video_title as string) || (task?.payload?.title as string) || safeHostname
-  const coverUrl: string = (result.video_thumbnail_url as string) || (payload.video_thumbnail_url as string) || ''
-  const durationSec: number = Number((result.video_duration as number) || (payload.video_duration as number)) || 0
+  const title: string =
+    (result.video_title as string) ||
+    (resultAudio?.title as string) ||
+    titleFromFilename(resultAudio?.filename) ||
+    (payload.video_title as string) ||
+    (task?.payload?.title as string) ||
+    safeHostname
+  const coverUrl: string =
+    (result.video_thumbnail_url as string) ||
+    (result.cover_thumbnail as string) ||
+    audioThumbnailFromResult(result, resultAudio) ||
+    (payload.video_thumbnail_url as string) ||
+    ''
+  const durationSec: number =
+    Number(
+      (result.video_duration as number) ||
+      (result.duration_sec as number) ||
+      (resultAudio?.duration_sec as number) ||
+      (payload.video_duration as number),
+    ) || 0
   const fmtDuration = (sec: number) => {
     if (!sec) return ''
     const m = Math.floor(sec / 60)
@@ -165,23 +244,13 @@ export default function ProcessingPage() {
                 <div className="live">● LIVE</div>
               )}
               {isAudioTask && coverUrl && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    bottom: 8,
-                    right: 8,
-                    width: 28,
-                    height: 28,
-                    borderRadius: 8,
-                    background: 'rgba(0,0,0,0.7)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backdropFilter: 'blur(4px)',
-                  }}
-                >
-                  <Music size={14} color="#fff" />
-                </div>
+                <>
+                  <div className="thumb-audio-mask" />
+                  <div className="thumb-audio-badge">
+                    <Music size={12} color="#fff" />
+                    <span>AUDIO</span>
+                  </div>
+                </>
               )}
             </div>
             <div className="info">
@@ -261,28 +330,23 @@ export default function ProcessingPage() {
             </div>
           </div>
 
-          {/* Failed state */}
+          {/* Failed state — inline indicator */}
           {isFailed && (
             <div className="proc-error">
+              <AlertTriangle size={28} style={{ color: 'var(--accent)' }} />
               <h3>任务失败</h3>
               <p style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>
                 {categorized.friendlyMessage}
               </p>
-              <p style={{ color: 'var(--ink-3)', fontSize: 13, marginBottom: 12 }}>
-                {categorized.suggestion}
-              </p>
-              {task?.error && (
-                <details style={{ marginBottom: 16, fontSize: 12, color: 'var(--ink-4)' }}>
-                  <summary style={{ cursor: 'pointer', fontFamily: 'var(--mono)' }}>
-                    查看原始错误信息
-                  </summary>
-                  <div className="error-log" style={{ marginTop: 8 }}>{task.error}</div>
-                </details>
-              )}
-              <button className="btn btn-primary" onClick={handleRetry}>
-                <RotateCcw size={14} />
-                重试
-              </button>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+                <button className="btn" onClick={() => setShowFailModal(true)}>
+                  查看详情
+                </button>
+                <button className="btn btn-primary" onClick={handleRetry}>
+                  <RotateCcw size={14} />
+                  重试
+                </button>
+              </div>
             </div>
           )}
 
@@ -329,6 +393,45 @@ export default function ProcessingPage() {
         onConfirmed={handleMusicConfirmed}
         onCancelled={handleMusicCancelled}
       />
+
+      {/* R18.1.3: 任务失败详情弹窗 */}
+      <Dialog open={showFailModal} onOpenChange={setShowFailModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle size={18} className="text-destructive" />
+              任务失败
+            </DialogTitle>
+            <DialogDescription>
+              {categorized.friendlyMessage}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">{categorized.suggestion}</p>
+            {task?.error && (
+              <details className="text-xs">
+                <summary className="cursor-pointer text-muted-foreground font-mono">
+                  查看原始错误信息
+                </summary>
+                <pre className="mt-2 p-3 rounded-md bg-muted text-muted-foreground whitespace-pre-wrap break-all text-[11px]">
+                  {task.error}
+                </pre>
+              </details>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFailModal(false)}>
+              关闭
+            </Button>
+            <Button onClick={() => { setShowFailModal(false); handleRetry() }}>
+              <RotateCcw size={14} className="mr-1" />
+              重试
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

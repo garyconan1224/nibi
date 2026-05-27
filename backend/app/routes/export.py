@@ -27,6 +27,7 @@ from backend.app.models.workspace import ItemType, WorkspaceItem, WorkspaceRecor
 from backend.app.services.audio_result_demo import build_demo_audio_result
 from backend.app.services.video_result_demo import build_demo_video_result
 from backend.app.routes.workspaces import _store, _sync_item_with_tasks
+from shared.config import get_workspace_root
 
 router = APIRouter(prefix="/workspaces", tags=["export"])
 
@@ -514,6 +515,49 @@ def export_subtitles(
     return StreamingResponse(
         io.BytesIO(content.encode("utf-8")),
         media_type=_SUBTITLE_MIME[format],
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
+        },
+    )
+
+
+# ── R19: 综合笔记 (av_synthesis) 导出 ─────────────────────────
+
+
+@router.get("/{workspace_id}/av-synthesis")
+def get_av_synthesis_markdown(workspace_id: str):
+    """返回综合笔记 markdown 原文（供前端页面渲染）。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+
+    md_path = get_workspace_root(workspace_id) / "av_synthesis.md"
+    if not md_path.exists():
+        raise HTTPException(status_code=404, detail="综合笔记尚未生成")
+
+    content = md_path.read_text(encoding="utf-8")
+    return StreamingResponse(
+        io.BytesIO(content.encode("utf-8")),
+        media_type="text/markdown; charset=utf-8",
+    )
+
+
+@router.get("/{workspace_id}/export/av-synthesis.md")
+def export_av_synthesis_md(workspace_id: str):
+    """下载综合笔记 .md 文件。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+
+    md_path = get_workspace_root(workspace_id) / "av_synthesis.md"
+    if not md_path.exists():
+        raise HTTPException(status_code=404, detail="综合笔记尚未生成")
+
+    content = md_path.read_text(encoding="utf-8")
+    filename = "综合笔记.md"
+    return StreamingResponse(
+        io.BytesIO(content.encode("utf-8")),
+        media_type="text/markdown; charset=utf-8",
         headers={
             "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
         },

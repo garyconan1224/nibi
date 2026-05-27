@@ -16,6 +16,7 @@ from backend.app.models.tasks import TaskRecord, TaskStatus
 from backend.app.services.task_runner import TaskRunner
 from shared.config import (
     get_workspace_json_dir,
+    get_workspace_root,
     get_workspace_text_dir,
     get_workspace_videos_dir,
 )
@@ -38,7 +39,7 @@ from shared.video_analyzer import (
     get_safe_name,
     run_batch_analysis,
 )
-from shared.video_download_ytdlp import is_platform_url, run_ytdlp_download
+from shared.video_download_ytdlp import fetch_ytdlp_metadata, is_platform_url, run_ytdlp_download
 from src.vidmirror.core.providers import ChatRequest
 from src.vidmirror.core.providers.registry import create_default_registry
 
@@ -2176,7 +2177,7 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     )
 
     # ── 1. FETCH ────────────────────────────────────────────
-    runner.store.update(task_id, status=TaskStatus.FETCH.value)
+    runner.store.update(task_id, status=TaskStatus.DOWNLOAD.value)
     runner.set_progress(task_id, 0.05, "拉取音频文件...")
 
     # A3 重跑：文件已在首次运行时下载，跳过
@@ -2185,6 +2186,13 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     audio_dir.mkdir(parents=True, exist_ok=True)
     audio_local_path: Path
     content_type = ""
+    yt_dlp_meta: Dict[str, Any] = {}
+
+    def _remember_ytdlp_metadata(meta: Dict[str, Any]) -> Dict[str, Any]:
+        mapped = _apply_ytdlp_metadata_to_task(record, runner, meta)
+        yt_dlp_meta.update(mapped)
+        return mapped
+
     if source_type == "url":
         url_path = source.split("?")[0]
         audio_filename = url_path.split("/")[-1] or "audio.mp3"
@@ -2194,6 +2202,11 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             log("📦 音频文件已存在（重跑），跳过下载")
             audio_bytes = audio_local_path.read_bytes()
         elif _is_platform:
+            # 先无副作用预取元数据，保证 audio-only 也能拿到 title/thumbnail
+            pre_meta = fetch_ytdlp_metadata(source, log=lambda m: runner.append_log(task_id, m))
+            if pre_meta:
+                _remember_ytdlp_metadata(pre_meta)
+
             log(f"🎬 检测到平台 URL，使用 yt-dlp 抽取音频流")
             result = run_ytdlp_download(
                 url=source,
@@ -2202,13 +2215,13 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 log=lambda m: runner.append_log(task_id, m),
                 progress_callback=lambda p, msg: runner.set_progress(task_id, 0.05 + p * 0.1, msg),
                 # R15 audio 任务也在下载中就回写标题，让 ProcessingPage 立刻显示真实名字
-                info_callback=lambda meta: _apply_ytdlp_metadata_to_task(record, runner, meta),
+                info_callback=_remember_ytdlp_metadata,
             )
             if not result.get("ok"):
                 raise RuntimeError(f"音频下载失败（yt-dlp）：{result.get('error', '未知错误')}")
 
             # R13.6.2 把 yt-dlp 元数据回写到 task.result，让 ProcessingPage 在 audio 阶段显示真实标题
-            _apply_ytdlp_metadata_to_task(record, runner, result)
+            _remember_ytdlp_metadata(result)
 
             audio_local_path = Path(result["save_path"])
             audio_filename = audio_local_path.name
@@ -2241,6 +2254,7 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     log(f"📦 音频已加载，{len(audio_bytes)//1024} KB，mime={audio_mime}，filename={audio_filename}")
 
     # ── 1.5 VAD（N8 / A3）────────────────────────────────────
+    runner.store.update(task_id, status=TaskStatus.PROBE.value)
     runner.set_progress(task_id, 0.15, "VAD 人声活动检测...")
     vad_result = run_vad(audio_local_path)
     speech_ratio = (
@@ -2279,7 +2293,7 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     skip_asr = (not vad_result.has_speech) or (not asr_enabled) or _music_confirmed
 
     # ── 2. TRANSCRIBE ────────────────────────────────────────
-    runner.store.update(task_id, status=TaskStatus.VLM.value)  # 借用 VLM 状态表示「模型推理中」
+    runner.store.update(task_id, status=TaskStatus.ASR.value)
     runner.set_progress(task_id, 0.30, "语音转文字中...")
 
     settings = load_settings()
@@ -2292,43 +2306,34 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
 
     if skip_asr:
         log("⏭️  跳过 ASR（无人声或未启用）")
-    elif not api_key:
-        log("⚠️  未提供 api_key，跳过转写")
     else:
-        # 用 multipart/form-data POST 到 /audio/transcriptions（OpenAI 兼容）
-        log(f"🔊 调用 audio model={audio_model} | language={whisper_lang}")
-        boundary = "----PythonFormBoundary"
-        body_parts = []
-        body_parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\n{audio_model}\r\n".encode())
-        body_parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"response_format\"\r\n\r\njson\r\n".encode())
-        if whisper_lang and whisper_lang != "auto":
-            body_parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"language\"\r\n\r\n{whisper_lang}\r\n".encode())
-        body_parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{audio_filename}\"\r\nContent-Type: {audio_mime}\r\n\r\n".encode())
-        body_parts.append(audio_bytes)
-        body_parts.append(f"\r\n--{boundary}--\r\n".encode())
-        body = b"".join(body_parts)
+        # R18.1.2: 通过 asr_router 按优先级尝试本地 ASR（mlx > fast > remote）
+        from backend.app.services.asr_router import run_local_asr_with_fallback, select_asr_engine
 
-        transcribe_url = base_url.rstrip("/") + "/audio/transcriptions"
-        transcribe_req = urllib.request.Request(
-            transcribe_url,
-            data=body,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": f"multipart/form-data; boundary={boundary}",
-            },
-            method="POST",
-        )
+        tcfg = settings.transcriber
+        engine = select_asr_engine(api_key=api_key)
+        log(f"🔍 选用 ASR 引擎：{engine}")
+
         try:
-            with urllib.request.urlopen(transcribe_req, timeout=120) as resp:
-                resp_data = json.loads(resp.read())
-            transcript_text = resp_data.get("text") or ""
-            transcript_segments = resp_data.get("segments") or []
-            log(f"✅ 转写完成，{len(transcript_text)} 字符")
-        except Exception as err:
-            log(f"⚠️  转写失败：{err}")
-            transcript_text = ""
+            transcript_text, transcript_segments, _, asr_engine = run_local_asr_with_fallback(
+                file_path=str(audio_local_path),
+                api_key=api_key,
+                api_base=base_url,
+                model_name=tcfg.whisper_model_size or "base",
+                audio_model=audio_model,
+                language=whisper_lang if whisper_lang != "auto" else "",
+                initial_prompt=tcfg.initial_prompt or "",
+                log_callback=log,
+                progress_callback=lambda ratio, msg: runner.set_progress(
+                    task_id, 0.30 + ratio * 0.35, msg
+                ),
+            )
+            log(f"✅ 转写完成（{asr_engine}），{len(transcript_text)} 字符 / {len(transcript_segments)} 段")
+        except (RuntimeError, FileNotFoundError) as err:
+            raise RuntimeError(f"ASR 全部失败，无法转写音频：{err}") from err
 
     # ── 3. SUMMARIZE ─────────────────────────────────────────
+    runner.store.update(task_id, status=TaskStatus.SUM.value)
     runner.set_progress(task_id, 0.70, "生成摘要中...")
     summary = ""
 
@@ -2508,18 +2513,36 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     runner.store.update(task_id, status=TaskStatus.STORE.value)
     runner.set_progress(task_id, 0.92, "归档音频产物...")
 
+    try:
+        audio_duration_sec = float(yt_dlp_meta.get("video_duration") or 0)
+    except (TypeError, ValueError):
+        audio_duration_sec = 0.0
+    if audio_duration_sec <= 0:
+        audio_duration_sec = float(vad_result.total_duration or 0)
+    audio_title = str(yt_dlp_meta.get("video_title") or audio_filename)
+
     result: Dict[str, Any] = {
         "task_id": task_id,
         "project_id": record.project_id,
         "source": source,
         "source_type": source_type,
+        **yt_dlp_meta,
+        "duration_sec": audio_duration_sec,
         "transcript": transcript_text,
         "transcript_segments": transcript_segments,
         "summary": summary,
         "audio": {
+            "title": audio_title,
             "filename": audio_filename,
+            "url": source if source_type == "url" else "",
+            "duration_sec": audio_duration_sec,
+            "duration_str": "",
             "mime": audio_mime,
             "size_bytes": len(audio_bytes),
+        },
+        "tracks_meta": {
+            "total_sec": audio_duration_sec,
+            "transcript_count": len(transcript_segments),
         },
         "vad": vad_result.to_dict(),
         "diarization": diarization_dict,
@@ -2536,6 +2559,153 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     return {**result, "json_path": str(json_path.resolve())}
 
 
+# ── R19-B: AV synthesis handler ───────────────────────────────
+
+def handle_av_synthesis_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
+    """综合笔记任务：关键帧 + 转写 → 图文教学笔记 Markdown。
+
+    依赖（需在同一 workspace 内已有产物）：
+    - 视频分析产物（json_data/ 下的 *_视觉数据.json + frames/）
+    - 音频转写产物（audio/ 下的 *.json，含 transcript_segments）
+
+    payload 字段：
+      - api_key: 可选，LLM API key（缺省从 settings 读取）
+      - text_model: 可选，chat model 名称
+    """
+    from backend.app.services.av_synthesis import (
+        align_frames_to_transcript,
+        llm_final_synthesis,
+        llm_global_summary,
+        llm_split_chapters,
+        load_frames_manifest,
+        load_transcript,
+    )
+    from backend.app.services.av_synthesis.render import (
+        AVSynthesisContext,
+        GalleryRow,
+        render_av_synthesis_md,
+    )
+
+    payload = record.payload
+    task_id = record.task_id
+    log = lambda msg: runner.append_log(task_id, msg)  # noqa: E731
+
+    settings = load_settings()
+    api_key = (
+        str(payload.get("api_key") or "").strip()
+        or settings.openai_api_key.strip()
+    )
+    if not api_key:
+        raise ValueError("av_synthesis 任务需要 API key（请在设置中配置或在 payload 中传入）")
+
+    # ── 1. 定位 workspace 产物 ────────────────────────────────
+    workspace_root = get_workspace_root(record.project_id)
+    json_dir = get_workspace_json_dir(record.project_id)
+
+    runner.set_progress(task_id, 0.05, "加载依赖产物...")
+    log("📂 开始加载帧数据和转写数据")
+
+    # 查找视频分析产物目录（json_data 下含 frames/ 子目录的目录）
+    frame_dirs = [d for d in json_dir.iterdir() if d.is_dir() and (d / "frames").is_dir()]
+    if not frame_dirs:
+        raise FileNotFoundError(f"workspace {record.project_id} 中未找到视频分析产物（json_data/*/frames/）")
+
+    # 加载帧数据（从第一个找到的分析产物目录）
+    frames = load_frames_manifest(frame_dirs[0])
+    if not frames:
+        raise FileNotFoundError(f"帧数据为空：{frame_dirs[0]}")
+    log(f"✅ 加载 {len(frames)} 个关键帧")
+
+    # 查找音频转写产物
+    audio_dir = workspace_root / "audio"
+    audio_jsons = list(audio_dir.glob("*.json")) if audio_dir.exists() else []
+    if not audio_jsons:
+        raise FileNotFoundError(f"workspace {record.project_id} 中未找到转写产物（audio/*.json）")
+
+    transcript_segments = load_transcript(audio_jsons[0])
+    if not transcript_segments:
+        raise FileNotFoundError(f"转写数据为空：{audio_jsons[0]}")
+    log(f"✅ 加载 {len(transcript_segments)} 段转写")
+
+    # 提取元数据
+    audio_data = json.loads(audio_jsons[0].read_text(encoding="utf-8"))
+    metadata: Dict[str, Any] = {
+        "title": audio_data.get("video_title") or audio_data.get("audio", {}).get("title") or "未命名",
+        "author": audio_data.get("uploader") or audio_data.get("video_uploader") or "",
+        "duration_display": _format_sec_short(audio_data.get("duration_sec") or audio_data.get("audio", {}).get("duration_sec") or 0),
+    }
+
+    # ── 2. 时间戳对齐 ────────────────────────────────────────
+    runner.set_progress(task_id, 0.15, "帧-转写对齐中...")
+    aligned = align_frames_to_transcript(frames, transcript_segments)
+    log(f"✅ 对齐完成：{len(aligned)} 帧")
+
+    # ── 3. LLM 分章节 ───────────────────────────────────────
+    runner.set_progress(task_id, 0.25, "LLM 拆分章节...")
+    log("🤖 调用 LLM 拆分章节...")
+    chapters = llm_split_chapters(aligned, metadata, api_key)
+    log(f"✅ 拆分为 {len(chapters)} 个章节")
+
+    # ── 4. LLM 全局摘要 ─────────────────────────────────────
+    runner.set_progress(task_id, 0.50, "LLM 生成全局摘要...")
+    log("🤖 调用 LLM 生成全局摘要...")
+    transcript_text = "\n".join(seg.text for seg in transcript_segments)
+    summary = llm_global_summary(transcript_text, api_key)
+    log(f"✅ 摘要生成完成：{len(summary)} 字")
+
+    # ── 5. LLM 最终综合 ─────────────────────────────────────
+    runner.set_progress(task_id, 0.70, "LLM 最终综合分析...")
+    log("🤖 调用 LLM 生成最终综合...")
+    final_synthesis = llm_final_synthesis(aligned, chapters, api_key)
+    log(f"✅ 综合分析完成：{len(final_synthesis)} 字")
+
+    # ── 6. 渲染 Markdown ────────────────────────────────────
+    runner.set_progress(task_id, 0.85, "渲染 Markdown...")
+
+    gallery_rows = [
+        GalleryRow(
+            timestamp_display=_format_sec_short(af.frame.timestamp),
+            image_path=af.frame.image_path,
+            scene_description=af.frame.scene_description,
+        )
+        for af in aligned
+    ]
+
+    # 格式化完整转写（带时间戳）
+    full_transcript_lines = []
+    for seg in transcript_segments:
+        ts = _format_sec_short(seg.start)
+        full_transcript_lines.append(f"[{ts}] {seg.text}")
+    full_transcript = "\n".join(full_transcript_lines)
+
+    ctx = AVSynthesisContext(
+        title=metadata.get("title", "未命名"),
+        platform=metadata.get("author", ""),
+        author=metadata.get("author", ""),
+        duration_display=metadata.get("duration_display", ""),
+        summary=summary,
+        gallery_rows=gallery_rows,
+        chapters=chapters,
+        full_transcript=full_transcript,
+        final_synthesis=final_synthesis,
+    )
+    md = render_av_synthesis_md(ctx)
+
+    # ── 7. 写出文件 ─────────────────────────────────────────
+    out_path = workspace_root / "av_synthesis.md"
+    out_path.write_text(md, encoding="utf-8")
+
+    runner.set_progress(task_id, 1.0, "综合笔记完成")
+    log(f"✅ 综合笔记已生成：{out_path}")
+
+    return {
+        "av_synthesis_path": "av_synthesis.md",
+        "chapter_count": len(chapters),
+        "frame_count": len(frames),
+        "segment_count": len(transcript_segments),
+    }
+
+
 def register_pipeline_handlers(runner: TaskRunner) -> None:
     runner.register("download",  handle_download_task)
     runner.register("analyze",   handle_analyze_task)
@@ -2545,3 +2715,4 @@ def register_pipeline_handlers(runner: TaskRunner) -> None:
     runner.register("text",      handle_text_task)
     runner.register("image",     handle_image_task)
     runner.register("audio",     handle_audio_task)
+    runner.register("av_synthesis", handle_av_synthesis_task)

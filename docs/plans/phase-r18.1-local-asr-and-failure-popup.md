@@ -69,7 +69,7 @@ trigger_case:
 
 - [ ] R18.1.1 `asr_mlx_whisper.py` + `asr_router.py` + 单测
 - [ ] R18.1.2 `pipeline_tasks.py` audio TRANSCRIBE 改造 + `workspaces.py` failed 分支
-- [ ] R18.1.3 前端 ErrorState + 失败 Modal
-- [ ] R18.1.4 前端模型下载进度条
+- [x] R18.1.3 前端 ErrorState + 失败 Modal
+- [x] R18.1.4 前端模型下载进度条
 
 完工后：①EXECUTION_PLAN.md 打勾 ② 本文件 frontmatter status=done + 填 commits ③ COMPLETED_WORK.md 追加一段。

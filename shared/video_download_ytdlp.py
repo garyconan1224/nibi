@@ -553,3 +553,56 @@ def run_ytdlp_download(
         "error_full": full,
         "percent": float(task_state.get("percent") or 0.0),
     }
+
+
+def fetch_ytdlp_metadata(
+    url: str,
+    *,
+    log: Callable[[str], None] | None = None,
+) -> dict[str, Any]:
+    """只跑 yt-dlp extract_info(download=False) 拿元数据，不下载。
+
+    返回 {"title", "duration", "uploader", "thumbnail_url"}，
+    任何字段拿不到就给空字符串/0。失败时返回空 dict（调用方按缺省处理）。
+    """
+    try:
+        import yt_dlp
+    except ImportError:
+        if log:
+            log("⚠️ yt-dlp 未安装，跳过元数据预取")
+        return {}
+
+    ydl_opts: dict[str, Any] = {
+        "quiet": True,
+        "skip_download": True,
+        "no_warnings": True,
+    }
+
+    # 复用已有的 cookie 路径
+    cbs = cookie_base_dirs()
+    cookie_files = _existing_cookie_files(cbs)
+    if cookie_files:
+        ydl_opts["cookiefile"] = cookie_files[0]
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+    except Exception as exc:
+        if log:
+            log(f"⚠️ 元数据预取失败：{str(exc)[:120]}")
+        return {}
+
+    # playlist 取首条
+    if info and info.get("_type") == "playlist":
+        entries = info.get("entries")
+        if entries:
+            info = next(entries, None)
+    if not info:
+        return {}
+
+    return {
+        "title": info.get("title") or "",
+        "duration": info.get("duration") or 0,
+        "uploader": info.get("uploader") or "",
+        "thumbnail_url": info.get("thumbnail") or "",
+    }

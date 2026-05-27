@@ -663,6 +663,93 @@ def test_library_uses_task_overlay_for_duration_and_thumbnail(
     assert item_out["primary_task_status"] == TaskStatus.SUCCESS.value
 
 
+def test_library_task_overlay_enriches_existing_item_results(client: TestClient) -> None:
+    """已有旧 results 时，最新 task metadata 仍应补回资料库标题和封面。"""
+    ws = client.post("/workspaces", json={"name": "旧结果补封面"}).json()
+    ws_id = ws["workspace_id"]
+    item = client.post(
+        f"/workspaces/{ws_id}/items",
+        json={
+            "type": "audio",
+            "source": "url",
+            "source_value": "https://www.bilibili.com/video/BV1xx1234",
+            "name": "https://www.bilibili.com/video/BV1xx1234",
+        },
+    ).json()["items"][0]
+    item_id = item["item_id"]
+
+    ws_module._store.update_item(
+        ws_id,
+        item_id,
+        related_task_ids=["audio-task"],
+        results={"transcript": "old transcript"},
+    )
+    task = TaskRecord(
+        task_id="audio-task",
+        project_id=ws_id,
+        task_type="audio",
+        payload={},
+        status=TaskStatus.SUCCESS.value,
+        result={
+            "video_title": "Codex 10个必装插件！实战演示",
+            "video_thumbnail_url": "https://example.com/cover.jpg",
+            "transcript": "new transcript",
+        },
+        updated_at="2026-01-02T00:00:00+00:00",
+    )
+    ws_module._pipeline_runner.store.get.side_effect = lambda task_id: task if task_id == "audio-task" else None
+
+    resp = client.get("/workspaces/library")
+    assert resp.status_code == 200
+    item_out = resp.json()["items"][0]
+    assert item_out["name"] == "Codex 10个必装插件！实战演示"
+    assert item_out["thumbnail"] == "https://example.com/cover.jpg"
+    assert item_out["results_summary"]["has_transcript"] is True
+
+
+def test_library_audio_uses_filename_title_and_local_audio_thumbnail(
+    client: TestClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """旧 audio result 只有 audio.filename 时，资料库仍应显示标题和同名封面。"""
+    data_root = tmp_path / "data"
+    audio_dir = data_root / "workspaces" / "default_project" / "audio"
+    audio_dir.mkdir(parents=True)
+    thumb = audio_dir / "Codex 10个必装插件.jpg"
+    thumb.write_bytes(b"fake-thumbnail")
+    monkeypatch.setattr(ws_module, "_ROOT_DIR", tmp_path)
+    monkeypatch.setattr(ws_module, "DATA_DIR", data_root)
+
+    ws = client.post("/workspaces", json={"name": "bilibili · Codex 10个必装插件"}).json()
+    ws_id = ws["workspace_id"]
+    item = client.post(
+        f"/workspaces/{ws_id}/items",
+        json={
+            "type": "audio",
+            "source": "url",
+            "source_value": "https://www.bilibili.com/video/BV1xx1234",
+            "name": "https://www.bilibili.com/video/BV1xx1234",
+        },
+    ).json()["items"][0]
+    item_id = item["item_id"]
+    ws_module._store.update_item(
+        ws_id,
+        item_id,
+        results={
+            "project_id": "default_project",
+            "transcript": "old transcript",
+            "audio": {"filename": "Codex 10个必装插件.mp4"},
+        },
+    )
+
+    resp = client.get("/workspaces/library")
+    assert resp.status_code == 200
+    item_out = resp.json()["items"][0]
+    assert item_out["name"] == "Codex 10个必装插件"
+    assert item_out["thumbnail"] == "/static/workspaces/default_project/audio/Codex 10个必装插件.jpg"
+
+
 def test_batch_delete_items_removes_valid_items_and_reports_failures(client: TestClient) -> None:
     """批量删除应删除合法 item，并返回失败条目供前端提示。"""
     ws = client.post("/workspaces", json={"name": "批量删除"}).json()
