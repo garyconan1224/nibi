@@ -199,7 +199,8 @@ export function PreflightDrawer({
   const serializeTasksForType = (itemType: ItemType) => {
     const taskKind = itemType as MediaKind
     const raw = (tasks[taskKind] ?? {}) as TaskState
-    const effective = applyCascades(taskKind, raw, materialCount, sc?.analysisScope).state
+    const sourceFeatures = sc?.features?.[itemType]
+    const effective = applyCascades(taskKind, raw, materialCount, sc?.analysisScope, sourceFeatures).state
     const enabledFeatures = Object.entries(effective)
       .filter(([, v]) => v.on)
       .map(([k]) => k)
@@ -217,6 +218,13 @@ export function PreflightDrawer({
     const map: Record<string, boolean> = {}
     for (const [taskId, featureId] of Object.entries(TASK_TO_FEATURE[taskKind])) {
       map[featureId] = Boolean(effective[taskId]?.on)
+    }
+    if (
+      taskKind === 'video' &&
+      sc?.features?.video?.av_synthesis &&
+      effective.summary?.summary_path === '音视频综合'
+    ) {
+      map.av_synthesis = true
     }
     return map
   }
@@ -279,7 +287,13 @@ export function PreflightDrawer({
   const groups = TASK_GROUPS[kind] ?? []
   const currentTasks = (tasks[kind] ?? {}) as Record<string, { on?: boolean; [k: string]: unknown }>
   // ── Cascade: compute effective state + lock/disabled reasons ──
-  const cascaded = applyCascades(kind, currentTasks as TaskState, materialCount, sc?.analysisScope)
+  const cascaded = applyCascades(
+    kind,
+    currentTasks as TaskState,
+    materialCount,
+    sc?.analysisScope,
+    sc?.features?.[kind],
+  )
   const effState = cascaded.state
   const locks = cascaded.locks
   const disabledReasons = cascaded.disabled

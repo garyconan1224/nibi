@@ -643,6 +643,18 @@ def _collect_frame_descriptions(json_paths: list) -> str:
     return "\n".join(lines)
 
 
+def _find_visual_json_paths_for_videos(project_json_dir: Path, videos: List[Path]) -> List[Path]:
+    """只返回当前 videos 对应的 VLM JSON，避免复用同工作区里其它视频的视觉数据。"""
+    expected_names = {f"{get_safe_name(video)}_视觉数据.json" for video in videos}
+    if not expected_names:
+        return []
+    return sorted(
+        path
+        for path in project_json_dir.glob("*_视觉数据.json")
+        if path.name in expected_names
+    )
+
+
 def _generate_combined_summary(
     api_key: str,
     text_model: str,
@@ -798,7 +810,7 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
         runner.set_progress(record.task_id, 0.7, "Generating combined summary")
 
         # 收集帧描述
-        json_paths = sorted(project_json_dir.glob("*_视觉数据.json"))
+        json_paths = _find_visual_json_paths_for_videos(project_json_dir, videos)
         frame_descriptions = _collect_frame_descriptions(json_paths)
 
         # 合并总结：transcript + frame descriptions → LLM
@@ -863,7 +875,7 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
         runner.store.update(record.task_id, result=merged)
         time.sleep(0.2)
     runner.set_progress(record.task_id, 0.95, "Frame analysis finished")
-    json_paths = sorted(project_json_dir.glob("*_视觉数据.json"))
+    json_paths = _find_visual_json_paths_for_videos(project_json_dir, videos)
     basenames = [p.name for p in json_paths]
     root = str(project_json_dir.resolve())
 

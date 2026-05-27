@@ -48,9 +48,9 @@ describe('applyCascades', () => {
     expect(locks.frame_prompt).toBeUndefined()
   })
 
-  it('video: 视频模型直接分析 不触发级联', () => {
+  it('video: 只听字幕/音频转写 不触发 frame_prompt 级联', () => {
     const state = makeState('video', {
-      summary: { on: true, summary_path: '视频模型直接分析' },
+      summary: { on: true, summary_path: '只听字幕/音频转写' },
     })
     const { locks } = applyCascades('video', state)
     expect(locks.frame_prompt).toBeUndefined()
@@ -151,6 +151,14 @@ describe('applyCascades', () => {
     const { state } = applyCascades('video', init, 1, 'av_combined')
     expect(state.summary.summary_path).toBe('音视频综合')
     expect(state.summary.on).toBe(true)
+  })
+
+  it('勾选 av_synthesis 时路径锁为音视频综合', () => {
+    const init = buildInitialTasks('video')
+    const features = { av_synthesis: true }
+    const { state, locks } = applyCascades('video', init, 1, undefined, features)
+    expect(state.summary.summary_path).toBe('音视频综合')
+    expect(locks['summary.summary_path']).toMatch(/综合笔记/)
   })
 })
 

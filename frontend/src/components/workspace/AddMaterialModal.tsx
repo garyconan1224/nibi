@@ -20,7 +20,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { FEATURES_BY_SCOPE, FEATURES_BY_TYPE, type Feature } from '@/lib/featuresToSteps'
+import { FEATURES_BY_SCOPE_V2, FEATURES_BY_TYPE, expandFeatureIds, type FeatureDef } from '@/lib/featuresToSteps'
 import type { SniffResult } from '@/services/workspaces'
 import {
   sniffUrl,
@@ -158,24 +158,28 @@ export function AddMaterialModal({
     /* eslint-disable react-hooks/set-state-in-effect */
     // R7.4: initialStaged 回填优先于 sniff 默认值
     if (initialStaged?.types?.length) {
-      setSelectedTypes(initialStaged.types)
+      const scope = initialStaged.analysisScope ?? (showScopeCards ? 'av_combined' : undefined)
+      const resetTypes = scope ? [SCOPE_META[scope].itemType] : initialStaged.types
+      setSelectedTypes(resetTypes)
       setFeatures({
-        ...buildDefaults(initialStaged.types),
+        ...buildDefaults(resetTypes, scope),
         ...(initialStaged.features ?? {}),
       })
       setBgOverrides(initialStaged.background ?? {})
-      if (initialStaged.analysisScope) setAnalysisScope(initialStaged.analysisScope)
+      setAnalysisScope(scope ?? 'av_combined')
     } else {
-      setSelectedTypes(types)
-      setFeatures(buildDefaults(types))
+      const scope = showScopeCards ? 'av_combined' : undefined
+      const resetTypes = scope ? [SCOPE_META[scope].itemType] : types
+      setSelectedTypes(resetTypes)
+      setFeatures(buildDefaults(resetTypes, scope))
       setBgOverrides({})
-      setAnalysisScope('av_combined')
+      setAnalysisScope(scope ?? 'av_combined')
     }
     setBgOpen(false)
     setError(null)
     setSubmitting(false)
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [open, effectiveInitial, initialStaged])
+  }, [open, effectiveInitial, initialStaged, showScopeCards])
 
   useEffect(() => {
     if (!open) return
@@ -226,12 +230,22 @@ export function AddMaterialModal({
     })
   }
 
-  // ── Feature 勾选切换 ──
+  // ── Feature 勾选切换（R17: 综合笔记联动）──
   const toggleFeature = (type: ItemType, featId: string) => {
-    setFeatures((prev) => ({
-      ...prev,
-      [type]: { ...prev[type], [featId]: !prev[type]?.[featId] },
-    }))
+    setFeatures((prev) => {
+      const next = { ...prev }
+      const cur = { ...(next[type] ?? {}) }
+      const turningOn = !cur[featId]
+      cur[featId] = turningOn
+      next[type] = cur
+
+      // 联动：勾上综合笔记 → 自动勾上画面分析 + 人声转写
+      if (featId === 'av_synthesis' && turningOn) {
+        cur['visual_analysis'] = true
+        cur['transcribe_summary'] = true
+      }
+      return next
+    })
   }
 
   // ── 背景字段更新 ──
@@ -277,10 +291,14 @@ export function AddMaterialModal({
 
       for (const { type, summaryPath } of typesToCreate) {
         try {
-          const allowed = showScopeCards ? new Set(FEATURES_BY_SCOPE[analysisScope]) : null
-          const enabledFeatures = Object.entries(features[type] ?? {})
-            .filter(([id, on]) => on && (!allowed || allowed.has(id as Feature)))
+          const scopedType = showScopeCards ? SCOPE_META[analysisScope].itemType : null
+          const allowed: Set<string> | null = showScopeCards && type === scopedType
+            ? new Set(FEATURES_BY_SCOPE_V2[analysisScope].map(f => f.id))
+            : null
+          const rawEnabled = Object.entries(features[type] ?? {})
+            .filter(([id, on]) => on && (!allowed || allowed.has(id)))
             .map(([id]) => id)
+          const enabledFeatures = expandFeatureIds(rawEnabled)
 
           // 2. addWorkspaceItem
           const ws = await addWorkspaceItem(wsId, {
@@ -459,8 +477,12 @@ export function AddMaterialModal({
                       onClick={() => {
                         setAnalysisScope(scope)
                         setSelectedTypes([meta.itemType])
-                        // 切换 scope 必清 features，避免隐藏 chip 状态泄漏到后端
-                        setFeatures({} as Record<ItemType, Record<string, boolean>>)
+                        // 切换 scope 时用新表重建默认值
+                        const scopeDefaults: Record<string, boolean> = {}
+                        for (const f of FEATURES_BY_SCOPE_V2[scope]) {
+                          scopeDefaults[f.id] = f.defaultChecked
+                        }
+                        setFeatures({ [meta.itemType]: scopeDefaults } as Record<ItemType, Record<string, boolean>>)
                       }}
                     >
                       <Icon size={22} />
@@ -542,10 +564,53 @@ export function AddMaterialModal({
               {selectedTypes.map((type) => {
                 const meta = TYPE_META[type]
                 const Icon = meta.icon
-                const baseFeatures = FEATURES_BY_TYPE[type]
-                const typeFeatures = showScopeCards
-                  ? baseFeatures.filter(f => FEATURES_BY_SCOPE[analysisScope].includes(f.id))
-                  : baseFeatures
+                const isScopedType = showScopeCards && type === SCOPE_META[analysisScope].itemType
+                const typeFeatures: FeatureDef[] = isScopedType
+                  ? FEATURES_BY_SCOPE_V2[analysisScope]
+                  : FEATURES_BY_TYPE[type]
+
+                // av_combined 时分组：highlight 项独占一行，然后分视频侧/音频侧
+                const splitScopeFeats = isScopedType && analysisScope === 'av_combined'
+                const highlightFeats = splitScopeFeats
+                  ? typeFeatures.filter(f => f.highlight)
+                  : []
+                const normalFeats = splitScopeFeats
+                  ? typeFeatures.filter(f => !f.highlight)
+                  : typeFeatures
+                const videoSideFeats = splitScopeFeats
+                  ? normalFeats.filter(f => f.id === 'visual_analysis')
+                  : []
+                const audioSideFeats = splitScopeFeats
+                  ? normalFeats.filter(f => f.id !== 'visual_analysis')
+                  : []
+
+                // 综合笔记精度下降 hint
+                const synthesisOn = features[type]?.['av_synthesis'] ?? false
+                const visualOn = features[type]?.['visual_analysis'] ?? false
+                const transcribeOn = features[type]?.['transcribe_summary'] ?? false
+                const showPrecisionHint = synthesisOn && (!visualOn || !transcribeOn)
+
+                const renderChip = (feat: FeatureDef) => {
+                  const on = features[type]?.[feat.id] ?? false
+                  return (
+                    <button
+                      key={feat.id}
+                      type="button"
+                      className="task-chip"
+                      data-on={on ? 'true' : 'false'}
+                      data-highlight={feat.highlight ? 'true' : undefined}
+                      onClick={() => toggleFeature(type, feat.id)}
+                      title={feat.hint}
+                    >
+                      <span className="tc-box">
+                        {on && <Check size={12} strokeWidth={2.5} />}
+                      </span>
+                      {feat.badge && <span style={{ marginRight: 2 }}>{feat.badge}</span>}
+                      {feat.label}
+                    </button>
+                  )
+                }
+
                 return (
                   <div key={type} style={{ marginBottom: 10 }}>
                     <div
@@ -562,25 +627,41 @@ export function AddMaterialModal({
                       <Icon size={12} />
                       {meta.label}
                     </div>
-                    <div className="task-chips">
-                      {typeFeatures.map((feat) => {
-                        const on = features[type]?.[feat.id] ?? false
-                        return (
-                          <button
-                            key={feat.id}
-                            type="button"
-                            className="task-chip"
-                            data-on={on ? 'true' : 'false'}
-                            onClick={() => toggleFeature(type, feat.id)}
-                          >
-                            <span className="tc-box">
-                              {on && <Check size={12} strokeWidth={2.5} />}
-                            </span>
-                            {feat.label}
-                          </button>
-                        )
-                      })}
-                    </div>
+                    {/* highlight 项（综合笔记）独占一行 */}
+                    {highlightFeats.length > 0 && (
+                      <div className="task-chips" style={{ marginBottom: 6 }}>
+                        {highlightFeats.map(renderChip)}
+                        {showPrecisionHint && (
+                          <span className="mono" style={{ fontSize: 10, color: 'var(--amber-600, #d97706)', marginLeft: 6 }}>
+                            ⚠ 已取消依赖项，精度可能下降
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {/* 视频侧 */}
+                    {videoSideFeats.length > 0 && (
+                      <>
+                        <div className="mono" style={{ fontSize: 9, color: 'var(--ink-4)', marginBottom: 3, marginTop: 4 }}>视频侧</div>
+                        <div className="task-chips" style={{ marginBottom: 4 }}>
+                          {videoSideFeats.map(renderChip)}
+                        </div>
+                      </>
+                    )}
+                    {/* 音频侧 */}
+                    {audioSideFeats.length > 0 && (
+                      <>
+                        <div className="mono" style={{ fontSize: 9, color: 'var(--ink-4)', marginBottom: 3 }}>音频侧</div>
+                        <div className="task-chips">
+                          {audioSideFeats.map(renderChip)}
+                        </div>
+                      </>
+                    )}
+                    {/* 非 av_combined 模式：直接渲染全部 chip */}
+                    {!splitScopeFeats && (
+                      <div className="task-chips">
+                        {normalFeats.map(renderChip)}
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -761,7 +842,15 @@ export function AddMaterialModal({
 
 // ── 默认值构建 ──────────────────────────────────────────────
 
-function buildTypeDefaults(type: ItemType): Record<string, boolean> {
+function buildTypeDefaults(type: ItemType, scope?: AnalysisScope): Record<string, boolean> {
+  // R17: scope 模式走新表，audio_only 对应 audio，visual/combined 对应 video。
+  if (scope && type === SCOPE_META[scope].itemType) {
+    const defaults: Record<string, boolean> = {}
+    for (const f of FEATURES_BY_SCOPE_V2[scope]) {
+      defaults[f.id] = f.defaultChecked
+    }
+    return defaults
+  }
   const defaults: Record<string, boolean> = {}
   for (const f of FEATURES_BY_TYPE[type]) {
     defaults[f.id] = f.defaultChecked
@@ -769,10 +858,10 @@ function buildTypeDefaults(type: ItemType): Record<string, boolean> {
   return defaults
 }
 
-function buildDefaults(types: ItemType[]): Record<ItemType, Record<string, boolean>> {
+function buildDefaults(types: ItemType[], scope?: AnalysisScope): Record<ItemType, Record<string, boolean>> {
   const result = {} as Record<ItemType, Record<string, boolean>>
   for (const t of types) {
-    result[t] = buildTypeDefaults(t)
+    result[t] = buildTypeDefaults(t, scope)
   }
   return result
 }

@@ -9,6 +9,7 @@ vi.mock('@/services/client', () => ({
 }))
 
 import { createNoteTask } from '@/services/pipeline'
+import { featuresToSteps } from '@/lib/featuresToSteps'
 
 describe('createNoteTask', () => {
   beforeEach(() => {
@@ -36,5 +37,12 @@ describe('createNoteTask', () => {
       },
       steps: ['download', 'transcribe', 'analyze', 'note'],
     })
+  })
+})
+
+describe('featuresToSteps', () => {
+  it('visual_analysis 不触发转写，av_synthesis 触发转写', () => {
+    expect(featuresToSteps('video', ['visual_analysis'])).toEqual(['download', 'analyze', 'note'])
+    expect(featuresToSteps('video', ['av_synthesis'])).toEqual(['download', 'transcribe', 'analyze', 'note'])
   })
 })

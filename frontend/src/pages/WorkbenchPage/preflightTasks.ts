@@ -64,7 +64,7 @@ export const TASK_GROUPS: Record<MediaKind, TaskGroup[]> = {
     {
       id: 'summary', label: '视频文案总结', sub: '只看画面 · 字幕转写 · 音视频综合 · 视频模型', default: true,
       children: [
-        { id: 'summary_path', label: '总结路径', type: 'radio', options: ['只看画面', '只听字幕/音频转写', '音视频综合', '视频模型直接分析'], default: '音视频综合' },
+        { id: 'summary_path', label: '总结路径', type: 'radio', options: ['只看画面', '只听字幕/音频转写', '音视频综合'], default: '音视频综合' },
         { id: 'summary_depth', label: '总结深度', type: 'radio', options: ['简洁', '详细', '带画面引用'], default: '详细', whenParent: 'summary_path', whenValue: '音视频综合' },
       ],
     },
@@ -144,6 +144,7 @@ export function applyCascades(
   raw: TaskState,
   materialCount = 1,
   scope?: AnalysisScope,
+  features?: Record<string, boolean>,
 ): CascadeResult {
   const s = structuredClone(raw)
   const locks: Record<string, string> = {}
@@ -164,6 +165,12 @@ export function applyCascades(
         locks['summary.summary_path'] = '音视频综合 · 路径已锁定'
       }
     }
+  }
+
+  // R17: 综合笔记勾选时强制 summary_path = 音视频综合
+  if (kind === 'video' && features?.av_synthesis && s.summary) {
+    s.summary = { ...s.summary, on: true, summary_path: '音视频综合' }
+    locks['summary.summary_path'] = '综合笔记模式 · 路径锁定为音视频综合'
   }
 
   if (kind === 'video' && s.summary) {
