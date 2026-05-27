@@ -80,6 +80,23 @@ def _mock_settings(api_key: str = ""):
     )
 
 
+def test_find_visual_json_paths_for_videos_filters_unrelated_workspace_json(tmp_path: Path) -> None:
+    from backend.app.services.pipeline_tasks import _find_visual_json_paths_for_videos
+    from shared.video_analyzer import get_safe_name
+
+    current_video = tmp_path / "current video.mp4"
+    other_video = tmp_path / "other video.mp4"
+    current_video.touch()
+    other_video.touch()
+
+    current_json = tmp_path / f"{get_safe_name(current_video)}_视觉数据.json"
+    other_json = tmp_path / f"{get_safe_name(other_video)}_视觉数据.json"
+    current_json.write_text('{"frames": []}', encoding="utf-8")
+    other_json.write_text('{"frames": []}', encoding="utf-8")
+
+    assert _find_visual_json_paths_for_videos(tmp_path, [current_video]) == [current_json]
+
+
 # ── 场景 A：仅下载 ─────────────────────────────────────────────────────────
 
 class TestScenarioA:

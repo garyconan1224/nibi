@@ -265,3 +265,26 @@
   max-width: 320px;
   line-height: 1.55;
 }
+
+/* Workspace card delete button */
+.ws-delete-btn {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  border: none;
+  border-radius: 7px;
+  padding: 4px 5px;
+  cursor: pointer;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transition: opacity 140ms, background 120ms;
+}
+
+.ws-card:hover .ws-delete-btn {
+  opacity: 1;
+}
+
+.ws-delete-btn:hover {
+  background: var(--accent) !important;
+}

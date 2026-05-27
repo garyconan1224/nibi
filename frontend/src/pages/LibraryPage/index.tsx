@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Trash2, Plus, Inbox, Filter } from 'lucide-react'
 import { toast } from 'sonner'
 import { fetchLibrary, deleteItem, batchDeleteItems, type LibraryItem, type LibraryResponse } from '@/services/library'
+import { deleteWorkspace } from '@/services/workspaces'
 import { useLibraryStore, type SortBy } from '@/store/libraryStore'
 import { FilterChips } from './FilterChips'
 import { SortMenu } from './SortMenu'
@@ -87,6 +88,15 @@ export default function LibraryPage() {
     })
   }, [])
 
+  const toggleWorkspaceSelect = useCallback((wsId: string) => {
+    setSelectedSet((prev) => {
+      const next = new Set(prev)
+      const key = `ws:${wsId}`
+      if (next.has(key)) next.delete(key); else next.add(key)
+      return next
+    })
+  }, [])
+
   const clearSelection = useCallback(() => {
     setSelectedSet(new Set())
     setSelecting(false)
@@ -123,6 +133,11 @@ export default function LibraryPage() {
   ) as string[]
   const showAll = selectedFilters.includes('all')
 
+  const filteredWorkspaces = useMemo(() => {
+    if (!data || !showWorkspace) return null
+    return data.workspaces
+  }, [data, showWorkspace])
+
   const filteredItems = useMemo(() => {
     if (!data) return []
     let items: LibraryItem[]
@@ -137,8 +152,13 @@ export default function LibraryPage() {
   }, [data, showAll, typeFilters, sortBy])
 
   const selectAll = useCallback(() => {
-    setSelectedSet(new Set(filteredItems.map((it) => selectionKey(it.workspace_id, it.item_id))))
-  }, [filteredItems])
+    const next = new Set<string>()
+    filteredItems.forEach((it) => next.add(selectionKey(it.workspace_id, it.item_id)))
+    if (filteredWorkspaces) {
+      filteredWorkspaces.forEach((ws) => next.add(`ws:${ws.workspace_id}`))
+    }
+    setSelectedSet(next)
+  }, [filteredItems, filteredWorkspaces])
 
   const handleDeleteOne = useCallback(async (item: LibraryItem) => {
     const label = item.name || '未命名'
@@ -153,18 +173,43 @@ export default function LibraryPage() {
     }
   }, [load])
 
+  const handleDeleteWorkspace = useCallback(async (wsId: string) => {
+    const ws = data?.workspaces.find((w) => w.workspace_id === wsId)
+    const label = ws?.name || '未命名工作空间'
+    const ok = window.confirm(`确定删除工作空间「${label}」？`)
+    if (!ok) return
+    try {
+      await deleteWorkspace(wsId)
+      toast.success(`已删除工作空间「${label}」`)
+      load()
+    } catch {
+      toast.error('删除工作空间失败，请重试')
+    }
+  }, [data, load])
+
   const handleBatchDelete = useCallback(async () => {
     if (selectedSet.size === 0) return
-    const ok = window.confirm(`确定删除选中的 ${selectedSet.size} 个素材？此操作不可撤销。`)
+    const ok = window.confirm(`确定删除选中的 ${selectedSet.size} 项？此操作不可撤销。`)
     if (!ok) return
     setDeleting(true)
     try {
-      const items = Array.from(selectedSet).map((key) => {
-        const [ws, ...rest] = key.split(':')
-        return { workspace_id: ws, item_id: rest.join(':') }
+      const items: { workspace_id: string; item_id: string }[] = []
+      const wsIds: string[] = []
+      Array.from(selectedSet).forEach((key) => {
+        if (key.startsWith('ws:')) {
+          wsIds.push(key.slice(3))
+        } else {
+          const [ws, ...rest] = key.split(':')
+          items.push({ workspace_id: ws, item_id: rest.join(':') })
+        }
       })
-      await batchDeleteItems(items)
-      toast.success(`已删除 ${selectedSet.size} 个素材`)
+      if (items.length > 0) {
+        await batchDeleteItems(items)
+      }
+      if (wsIds.length > 0) {
+        await Promise.all(wsIds.map((id) => deleteWorkspace(id)))
+      }
+      toast.success(`已删除 ${selectedSet.size} 项`)
       setSelectedSet(new Set())
       load()
     } catch {
@@ -174,10 +219,7 @@ export default function LibraryPage() {
     }
   }, [selectedSet, load])
 
-  const filteredWorkspaces = useMemo(() => {
-    if (!data || !showWorkspace) return null
-    return data.workspaces
-  }, [data, showWorkspace])
+
 
   const chipCounts = useMemo(() => {
     if (!data) return undefined
@@ -238,7 +280,7 @@ export default function LibraryPage() {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {/* 选择控制 */}
-          {filteredItems.length > 0 && (
+          {(filteredItems.length > 0 || (filteredWorkspaces && filteredWorkspaces.length > 0)) && (
             <>
               {selectMode ? (
                 <>
@@ -248,23 +290,21 @@ export default function LibraryPage() {
                   <button className="btn" style={{ fontSize: 12, height: 32 }} onClick={clearSelection}>
                     取消
                   </button>
-                  {selectedSet.size > 0 && (
-                    <button
-                      className="btn"
-                      style={{
-                        fontSize: 12,
-                        height: 32,
-                        color: 'var(--accent)',
-                        borderColor: 'var(--accent)',
-                        opacity: deleting ? 0.5 : 1,
-                      }}
-                      onClick={handleBatchDelete}
-                      disabled={deleting}
-                    >
-                      <Trash2 size={13} />
-                      删除 ({selectedSet.size})
-                    </button>
-                  )}
+                  <button
+                    className="btn"
+                    style={{
+                      fontSize: 12,
+                      height: 32,
+                      color: selectedSet.size > 0 ? 'var(--accent)' : 'var(--ink-4)',
+                      borderColor: selectedSet.size > 0 ? 'var(--accent)' : 'var(--line)',
+                      opacity: deleting || selectedSet.size === 0 ? 0.5 : 1,
+                    }}
+                    onClick={handleBatchDelete}
+                    disabled={deleting || selectedSet.size === 0}
+                  >
+                    <Trash2 size={13} />
+                    删除 {selectedSet.size > 0 ? `(${selectedSet.size})` : ''}
+                  </button>
                 </>
               ) : (
                 <button className="btn" style={{ fontSize: 12, height: 32 }} onClick={enterSelectMode}>
@@ -336,6 +376,10 @@ export default function LibraryPage() {
                       key={ws.workspace_id}
                       workspace={ws}
                       items={wsItems}
+                      selectMode={selectMode}
+                      selected={selectedSet.has(`ws:${ws.workspace_id}`)}
+                      onToggleSelect={toggleWorkspaceSelect}
+                      onDelete={handleDeleteWorkspace}
                     />
                   )
                 })}

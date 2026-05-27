@@ -105,7 +105,6 @@ export default function ProcessingPage() {
   const payload = task?.payload ?? {} as Record<string, unknown>
   const taskType: string = task?.task_type ?? ''
   const isAudioTask = taskType === 'audio'
-  const isNoteTask = taskType === 'note'
   // R13.2 标题/封面/时长来源优先级：result（直接来源）→ payload（从 download 继承）→ fallback
   const url = (task?.payload?.url as string) ?? (payload.source_url as string) ?? state?.url ?? ''
   const platform = platformPrefixFromUrl(url)

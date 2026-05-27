@@ -199,7 +199,7 @@ describe('PreflightDrawer R4', () => {
           enabled_features: expect.arrayContaining(['frame_prompt', 'summary', 'srt']),
           summary: expect.objectContaining({
             on: true,
-            summary_path: '音视频合并 · 最详细',
+            summary_path: '音视频综合',
           }),
         }),
       }),
@@ -247,5 +247,127 @@ describe('PreflightDrawer R7.4 stage 模式', () => {
 
     const btn = screen.getByRole('button', { name: /开始解析/ })
     expect(btn).toBeDefined()
+  })
+})
+
+describe('PreflightDrawer analysisScope', () => {
+  beforeEach(() => {
+    addWorkspaceItemMock.mockReset()
+    autoCreateWorkspaceMock.mockReset()
+    startItemPipelineMock.mockReset()
+    savePreflightMock.mockReset()
+  })
+
+  it('analysisScope=visual_only 时 summary_path 为 只看画面', async () => {
+    autoCreateWorkspaceMock.mockResolvedValue({
+      workspace_id: 'ws-1',
+      name: '自动工作空间',
+    })
+    addWorkspaceItemMock.mockResolvedValue({
+      items: [{ item_id: 'item-1', type: 'video' }],
+    })
+    savePreflightMock.mockResolvedValue({})
+    startItemPipelineMock.mockResolvedValue({ task_id: 'task-video' })
+
+    render(
+      <PreflightDrawer
+        {...defaultProps}
+        stagedConfig={{
+          types: ['video'],
+          features: {},
+          background: {},
+          workspaceIds: ['ws-1'],
+          analysisScope: 'visual_only',
+        }}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /开始解析/ }))
+
+    await waitFor(() => {
+      expect(savePreflightMock).toHaveBeenCalledTimes(1)
+    })
+
+    expect(savePreflightMock).toHaveBeenCalledWith(
+      'ws-1',
+      'item-1',
+      expect.objectContaining({
+        tasks: expect.objectContaining({
+          summary: expect.objectContaining({
+            summary_path: '只看画面',
+          }),
+        }),
+      }),
+    )
+  })
+
+  it('analysisScope=av_combined 时 summary_path 为 音视频综合', async () => {
+    autoCreateWorkspaceMock.mockResolvedValue({
+      workspace_id: 'ws-1',
+      name: '自动工作空间',
+    })
+    addWorkspaceItemMock.mockResolvedValue({
+      items: [{ item_id: 'item-1', type: 'video' }],
+    })
+    savePreflightMock.mockResolvedValue({})
+    startItemPipelineMock.mockResolvedValue({ task_id: 'task-video' })
+
+    render(
+      <PreflightDrawer
+        {...defaultProps}
+        stagedConfig={{
+          types: ['video'],
+          features: {},
+          background: {},
+          workspaceIds: ['ws-1'],
+          analysisScope: 'av_combined',
+        }}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /开始解析/ }))
+
+    await waitFor(() => {
+      expect(savePreflightMock).toHaveBeenCalledTimes(1)
+    })
+
+    expect(savePreflightMock).toHaveBeenCalledWith(
+      'ws-1',
+      'item-1',
+      expect.objectContaining({
+        tasks: expect.objectContaining({
+          summary: expect.objectContaining({
+            summary_path: '音视频综合',
+          }),
+        }),
+      }),
+    )
+  })
+
+  it('stage 模式传递 analysisScope 到 onSaveStaged', () => {
+    const onSaveStaged = vi.fn()
+    render(
+      <PreflightDrawer
+        {...defaultProps}
+        mode="stage"
+        onSaveStaged={onSaveStaged}
+        stagedConfig={{
+          types: ['video'],
+          features: {},
+          background: {},
+          workspaceIds: ['ws-1'],
+          analysisScope: 'visual_only',
+        }}
+      />,
+    )
+
+    const btn = screen.getByRole('button', { name: /保存配置 & 返回/ })
+    fireEvent.click(btn)
+
+    expect(onSaveStaged).toHaveBeenCalledWith(
+      expect.objectContaining({
+        analysisScope: 'visual_only',
+      }),
+    )
   })
 })

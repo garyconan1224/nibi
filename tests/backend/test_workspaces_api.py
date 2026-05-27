@@ -694,3 +694,123 @@ def test_batch_delete_items_removes_valid_items_and_reports_failures(client: Tes
 
     remaining = client.get(f"/workspaces/{ws_id}").json()["items"]
     assert [it["item_id"] for it in remaining] == [second["item_id"]]
+
+
+# ── normalize_video_summary_path ────────────────────────────────────────────
+
+
+def test_normalize_video_summary_path() -> None:
+    """各中文/英文 summary_path 值规范化到 canonical 值。"""
+    from backend.app.routes.workspaces import normalize_video_summary_path as n
+
+    assert n("字幕直接总结") == "subtitle"
+    assert n("只听字幕/音频转写") == "subtitle"
+    assert n("subtitle") == "subtitle"
+
+    assert n("音视频合并 · 最详细") == "av_combined"
+    assert n("音视频综合") == "av_combined"
+    assert n("detailed") == "av_combined"
+    assert n("av_combined") == "av_combined"
+
+    assert n("只看画面") == "visual_only"
+    assert n("visual_only") == "visual_only"
+
+    assert n("视频模型直接分析") == "video_model"
+    assert n("video_model") == "video_model"
+
+    assert n("") == ""
+    assert n("unknown_value") == "unknown_value"
+
+
+def test_augment_video_analyze_payload_r8_summary_path() -> None:
+    """R8 新格式 summary.summary_path 应被读取并规范化。"""
+    from backend.app.routes.workspaces import _augment_video_analyze_payload
+
+    item = WorkspaceItem(
+        item_id="v1", type="video", source="url",
+        source_value="https://x.com/v", name="v",
+        preflight=PreflightConfig(tasks={
+            "summary": {"on": True, "summary_path": "音视频综合", "summary_depth": "详细"},
+        }),
+    )
+    payload: dict = {}
+    _augment_video_analyze_payload(payload, item)
+    assert payload["summary_path"] == "av_combined"
+
+
+def test_augment_video_analyze_payload_legacy_path_fallback() -> None:
+    """旧格式 summary.path 仍兼容（fallback）。"""
+    from backend.app.routes.workspaces import _augment_video_analyze_payload
+
+    item = WorkspaceItem(
+        item_id="v2", type="video", source="url",
+        source_value="https://x.com/v", name="v",
+        preflight=PreflightConfig(tasks={
+            "summary": {"enabled": True, "path": "detailed"},
+        }),
+    )
+    payload: dict = {}
+    _augment_video_analyze_payload(payload, item)
+    assert payload["summary_path"] == "av_combined"
+
+
+def test_augment_video_analyze_payload_r8_frame_prompt_adaptation() -> None:
+    """R8 frame_prompt 字段名（frame_mode/sec_per_frame/shot_frames）适配到 CaptureParams 可读字段。"""
+    from backend.app.routes.workspaces import _augment_video_analyze_payload
+
+    item = WorkspaceItem(
+        item_id="v3", type="video", source="url",
+        source_value="https://x.com/v", name="v",
+        preflight=PreflightConfig(tasks={
+            "frame_prompt": {
+                "on": True,
+                "frame_mode": "按秒截帧",
+                "sec_per_frame": 5,
+                "max_frames": 60,
+            },
+        }),
+    )
+    payload: dict = {}
+    _augment_video_analyze_payload(payload, item)
+    fp = payload.get("frame_prompt", {})
+    assert fp.get("mode") == "interval"
+    assert fp.get("interval_sec") == 5
+    assert fp.get("max_frames") == 60
+    assert "frame_mode" not in fp
+    assert "sec_per_frame" not in fp
+
+
+# ── _video_result_has_real_data 新路径 ──────────────────────────────────────
+
+
+def test_video_result_has_real_data_visual_only() -> None:
+    """visual_only: frames 非空 list 即为真数据。"""
+    assert ws_module._video_result_has_real_data({
+        "summary_path": "visual_only",
+        "frames": [{"frame_image": "f1.jpg"}],
+    }) is True
+    assert ws_module._video_result_has_real_data({
+        "summary_path": "visual_only",
+        "frames": [],
+    }) is False
+
+
+def test_video_result_has_real_data_av_combined() -> None:
+    """av_combined: frames + (transcript 或 summary)。"""
+    # 有 frames + transcript
+    assert ws_module._video_result_has_real_data({
+        "summary_path": "av_combined",
+        "frames": [{"frame_image": "f1.jpg"}],
+        "transcript": [{"t_sec": 0, "text": "hello"}],
+    }) is True
+    # 有 frames + summary
+    assert ws_module._video_result_has_real_data({
+        "summary_path": "av_combined",
+        "frames": [{"frame_image": "f1.jpg"}],
+        "summary": "combined result",
+    }) is True
+    # 只有 frames 不够
+    assert ws_module._video_result_has_real_data({
+        "summary_path": "av_combined",
+        "frames": [{"frame_image": "f1.jpg"}],
+    }) is False

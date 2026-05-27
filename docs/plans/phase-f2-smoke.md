@@ -4,7 +4,7 @@ status: ready
 phase: F2
 track: F (Flow)
 prerequisite: F1.7 (170ec0b)
-model: DS v4-pro (修 bug) + 用户 (跑 UI)
+model: deepseek v4-pro (修 bug) + 用户 (跑 UI)
 created: 2026-05-22
 ---
 
@@ -22,7 +22,7 @@ created: 2026-05-22
 
 ### 角色分工
 - **用户**：浏览器里实际操作（粘 URL、点按钮、看截图），把异常现象 + 复现步骤填到 §3 失败记录表。
-- **DS v4-pro**：读后端日志 `.local/backend.log` + 前端 console + 失败记录，定位 + 修 + 加最小回归测试。
+- **deepseek v4-pro**：读后端日志 `.local/backend.log` + 前端 console + 失败记录，定位 + 修 + 加最小回归测试。
 
 ### Bug 修复颗粒度
 - **一个 bug 一个 commit**，message 格式：`fix(F2): <Bug编号> <一句话>`
@@ -80,12 +80,12 @@ created: 2026-05-22
 
 ---
 
-## 4. DS v4-pro 接力 Prompt 模板
+## 4. deepseek v4-pro 接力 Prompt 模板
 
 新会话开场可以直接粘：
 
 ```
-你是 DS v4-pro，在 Nibi 项目做 F2 冒烟 bug 修。
+你是 deepseek v4-pro，在 Nibi 项目做 F2 冒烟 bug 修。
 1. 先读 CLAUDE.md + docs/plans/phase-f2-smoke.md
 2. 看 §3 失败记录表里 status=open 的最上一行
 3. 读对应后端日志（.local/backend.log）+ 前端 console（用户会贴）

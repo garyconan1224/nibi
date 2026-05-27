@@ -44,9 +44,13 @@ function formatRelative(iso: string): string {
 interface WorkspaceCardProps {
   workspace: LibraryWorkspace
   items: LibraryItem[]
+  selectMode?: boolean
+  selected?: boolean
+  onToggleSelect?: (workspaceId: string) => void
+  onDelete?: (workspaceId: string) => void
 }
 
-export function WorkspaceCard({ workspace, items }: WorkspaceCardProps) {
+export function WorkspaceCard({ workspace, items, selectMode, selected, onToggleSelect, onDelete }: WorkspaceCardProps) {
   const navigate = useNavigate()
 
   const comp = workspace.items_count_by_type || {}
@@ -61,10 +65,59 @@ export function WorkspaceCard({ workspace, items }: WorkspaceCardProps) {
     const more = Math.max(0, total - thumbs.length)
 
   return (
-    <button
+    <div
       className="ws-card"
-      onClick={() => navigate(`/workspaces/${workspace.workspace_id}`)}
+      onClick={() => {
+        if (selectMode) {
+          onToggleSelect?.(workspace.workspace_id)
+        } else {
+          navigate(`/workspaces/${workspace.workspace_id}`)
+        }
+      }}
+      style={{
+        position: 'relative',
+        borderColor: selected ? 'var(--ink)' : 'var(--line)',
+      }}
     >
+      {/* ── 顶部操作栏（选择或删除） ── */}
+      <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}>
+        {selectMode ? (
+          <span
+            onClick={(e) => {
+              e.stopPropagation()
+              onToggleSelect?.(workspace.workspace_id)
+            }}
+            className="ex-select-dot"
+            style={{
+              background: selected ? '#fff' : 'rgba(0,0,0,0.5)',
+              color: selected ? 'var(--ink)' : '#fff',
+              borderColor: selected ? '#fff' : 'rgba(255,255,255,0.6)',
+            }}
+          >
+            {selected && (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+            )}
+          </span>
+        ) : (
+          onDelete && (
+            <button
+              className="ws-delete-btn"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete(workspace.workspace_id)
+              }}
+              title="删除"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
+              </svg>
+            </button>
+          )
+        )}
+      </div>
+
       {/* 主色顶条 */}
       <div
         style={{ height: 4, background: stripeColor, flexShrink: 0 }}
@@ -156,6 +209,6 @@ export function WorkspaceCard({ workspace, items }: WorkspaceCardProps) {
           </span>
         </div>
       </div>
-    </button>
+    </div>
   )
 }

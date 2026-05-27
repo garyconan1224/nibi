@@ -186,6 +186,36 @@ R13 只覆盖了 download → analyze 路径（_on_download_success 回调），
 
 ---
 
+## Phase R17 — AddMaterial 弹窗：分析范围与任务勾选/细调联动
+
+**完成日期**：2026-05-26
+**模型 / 工具**：DS v4-pro
+**分支**：feat/phase-r17-add-material-scope-features
+**Commit**：pending
+
+### 影响范围
+- 前端：`featuresToSteps.ts`、`AddMaterialModal.tsx`、`PreflightDrawer.tsx`、`preflightTasks.ts`
+- 类型：`types/workspace.ts`（新增 `AnalysisScope` 类型）
+- 测试：`AddMaterialModal.test.tsx`（+3）、`preflightTasks.test.ts`（+2）
+
+### 关键改动
+- `featuresToSteps.ts` 新增 `FEATURES_BY_SCOPE`：analysis scope → 允许的 feature 子集映射
+- `AddMaterialModal` 第③区 chips 按 scope 过滤；切换 scope card 时清空 features；submit 双保险过滤
+- `preflightTasks.ts` `applyCascades` 加 scope 参数：visual_only 禁用 srt/music + 锁 summary_path；av_combined 锁 summary_path
+- `PreflightDrawer` 两处 `applyCascades` 调用透传 `sc?.analysisScope`；PFTaskCard 支持 child-level lock
+- `AnalysisScope` 类型从 AddMaterialModal 移到 `types/workspace.ts` 避免循环依赖
+
+### 为什么这么做
+- 用户决议 visual_only 只走「只看画面」路径，字幕导出和音乐分析 chip 不应出现
+- 方案 A（切 scope 清空 features）：避免隐藏 chip 状态泄漏到后端
+- 双保险：UI 过滤 + submit 回写过滤，确保 `enabled_features` 永不含 scope 外项
+
+### 验证
+- `npm run test`：10 files / 63 tests passed
+- `npm run build`：无 TS 错误
+
+---
+
 ## 记录模板（复制后填写）
 
 ```markdown

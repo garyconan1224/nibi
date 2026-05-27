@@ -265,7 +265,7 @@ git branch --show-current
 - **Phase merge 默认**：完工默认 merge 进 main，开新 phase 默认上一个已 merge
 - **Tag 策略**：不按 SemVer 自动打，等"功能都差不多"统一打（那时就是开源时刻）
 - **模型分配**：
-  - 简单/模板/git/CSS → ⭐ DS v4-pro（Claude Code + ccswitch，便宜优先；v4-flash 太弱别当默认）
+  - 简单/模板/git/CSS → ⭐ deepseek v4-pro（Claude Code + ccswitch，便宜优先；v4-flash 太弱别当默认）
   - 中等多文件 React → Sonnet 4.6
   - 跨 5+ 文件 / 状态机 / 加密 → Opus 4.7
 - **设计稿源**：`docs/design/components/*.jsx` + `styles.css` + `VidMirror.html`（Taskboard CSS 大部分在 HTML 不在 styles.css）
