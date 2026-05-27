@@ -1302,9 +1302,25 @@ def _bridge_to_pipeline_payload(
         if models.get("text"):
             payload["text_model"] = models["text"]
         tasks = item.preflight.tasks or {}
-        _copy_task_config(payload, "asr", tasks, "asr_summary", "asr")
-        _copy_task_config(payload, "voiceprint", tasks, "voiceprint")
-        _copy_task_config(payload, "srt", tasks, "subtitle_file", "srt")
+        # R18: 新结构 transcribe_summary 包含所有转写+总结子项
+        ts = tasks.get("transcribe_summary")
+        if isinstance(ts, dict):
+            # 映射子项到后端期望的 payload key
+            _copy_task_config(payload, "voiceprint", ts, "speaker_diarize")
+            _copy_task_config(payload, "srt", ts, "subtitle_export")
+            # 顶层参数直接透传
+            for k in ("proper_nouns", "include_timestamps", "summary_template"):
+                v = ts.get(k)
+                if v is not None and v != "":
+                    payload[k] = v
+            # asr 整体开关
+            if "on" in ts:
+                payload["asr"] = {"enabled": bool(ts["on"])}
+        else:
+            # 兼容旧结构
+            _copy_task_config(payload, "asr", tasks, "asr_summary", "asr")
+            _copy_task_config(payload, "voiceprint", tasks, "voiceprint")
+            _copy_task_config(payload, "srt", tasks, "subtitle_file", "srt")
         _copy_task_config(payload, "music", tasks, "music_analysis", "music")
         # 以下三个前端任务 ID 透传到 payload，Tier B 后端未实现
         _copy_task_config(payload, "vocal_separation", tasks, "vocal_separation")

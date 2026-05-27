@@ -1,11 +1,14 @@
 ---
 phase: R18
-title: PreflightDrawer 细调抽屉 · 总结模板 9 种 + 字幕精修 + 截帧细调
-status: ready
-owner: deepseek v4-pro
-estimated_hours: 5
+title: 主 chip 重构 + PreflightDrawer 细调抽屉（模板 9 种 + 字幕精修 + 截帧细调）
+status: done
+owner: xiaomi mimo v2.5-pro
+estimated_hours: 8
+completed_date: 2026-05-27
+commits:
+  - 2fbb301 feat(phase-r18): 9 种总结模板系统 + PreflightDrawer 子项重构
 depends_on:
-  - R17（chip 重构必须先合）
+  - R17 v1 已合（chip filter，已 done）
 related_spec:
   - docs/spec/03-preflight-config.md
   - docs/spec/04-pipeline-tasks.md
@@ -13,15 +16,95 @@ related_spec:
 
 ## 背景
 
-R17 把添加素材弹窗的主 chip 砍到极简后，原来直接出现在 chip 上的能力（说话人音色 / 字幕导出 / 总结深度）都要降级到细调抽屉。同时本期落地用户提的几个增强：
-
-1. 总结模板 9 种（替代现有「简洁 / 详细 / 带画面引用」3 档）
-2. 字幕导出加「专有名词修正（LLM 注入）/ 时间轴开关」
-3. 截帧细调挪进「画面分析」子项
+R17 v1 只做了 chip filter（status: done）。本期一次性完成两块：① 主 chip 重构（visual=1 / audio=2 / av+⭐综合）；② 细调抽屉模板 / 字幕精修 / 截帧细调挪位。
 
 后端这边主要是新加 prompt 模板文件 + 透传新参数。不改任何 pipeline 步骤结构。
 
 ## 修改清单
+
+### 0. 前端：主 chip 重构（这一节合并自旧 R17 v2 计划）
+
+#### 0a. `frontend/src/lib/featuresToSteps.ts` 新增 2 个 Feature id
+
+在 `Feature` type union 加 `'visual_analysis'` 和 `'av_synthesis'`（旧 id 全保留，submit 时展开兼容）。
+
+新增 `FEATURES_BY_SCOPE_V2`：
+
+```ts
+export interface FeatureDef {
+  id: Feature; label: string; defaultChecked: boolean
+  hint?: string; badge?: string; highlight?: boolean  // 新增 3 个可选字段
+}
+
+export const FEATURES_BY_SCOPE_V2: Record<AnalysisScope, FeatureDef[]> = {
+  visual_only: [
+    { id: 'visual_analysis', label: '画面分析', defaultChecked: true, hint: '逐帧/AI 镜头分析画面' },
+  ],
+  audio_only: [
+    { id: 'transcribe_summary', label: '人声转写+总结', defaultChecked: true, hint: 'Whisper 转写 + LLM 总结' },
+    { id: 'music_analysis',     label: '音乐分析',       defaultChecked: false, hint: 'BPM/调性/乐器/风格' },
+  ],
+  av_combined: [
+    { id: 'av_synthesis',       label: '综合笔记',       defaultChecked: true, badge: '⭐', highlight: true, hint: '画面+转写时间戳对齐生成图文教学笔记' },
+    { id: 'visual_analysis',    label: '画面分析',       defaultChecked: true },
+    { id: 'transcribe_summary', label: '人声转写+总结',  defaultChecked: true },
+    { id: 'music_analysis',     label: '音乐分析',       defaultChecked: false },
+  ],
+}
+```
+
+`TASK_TYPE_MAP` 补 2 条：
+```ts
+visual_analysis: ['frame_extract', 'vlm_analyze'],
+av_synthesis:    ['frame_extract', 'vlm_analyze', 'asr', 'av_synthesis'],  // R19 实现 handler
+```
+
+#### 0b. `AddMaterialModal.tsx` chip 渲染分支
+
+- video 输入 + showScopeCards=true 时，chips 走 `FEATURES_BY_SCOPE_V2[analysisScope]`，否则走旧 `FEATURES_BY_TYPE`
+- `highlight: true` 的 chip 独占一行 + 加渐变 bg + ⭐ badge
+- av_combined 时下方加小标题分组「视频侧」「音频侧」
+- 每个 chip 右上加 `?` 图标 hover 显示 hint
+
+#### 0c. 综合笔记联动逻辑
+
+`toggleFeature` 内：勾上 av_synthesis 时自动勾上 `visual_analysis` 和 `transcribe_summary`；取消时不联动。
+当 `features.av_synthesis === true` 且 `visual_analysis` 或 `transcribe_summary` 任一为 false → 在 av_synthesis chip 下方显示 hint「⚠ 已取消依赖项，精度可能下降」。
+
+#### 0d. submit 兼容映射
+
+submit 时把新 id 展开成老 id（让 R18~R19 完成前后端不会断）：
+
+```ts
+function expandFeatureIds(ids: Feature[]): string[] {
+  const out = new Set<string>()
+  for (const id of ids) {
+    if (id === 'visual_analysis') { out.add('visual_prompt'); out.add('video_summary') }
+    else if (id === 'av_synthesis') {
+      out.add('av_synthesis')        // R19 后端实现前会被忽略
+      out.add('visual_prompt'); out.add('video_summary')
+      out.add('transcribe_summary'); out.add('subtitle_export')
+    } else out.add(id)
+  }
+  return [...out]
+}
+```
+
+#### 0e. PreflightDrawer summary_path 选项
+
+[preflightTasks.ts:67](frontend/src/pages/WorkbenchPage/preflightTasks.ts:67) 把 options 改成：
+```ts
+options: ['只看画面', '只听字幕/音频转写', '音视频综合']  // 删「视频模型直接分析」
+```
+
+`applyCascades` 新增：features.av_synthesis 为真时强制 `summary_path='音视频综合'` + 加 lock 提示「综合笔记模式 · 路径已锁定」。
+
+#### 0f. 测试新增
+
+- `AddMaterialModal.test.tsx`：visual_only 1 chip / audio_only 2 chip / av_combined 4 chip 含综合笔记 / 勾综合笔记联动 / 精度下降 hint（5 case）
+- `preflightTasks.test.ts`：av_synthesis 锁路径（1 case）
+
+---
 
 ### 1. 后端：总结模板系统
 

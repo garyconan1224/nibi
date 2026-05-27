@@ -71,7 +71,7 @@ const NEEDS_TRANSCRIBE: ReadonlySet<Feature> = new Set([
 /** R17: feature → 后端 task id 映射 */
 const TASK_TYPE_MAP: Record<Feature, string[]> = {
   visual_analysis:    ['frame_extract', 'vlm_analyze'],
-  av_synthesis:       ['frame_extract', 'asr', 'av_align', 'note_render'],
+  av_synthesis:       ['frame_extract', 'vlm_analyze', 'asr', 'av_synthesis'],
   transcribe_summary: ['asr', 'summary'],
   music_analysis:     ['music_analyze'],
   visual_prompt:      ['frame_extract', 'vlm_analyze'],

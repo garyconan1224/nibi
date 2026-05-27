@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyCascades, buildInitialTasks } from '@/pages/WorkbenchPage/preflightTasks'
+import { applyCascades, buildInitialTasks, TASK_GROUPS } from '@/pages/WorkbenchPage/preflightTasks'
 import type { MediaKind, TaskState } from '@/pages/WorkbenchPage/preflightTasks'
 
 function makeState(kind: MediaKind, overrides: Record<string, Partial<{ on: boolean; [k: string]: unknown }>> = {}): TaskState {
@@ -56,47 +56,40 @@ describe('applyCascades', () => {
     expect(locks.frame_prompt).toBeUndefined()
   })
 
-  it('audio: voiceprint.on → 强制 asr.on + locked', () => {
+  it('audio: speaker_diarize on → 强制 transcribe_summary on + locked', () => {
     const state = makeState('audio', {
-      asr: { on: false },
-      voiceprint: { on: true },
+      transcribe_summary: { on: false, speaker_diarize: true, subtitle_export: false },
     })
     const { state: eff, locks } = applyCascades('audio', state)
-    expect(eff.asr.on).toBe(true)
-    expect(locks.asr).toBe('说话人区分需要先转写')
+    expect(eff.transcribe_summary.on).toBe(true)
+    expect(locks.transcribe_summary).toBe('说话人区分/字幕导出需要转写')
   })
 
-  it('audio: srt.on → 强制 asr.on + locked', () => {
+  it('audio: subtitle_export on → 强制 transcribe_summary on + locked', () => {
     const state = makeState('audio', {
-      asr: { on: false },
-      voiceprint: { on: false },
-      srt: { on: true },
+      transcribe_summary: { on: false, speaker_diarize: false, subtitle_export: true },
     })
     const { state: eff, locks } = applyCascades('audio', state)
-    expect(eff.asr.on).toBe(true)
-    expect(locks.asr).toBe('字幕导出需要转写')
+    expect(eff.transcribe_summary.on).toBe(true)
+    expect(locks.transcribe_summary).toBe('说话人区分/字幕导出需要转写')
   })
 
-  it('audio: voiceprint 和 srt 都关时 asr 不受影响', () => {
+  it('audio: speaker_diarize 和 subtitle_export 都关时 transcribe_summary 不受影响', () => {
     const state = makeState('audio', {
-      asr: { on: false },
-      voiceprint: { on: false },
-      srt: { on: false },
+      transcribe_summary: { on: false, speaker_diarize: false, subtitle_export: false },
     })
     const { state: eff, locks } = applyCascades('audio', state)
-    expect(eff.asr.on).toBe(false)
-    expect(locks.asr).toBeUndefined()
+    expect(eff.transcribe_summary.on).toBe(false)
+    expect(locks.transcribe_summary).toBeUndefined()
   })
 
-  it('audio: asr 已 on 时 srt.on 不重复设置（voiceprint 锁优先）', () => {
+  it('audio: transcribe_summary 已 on 时不重复设置锁', () => {
     const state = makeState('audio', {
-      asr: { on: true },
-      voiceprint: { on: true },
-      srt: { on: true },
+      transcribe_summary: { on: true, speaker_diarize: true, subtitle_export: true },
     })
     const { state: eff, locks } = applyCascades('audio', state)
-    expect(eff.asr.on).toBe(true)
-    expect(locks.asr).toBe('说话人区分需要先转写')
+    expect(eff.transcribe_summary.on).toBe(true)
+    expect(locks.transcribe_summary).toBeUndefined()
   })
 
   it('image: 1 张图片时 compare 强制 off + disabled', () => {
@@ -179,11 +172,11 @@ describe('buildInitialTasks', () => {
     expect(tasks.summary.summary_path).toBe('音视频综合')
   })
 
-  it('audio 初始化 4 个任务', () => {
+  it('audio 初始化 2 个任务', () => {
     const tasks = buildInitialTasks('audio')
-    expect(Object.keys(tasks)).toHaveLength(4)
-    expect(tasks.asr.on).toBe(true)
-    expect(tasks.asr.asr_lang).toBe('自动检测')
+    expect(Object.keys(tasks)).toHaveLength(2)
+    expect(tasks.transcribe_summary.on).toBe(true)
+    expect(tasks.transcribe_summary.summary_template).toBe('concise')
   })
 
   it('image 初始化 5 个任务', () => {
@@ -197,5 +190,34 @@ describe('buildInitialTasks', () => {
     expect(tasks.summary.on).toBe(true)
     expect(tasks.translate.on).toBe(false)
     expect(tasks.translate.tr_lang).toBe('English')
+  })
+
+  it('audio 总结模板默认 concise', () => {
+    const tasks = buildInitialTasks('audio')
+    expect(tasks.transcribe_summary.summary_template).toBe('concise')
+  })
+
+  it('audio 字幕导出关时 include_timestamps 和 proper_nouns 有 whenParent 约束', () => {
+    const groups = TASK_GROUPS.audio
+    const ts = groups.find(g => g.id === 'transcribe_summary')!
+    const incTs = ts.children!.find(c => c.id === 'include_timestamps')!
+    expect(incTs.whenParent).toBe('subtitle_export')
+    expect(incTs.whenValue).toBe(true)
+    const pn = ts.children!.find(c => c.id === 'proper_nouns')!
+    expect(pn.whenParent).toBe('subtitle_export')
+    expect(pn.whenValue).toBe(true)
+    const tasks = buildInitialTasks('audio')
+    expect(tasks.transcribe_summary.subtitle_export).toBe(false)
+  })
+
+  it('video 截帧模式切到 AI 镜头分析时 shot_frames 有 whenParent 约束', () => {
+    const groups = TASK_GROUPS.video
+    const fp = groups.find(g => g.id === 'frame_prompt')!
+    const shotFrames = fp.children!.find(c => c.id === 'shot_frames')!
+    expect(shotFrames.whenParent).toBe('frame_mode')
+    expect(shotFrames.whenValue).toBe('AI 镜头分析')
+    const secPerFrame = fp.children!.find(c => c.id === 'sec_per_frame')!
+    expect(secPerFrame.whenParent).toBe('frame_mode')
+    expect(secPerFrame.whenValue).toBe('按秒截帧')
   })
 })

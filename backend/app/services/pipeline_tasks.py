@@ -574,10 +574,18 @@ def _run_subtitle_summary(
     if api_key:
         try:
             runner.set_progress(task_id, 0.98, "LLM 生成摘要...")
-            prompt = _build_video_summary_prompt(
-                transcript_text, video_template, summary_depth, output_format,
-            )
-            log(f"📝 LLM 总结 | template={video_template} | depth={summary_depth} | format={output_format}")
+            # R18: 优先使用 summary_template（新模板系统）
+            summary_template_id = str(payload.get("summary_template") or "").strip()
+            if summary_template_id:
+                from backend.app.services.summary_templates import get_template
+                tpl = get_template(summary_template_id)
+                prompt = tpl.user_prompt.replace("{transcript}", transcript_text[:12000])
+                log(f"📝 LLM 总结 | template={tpl.label} ({summary_template_id})")
+            else:
+                prompt = _build_video_summary_prompt(
+                    transcript_text, video_template, summary_depth, output_format,
+                )
+                log(f"📝 LLM 总结 | template={video_template} | depth={summary_depth} | format={output_format}")
 
             settings = load_settings()
             registry = create_default_registry()
@@ -2336,22 +2344,29 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         )
         if chat_model:
             try:
+                # R18: 优先使用 summary_template（新模板系统）
+                summary_template_id = str(payload.get("summary_template") or "").strip()
+                if summary_template_id:
+                    from backend.app.services.summary_templates import get_template
+                    tpl = get_template(summary_template_id)
+                    prompt = tpl.user_prompt.replace("{transcript}", transcript_text[:3000])
+                    log(f"📝 LLM 总结 | template={tpl.label} ({summary_template_id})")
+                else:
+                    prompt = f"请将以下音频转写内容总结为 100-200 字的中文摘要：\n\n{transcript_text[:3000]}"
+                    log("📝 LLM 总结 | template=default (100-200字摘要)")
                 summary = provider.chat(
                     ChatRequest(
                         model=chat_model,
-                        messages=[{
-                            "role": "user",
-                            "content": (
-                                f"请将以下音频转写内容总结为 100-200 字的中文摘要：\n\n{transcript_text[:3000]}"
-                            ),
-                        }],
+                        messages=[{"role": "user", "content": prompt}],
                         temperature=0.3,
-                        max_tokens=400,
+                        max_tokens=1200,
                     )
                 )
                 log(f"📋 摘要生成完成，{len(summary)} 字符")
             except Exception as err:
                 log(f"⚠️  摘要生成失败：{err}")
+
+    subtitle_paths: Dict[str, str] = {}
 
     # ── 3.5 说话人分离（N8）──────────────────────────────────
     diarization_dict: Optional[Dict[str, Any]] = None
@@ -2427,16 +2442,67 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                     log(f"⚠️  多段切分失败（{seg_err}），已回退整体分析")
 
     # ── 3.7 字幕导出（N8）──────────────────────────────────
-    subtitle_paths: Dict[str, str] = {}
+    # R18: 专有名词修正 + include_timestamps 开关
+    proper_nouns = str(payload.get("proper_nouns") or "").strip()
+    include_timestamps = bool(payload.get("include_timestamps", True))
     if subtitle_enabled and transcript_segments:
+        # R18: 专有名词修正（批量 LLM 调用）
+        if proper_nouns and api_key:
+            try:
+                runner.set_progress(task_id, 0.88, "专有名词修正...")
+                segments_json = json.dumps(
+                    [{"idx": i, "text": s.get("text", "")} for i, s in enumerate(transcript_segments)],
+                    ensure_ascii=False,
+                )
+                # 分块处理（每块 8000 字）
+                chunk_size = 8000
+                chunks = [segments_json[i:i+chunk_size] for i in range(0, len(segments_json), chunk_size)]
+                all_corrections = []
+                for ci, chunk in enumerate(chunks):
+                    correction_prompt = (
+                        f"你是字幕校对员。下面是用户提供的专有名词清单（可能含人名/术语/品牌），"
+                        f"请在转写文本中找出读音相近但拼写错误的位置，替换为清单里的正确写法。"
+                        f"只改专有名词，不改其他文字。输出 JSON：[{{\"idx\": 原始idx, \"original\": 原文, \"corrected\": 修正后}}]。\n\n"
+                        f"专有名词清单：{proper_nouns}\n\n转写片段：{chunk}"
+                    )
+                    resp = provider.chat(ChatRequest(
+                        model=chat_model,
+                        messages=[{"role": "user", "content": correction_prompt}],
+                        temperature=0.1,
+                        max_tokens=2000,
+                    ))
+                    try:
+                        corrections = json.loads(resp)
+                        if isinstance(corrections, list):
+                            all_corrections.extend(corrections)
+                    except json.JSONDecodeError:
+                        log(f"⚠️  专有名词修正结果解析失败（chunk {ci}），跳过")
+                # 应用修正
+                if all_corrections:
+                    for c in all_corrections:
+                        idx = c.get("idx")
+                        corrected = c.get("corrected")
+                        if isinstance(idx, int) and 0 <= idx < len(transcript_segments) and corrected:
+                            original = transcript_segments[idx].get("text", "")
+                            transcript_segments[idx]["text"] = corrected
+                            if original != corrected:
+                                log(f"📝 修正 #{idx}: {original[:20]}... → {corrected[:20]}...")
+                    log(f"✅ 专有名词修正完成，共 {len(all_corrections)} 处")
+            except Exception as e:
+                log(f"⚠️  专有名词修正失败（保留原始转写）: {e}")
+
+        # 字幕导出
         srt_text = export_srt(transcript_segments)
         txt_text = export_txt(transcript_segments, with_speaker=bool(diarization_dict))
-        srt_path = audio_dir / f"{task_id}.srt"
-        txt_path = audio_dir / f"{task_id}.txt"
-        srt_path.write_text(srt_text, encoding="utf-8")
-        txt_path.write_text(txt_text, encoding="utf-8")
-        subtitle_paths = {"srt": str(srt_path.resolve()), "txt": str(txt_path.resolve())}
-        log(f"📄 字幕已导出 .srt / .txt（{len(transcript_segments)} 段）")
+        if include_timestamps:
+            srt_path = audio_dir / f"{task_id}.srt"
+            srt_path.write_text(srt_text, encoding="utf-8")
+            subtitle_paths = {"srt": str(srt_path.resolve())}
+        else:
+            txt_path = audio_dir / f"{task_id}.txt"
+            txt_path.write_text(txt_text, encoding="utf-8")
+            subtitle_paths = {"txt": str(txt_path.resolve())}
+        log(f"📄 字幕已导出（{len(transcript_segments)} 段）")
 
     # ── 4. STORE ─────────────────────────────────────────────
     runner.store.update(task_id, status=TaskStatus.STORE.value)
