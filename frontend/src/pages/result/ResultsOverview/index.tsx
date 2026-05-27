@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, BookOpen, Clapperboard, Download, MessageSquare } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, BookOpen, Clapperboard, Download, MessageSquare, RotateCcw } from 'lucide-react'
 
 import {
   type AudioResult,
@@ -38,9 +38,17 @@ type ItemResult = VideoResult | AudioResult | ImageResult | TextResult
 type PageState =
   | { kind: 'loading' }
   | { kind: 'ready'; workspace: WorkspaceRecord; item: WorkspaceItem; result: ItemResult }
+  | { kind: 'task_failed'; workspace: WorkspaceRecord; item: WorkspaceItem; error: string; taskId?: string }
   | { kind: 'error'; message: string }
 
 type TimelineLine = { t_sec?: number; t_str?: string; text: string }
+
+function titleFromFilename(filename: unknown): string {
+  const raw = typeof filename === 'string' ? filename.trim() : ''
+  if (!raw) return ''
+  const name = raw.split('/').pop() || raw
+  return name.replace(/\.[^.]+$/, '')
+}
 
 function formatSec(sec: number): string {
   const s = Math.max(0, Math.floor(sec))
@@ -152,6 +160,18 @@ export default function ResultsOverview() {
             return
         }
         if (cancelled) return
+        // R18.1.3: 任务已失败时显示 ErrorState，不回落 demo
+        const raw = result as unknown as Record<string, unknown>
+        if (raw.source === 'task_failed') {
+          setPageState({
+            kind: 'task_failed',
+            workspace: ws,
+            item,
+            error: String(raw.error || '未知错误'),
+            taskId: raw.task_id ? String(raw.task_id) : undefined,
+          })
+          return
+        }
         setPageState({ kind: 'ready', workspace: ws, item, result })
       } catch (err: unknown) {
         if (cancelled) return
@@ -193,10 +213,89 @@ export default function ResultsOverview() {
     )
   }
 
+  // ── Task Failed ──
+  if (pageState.kind === 'task_failed') {
+    const { workspace, item, error, taskId } = pageState
+    const wid = workspace.workspace_id
+    return (
+      <div className="vm-overview-scope" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div className="ov-nav">
+          <button className="btn-ghost" onClick={() => navigate(-1)}>
+            <ArrowLeft size={13} /> 任务中心
+          </button>
+          <span className="ov-sep" />
+          <span className="ov-title">任务失败</span>
+        </div>
+        <div className="ov-main" style={{ alignItems: 'center', justifyContent: 'center' }}>
+          <div className="ov-card" style={{ maxWidth: 480, textAlign: 'center', borderColor: 'rgba(255, 77, 126, 0.2)' }}>
+            <AlertTriangle size={32} style={{ color: 'var(--accent)', marginBottom: 12 }} />
+            <h2 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 8px' }}>处理失败</h2>
+            <p style={{ fontSize: 13, color: 'var(--ink-3)', margin: '0 0 16px', lineHeight: 1.6 }}>
+              该素材的任务处理过程中出现错误，无法生成结果。
+            </p>
+            <div style={{
+              background: 'var(--bg-sunken)',
+              borderRadius: 8,
+              padding: '10px 14px',
+              marginBottom: 20,
+              fontSize: 12,
+              fontFamily: 'var(--mono)',
+              color: 'var(--accent)',
+              textAlign: 'left',
+              wordBreak: 'break-all',
+            }}>
+              {error}
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+              <button
+                className="btn-ghost"
+                style={{ padding: '8px 16px', border: '1px solid var(--line-strong)', borderRadius: 8 }}
+                onClick={() => navigate(-1)}
+              >
+                <ArrowLeft size={14} /> 返回
+              </button>
+              <button
+                className="btn-ghost"
+                style={{
+                  padding: '8px 16px',
+                  background: 'var(--accent)',
+                  color: '#fff',
+                  borderRadius: 8,
+                  border: 'none',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  cursor: 'pointer',
+                }}
+                onClick={() => {
+                  if (taskId) {
+                    navigate(`/processing/${taskId}`, {
+                      state: { workspaceId: wid, itemId: item.item_id },
+                    })
+                  }
+                }}
+              >
+                <RotateCcw size={14} /> 重试
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // ── Ready ──
   const { item, result } = pageState
   const itemType = item.type
-  const title = item.name || (result as VideoResult).video?.title || (result as AudioResult).audio?.title || (result as TextResult).title || ITEM_TYPE_TEXT[itemType]
+  const title = (
+    (result as VideoResult).video?.title ||
+    (result as { video_title?: string }).video_title ||
+    (result as AudioResult).audio?.title ||
+    titleFromFilename((result as AudioResult).audio?.filename) ||
+    (result as TextResult).title ||
+    item.name ||
+    ITEM_TYPE_TEXT[itemType]
+  )
   const summary = extractSummary(itemType, result)
   const transcriptPreview = extractTranscriptPreview(itemType, result)
   const transcriptCount = extractTranscriptCount(itemType, result)
@@ -219,17 +318,37 @@ export default function ResultsOverview() {
         <span
           className="ov-status-chip"
           style={{
-            background: item.status === 'done' ? 'rgba(34, 211, 154, 0.12)' : 'var(--bg-sunken)',
-            color: item.status === 'done' ? 'var(--accent-green)' : 'var(--ink-3)',
+            background: item.status === 'done' ? 'rgba(34, 211, 154, 0.12)' : item.status === 'failed' ? 'rgba(255, 77, 126, 0.12)' : 'var(--bg-sunken)',
+            color: item.status === 'done' ? 'var(--accent-green)' : item.status === 'failed' ? 'var(--accent)' : 'var(--ink-3)',
           }}
         >
-          <span className="dot" style={{ background: item.status === 'done' ? 'var(--accent-green)' : 'var(--ink-4)' }} />
-          {item.status === 'done' ? '完成' : item.status === 'processing' ? '处理中' : item.status}
+          <span className="dot" style={{ background: item.status === 'done' ? 'var(--accent-green)' : item.status === 'failed' ? 'var(--accent)' : 'var(--ink-4)' }} />
+          {item.status === 'done' ? '完成' : item.status === 'processing' ? '处理中' : item.status === 'failed' ? '失败' : item.status}
         </span>
         {result.source === 'demo_fixture' && (
           <span className="mono" style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'var(--accent-warm)', color: '#fff', fontWeight: 600 }}>DEMO</span>
         )}
       </div>
+
+      {/* R18.1.3: demo_fixture 黄色 callout */}
+      {result.source === 'demo_fixture' && (
+        <div style={{
+          margin: '0 20px',
+          padding: '10px 14px',
+          borderRadius: 8,
+          background: 'rgba(255, 184, 76, 0.12)',
+          border: '1px solid rgba(255, 184, 76, 0.25)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          fontSize: 12,
+          color: 'var(--ink-2)',
+          flexShrink: 0,
+        }}>
+          <AlertTriangle size={14} style={{ color: 'var(--accent-warm)', flexShrink: 0 }} />
+          <span>当前显示的是 <strong>示例数据</strong>（DEMO）。该素材的任务可能未成功完成，请返回任务中心重试。</span>
+        </div>
+      )}
 
       {/* Tags */}
       <div style={{ padding: '10px 20px 0', flexShrink: 0 }}>

@@ -53,6 +53,72 @@ describe('taskStore smoke tests', () => {
     expect(useTaskStore.getState().hiddenTaskIds).toContain('t-rm-1')
   })
 
+  it('setTasks: lite 列表（空 result/log）不洗掉本地已有的丰富字段', () => {
+    useTaskStore.getState().addTask(
+      makeTask({
+        task_id: 't-lite',
+        result: { video_title: 'foo', video_thumbnail_url: 'https://img' },
+        log: [{ level: 'info', message: 'started', ts: '2026-05-27T00:00:00Z' }],
+      }),
+    )
+    // 列表接口返回 lite 记录：result 为空对象，log 为空数组
+    useTaskStore.getState().setTasks([
+      makeTask({
+        task_id: 't-lite',
+        status: 'VLM',
+        progress: 0.5,
+        result: {},
+        log: [],
+      }),
+    ])
+    const t = useTaskStore.getState().getTask('t-lite')!
+    expect(t.result.video_title).toBe('foo')
+    expect(t.result.video_thumbnail_url).toBe('https://img')
+    expect(t.log).toHaveLength(1)
+    // 但 status / progress 应以 incoming 为准
+    expect(t.status).toBe('VLM')
+    expect(t.progress).toBe(0.5)
+  })
+
+  it('setTasks: rich 列表（非空 result/log）会覆盖本地旧值', () => {
+    useTaskStore.getState().addTask(
+      makeTask({
+        task_id: 't-rich',
+        result: { video_title: 'old' },
+        log: [{ level: 'info', message: 'old-log', ts: '2026-05-27T00:00:00Z' }],
+      }),
+    )
+    useTaskStore.getState().setTasks([
+      makeTask({
+        task_id: 't-rich',
+        result: { video_title: 'new' },
+        log: [{ level: 'info', message: 'new-log', ts: '2026-05-27T01:00:00Z' }],
+      }),
+    ])
+    const t = useTaskStore.getState().getTask('t-rich')!
+    expect(t.result.video_title).toBe('new')
+    expect(t.log).toHaveLength(1)
+    expect(t.log[0].message).toBe('new-log')
+  })
+
+  it('setTasks: incoming 无 result 字段时也保留本地已有 result', () => {
+    useTaskStore.getState().addTask(
+      makeTask({
+        task_id: 't-nofield',
+        result: { video_title: 'keep-me' },
+        log: [{ level: 'info', message: 'keep', ts: '2026-05-27T00:00:00Z' }],
+      }),
+    )
+    // 构造一条没有 result / log 字段的 incoming 记录
+    const lite = makeTask({ task_id: 't-nofield', status: 'ASR' })
+    delete (lite as any).result
+    delete (lite as any).log
+    useTaskStore.getState().setTasks([lite])
+    const t = useTaskStore.getState().getTask('t-nofield')!
+    expect(t.result.video_title).toBe('keep-me')
+    expect(t.log).toHaveLength(1)
+  })
+
   it('setTasks 不会把本地隐藏任务重新同步回来', () => {
     useTaskStore.getState().removeTask('t-hidden')
     useTaskStore.getState().setTasks([

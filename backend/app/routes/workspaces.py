@@ -609,10 +609,11 @@ def _sync_item_with_tasks(item: WorkspaceItem) -> Optional[Dict[str, Any]]:
     else:
         overlay["status"] = ItemStatus.PROCESSING.value
 
-    if latest_success is not None and latest_success.result and not item.results:
-        merged = dict(latest_success.result)
+    if latest_success is not None and latest_success.result:
+        merged = dict(item.results or {})
+        merged.update(latest_success.result)
         # 若最新 task 没提供 cover_thumbnail，从更早的 SUCCESS task 补（下载封面优先）
-        if "cover_thumbnail" not in merged:
+        if not merged.get("cover_thumbnail"):
             for tid in item.related_task_ids:
                 task = _pipeline_runner.store.get(tid)
                 if task is None or task is latest_success:
@@ -847,6 +848,18 @@ def _item_thumbnail(item: WorkspaceItem, results: dict = None) -> Optional[str]:
                 if frames[0].get(key):
                     path = str(frames[0][key])
                     break
+    if not path and item.type == "audio":
+        audio = results.get("audio") if isinstance(results.get("audio"), dict) else {}
+        audio_filename = str(audio.get("filename") or "").strip()
+        project_id = str(results.get("project_id") or "").strip()
+        if audio_filename and project_id:
+            stem = Path(audio_filename).stem
+            audio_dir = DATA_DIR / "workspaces" / project_id / "audio"
+            for ext in (".jpg", ".jpeg", ".webp", ".png"):
+                candidate = audio_dir / f"{stem}{ext}"
+                if candidate.is_file():
+                    path = str(candidate)
+                    break
     if path:
         # HTTP URL 直接返回（如图片源地址）
         if path.startswith(("http://", "https://")):
@@ -864,6 +877,31 @@ def _item_thumbnail(item: WorkspaceItem, results: dict = None) -> Optional[str]:
     if vt and isinstance(vt, str) and vt.startswith(("http://", "https://")):
         return vt
     return None
+
+
+def _item_display_name(
+    rec: WorkspaceRecord,
+    item: WorkspaceItem,
+    results: dict,
+) -> str:
+    """从最新结果里取资料库卡片标题，兼容旧 audio 结果只存 filename 的情况。"""
+    video_title = str(results.get("video_title") or "").strip()
+    if video_title:
+        return video_title
+
+    audio = results.get("audio") if isinstance(results.get("audio"), dict) else {}
+    audio_filename = str(audio.get("filename") or "").strip()
+    if audio_filename:
+        return Path(audio_filename).stem
+
+    raw_name = item.name or ""
+    source_tail = item.source_value.split("/")[-1] if item.source_value else ""
+    if raw_name and raw_name not in (item.source_value, source_tail):
+        return raw_name
+
+    if rec.name:
+        return rec.name
+    return raw_name
 
 
 def _item_primary_task_status(item: WorkspaceItem) -> Optional[str]:
@@ -911,11 +949,7 @@ def get_library(include_trashed: bool = False) -> Dict[str, Any]:
                 item_status = overlay["status"]
 
             results = (overlay.get("results") if overlay else None) or item.results or {}
-            display_name = (
-                str(results.get("video_title") or "").strip()
-                or item.name
-                or ""
-            )
+            display_name = _item_display_name(rec, item, results)
             audio_nature = None
             if item.type == "audio":
                 music_mode = results.get("music_mode")
@@ -1960,16 +1994,19 @@ def get_audio_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
     if has_real:
         payload = dict(results)
         payload.setdefault("source", "item_results")
-        payload.setdefault(
-            "audio",
-            {
-                "item_id": item.item_id,
-                "title": item.name,
-                "url": item.source_value if item.source == "url" else "",
-                "duration_sec": results.get("tracks_meta", {}).get("total_sec", 0),
-                "duration_str": "",
-            },
-        )
+        audio_payload = dict(payload.get("audio") or {})
+        if not audio_payload.get("title"):
+            filename_title = Path(str(audio_payload.get("filename") or "")).stem
+            audio_payload["title"] = (
+                str(results.get("video_title") or "").strip()
+                or filename_title
+                or item.name
+            )
+        audio_payload.setdefault("item_id", item.item_id)
+        audio_payload.setdefault("url", item.source_value if item.source == "url" else "")
+        audio_payload.setdefault("duration_sec", results.get("tracks_meta", {}).get("total_sec", 0))
+        audio_payload.setdefault("duration_str", "")
+        payload["audio"] = audio_payload
         payload.setdefault(
             "tracks_meta",
             {

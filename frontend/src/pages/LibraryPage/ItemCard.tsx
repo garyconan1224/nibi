@@ -47,7 +47,7 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
       {/* ── Thumbnail 16/9 ── */}
       <div className="ex-thumb">
         {item.thumbnail ? (
-          <img src={item.thumbnail} alt={item.name} />
+          <img src={item.thumbnail} alt={item.name} referrerPolicy="no-referrer" />
         ) : (
           <Icon size={32} strokeWidth={1.2} style={{ color: 'rgba(255,255,255,0.45)' }} />
         )}

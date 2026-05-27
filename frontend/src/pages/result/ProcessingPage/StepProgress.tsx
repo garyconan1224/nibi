@@ -106,7 +106,16 @@ function getLogsForStage(
   // R12.3 三色日志：error→err（粉）/ warning→warn（橙）/ info+成功关键词→ok（绿）/ 其它→默认灰
   const SUCCESS_HINTS = ['成功', 'success', 'ok', 'done', '完成', '✓', '入库']
   return logs
-    .filter((l) => kws.some((kw) => l.message.toLowerCase().includes(kw)))
+    .filter((l) => {
+      const msg = l.message.toLowerCase()
+      if (stageId === 'DOWNLOAD' && (msg.includes('下载模型') || msg.includes('模型下载') || msg.includes('whisper 模型'))) {
+        return false
+      }
+      if (stageId === 'PROBE' && msg.includes('尝试策略')) {
+        return false
+      }
+      return kws.some((kw) => msg.includes(kw))
+    })
     .map((l) => {
       const lv = (l.level || '').toLowerCase()
       let kind = ''
@@ -115,6 +124,51 @@ function getLogsForStage(
       else if (SUCCESS_HINTS.some((h) => l.message.toLowerCase().includes(h))) kind = 'ok'
       return { text: l.message, kind }
     })
+}
+
+/** R18.1.4: 从 ASR 日志中提取模型下载进度 */
+function extractDownloadProgress(
+  logs: StepProgressProps['taskLogs'],
+): {
+  doneMB: number
+  totalMB: number
+  files: string
+  active: boolean
+  fileDone?: number
+  fileTotal?: number
+} | null {
+  // 从后往前找最近一条下载进度日志
+  for (let i = logs.length - 1; i >= 0; i--) {
+    const msg = logs[i].message
+    // 格式: "📥 下载模型 | 50/140 MB | 3/5 files"
+    const m = msg.match(/(\d+(?:\.\d+)?)\/(\d+(?:\.\d+)?)\s*MB\s*\|\s*(\d+\/\d+\s*files)/)
+    if (m) {
+      return { doneMB: parseFloat(m[1]), totalMB: parseFloat(m[2]), files: m[3], active: true }
+    }
+    // 格式: "📥 下载模型 | 3/5 files"
+    const fm = msg.match(/下载模型\s*\|\s*(\d+)\/(\d+)\s*files/)
+    if (fm) {
+      const fileDone = parseInt(fm[1], 10)
+      const fileTotal = parseInt(fm[2], 10)
+      return {
+        doneMB: 0,
+        totalMB: 0,
+        files: `${fileDone}/${fileTotal} files`,
+        active: true,
+        fileDone,
+        fileTotal,
+      }
+    }
+    // 模型已就绪 → 下载完成
+    if (msg.includes('模型已就绪') || msg.includes('模型下载完成')) {
+      return null // 下载已完成，不再显示
+    }
+    // 开始下载但尚无进度数据
+    if (msg.includes('开始下载模型文件')) {
+      return { doneMB: 0, totalMB: 0, files: '...', active: true }
+    }
+  }
+  return null
 }
 
 export function StepProgress({ currentStatus, progress, taskType, taskLogs }: StepProgressProps) {
@@ -143,6 +197,51 @@ export function StepProgress({ currentStatus, progress, taskType, taskLogs }: St
                 <span className="kbd">{s.id.toLowerCase()}</span>
               </div>
               <div className="desc">{STAGE_DESC[s.id] ?? ''}</div>
+              {/* R18.1.4: ASR 模型下载进度条 */}
+              {s.id === 'ASR' && s.state === 'running' && (() => {
+                const dl = extractDownloadProgress(taskLogs)
+                if (!dl) return null
+                const pct = dl.totalMB > 0
+                  ? Math.min(100, Math.round((dl.doneMB / dl.totalMB) * 100))
+                  : dl.fileTotal
+                    ? Math.min(100, Math.round(((dl.fileDone ?? 0) / dl.fileTotal) * 100))
+                    : 0
+                const detail = dl.totalMB > 0
+                  ? `${dl.doneMB.toFixed(0)}/${dl.totalMB.toFixed(0)} MB · ${dl.files}`
+                  : dl.fileTotal
+                    ? dl.files
+                    : `准备中... · ${dl.files}`
+                return (
+                  <div style={{
+                    margin: '8px 0',
+                    padding: '8px 10px',
+                    borderRadius: 6,
+                    background: 'var(--surface-2, #f0f4ff)',
+                    border: '1px solid var(--border, #d0d8f0)',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                      <span style={{ fontWeight: 600 }}>📥 下载 ASR 模型</span>
+                      <span style={{ fontFamily: 'var(--mono)', color: 'var(--ink-3)' }}>
+                        {detail}
+                      </span>
+                    </div>
+                    <div style={{
+                      height: 6,
+                      borderRadius: 3,
+                      background: 'var(--surface-3, #e0e4ee)',
+                      overflow: 'hidden',
+                    }}>
+                      <div style={{
+                        height: '100%',
+                        borderRadius: 3,
+                        background: 'var(--accent, #4f7df9)',
+                        width: `${pct}%`,
+                        transition: 'width 0.3s ease',
+                      }} />
+                    </div>
+                  </div>
+                )
+              })()}
               {stageLogs.length > 0 && (
                 <div className="logs">
                   {stageLogs.map((l, j) => (

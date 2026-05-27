@@ -100,19 +100,23 @@ def test_audio_with_speech_no_awaiting(tmp_path: Path) -> None:
         payload={"source": str(audio_file), "source_type": "local"},
     )
 
+    mock_settings = MagicMock(
+        openai_api_key="",
+        openai_base_url="https://example.com/v1",
+        transcriber=MagicMock(whisper_model_size="base", device="cpu", language="", initial_prompt=""),
+    )
+
     with (
         patch("backend.app.services.pipeline_tasks.run_vad",
               return_value=VadResult(has_speech=True, total_speech_duration=150.0, total_duration=180.0)),
-        patch("backend.app.services.pipeline_tasks.load_settings",
-              return_value=MagicMock(openai_api_key="sk-test", openai_base_url="https://example.com/v1")),
+        patch("backend.app.services.pipeline_tasks.load_settings", return_value=mock_settings),
         patch("shared.config.get_workspace_root", return_value=tmp_path / "workspace"),
-        patch("urllib.request.urlopen") as urlopen,
+        patch("backend.app.services.asr_router.run_local_asr_with_fallback",
+              return_value=("hello world", [{"text": "hello world", "start": 0.0, "end": 1.0}], 1.0, "remote")),
     ):
         result = handle_audio_task(record, runner)
 
     assert result.get("awaiting_confirm") is None
-    # 应该调了 URL open（ASR 请求）
-    urlopen.assert_called()
 
 
 # ── A3.2: music_mode_confirmed 重跑 ─────────────────────────────

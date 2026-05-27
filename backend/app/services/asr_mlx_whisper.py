@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import platform
+import threading
 import time
 import traceback
 from pathlib import Path
@@ -61,6 +62,152 @@ def get_last_probe_error() -> Optional[Tuple[str, str, str]]:
     return _last_probe_error
 
 
+class _DownloadProgressAggregator:
+    """线程安全的下载进度聚合器，供 snapshot_download 的 tqdm_class 使用。
+
+    snapshot_download 会把 tqdm_class 交给 thread_map 包裹文件列表；
+    这里按已完成文件数统一上报 progress_callback。
+    """
+
+    _lock = threading.Lock()
+    _total_bytes: int = 0
+    _done_bytes: int = 0
+    _files_done: int = 0
+    _files_total: int = 0
+    _callback: Optional[Callable[[float, str], None]] = None
+    _log_callback: Optional[Callable[[str], None]] = None
+    _download_started: bool = False
+
+    @classmethod
+    def reset(
+        cls,
+        progress_callback: Optional[Callable[[float, str], None]],
+        log_callback: Optional[Callable[[str], None]],
+    ) -> None:
+        with cls._lock:
+            cls._total_bytes = 0
+            cls._done_bytes = 0
+            cls._files_done = 0
+            cls._files_total = 0
+            cls._callback = progress_callback
+            cls._log_callback = log_callback
+            cls._download_started = False
+
+    @classmethod
+    def _report(cls) -> None:
+        with cls._lock:
+            cb = cls._callback
+            total = cls._total_bytes
+            done = cls._done_bytes
+            fd = cls._files_done
+            ft = cls._files_total
+        if not cb:
+            return
+        if total > 0:
+            ratio = min(0.99, done / total)
+            done_mb = done / 1024 / 1024
+            total_mb = total / 1024 / 1024
+            msg = f"📥 下载模型 | {done_mb:.0f}/{total_mb:.0f} MB | {fd}/{ft} files"
+            try:
+                cb(ratio, msg)
+            except Exception:  # noqa: BLE001
+                pass
+        elif ft > 0:
+            ratio = min(1.0, fd / ft)
+            msg = f"📥 下载模型 | {fd}/{ft} files"
+            try:
+                cb(ratio, msg)
+            except Exception:  # noqa: BLE001
+                pass
+
+
+class _FileProgress:
+    """snapshot_download 的 tqdm_class 代理。
+
+    huggingface_hub.snapshot_download 会把 tqdm_class 传给 thread_map，
+    因此这里跟踪的是已完成文件数，不是单文件字节数。
+    """
+
+    _lock = threading.RLock()
+
+    @classmethod
+    def get_lock(cls) -> Any:
+        return cls._lock
+
+    @classmethod
+    def set_lock(cls, lock: Any) -> None:
+        cls._lock = lock
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self._iterable = args[0] if args else None
+        try:
+            total = int(kwargs.get("total", 0) or 0)
+        except (TypeError, ValueError):
+            total = 0
+        with _DownloadProgressAggregator._lock:
+            _DownloadProgressAggregator._files_total = max(
+                _DownloadProgressAggregator._files_total,
+                total,
+            )
+            if not _DownloadProgressAggregator._download_started:
+                _DownloadProgressAggregator._download_started = True
+                log_cb = _DownloadProgressAggregator._log_callback
+                if log_cb:
+                    try:
+                        log_cb(f"📥 开始下载模型文件...")
+                    except Exception:  # noqa: BLE001
+                        pass
+        self._total = total
+        self._done = 0
+
+    def __iter__(self) -> Any:
+        if self._iterable is None:
+            return iter(())
+        for item in self._iterable:
+            yield item
+            self.update(1)
+
+    def update(self, n: int = 1) -> None:
+        if n <= 0:
+            return
+        prev = self._done
+        self._done = min(self._total, prev + n) if self._total else prev + n
+        delta = self._done - prev
+        if delta > 0:
+            with _DownloadProgressAggregator._lock:
+                _DownloadProgressAggregator._files_done += delta
+            _DownloadProgressAggregator._report()
+
+    def close(self) -> None:
+        if self._total and self._done < self._total:
+            self.update(self._total - self._done)
+
+    # tqdm duck-type：让 snapshot_download 不报错
+    def set_description(self, desc: str) -> None:
+        pass
+
+    def set_postfix(self, **kwargs: Any) -> None:
+        pass
+
+    def refresh(self) -> None:
+        pass
+
+    def unpause(self) -> None:
+        pass
+
+    def clear(self) -> None:
+        pass
+
+    def display(self) -> None:
+        pass
+
+    def __enter__(self) -> "_FileProgress":
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        self.close()
+
+
 def _ensure_model_downloaded(
     repo_id: str,
     *,
@@ -69,7 +216,8 @@ def _ensure_model_downloaded(
 ) -> str:
     """确保模型已下载到本地缓存，返回本地路径。
 
-    使用 huggingface_hub.snapshot_download，首次下载时通过 progress_callback 报进度。
+    使用 huggingface_hub.snapshot_download + 自定义 tqdm class，
+    通过 progress_callback 实时推送逐文件下载进度。
     """
     from huggingface_hub import snapshot_download
 
@@ -90,9 +238,12 @@ def _ensure_model_downloaded(
     _emit(f"📥 下载 mlx-whisper 模型 | repo={repo_id}")
     _emit_progress(0.0, "开始下载...")
 
+    _DownloadProgressAggregator.reset(progress_callback, log_callback)
+
     local_dir = snapshot_download(
         repo_id,
         local_dir_use_symlinks=False,
+        tqdm_class=_FileProgress,
     )
 
     _emit_progress(1.0, "模型下载完成")

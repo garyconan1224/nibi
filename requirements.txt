@@ -37,6 +37,8 @@ yt-dlp>=2024.1.0
 # ── 本地语音识别（ASR）───────────────────────────────────────────
 # faster-whisper 用于本地转录，规避外部 API 限流与网络依赖
 faster-whisper>=1.0.0
+# mlx-whisper：Apple Silicon 专用 ASR（M1/M2/M3），asr_router 自动检测可用性
+mlx-whisper>=0.4.0; platform_machine == "arm64" and sys_platform == "darwin"
 
 # ── 音频分析（N8）──────────────────────────────────────────────
 silero-vad>=5.0    # VAD 人声活动检测（轻量，torch 后端）

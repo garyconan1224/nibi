@@ -56,6 +56,7 @@ def run_local_asr_with_fallback(
     api_key: str = "",
     api_base: str = "",
     model_name: str = "base",
+    audio_model: str = "",
     language: str = "",
     initial_prompt: str = "",
     log_callback: Optional[Callable[[str], None]] = None,
@@ -140,6 +141,7 @@ def run_local_asr_with_fallback(
                 file_path,
                 api_key=api_key,
                 api_base=api_base,
+                audio_model=audio_model,
                 language=language,
                 log_callback=log_callback,
                 progress_callback=progress_callback,
@@ -161,6 +163,7 @@ def _transcribe_remote(
     *,
     api_key: str,
     api_base: str = "",
+    audio_model: str = "",
     language: str = "",
     log_callback: Optional[Callable[[str], None]] = None,
     progress_callback: Optional[Callable[[float, str], None]] = None,
@@ -191,7 +194,7 @@ def _transcribe_remote(
     path = Path(file_path)
     with open(path, "rb") as f:
         files = {"file": (path.name, f, "application/octet-stream")}
-        data: dict[str, Any] = {"model": "whisper-1", "response_format": "verbose_json"}
+        data: dict[str, Any] = {"model": audio_model or "whisper-1", "response_format": "verbose_json"}
         if language:
             data["language"] = language
         resp = httpx.post(

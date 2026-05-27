@@ -2176,7 +2176,7 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     )
 
     # ── 1. FETCH ────────────────────────────────────────────
-    runner.store.update(task_id, status=TaskStatus.FETCH.value)
+    runner.store.update(task_id, status=TaskStatus.DOWNLOAD.value)
     runner.set_progress(task_id, 0.05, "拉取音频文件...")
 
     # A3 重跑：文件已在首次运行时下载，跳过
@@ -2185,6 +2185,13 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     audio_dir.mkdir(parents=True, exist_ok=True)
     audio_local_path: Path
     content_type = ""
+    yt_dlp_meta: Dict[str, Any] = {}
+
+    def _remember_ytdlp_metadata(meta: Dict[str, Any]) -> Dict[str, Any]:
+        mapped = _apply_ytdlp_metadata_to_task(record, runner, meta)
+        yt_dlp_meta.update(mapped)
+        return mapped
+
     if source_type == "url":
         url_path = source.split("?")[0]
         audio_filename = url_path.split("/")[-1] or "audio.mp3"
@@ -2197,7 +2204,7 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             # 先无副作用预取元数据，保证 audio-only 也能拿到 title/thumbnail
             pre_meta = fetch_ytdlp_metadata(source, log=lambda m: runner.append_log(task_id, m))
             if pre_meta:
-                _apply_ytdlp_metadata_to_task(record, runner, pre_meta)
+                _remember_ytdlp_metadata(pre_meta)
 
             log(f"🎬 检测到平台 URL，使用 yt-dlp 抽取音频流")
             result = run_ytdlp_download(
@@ -2207,13 +2214,13 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 log=lambda m: runner.append_log(task_id, m),
                 progress_callback=lambda p, msg: runner.set_progress(task_id, 0.05 + p * 0.1, msg),
                 # R15 audio 任务也在下载中就回写标题，让 ProcessingPage 立刻显示真实名字
-                info_callback=lambda meta: _apply_ytdlp_metadata_to_task(record, runner, meta),
+                info_callback=_remember_ytdlp_metadata,
             )
             if not result.get("ok"):
                 raise RuntimeError(f"音频下载失败（yt-dlp）：{result.get('error', '未知错误')}")
 
             # R13.6.2 把 yt-dlp 元数据回写到 task.result，让 ProcessingPage 在 audio 阶段显示真实标题
-            _apply_ytdlp_metadata_to_task(record, runner, result)
+            _remember_ytdlp_metadata(result)
 
             audio_local_path = Path(result["save_path"])
             audio_filename = audio_local_path.name
@@ -2246,6 +2253,7 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     log(f"📦 音频已加载，{len(audio_bytes)//1024} KB，mime={audio_mime}，filename={audio_filename}")
 
     # ── 1.5 VAD（N8 / A3）────────────────────────────────────
+    runner.store.update(task_id, status=TaskStatus.PROBE.value)
     runner.set_progress(task_id, 0.15, "VAD 人声活动检测...")
     vad_result = run_vad(audio_local_path)
     speech_ratio = (
@@ -2284,7 +2292,7 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     skip_asr = (not vad_result.has_speech) or (not asr_enabled) or _music_confirmed
 
     # ── 2. TRANSCRIBE ────────────────────────────────────────
-    runner.store.update(task_id, status=TaskStatus.VLM.value)  # 借用 VLM 状态表示「模型推理中」
+    runner.store.update(task_id, status=TaskStatus.ASR.value)
     runner.set_progress(task_id, 0.30, "语音转文字中...")
 
     settings = load_settings()
@@ -2297,43 +2305,34 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
 
     if skip_asr:
         log("⏭️  跳过 ASR（无人声或未启用）")
-    elif not api_key:
-        log("⚠️  未提供 api_key，跳过转写")
     else:
-        # 用 multipart/form-data POST 到 /audio/transcriptions（OpenAI 兼容）
-        log(f"🔊 调用 audio model={audio_model} | language={whisper_lang}")
-        boundary = "----PythonFormBoundary"
-        body_parts = []
-        body_parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\n{audio_model}\r\n".encode())
-        body_parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"response_format\"\r\n\r\njson\r\n".encode())
-        if whisper_lang and whisper_lang != "auto":
-            body_parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"language\"\r\n\r\n{whisper_lang}\r\n".encode())
-        body_parts.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{audio_filename}\"\r\nContent-Type: {audio_mime}\r\n\r\n".encode())
-        body_parts.append(audio_bytes)
-        body_parts.append(f"\r\n--{boundary}--\r\n".encode())
-        body = b"".join(body_parts)
+        # R18.1.2: 通过 asr_router 按优先级尝试本地 ASR（mlx > fast > remote）
+        from backend.app.services.asr_router import run_local_asr_with_fallback, select_asr_engine
 
-        transcribe_url = base_url.rstrip("/") + "/audio/transcriptions"
-        transcribe_req = urllib.request.Request(
-            transcribe_url,
-            data=body,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": f"multipart/form-data; boundary={boundary}",
-            },
-            method="POST",
-        )
+        tcfg = settings.transcriber
+        engine = select_asr_engine(api_key=api_key)
+        log(f"🔍 选用 ASR 引擎：{engine}")
+
         try:
-            with urllib.request.urlopen(transcribe_req, timeout=120) as resp:
-                resp_data = json.loads(resp.read())
-            transcript_text = resp_data.get("text") or ""
-            transcript_segments = resp_data.get("segments") or []
-            log(f"✅ 转写完成，{len(transcript_text)} 字符")
-        except Exception as err:
-            log(f"⚠️  转写失败：{err}")
-            transcript_text = ""
+            transcript_text, transcript_segments, _, asr_engine = run_local_asr_with_fallback(
+                file_path=str(audio_local_path),
+                api_key=api_key,
+                api_base=base_url,
+                model_name=tcfg.whisper_model_size or "base",
+                audio_model=audio_model,
+                language=whisper_lang if whisper_lang != "auto" else "",
+                initial_prompt=tcfg.initial_prompt or "",
+                log_callback=log,
+                progress_callback=lambda ratio, msg: runner.set_progress(
+                    task_id, 0.30 + ratio * 0.35, msg
+                ),
+            )
+            log(f"✅ 转写完成（{asr_engine}），{len(transcript_text)} 字符 / {len(transcript_segments)} 段")
+        except (RuntimeError, FileNotFoundError) as err:
+            raise RuntimeError(f"ASR 全部失败，无法转写音频：{err}") from err
 
     # ── 3. SUMMARIZE ─────────────────────────────────────────
+    runner.store.update(task_id, status=TaskStatus.SUM.value)
     runner.set_progress(task_id, 0.70, "生成摘要中...")
     summary = ""
 
@@ -2513,18 +2512,36 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     runner.store.update(task_id, status=TaskStatus.STORE.value)
     runner.set_progress(task_id, 0.92, "归档音频产物...")
 
+    try:
+        audio_duration_sec = float(yt_dlp_meta.get("video_duration") or 0)
+    except (TypeError, ValueError):
+        audio_duration_sec = 0.0
+    if audio_duration_sec <= 0:
+        audio_duration_sec = float(vad_result.total_duration or 0)
+    audio_title = str(yt_dlp_meta.get("video_title") or audio_filename)
+
     result: Dict[str, Any] = {
         "task_id": task_id,
         "project_id": record.project_id,
         "source": source,
         "source_type": source_type,
+        **yt_dlp_meta,
+        "duration_sec": audio_duration_sec,
         "transcript": transcript_text,
         "transcript_segments": transcript_segments,
         "summary": summary,
         "audio": {
+            "title": audio_title,
             "filename": audio_filename,
+            "url": source if source_type == "url" else "",
+            "duration_sec": audio_duration_sec,
+            "duration_str": "",
             "mime": audio_mime,
             "size_bytes": len(audio_bytes),
+        },
+        "tracks_meta": {
+            "total_sec": audio_duration_sec,
+            "transcript_count": len(transcript_segments),
         },
         "vad": vad_result.to_dict(),
         "diarization": diarization_dict,
