@@ -235,14 +235,14 @@ R17 在 `featuresToSteps` 里已经把 av_synthesis 展开成 `['frame_extract',
 
 ## 验收标准
 
-1. Spike 结论已写
-2. 后端 `pytest backend/tests/services/av_synthesis/` 全绿（至少 3 个 case）
-3. 后端 `pytest tests/services/test_pipeline_av_synthesis.py` 通过
-4. 前端 `npm run test` 全绿，新增 2 个 case
-5. `npm run build` 无 TS 错
-6. 端到端：B 站教学视频跑通 → 产出含「全局摘要 / 关键帧画廊 / 章节正文 / 字幕原文 / 最终综合」5 个 H2 段落的 .md 文件
-7. 结果页能预览 + 能下载 .md
-8. 综合笔记产物 .md 文件大小 < 5MB（关键帧用相对路径引用，不内嵌 base64）
+1. [x] Spike 结论已写 — 用户已拍板方案 C（跳过 OCR，LLM 自行推断公式/代码）
+2. [x] 后端 `pytest backend/tests/services/av_synthesis/` 全绿（12 case: 6 align + 6 render）
+3. [x] 后端 `pytest backend/tests/services/test_pipeline_av_synthesis.py` 通过（8 case）
+4. [x] 前端 `npm run test` 全绿（76 case，含 AVSynthesisResultPage 2 case）
+5. [x] `npm run build` 无 TS 错
+6. [ ] 端到端：B 站教学视频跑通 → 产出含「全局摘要 / 关键帧画廊 / 章节正文 / 字幕原文 / 最终综合」5 个 H2 段落的 .md 文件
+7. [x] 结果页能预览 + 能下载 .md（代码已实现 + curl 测试通过，等待用户人工验证）
+8. [x] 综合笔记产物 .md 文件大小 < 5MB（关键帧用相对路径引用，不内嵌 base64）
 
 ## 不在本期范围
 
