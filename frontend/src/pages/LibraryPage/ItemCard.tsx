@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import type { LibraryItem } from '@/services/library'
+import { Mic, Music } from 'lucide-react'
 import {
   TYPE_ICON,
   STATE_COLOR,
@@ -49,6 +50,19 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
           <img src={item.thumbnail} alt={item.name} />
         ) : (
           <Icon size={32} strokeWidth={1.2} style={{ color: 'rgba(255,255,255,0.45)' }} />
+        )}
+
+        {/* type badge — top-left */}
+        <span className={`ex-type-badge ex-type-badge--${item.type}`}>
+          {item.type.toUpperCase()}
+        </span>
+
+        {/* audio nature badge — bottom-left */}
+        {item.type === 'audio' && item.audio_nature && (
+          <span className="ex-nature-badge">
+            {item.audio_nature === 'speech' ? <Mic size={12} /> : <Music size={12} />}
+            {item.audio_nature === 'speech' ? '人声' : '音乐'}
+          </span>
         )}
 
         {/* running progress bar */}
