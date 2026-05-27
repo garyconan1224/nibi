@@ -1,51 +1,44 @@
-local_settings.py
-**/.env
+
+__pycache__/
+!.env.example
+.claude/
+.claude/current-task.md
+.claude/worktrees/
+.codegraph/
+.DS_Store
 .env
 .env.*
-!.env.example
+.local/
+.playwright-mcp/
+.pytest_cache/
+.venv/
+*.log
 *.pem
-__pycache__/
 *.pyc
 *.pyo
-.pytest_cache/
-data/videos/
-data/json_data/
-data/cookies/
-data/workspaces/
-data/*.db
 *.sqlite*
-projects/
-runtime.log
-*.log
+*.swp
 *.zip
-.DS_Store
-.local/
-data/projects/
-data/chats/
-output/
-frontend/.playwright-cli/
-.playwright-mcp/
-
+**/.env
+# CodeGraph Index
+# Design source archives (already extracted to docs/design/)
 # Frontend (Vite + React)
-node_modules/
-frontend/dist/
-frontend/tsconfig.tsbuildinfo
+# Local agent/tool instructions
+data/*.db
+data/chats/
+data/cookies/
+data/json_data/
+data/projects/
+data/videos/
+data/workspaces/
 frontend/.env
 frontend/.env.local
-.venv/
-*.pyc
-__pycache__/
-.claude/worktrees/
-
-# Local agent/tool instructions
+frontend/.playwright-cli/
+frontend/dist/
+frontend/tsconfig.tsbuildinfo
 GEMINI.md
-.claude/current-task.md
-
-# Design source archives (already extracted to docs/design/)
-*.zip
-.DS_Store
-*.swp
-
-# CodeGraph Index
-.codegraph/
-
+local_settings.py
+node_modules/
+output/
+projects/
+runtime.log
