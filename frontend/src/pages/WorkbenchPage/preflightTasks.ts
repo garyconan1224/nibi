@@ -4,15 +4,23 @@ import type { AnalysisScope } from '@/types/workspace'
 
 export type MediaKind = 'video' | 'audio' | 'image' | 'text'
 
+export interface RadioOption {
+  value: string
+  label: string
+  tooltip?: string
+}
+
 export interface TaskChild {
   id: string
   label: string
-  type: 'radio' | 'check' | 'number' | 'text'
-  options?: string[]
+  type: 'radio' | 'check' | 'number' | 'text' | 'textarea'
+  options?: (string | RadioOption)[]
   default: string | number | boolean
   unit?: string
+  placeholder?: string
+  hint?: string
   whenParent?: string
-  whenValue?: string
+  whenValue?: string | boolean
 }
 
 export interface TaskGroup {
@@ -77,14 +85,33 @@ export const TASK_GROUPS: Record<MediaKind, TaskGroup[]> = {
   ],
   audio: [
     {
-      id: 'asr', label: '人声转写 + 内容总结', sub: 'Whisper · 多语言', default: true,
+      id: 'transcribe_summary', label: '人声转写 + 内容总结', sub: 'Whisper · 多语言 · 模板总结', default: true,
       children: [
-        { id: 'asr_lang', label: '语言', type: 'radio', options: ['自动检测', '中文', '英文', '其他'], default: '自动检测' },
-        { id: 'asr_diar', label: '开启说话人分离', type: 'check', default: true },
+        { id: 'speaker_diarize', label: '区分说话人音色', type: 'check', default: false,
+          hint: '声纹聚类 → 给每个 segment 加 [说话人 A/B] 标签' },
+        { id: 'subtitle_export', label: '导出字幕文件', type: 'check', default: false },
+        { id: 'include_timestamps', label: '含时间轴', type: 'check', default: true,
+          whenParent: 'subtitle_export', whenValue: true,
+          hint: '勾上导出 .srt（可二压视频）；不勾导出 .txt 纯文本' },
+        { id: 'proper_nouns', label: '专有名词修正', type: 'textarea', default: '',
+          placeholder: '人名 / 术语 / 品牌（逗号或换行分隔）',
+          hint: '在转写完成后调用 LLM 找读音相近但拼错的词，替换为清单中正确写法',
+          whenParent: 'subtitle_export', whenValue: true },
+        { id: 'summary_template', label: '总结模板', type: 'radio',
+          options: [
+            { value: 'concise', label: '简洁摘要', tooltip: '100-200 字一段，适合快速浏览' },
+            { value: 'detailed', label: '详细要点', tooltip: '多级 bullet + 关键词，适合深度学习' },
+            { value: 'quotes', label: '金句提取', tooltip: '5-10 条独立金句卡片，适合短视频/社媒' },
+            { value: 'meeting', label: '会议纪要', tooltip: '议题/决议/待办/参会人 4 段式' },
+            { value: 'xhs', label: '小红书风格', tooltip: '标题党+emoji+分段+话题 tag' },
+            { value: 'longform', label: '公众号长文', tooltip: '引言/正文(H2分节)/结尾' },
+            { value: 'lecture', label: '教学笔记', tooltip: '知识点/例子/重点/延伸阅读' },
+            { value: 'interview', label: '访谈整理', tooltip: 'Q&A 对话 + 嘉宾观点摘录' },
+            { value: 'shownotes', label: '播客 shownotes', tooltip: '时间戳章节 + 嘉宾介绍 + 推荐链接' },
+          ],
+          default: 'concise' },
       ],
     },
-    { id: 'voiceprint', label: '说话人音色区分', sub: '声纹聚类 · 自动匹配参与人员', default: true },
-    { id: 'srt', label: '生成字幕文件', sub: '.srt / .txt', default: true },
     { id: 'music', label: '音乐分析', sub: 'BPM / 调性 / 乐器', default: false,
       children: [
         { id: 'music_suno', label: '生成 Suno / Udio 格式提示词', type: 'check', default: true },
@@ -193,14 +220,13 @@ export function applyCascades(
     }
   }
   if (kind === 'audio') {
-    if (s.voiceprint && s.voiceprint.on) {
-      s.asr = { ...s.asr, on: true }
-      locks.asr = '说话人区分需要先转写'
-    }
-    if (s.srt && s.srt.on) {
-      if (!s.asr || !s.asr.on) {
-        s.asr = { ...s.asr, on: true }
-        locks.asr = '字幕导出需要转写'
+    if (s.transcribe_summary) {
+      const ts = s.transcribe_summary
+      if (ts.speaker_diarize || ts.subtitle_export) {
+        if (!ts.on) {
+          s.transcribe_summary = { ...ts, on: true }
+          locks.transcribe_summary = '说话人区分/字幕导出需要转写'
+        }
       }
     }
   }

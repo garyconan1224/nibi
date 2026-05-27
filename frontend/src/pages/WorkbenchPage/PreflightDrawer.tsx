@@ -43,9 +43,7 @@ const TASK_TO_FEATURE: Record<MediaKind, Record<string, string>> = {
     music: 'music_analysis',
   },
   audio: {
-    asr: 'transcribe_summary',
-    voiceprint: 'speaker_diarize',
-    srt: 'subtitle_export',
+    transcribe_summary: 'transcribe_summary',
     music: 'music_analysis',
   },
   image: {
@@ -84,7 +82,7 @@ const PRESETS: { id: string; label: string; apply: Record<MediaKind, Record<stri
     id: 'standard', label: '标准',
     apply: {
       video: { frame_prompt: { on: true }, summary: { on: true }, music: { on: false }, srt: { on: true } },
-      audio: { asr: { on: true }, voiceprint: { on: true }, srt: { on: true }, music: { on: false } },
+      audio: { transcribe_summary: { on: true }, music: { on: false } },
       image: { describe: { on: true }, ocr: { on: false }, prompt: { on: true }, assoc: { on: false }, compare: { on: false } },
       text: { summary: { on: true }, assoc: { on: true }, rewrite: { on: false }, translate: { on: false }, multi: { on: false } },
     },
@@ -93,7 +91,7 @@ const PRESETS: { id: string; label: string; apply: Record<MediaKind, Record<stri
     id: 'minimal', label: '极简',
     apply: {
       video: { frame_prompt: { on: false }, summary: { on: true }, music: { on: false }, srt: { on: false } },
-      audio: { asr: { on: true }, voiceprint: { on: false }, srt: { on: false }, music: { on: false } },
+      audio: { transcribe_summary: { on: true }, music: { on: false } },
       image: { describe: { on: true }, ocr: { on: false }, prompt: { on: false }, assoc: { on: false }, compare: { on: false } },
       text: { summary: { on: true }, assoc: { on: false }, rewrite: { on: false }, translate: { on: false }, multi: { on: false } },
     },
@@ -671,7 +669,7 @@ function PresetBar({ current, onPick }: {
 }
 
 function PFTaskCard({ group, state, setState, locks, disabledReasons }: {
-  group: { id: string; label: string; sub?: string; children?: { id: string; label: string; type: string; options?: string[]; default: unknown; unit?: string; whenParent?: string; whenValue?: string }[] }
+  group: { id: string; label: string; sub?: string; children?: { id: string; label: string; type: string; options?: (string | { value: string; label: string; tooltip?: string })[]; default: unknown; unit?: string; placeholder?: string; hint?: string; whenParent?: string; whenValue?: string | boolean }[] }
   state: Record<string, unknown>
   setState: (patch: Record<string, unknown>) => void
   locks: Record<string, string>
@@ -682,6 +680,8 @@ function PFTaskCard({ group, state, setState, locks, disabledReasons }: {
   const locked = !!lockedReason
   const disabledReason = disabledReasons[group.id]
   const disabled = !!disabledReason
+  const [tooltip, setTooltip] = useState<string | null>(null)
+  const [radioExpanded, setRadioExpanded] = useState<Record<string, boolean>>({})
   const cardBg = disabled ? 'var(--bg-sunken)'
     : on ? 'var(--bg-elev)'
     : 'transparent'
@@ -769,15 +769,19 @@ function PFTaskCard({ group, state, setState, locks, disabledReasons }: {
               const val = state[c.id] ?? c.default
               const childLockKey = `${group.id}.${c.id}`
               const childLocked = !!locks[childLockKey]
+              const opts = (c.options ?? []).map(o => typeof o === 'string' ? { value: o, label: o } : o)
+              const expanded = !!radioExpanded[c.id]
+              const selectedOpt = opts.find(o => o.value === val)
+              const visibleOpts = expanded ? opts : (selectedOpt ? [selectedOpt] : opts)
               return (
                 <div key={c.id}>
                   <div style={{ fontSize: 11, color: 'var(--ink-2)', marginBottom: 6, fontWeight: 500 }}>{c.label}</div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {(c.options ?? []).map(o => {
-                      const active = val === o
-                      return (
-                        <button key={o}
-                          onClick={() => { if (!childLocked) setState({ [c.id]: o }) }}
+                    {visibleOpts.map(o => {
+                      const active = val === o.value
+                      const btn = (
+                        <button key={o.value}
+                          onClick={() => { if (!childLocked) setState({ [c.id]: o.value }) }}
                           disabled={childLocked}
                           style={{
                             height: 28, padding: '0 12px',
@@ -789,10 +793,39 @@ function PFTaskCard({ group, state, setState, locks, disabledReasons }: {
                             cursor: childLocked ? 'not-allowed' : 'pointer',
                             opacity: childLocked ? 0.5 : 1,
                           }}>
-                          {o}
+                          {o.label}
                         </button>
                       )
+                      if (!o.tooltip) return btn
+                      return (
+                        <div key={o.value} style={{ position: 'relative' }}
+                          onMouseEnter={() => setTooltip(o.value)}
+                          onMouseLeave={() => setTooltip(null)}>
+                          {btn}
+                          {tooltip === o.value && (
+                            <div style={{
+                              position: 'absolute', bottom: '100%', left: 0, marginBottom: 6,
+                              background: 'var(--ink)', color: 'var(--bg)',
+                              fontSize: 11, lineHeight: 1.4, padding: '6px 10px',
+                              borderRadius: 8, whiteSpace: 'normal', width: 220, zIndex: 10,
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                            }}>
+                              {o.tooltip}
+                            </div>
+                          )}
+                        </div>
+                      )
                     })}
+                    {opts.length > 1 && (
+                      <button onClick={() => setRadioExpanded(prev => ({ ...prev, [c.id]: !prev[c.id] }))}
+                        style={{
+                          height: 28, padding: '0 8px', borderRadius: 8,
+                          border: '1px solid var(--line)', background: 'transparent',
+                          color: 'var(--ink-3)', fontSize: 11, cursor: 'pointer',
+                        }}>
+                        {expanded ? '收起' : `${opts.length} 项`}
+                      </button>
+                    )}
                   </div>
                   {childLocked && (
                     <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 4 }}>{locks[childLockKey]}</div>
@@ -824,7 +857,24 @@ function PFTaskCard({ group, state, setState, locks, disabledReasons }: {
               return (
                 <div key={c.id}>
                   <div style={{ fontSize: 11, color: 'var(--ink-2)', marginBottom: 6 }}>{c.label}</div>
-                  <input className="pf-inp" value={(state[c.id] ?? c.default) as string} onChange={e => setState({ [c.id]: e.target.value })} />
+                  <input className="pf-inp" value={(state[c.id] ?? c.default) as string}
+                    placeholder={c.placeholder}
+                    onChange={e => setState({ [c.id]: e.target.value })} />
+                </div>
+              )
+            }
+            if (c.type === 'textarea') {
+              return (
+                <div key={c.id}>
+                  <div style={{ fontSize: 11, color: 'var(--ink-2)', marginBottom: 6 }}>{c.label}</div>
+                  <textarea className="pf-inp" value={(state[c.id] ?? c.default) as string}
+                    placeholder={c.placeholder}
+                    onChange={e => setState({ [c.id]: e.target.value })}
+                    rows={3}
+                    style={{ width: '100%', resize: 'vertical', fontSize: 12, padding: '6px 8px' }} />
+                  {c.hint && (
+                    <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 4 }}>{c.hint}</div>
+                  )}
                 </div>
               )
             }
