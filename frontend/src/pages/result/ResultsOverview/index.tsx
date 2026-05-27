@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, BookOpen, Clapperboard, Download, MessageSquare, RotateCcw } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, BookOpen, Clapperboard, Download, MessageSquare, RotateCcw, Star } from 'lucide-react'
 
 import {
   type AudioResult,
@@ -450,6 +450,23 @@ export default function ResultsOverview() {
             </div>
             <div className="ov-transcript-preview">
               {transcriptPreview}
+            </div>
+          </div>
+        )}
+
+        {/* R19: 综合笔记入口卡片（顶置） */}
+        {pageState.kind === 'ready' && Boolean((pageState.item.results as Record<string, unknown>)?.av_synthesis_path) && (
+          <div
+            className="ov-action-card"
+            style={{ border: '1px solid var(--accent, #4f46e5)', background: 'var(--accent-bg, #eef2ff)' }}
+            onClick={() => navigate(`/workspaces/${workspaceId}/av-synthesis`)}
+          >
+            <div className="ov-action-icon" style={{ background: 'var(--accent-bg, #eef2ff)', color: 'var(--accent, #4f46e5)' }}>
+              <Star size={18} />
+            </div>
+            <div className="ov-action-text">
+              <div className="title">综合笔记已就绪</div>
+              <div className="desc">查看图文教学笔记</div>
             </div>
           </div>
         )}

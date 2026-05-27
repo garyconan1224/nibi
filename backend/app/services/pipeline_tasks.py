@@ -16,6 +16,7 @@ from backend.app.models.tasks import TaskRecord, TaskStatus
 from backend.app.services.task_runner import TaskRunner
 from shared.config import (
     get_workspace_json_dir,
+    get_workspace_root,
     get_workspace_text_dir,
     get_workspace_videos_dir,
 )
@@ -2558,6 +2559,153 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     return {**result, "json_path": str(json_path.resolve())}
 
 
+# ── R19-B: AV synthesis handler ───────────────────────────────
+
+def handle_av_synthesis_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
+    """综合笔记任务：关键帧 + 转写 → 图文教学笔记 Markdown。
+
+    依赖（需在同一 workspace 内已有产物）：
+    - 视频分析产物（json_data/ 下的 *_视觉数据.json + frames/）
+    - 音频转写产物（audio/ 下的 *.json，含 transcript_segments）
+
+    payload 字段：
+      - api_key: 可选，LLM API key（缺省从 settings 读取）
+      - text_model: 可选，chat model 名称
+    """
+    from backend.app.services.av_synthesis import (
+        align_frames_to_transcript,
+        llm_final_synthesis,
+        llm_global_summary,
+        llm_split_chapters,
+        load_frames_manifest,
+        load_transcript,
+    )
+    from backend.app.services.av_synthesis.render import (
+        AVSynthesisContext,
+        GalleryRow,
+        render_av_synthesis_md,
+    )
+
+    payload = record.payload
+    task_id = record.task_id
+    log = lambda msg: runner.append_log(task_id, msg)  # noqa: E731
+
+    settings = load_settings()
+    api_key = (
+        str(payload.get("api_key") or "").strip()
+        or settings.openai_api_key.strip()
+    )
+    if not api_key:
+        raise ValueError("av_synthesis 任务需要 API key（请在设置中配置或在 payload 中传入）")
+
+    # ── 1. 定位 workspace 产物 ────────────────────────────────
+    workspace_root = get_workspace_root(record.project_id)
+    json_dir = get_workspace_json_dir(record.project_id)
+
+    runner.set_progress(task_id, 0.05, "加载依赖产物...")
+    log("📂 开始加载帧数据和转写数据")
+
+    # 查找视频分析产物目录（json_data 下含 frames/ 子目录的目录）
+    frame_dirs = [d for d in json_dir.iterdir() if d.is_dir() and (d / "frames").is_dir()]
+    if not frame_dirs:
+        raise FileNotFoundError(f"workspace {record.project_id} 中未找到视频分析产物（json_data/*/frames/）")
+
+    # 加载帧数据（从第一个找到的分析产物目录）
+    frames = load_frames_manifest(frame_dirs[0])
+    if not frames:
+        raise FileNotFoundError(f"帧数据为空：{frame_dirs[0]}")
+    log(f"✅ 加载 {len(frames)} 个关键帧")
+
+    # 查找音频转写产物
+    audio_dir = workspace_root / "audio"
+    audio_jsons = list(audio_dir.glob("*.json")) if audio_dir.exists() else []
+    if not audio_jsons:
+        raise FileNotFoundError(f"workspace {record.project_id} 中未找到转写产物（audio/*.json）")
+
+    transcript_segments = load_transcript(audio_jsons[0])
+    if not transcript_segments:
+        raise FileNotFoundError(f"转写数据为空：{audio_jsons[0]}")
+    log(f"✅ 加载 {len(transcript_segments)} 段转写")
+
+    # 提取元数据
+    audio_data = json.loads(audio_jsons[0].read_text(encoding="utf-8"))
+    metadata: Dict[str, Any] = {
+        "title": audio_data.get("video_title") or audio_data.get("audio", {}).get("title") or "未命名",
+        "author": audio_data.get("uploader") or audio_data.get("video_uploader") or "",
+        "duration_display": _format_sec_short(audio_data.get("duration_sec") or audio_data.get("audio", {}).get("duration_sec") or 0),
+    }
+
+    # ── 2. 时间戳对齐 ────────────────────────────────────────
+    runner.set_progress(task_id, 0.15, "帧-转写对齐中...")
+    aligned = align_frames_to_transcript(frames, transcript_segments)
+    log(f"✅ 对齐完成：{len(aligned)} 帧")
+
+    # ── 3. LLM 分章节 ───────────────────────────────────────
+    runner.set_progress(task_id, 0.25, "LLM 拆分章节...")
+    log("🤖 调用 LLM 拆分章节...")
+    chapters = llm_split_chapters(aligned, metadata, api_key)
+    log(f"✅ 拆分为 {len(chapters)} 个章节")
+
+    # ── 4. LLM 全局摘要 ─────────────────────────────────────
+    runner.set_progress(task_id, 0.50, "LLM 生成全局摘要...")
+    log("🤖 调用 LLM 生成全局摘要...")
+    transcript_text = "\n".join(seg.text for seg in transcript_segments)
+    summary = llm_global_summary(transcript_text, api_key)
+    log(f"✅ 摘要生成完成：{len(summary)} 字")
+
+    # ── 5. LLM 最终综合 ─────────────────────────────────────
+    runner.set_progress(task_id, 0.70, "LLM 最终综合分析...")
+    log("🤖 调用 LLM 生成最终综合...")
+    final_synthesis = llm_final_synthesis(aligned, chapters, api_key)
+    log(f"✅ 综合分析完成：{len(final_synthesis)} 字")
+
+    # ── 6. 渲染 Markdown ────────────────────────────────────
+    runner.set_progress(task_id, 0.85, "渲染 Markdown...")
+
+    gallery_rows = [
+        GalleryRow(
+            timestamp_display=_format_sec_short(af.frame.timestamp),
+            image_path=af.frame.image_path,
+            scene_description=af.frame.scene_description,
+        )
+        for af in aligned
+    ]
+
+    # 格式化完整转写（带时间戳）
+    full_transcript_lines = []
+    for seg in transcript_segments:
+        ts = _format_sec_short(seg.start)
+        full_transcript_lines.append(f"[{ts}] {seg.text}")
+    full_transcript = "\n".join(full_transcript_lines)
+
+    ctx = AVSynthesisContext(
+        title=metadata.get("title", "未命名"),
+        platform=metadata.get("author", ""),
+        author=metadata.get("author", ""),
+        duration_display=metadata.get("duration_display", ""),
+        summary=summary,
+        gallery_rows=gallery_rows,
+        chapters=chapters,
+        full_transcript=full_transcript,
+        final_synthesis=final_synthesis,
+    )
+    md = render_av_synthesis_md(ctx)
+
+    # ── 7. 写出文件 ─────────────────────────────────────────
+    out_path = workspace_root / "av_synthesis.md"
+    out_path.write_text(md, encoding="utf-8")
+
+    runner.set_progress(task_id, 1.0, "综合笔记完成")
+    log(f"✅ 综合笔记已生成：{out_path}")
+
+    return {
+        "av_synthesis_path": "av_synthesis.md",
+        "chapter_count": len(chapters),
+        "frame_count": len(frames),
+        "segment_count": len(transcript_segments),
+    }
+
+
 def register_pipeline_handlers(runner: TaskRunner) -> None:
     runner.register("download",  handle_download_task)
     runner.register("analyze",   handle_analyze_task)
@@ -2567,3 +2715,4 @@ def register_pipeline_handlers(runner: TaskRunner) -> None:
     runner.register("text",      handle_text_task)
     runner.register("image",     handle_image_task)
     runner.register("audio",     handle_audio_task)
+    runner.register("av_synthesis", handle_av_synthesis_task)
