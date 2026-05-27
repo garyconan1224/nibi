@@ -165,23 +165,13 @@ export default function ProcessingPage() {
                 <div className="live">● LIVE</div>
               )}
               {isAudioTask && coverUrl && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    bottom: 8,
-                    right: 8,
-                    width: 28,
-                    height: 28,
-                    borderRadius: 8,
-                    background: 'rgba(0,0,0,0.7)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backdropFilter: 'blur(4px)',
-                  }}
-                >
-                  <Music size={14} color="#fff" />
-                </div>
+                <>
+                  <div className="thumb-audio-mask" />
+                  <div className="thumb-audio-badge">
+                    <Music size={12} color="#fff" />
+                    <span>AUDIO</span>
+                  </div>
+                </>
               )}
             </div>
             <div className="info">
