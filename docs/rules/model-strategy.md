@@ -40,7 +40,7 @@
 
 ---
 
-## 档 3 — DS v4-pro（Claude Code + ccswitch，⭐便宜优先）：简单任务默认
+## 档 3 — deepseek v4-pro（Claude Code + ccswitch，⭐便宜优先）：简单任务默认
 
 **这一档是日常默认**。在 Claude Code 里选 Sonnet 或 Opus 角色，ccswitch 自动路由到 `deepseek-v4-pro`。**能用就用，不要因为"DS 可能不够强"而升到桌面 Sonnet 浪费 Claude 付费额度**。
 
@@ -57,7 +57,7 @@
 
 **DS 的工具能力**：Bash / Read / Write / Edit / Grep / Glob 全套都能用，可独立完成 git 提交、跑测试、改文件。
 
-**DS v4-pro 不擅长 → 升档 1 Opus**：
+**deepseek v4-pro 不擅长 → 升档 1 Opus**：
 
 - 跨 5+ 文件架构
 - 复杂状态机推理
@@ -66,11 +66,11 @@
 
 ---
 
-## 档 4 — DS v4-flash / Haiku 4.5：极简兜底
+## 档 4 — deepseek v4-flash / Haiku 4.5：极简兜底
 
 - 单行修改 / typo
 - 短得不值得用 pro 的任务（< 2 分钟）
-- 优先 **DS v4-flash**（Claude Code 里选 Haiku 角色，ccswitch 中转到 `deepseek-v4-flash`，比桌面 Haiku 更便宜）；DS 不可用时再用桌面 Haiku 4.5
+- 优先 **deepseek v4-flash**（Claude Code 里选 Haiku 角色，ccswitch 中转到 `deepseek-v4-flash`，比桌面 Haiku 更便宜）；DS 不可用时再用桌面 Haiku 4.5
 
 > ⚠️ **不要让 v4-flash 当日常默认**：它对应原 Haiku 档，能力弱，多文件 CRUD / 组件级前端会翻车。日常默认必须 v4-pro。
 
@@ -83,7 +83,7 @@
 - **当前阶段：N11 后收口决策点**。`[A]` 现状同步与 `[B]` N1~N11 落地差异已完成。
 - **可选下一步**：`.git` 历史瘦身（需用户明确授权）/ `N1b` / `N7b` / `N8b` / `[C] AI 导演` / `[D] 开源准备`。
 - **[C] AI 导演**：需先补完整 director 设计，再进入实现。
-- **简单阶段**（N1 / N2 / N3 / N11 等纯前后端 CRUD）：⭐ DS v4-pro（Claude Code + ccswitch，便宜）/ Sonnet 4.6，**不开 worktree**。
+- **简单阶段**（N1 / N2 / N3 / N11 等纯前后端 CRUD）：⭐ deepseek v4-pro（Claude Code + ccswitch，便宜）/ Sonnet 4.6，**不开 worktree**。
 - **复杂阶段**（N5 Preflight 抽屉子参数细化 / N6 任务级 LLM 对话 + RAG / N7 视频镜头分析）：**Opus 4.7 + 新 worktree**（`feat/phase<N>-<短名>` 分支）。
 
 ### 决策速查表
@@ -92,5 +92,5 @@
 |---|---|
 | 复杂 / SSE / 状态机 / 加密 | Opus 4.7 |
 | 中等多文件 CRUD | Sonnet 4.6 |
-| git / 测试 / 文档 / 模板 | DS v4-pro（ccswitch）|
-| 单行 typo | DS v4-flash（ccswitch）/ Haiku |
+| git / 测试 / 文档 / 模板 | deepseek v4-pro（ccswitch）|
+| 单行 typo | deepseek v4-flash（ccswitch）/ Haiku |

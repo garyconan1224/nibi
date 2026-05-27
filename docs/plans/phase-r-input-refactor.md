@@ -7,7 +7,7 @@ actual_hours: ~8h (R1~R5 分散实现 + R6 合并收尾)
 phase: R (输入层重构 / Composer 瘦身 + 模态化 + 单链接多类型)
 track: F (Flow)
 prerequisite: IP.9 已合入 main；H1 Workbench 已落地
-model: R1/R5 DS v4-pro；R2/R3/R4 Sonnet 4.6（必要时升 Opus）；R3.1 UI 收口按 Remix 规范执行
+model: R1/R5 deepseek v4-pro；R2/R3/R4 Sonnet 4.6（必要时升 Opus）；R3.1 UI 收口按 Remix 规范执行
 branch: feat/phase-r-input-refactor
 created: 2026-05-24
 ---
@@ -71,11 +71,11 @@ flowchart TD
 
 > 每完成一个子任务立即 commit 并通知用户。本 phase 全程在 `feat/phase-r-input-refactor` 分支上做。
 
-### R0 准备分支（DS v4-pro，5 min）
+### R0 准备分支（deepseek v4-pro，5 min）
 - [ ] R0.1 `git checkout -b feat/phase-r-input-refactor`
 - [ ] R0.2 把本文件 `status: ready → in_progress`，提交 `chore(phase-r): R0 启动分支与计划落地`
 
-### R1 Composer 瘦身（DS v4-pro，30 min；单文件改动）
+### R1 Composer 瘦身（deepseek v4-pro，30 min；单文件改动）
 **目标**：删 6 块死 UI，handleRun 改为打开模态。Composer 行数从 630 → 预计 ~250。
 
 - [ ] R1.1 删 `composer-quality` 区块（画质 + 抽帧 A/B + fps + maxFrames 输入框）
@@ -159,7 +159,7 @@ flowchart TD
 - [x] R4.5 跑端到端：点"细调…"→ 抽屉打开 → 改抽帧间隔 → 提交 → 队列出现任务且 payload 含新参数
 - [x] commit: `feat(phase-r): R4 PreflightDrawer 接管细粒度参数` @ a5df14d
 
-### R5 端到端冒烟（DS v4-pro 跑命令，1h）
+### R5 端到端冒烟（deepseek v4-pro 跑命令，1h）
 **目标**：跑通 5 条真实链接确认闭环。
 
 - [x] R5.1 `./start.sh` 起服务
@@ -169,7 +169,7 @@ flowchart TD
 - [x] R5.5 无 R2-R4 bug（FAILED均为外部平台限制）
 - [x] commit: `test(phase-r): R5 端到端冒烟 6 条链接`
 
-### R6 合并与收尾（DS v4-pro，10 min）
+### R6 合并与收尾（deepseek v4-pro，10 min）
 - [x] R6.1 自测全绿后：本地 `git checkout main && git merge --no-ff feat/phase-r-input-refactor`
 - [x] R6.2 更新 `docs/EXECUTION_PLAN.md`：R6 子任务打勾
 - [x] R6.3 更新本文件 frontmatter：`status: done` + `commits` + `completed_date` + `actual_hours`
@@ -183,7 +183,7 @@ flowchart TD
 
 | 子任务 | 推荐模型 | 触发升档 Opus 的情况 |
 |---|---|---|
-| R0 / R1 / R5 / R6 | DS v4-pro（ccswitch） | TypeScript 类型推断卡死 |
+| R0 / R1 / R5 / R6 | deepseek v4-pro（ccswitch） | TypeScript 类型推断卡死 |
 | R2 | Sonnet 4.6 | 模态状态机出现 5+ 个互相依赖状态 |
 | R3 | Sonnet 4.6 | 后端 payload 校验失败需要排查 |
 | R4 | Sonnet 4.6 | composerDefaults 旧链路引用超过 3 个文件 |

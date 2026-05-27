@@ -102,7 +102,7 @@ git log --oneline -10
 
 **索引**：`docs/plans/phase-ip9-flow-gaps.md`
 **前置**：IP.8 已合并 ✅
-**模型分配**：UI 层 ⭐ DS v4-pro；后端层 Sonnet / Opus
+**模型分配**：UI 层 ⭐ deepseek v4-pro；后端层 Sonnet / Opus
 **分支**：`feat/ip9-flow-gaps`（已合并入 main）
 **子任务**：
 - [x] F1.1（IP.9.1）Results 总览页 s05 + 修跳转 bug — `9886826`
@@ -113,7 +113,7 @@ git log --oneline -10
 - [x] F1.6（IP.9.6）字幕清洗（规则 + LLM）— `shared/transcript_cleaner.py`
 - [x] **F1.7 URL 规整 + 真实前端冒烟**（2026-05-22 用户决议加入，F2 前置）— `170ec0b`
   - **背景**：F2 Bug3 的"冒烟通过"实际是 DS 用 `.venv/bin/python -c` 直调 `run_ytdlp_download` 跑的纯 BV 号，**没走前端 Composer → 后端 pipeline 真实链路**。真用户从浏览器复制的 URL 会带 `?spm_id_from=xxx&vd_source=yyy` 等追踪参数，`platforms.ts::detectPlatform()` 用 `new URL()` 要求 scheme，而后端 `task_runner` 的"同 project + 同 URL 幂等去重"会被追踪参数随机化破坏（同一个视频被识别成两个任务，重复下载）。
-  - **改动文件**（< 5 个，DS v4-pro cover）：
+  - **改动文件**（< 5 个，deepseek v4-pro cover）：
     - 新增 `frontend/src/lib/url.ts`：`normalizeMediaUrl(raw)` 处理①纯 BV 号 → 拼完整 URL ②缺 scheme 补 `https://` ③去追踪参数白名单（`spm_id_from / vd_source / share_source / share_medium / bbid / ts / unique_k`）④去尾斜杠便于 dedup
     - 改 `frontend/src/pages/WorkbenchPage/Composer.tsx`：提交前调用 `normalizeMediaUrl()`，让 `detectPlatform` 和后端拿到的都是同一个干净 URL
     - 改 `frontend/src/pages/WorkbenchPage/platforms.ts`：`detectPlatform` 内部也先补 scheme 兜底
@@ -121,7 +121,7 @@ git log --oneline -10
     - 新增 `tests/frontend/url.test.ts` 或 vitest 单测：5 个 case（纯 BV / 缺 scheme / 带追踪参数 / 已规整 / 不规范末尾斜杠）
     - 新增后端单测：同一视频带不同追踪参数应去重成一个任务
   - **真实冒烟（必跑）**：`./start.sh` 起前后端 → 浏览器打开 `/` → 粘完整带追踪参数的 B 站 URL（用户提供：`https://www.bilibili.com/video/BV1qA5j6jEJC/?spm_id_from=333.1007.tianma.6-2-20.click&vd_source=...`）→ Preflight → 提交 → 看 yt-dlp 日志 → 到 Results。**全链路通才算完工**，不准再用 `python -c` 直调代替。
-  - **模型**：⭐ DS v4-pro（Claude Code + ccswitch）
+  - **模型**：⭐ deepseek v4-pro（Claude Code + ccswitch）
   - **分支**：`feat/f1.7-url-normalize`（或直接 main 也行，<5 文件改动）
   - **完工验收**：用户粘的 4 种 URL 变体都能正常跑出结果，且任务去重正确
 
@@ -131,7 +131,7 @@ git log --oneline -10
 ### F2 真端到端冒烟测试 + Bug 修
 
 **前置**：F1 完成
-**模型**：用户自己跑 + ⭐ DS v4-pro 修小 bug
+**模型**：用户自己跑 + ⭐ deepseek v4-pro 修小 bug
 **状态**：✅ 8/10 URL 通过，3 Bug 已修（2026-05-22）
 **索引**：`docs/plans/phase-f2-smoke.md`
 **已修 Bug**：
@@ -190,7 +190,7 @@ git log --oneline -10
 
 **前置**：F3 已完成
 **目标**：统一的资料库汇总视图——跨 workspace 浏览所有已分析内容，按类型/工作空间筛选，多维度排序，点卡片下钻 Results
-**模型**：⭐ DS v4-pro（4 子任务均 <5 文件）
+**模型**：⭐ deepseek v4-pro（4 子任务均 <5 文件）
 **分支**：直接打 main
 **索引**：`docs/plans/phase-l-library.md`
 
@@ -224,7 +224,7 @@ git log --oneline -10
 ### V1 视频路径选择 UI + 路径 1/3 后端
 
 **索引**：`docs/flows/video.md` + `system_design_v3_final.md` §视频 + 现有 `handle_analyze_task`
-**模型**：UI ⭐ DS v4-pro；路径 1 Sonnet；路径 3 Opus
+**模型**：UI ⭐ deepseek v4-pro；路径 1 Sonnet；路径 3 Opus
 **分支**：`feat/ip9-flow-gaps`（UI 已合并入 main）
 **子任务**：
 - [x] V1.1 Preflight 加路径单选 + 视频类型模板 select（= F1.3）— `e618d1a`
@@ -275,7 +275,7 @@ git log --oneline -10
 ### A1 音频前端 6 任务勾选（= F1.2 = IP.9.2）
 
 **索引**：`docs/flows/audio.md` + `pipeline_tasks.py::handle_audio_task`
-**模型**：⭐ DS v4-pro
+**模型**：⭐ deepseek v4-pro
 **分支**：`feat/ip9-flow-gaps`（已合并入 main）
 **子任务**：
 - [x] A1.1 Preflight audio 分支补 6 个 checkbox — `cb27dd5`
@@ -296,7 +296,7 @@ git log --oneline -10
 ### A3 无人声切音乐模式（N8b 第 2 部分）✅
 
 **索引**：`docs/flows/audio.md` 中"无人声 -> 音乐分析"分支
-**模型**：⭐ DS v4-pro
+**模型**：⭐ deepseek v4-pro
 **分支**：main（直接做）
 **完成**：2026-05-23，commit `(pending)`
 **子任务**：
@@ -308,7 +308,7 @@ git log --oneline -10
 ### A4 字幕导出 + .srt/.ass/.vtt 格式 ✅
 
 **索引**：`docs/flows/audio.md` 中"字幕导出"分支
-**模型**：⭐ DS v4-pro
+**模型**：⭐ deepseek v4-pro
 **分支**：`feat/a4-subtitle-export`
 **子任务**：
 - [x] A4.1 后端字幕生成支持多格式（`2559164`）
@@ -365,7 +365,7 @@ git log --oneline -10
 ### I1 EXIF 提取 + 基本信息卡
 
 **索引**：`docs/flows/image.md` 中"基本信息（分辨率 / 拍摄设备 / EXIF）"
-**模型**：⭐ DS v4-pro（前端展示 + 后端 PIL 一行）
+**模型**：⭐ deepseek v4-pro（前端展示 + 后端 PIL 一行）
 
 **分支**：`feat/i1-image-exif`
 **子任务**：
@@ -458,10 +458,10 @@ git log --oneline -10
 |---|---|---|
 | 1 | **Opus 4.7**（桌面）| 跨 5+ 文件 / 状态机 / 加密 / 外部 API 集成 |
 | 2 | **Sonnet 4.6**（桌面）| 多文件 CRUD / 组件级前端 / 后端 handler 改写 |
-| 3 | ⭐ **DS v4-pro**（Claude Code + ccswitch，比 Claude 便宜）| 模板代码 / git / 单文件改 / CSS / 测试模板 / 文档 |
-| 4 | **DS v4-flash / Haiku 4.5**（ccswitch Haiku 角色 / 桌面）| 单行 typo / 极简兜底；优先 v4-flash |
+| 3 | ⭐ **deepseek v4-pro**（Claude Code + ccswitch，比 Claude 便宜）| 模板代码 / git / 单文件改 / CSS / 测试模板 / 文档 |
+| 4 | **deepseek v4-flash / Haiku 4.5**（ccswitch Haiku 角色 / 桌面）| 单行 typo / 极简兜底；优先 v4-flash |
 
-⭐ **日常默认走 DS v4-pro**，能用就用。⚠️ 不要让 v4-flash 当默认——它对应 Haiku 档，能力弱，多文件 CRUD 会翻车。
+⭐ **日常默认走 deepseek v4-pro**，能用就用。⚠️ 不要让 v4-flash 当默认——它对应 Haiku 档，能力弱，多文件 CRUD 会翻车。
 
 > **2026-05-22 通道变更**：小米 2.5 Pro 套餐用完，改用 ccswitch 中转 DeepSeek API。ccswitch 是透明代理，在 Claude Code 里选 Sonnet/Opus 角色 → 路由到 `deepseek-v4-pro`；选 Haiku 角色 → 路由到 `deepseek-v4-flash`。
 

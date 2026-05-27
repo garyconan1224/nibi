@@ -6,7 +6,7 @@ commits: [702177d, c040c70]
 completed_date: 2026-05-23
 track: V (Video)
 prerequisite: V2.2/V2.3 已完成（3b43a59）
-model: V3.1 已隐式完成 / V3.2 Sonnet 4.6 / V3.3 ⭐ DS v4-pro
+model: V3.1 已隐式完成 / V3.2 Sonnet 4.6 / V3.3 ⭐ deepseek v4-pro
 branch: 可直接打 main
 created: 2026-05-22
 ---
@@ -87,7 +87,7 @@ class VideoTemplate(BaseModel):
 
 ### V3.3 — LLM 自动检测模板
 
-**模型**：⭐ DS v4-pro（颗粒度小，纯加一个分类调用 + dropdown 加 "auto" 选项）
+**模型**：⭐ deepseek v4-pro（颗粒度小，纯加一个分类调用 + dropdown 加 "auto" 选项）
 **预计**：2~3 小时
 
 **改动文件**（≤4）：
@@ -150,10 +150,10 @@ V3.1 已隐式完成（pipeline_tasks.py:54 _VIDEO_TEMPLATE_PROMPTS 已 6 类）
 全绿再 commit。做完停下等我开 V3.3。
 ```
 
-### 开 V3.3 时（DS v4-pro）
+### 开 V3.3 时（deepseek v4-pro）
 
 ```
-你是 DS v4-pro，做 Nibi 项目 V3.3 LLM 自动检测视频模板。
+你是 deepseek v4-pro，做 Nibi 项目 V3.3 LLM 自动检测视频模板。
 读 CLAUDE.md + docs/plans/phase-v3-video-templates.md，执行 §V3.3。
 
 V3.2 已合并（commit 见 git log），_load_video_template_prompts 能拿到所有模板名。

@@ -3,7 +3,7 @@ name: phase-f4-content-sniff
 description: F4 内容类型自动识别——URL 嗅探替代手动指定 type，混合内容自动拆多 item
 status: ready
 created_date: 2026-05-22
-model: DS v4-pro（F4.1/F4.2/F4.4）；F4.3 复杂时升 Opus
+model: deepseek v4-pro（F4.1/F4.2/F4.4）；F4.3 复杂时升 Opus
 branch: feat/f4-content-sniff
 commits: []
 completed_date: ~
@@ -120,7 +120,7 @@ SPEC 模块 2.2 链接处理流程：
 | `backend/app/routes/workspaces.py` | 新增 1 个端点 | `POST /workspaces/sniff-url` |
 | `frontend/src/services/workspaces.ts` | 新增 1 个函数 | `sniffUrl()` |
 
-**模型分配**：⭐ DS v4-pro（单文件新增 + 单端点 + 前端一个函数，难度低）
+**模型分配**：⭐ deepseek v4-pro（单文件新增 + 单端点 + 前端一个函数，难度低）
 
 **验收标准**：
 - `curl -X POST localhost:8000/workspaces/sniff-url -d '{"url":"https://www.bilibili.com/video/BV1qA5j6jEJC"}'` 返回 `primary_type: "video"`
@@ -166,7 +166,7 @@ SPEC 模块 2.2 链接处理流程：
 - `sniffResult` 为 null 时，行为退化为当前的 `type: 'video'` 硬编码——**旧接口零破坏**
 - 用户仍然可以手动在 Composer 里选类型（如果以后加了类型选择器的话）
 
-**模型分配**：⭐ DS v4-pro（前端组件改动，不涉及状态机）
+**模型分配**：⭐ deepseek v4-pro（前端组件改动，不涉及状态机）
 
 **验收标准**：
 - 粘贴 B站视频 URL → PreflightDrawer 自动以 `type='video'` 创建 item → pipeline 走 `_bridge_to_pipeline_payload` 的 video 分支
@@ -234,7 +234,7 @@ for (const itemType of typesToCreate) {
 - `selectedTypes` 如果长度 = 1（用户通过 MixedContentModal 只选了 1 种），则只创建 1 个 item，行为=F4.2
 - `sniffResult` 为 null 时，退化为创建 1 个 `type='video'` item，行为=当前
 
-**模型分配**：如果 typesToCreate ≤ 3 且逻辑不超 50 行 → ⭐ DS v4-pro；如果循环内涉及复杂 preflight 分支（4 种 type 的 task 构建各不相同）→ 升 Opus 4.7
+**模型分配**：如果 typesToCreate ≤ 3 且逻辑不超 50 行 → ⭐ deepseek v4-pro；如果循环内涉及复杂 preflight 分支（4 种 type 的 task 构建各不相同）→ 升 Opus 4.7
 
 **验收标准**：
 - B站视频 URL（sniff 返回 `possible_types: ['video', 'audio']`）→ 创建 2 个 item：一个 video + 一个 audio
@@ -270,7 +270,7 @@ for (const itemType of typesToCreate) {
 - 粘贴微信公众号 URL → 自动识别为 text → 提交 → text pipeline 启动
 - 粘贴图片直链 → 自动识别为 image → 提交 → image pipeline 启动
 
-**模型分配**：⭐ DS v4-pro（写测试模板 + 跑验证）
+**模型分配**：⭐ deepseek v4-pro（写测试模板 + 跑验证）
 
 ---
 
@@ -352,7 +352,7 @@ async function sniffUrl(url: string): Promise<SniffResult>
 4. HTTP HEAD 请求遇到重定向链 / CDN 边缘 case 需要做复杂的 Content-Type 推断（MIME sniffing 安全策略）
 5. 跨文件改动 ≥ 5 个（实际预期 F4.1 3 个 + F4.2 2 个 = 5 个，但分阶段独立做，每阶段 ≤ 3 个）
 
-**DS v4-pro 的合理范围**：F4.1~F4.4 每个子阶段独立做、独立 commit，单阶段改动 ≤ 3 个文件，不涉及状态机或加密。
+**deepseek v4-pro 的合理范围**：F4.1~F4.4 每个子阶段独立做、独立 commit，单阶段改动 ≤ 3 个文件，不涉及状态机或加密。
 
 ---
 

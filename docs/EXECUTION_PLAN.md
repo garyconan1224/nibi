@@ -23,7 +23,7 @@
 
 > 这是当前插队执行项，放在总进度前面，避免新会话按旧的未完成 N7b/N8b 误开工。
 
-- [x] **L5 Library Remix Polish** — 保留当前 `/library` 真实功能，对齐最新 Remix 资料库设计稿（header / controls / item card / rich workspace card / empty state / delete feedback）。详细计划：[docs/plans/phase-l5-library-remix-polish.md](plans/phase-l5-library-remix-polish.md)。模型：DS v4-pro；分支：`feat/phase-l5-library-remix-polish`；不改 API/schema，不 push。
+- [x] **L5 Library Remix Polish** — 保留当前 `/library` 真实功能，对齐最新 Remix 资料库设计稿（header / controls / item card / rich workspace card / empty state / delete feedback）。详细计划：[docs/plans/phase-l5-library-remix-polish.md](plans/phase-l5-library-remix-polish.md)。模型：deepseek v4-pro；分支：`feat/phase-l5-library-remix-polish`；不改 API/schema，不 push。
 
 ---
 

@@ -134,7 +134,7 @@ git log --oneline -20            # 对账铁律：phase 文档不是事实来源
 | Git 行为 / commit 颗粒度 / 分支策略 / push 暂缓 / 工具串行交接 | [`docs/rules/git-workflow.md`](docs/rules/git-workflow.md) | 准备 commit、merge、新开会话前 |
 | Python / TypeScript 代码风格、UI 设计规范、测试要求 | [`docs/rules/code-style.md`](docs/rules/code-style.md) | 写代码 / 改 UI / 加测试前 |
 | 业务规格契约：状态机、级联依赖、阈值、可跳过策略、清理策略 | [`docs/rules/business-contract.md`](docs/rules/business-contract.md) | 改 pipeline、前置配置、状态流转、阈值时 |
-| 模型选择四档决策树（Opus / Sonnet / DS-pro / DS-flash） | [`docs/rules/model-strategy.md`](docs/rules/model-strategy.md) | 判断当前任务该用哪档模型时（一般用户决定，AI 仅在被问时查） |
+| 模型选择四档决策树（Opus / Sonnet / deepseek v4-pro / deepseek v4-flash） | [`docs/rules/model-strategy.md`](docs/rules/model-strategy.md) | 判断当前任务该用哪档模型时（一般用户决定，AI 仅在被问时查） |
 | 项目架构 / 后端 router / 前端路由 / 共享层 / 端口 / CodeGraph MCP / 常用命令 | [`docs/rules/project-map.md`](docs/rules/project-map.md) | 新人入门、改路由、找模块入口 |
 
 > 💡 **AI 使用方法**：每个文件顶部都有目录章节锚点。AI 应用 `rg -n "^#" docs/rules/<file>.md` 查目录，再 `sed -n` 读对应段落。**禁止整文件读取大文件（ROADMAP.md / 设计稿等）；SPEC 先读 `docs/SPEC.md` 索引，再读相关 `docs/spec/*.md` 模块。**

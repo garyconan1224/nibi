@@ -11,7 +11,7 @@
 | [`git-workflow.md`](git-workflow.md) | Git 行为 / commit 颗粒度 / 分支策略 / push 暂缓 / 工具串行交接 / 用户卡住处理 | 准备 commit、merge、新开会话前 |
 | [`code-style.md`](code-style.md) | Python / TypeScript 代码风格 + UI 设计规范 + 测试要求 | 写代码 / 改 UI / 加测试前 |
 | [`business-contract.md`](business-contract.md) | 业务规格契约：状态机、级联依赖、阈值、可跳过策略、存储清理 | 改 pipeline、前置配置、状态流转、阈值时 |
-| [`model-strategy.md`](model-strategy.md) | 模型选择四档决策树（Opus / Sonnet / DS-pro / DS-flash） | 判断当前任务用哪档模型时（用户决定，AI 仅在被问时查） |
+| [`model-strategy.md`](model-strategy.md) | 模型选择四档决策树（Opus / Sonnet / deepseek v4-pro / deepseek v4-flash） | 判断当前任务用哪档模型时（用户决定，AI 仅在被问时查） |
 | [`project-map.md`](project-map.md) | 项目架构（后端 router / 前端路由 / shared）+ 常用命令 + 端口 + CodeGraph MCP | 新人入门、改路由、找模块入口 |
 
 ## AI 使用方法（重要）

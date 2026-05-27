@@ -2,7 +2,7 @@
 phase: R17
 title: AddMaterial 弹窗 · 分析范围与任务勾选/细调联动
 status: done
-owner: DS v4-pro
+owner: deepseek v4-pro
 estimated_hours: 2
 actual_hours: 1.5
 completed_date: 2026-05-26
