@@ -38,7 +38,7 @@ from shared.video_analyzer import (
     get_safe_name,
     run_batch_analysis,
 )
-from shared.video_download_ytdlp import is_platform_url, run_ytdlp_download
+from shared.video_download_ytdlp import fetch_ytdlp_metadata, is_platform_url, run_ytdlp_download
 from src.vidmirror.core.providers import ChatRequest
 from src.vidmirror.core.providers.registry import create_default_registry
 
@@ -2194,6 +2194,11 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             log("📦 音频文件已存在（重跑），跳过下载")
             audio_bytes = audio_local_path.read_bytes()
         elif _is_platform:
+            # 先无副作用预取元数据，保证 audio-only 也能拿到 title/thumbnail
+            pre_meta = fetch_ytdlp_metadata(source, log=lambda m: runner.append_log(task_id, m))
+            if pre_meta:
+                _apply_ytdlp_metadata_to_task(record, runner, pre_meta)
+
             log(f"🎬 检测到平台 URL，使用 yt-dlp 抽取音频流")
             result = run_ytdlp_download(
                 url=source,
