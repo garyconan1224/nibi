@@ -53,6 +53,9 @@ interface StepWithState {
   pct: number
 }
 
+// 覆盖全 pipeline 的终端任务类型（SUCCESS = 整条流水线完成）
+const TERMINAL_TASK_TYPES = new Set(['analyze', 'av_synthesis', 'note'])
+
 export function deriveSteps(currentStatus: string, progress: number, taskType: string): StepWithState[] {
   const stages = visibleStages(taskType)
   const stageIds = stages.map((s) => s.id)
@@ -64,9 +67,14 @@ export function deriveSteps(currentStatus: string, progress: number, taskType: s
     let pct: number
 
     if (currentIdx < 0) {
-      if (currentStatus === 'SUCCESS' && progress >= 1) {
+      if (currentStatus === 'SUCCESS' && progress >= 1 && TERMINAL_TASK_TYPES.has(taskType)) {
+        // 终端任务 SUCCESS → 整条 pipeline 完成
         state = 'done'
         pct = 1
+      } else if (!stageIds.includes(currentStatus as TaskStatus) && currentStatus !== 'SUCCESS') {
+        // currentStatus 不是已知阶段也不是 SUCCESS → 保守 queued
+        state = 'queued'
+        pct = 0
       } else {
         state = 'queued'
         pct = 0
@@ -75,7 +83,8 @@ export function deriveSteps(currentStatus: string, progress: number, taskType: s
       state = 'done'
       pct = 1
     } else if (stageIdx === currentIdx) {
-      state = 'running'
+      // 当前阶段：progress=1.0 视为该阶段已完成
+      state = progress >= 1 ? 'done' : 'running'
       pct = progress
     } else {
       state = 'queued'
@@ -95,8 +104,8 @@ function getLogsForStage(
   const keywords: Record<string, string[]> = {
     DOWNLOAD: ['download', 'yt-dlp', '下载'],
     PROBE: ['probe', 'ffprobe', '探测', '格式'],
-    ASR: ['whisper', 'asr', '转录', 'transcribe'],
-    FRAMES: ['frame', '截帧', 'ffmpeg'],
+    ASR: ['whisper', 'asr', '转录', 'transcribe', '转写', '解码', '字符', '段'],
+    FRAMES: ['frame', '截帧', 'ffmpeg', 'capture', '帧'],
     VLM: ['vlm', 'vision', '视觉', 'qwen'],
     SUM: ['summar', '总结', 'claude'],
     STORE: ['store', '入库', 'database'],

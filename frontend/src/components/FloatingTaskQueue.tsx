@@ -103,7 +103,7 @@ export function FloatingTaskQueue() {
     const groups = new Map<string, TaskRecord[]>()
     for (const task of activeTasks) {
       const payload = (task.payload ?? {}) as Record<string, unknown>
-      const url = (payload?.url as string) || ''
+      const url = (payload?.url as string) || (payload?.source_url as string) || ''
       const key = `${task.project_id}::${url || task.task_id}`
       const group = groups.get(key) || []
       group.push(task)

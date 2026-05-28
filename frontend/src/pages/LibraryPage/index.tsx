@@ -239,7 +239,12 @@ export default function LibraryPage() {
       : `${filteredItems.length} ITEMS`
 
   const handleOpenItem = useCallback((item: LibraryItem) => {
-    navigate(`/workspaces/${item.workspace_id}/items/${item.item_id}/overview`)
+    if (item.status === 'done') {
+      navigate(`/workspaces/${item.workspace_id}/items/${item.item_id}/overview`)
+    } else {
+      // 未完成 → 不进结果页，提示用户
+      toast.info('该素材尚在分析中，请从任务面板查看进度')
+    }
   }, [navigate])
 
   return (

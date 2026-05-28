@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import type { LibraryItem } from '@/services/library'
 import { Mic, Music } from 'lucide-react'
 import {
@@ -28,11 +29,21 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
   const hasDur = item.duration_seconds != null && item.duration_seconds > 0
   const srcLabel = extractDomain(item.source_value)
 
+  const isDone = state === 'done'
+
   const handleCardClick = () => {
     if (selectMode && onToggleSelect) {
       onToggleSelect(item.item_id, item.workspace_id)
-    } else {
+    } else if (isDone) {
       navigate(`/workspaces/${item.workspace_id}/items/${item.item_id}/overview`)
+    } else {
+      // 未完成 → 进 ProcessingPage；用首个关联 task 兜底
+      const tid = item.related_task_ids?.[0] ?? ''
+      if (tid) {
+        navigate(`/processing/${tid}`)
+      } else {
+        toast.info('该素材尚在分析中，请从任务面板查看进度')
+      }
     }
   }
 
