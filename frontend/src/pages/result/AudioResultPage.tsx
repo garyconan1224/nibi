@@ -21,6 +21,7 @@ import {
 import './tokens.css'
 import './audio-result.css'
 import { ItemTagsPanel } from '@/components/workspace/ItemTagsPanel'
+import { SummariesTab } from '@/components/SummariesTab'
 
 /** deterministic 波形高度（从 seed 生成伪随机序列） */
 function generateWaveform(length: number, height: number): number[] {
@@ -528,43 +529,7 @@ export default function AudioResultPage() {
         )}
 
         {activeTab === 'summary' && (
-          <div className="ad-summary-scroll">
-            {result.summary ? (
-              <>
-                <div className="eyebrow" style={{ marginBottom: 8 }}>摘要</div>
-                <div style={{ marginBottom: 20, fontSize: 13, lineHeight: 1.7, color: 'var(--ink-2)' }}>
-                  <ReactMarkdown
-                    remarkPlugins={remarkPlugins}
-                    components={{
-                      h1: ({ children }) => <h1 style={{ fontSize: 18, fontWeight: 700, margin: '12px 0 8px' }}>{children}</h1>,
-                      h2: ({ children }) => <h2 style={{ fontSize: 15, fontWeight: 600, margin: '10px 0 6px' }}>{children}</h2>,
-                      h3: ({ children }) => <h3 style={{ fontSize: 14, fontWeight: 600, margin: '8px 0 4px' }}>{children}</h3>,
-                      p: ({ children }) => <p style={{ margin: '0 0 8px' }}>{children}</p>,
-                      ul: ({ children }) => <ul style={{ margin: '0 0 8px', paddingLeft: 20 }}>{children}</ul>,
-                      ol: ({ children }) => <ol style={{ margin: '0 0 8px', paddingLeft: 20 }}>{children}</ol>,
-                      li: ({ children }) => <li style={{ lineHeight: 1.6 }}>{children}</li>,
-                      blockquote: ({ children }) => (
-                        <blockquote style={{ borderLeft: '3px solid var(--accent-warm)', paddingLeft: 12, margin: '8px 0', color: 'var(--ink-3)' }}>{children}</blockquote>
-                      ),
-                      code: ({ children, className }) => {
-                        const isBlock = className?.includes('language-')
-                        return isBlock
-                          ? <pre style={{ background: 'var(--bg-sunken)', padding: 10, borderRadius: 6, overflow: 'auto', fontSize: 12, margin: '8px 0' }}><code>{children}</code></pre>
-                          : <code style={{ background: 'var(--bg-sunken)', padding: '1px 4px', borderRadius: 3, fontSize: 12 }}>{children}</code>
-                      },
-                    }}
-                  >
-                    {result.summary}
-                  </ReactMarkdown>
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn"><FileText size={13} /> 导出 .md</button>
-                </div>
-              </>
-            ) : (
-              <span className="mono" style={{ fontSize: 12, color: 'var(--ink-4)' }}>暂无摘要数据</span>
-            )}
-          </div>
+          <SummariesTab workspaceId={workspaceId} itemId={itemId} />
         )}
 
         {activeTab === 'vocal' && (
