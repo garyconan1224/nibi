@@ -783,6 +783,18 @@ export default function VideoResultPage() {
           </div>
         </div>
 
+        {/* 学习模式：补图入口 */}
+        {isLearning && suggestedFrames.length > 0 && (
+          <button
+            className="btn-ghost"
+            style={{ margin: '0 16px', height: 28, fontSize: 11, borderRadius: 6, border: '1px dashed var(--line)', color: 'var(--ink-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
+            onClick={() => { setFramePickerSegmentIdx(activeFrame); setFramePickerOpen(true) }}
+            title="从推荐帧中插入截图"
+          >
+            📷 补图
+          </button>
+        )}
+
         {/* tabs */}
         <div className="vd-tabs-bar">
           <span className="eyebrow" style={{ flex: 1 }}>提示词格式</span>
@@ -849,6 +861,21 @@ export default function VideoResultPage() {
           onToggle={togglePickerId}
           onCancel={() => setPickerOpen(false)}
           onSave={savePicker}
+        />
+      )}
+
+      {/* 帧选择器弹窗（与字幕路径共用） */}
+      {framePickerOpen && (
+        <FramePickerModal
+          frames={frames.map((f) => ({
+            timestamp: f.sec ?? parseTsStr(f.ts ?? f.timestamp ?? ''),
+            image_path: f.image_path || '',
+            scene_description: f.description || '',
+          }))}
+          suggested={suggestedFrames}
+          currentSegmentIdx={framePickerSegmentIdx}
+          onSelect={handleInsertFrame}
+          onClose={() => setFramePickerOpen(false)}
         />
       )}
     </div>
