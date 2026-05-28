@@ -95,19 +95,58 @@ export function FloatingTaskQueue() {
   const currentTaskId = routeTaskId ?? storeCurrentTaskId
 
   const rows: QueueRow[] = useMemo(() => {
-    return tasks
-      .filter((t) => !isTaskTerminal(t.status) || t.status === 'FAILED')
-      .sort((a, b) => timeOf(b.updated_at) - timeOf(a.updated_at))
+    const activeTasks = tasks.filter((t) => !isTaskTerminal(t.status) || t.status === 'FAILED')
+
+    // 按 project_id + payload.url 分组
+    const groups = new Map<string, TaskRecord[]>()
+    for (const task of activeTasks) {
+      const payload = (task.payload ?? {}) as Record<string, unknown>
+      const url = (payload?.url as string) || ''
+      const key = `${task.project_id}::${url || task.task_id}`
+      const group = groups.get(key) || []
+      group.push(task)
+      groups.set(key, group)
+    }
+
+    // 每组取代表 task
+    const statusPriority: Record<string, number> = {
+      RUNNING: 4,
+      PENDING: 3,
+      FAILED: 2,
+      SUCCESS: 1,
+    }
+
+    const representativeTasks = Array.from(groups.values()).map((group) => {
+      // 按 status 优先级排序，取优先级最高的
+      group.sort((a, b) => (statusPriority[b.status] || 0) - (statusPriority[a.status] || 0))
+      const representative = group[0]
+
+      // 计算加权平均进度（download 30% + analyze 70%）
+      const downloadTask = group.find((t) => t.task_type === 'download')
+      const analyzeTask = group.find((t) => t.task_type === 'analyze')
+      const downloadProgress = downloadTask ? (downloadTask.progress ?? 0) : 0
+      const analyzeProgress = analyzeTask ? (analyzeTask.progress ?? 0) : 0
+      const weightedProgress = downloadProgress * 0.3 + analyzeProgress * 0.7
+
+      return {
+        task: representative,
+        progress: weightedProgress,
+      }
+    })
+
+    // 按更新时间排序，取前 8 个
+    return representativeTasks
+      .sort((a, b) => timeOf(b.task.updated_at) - timeOf(a.task.updated_at))
       .slice(0, 8)
-      .map((t) => {
+      .map(({ task: t, progress }) => {
         const state = displayState(t.status)
-        const progress = Math.round((t.progress ?? 0) * 100)
+        const displayProgress = Math.round(progress * 100)
         return {
           id: t.task_id,
           title: getTaskTitle(t),
           state,
           status: t.status,
-          progress: state === 'error' ? Math.max(progress, 1) : progress,
+          progress: state === 'error' ? Math.max(displayProgress, 1) : displayProgress,
           stage: getStageLabel(t.status, t.error || undefined),
         }
       })
