@@ -90,10 +90,22 @@ def _generate_summary(prompt: str) -> tuple[str, str]:
 ```
 
 新建文件 `backend/app/services/summary_generator.py` 封装：
-- `build_prompt(item: WorkspaceItem, template: str, background: str) -> str`
-- `generate_summary(item, template, background) -> ItemSummary`
+- `build_prompt(item: WorkspaceItem, template_id: str, background: str) -> tuple[str, str]` 返回 (system_prompt, user_prompt)
+- `generate_summary(item, template_id, background) -> ItemSummary`
 
-**prompt 模板放哪**：本期硬编码 9 个模板的 prompt 在 `summary_generator.py` 里（py dict），不引入 jinja2。模板内容可以参考 av_synthesis/templates/ 已有的 j2 文件做翻译。
+**prompt 模板**：✅ **直接复用 [backend/app/services/summary_templates.py](backend/app/services/summary_templates.py)**！9 个模板已实现（R18 时代留下的）：
+
+```python
+from backend.app.services.summary_templates import get_template, list_template_ids
+# template = get_template("xhs")  # → SummaryTemplate(system_prompt, user_prompt, ...)
+# user_prompt 已含 {transcript} 占位符，build_prompt 时 .format(transcript=...) 注入即可
+```
+
+**不要重新写 9 个 prompt。** 如果发现需要在 user_prompt 注入「总结用背景」（现有模板没这个占位符），有两种选择：
+- (a) 把背景拼到 user_prompt 前面作为前置上下文（推荐，零侵入）
+- (b) 改 summary_templates.py 给每个模板加 `{background}` 占位符（要改 9 个模板，要回归测试）
+
+**默认走 (a)**。如果用户要 (b)，停下确认。
 
 ### 5. UI 布局（结果页）
 
@@ -234,12 +246,24 @@ from shared.settings_store import load_settings
 
 **不要新建 `routes/summaries.py`**。
 
-### A.4 9 个总结模板的 prompt 从哪来
+### A.4 9 个总结模板已存在，直接复用
 
-- `backend/app/services/av_synthesis/templates/lecture.md.j2` 已有 lecture 模板做参考
-- 9 个模板名（简洁摘要 / 详细要点 / 金句提取 / 会议纪要 / 小红书风格 / 公众号长文 / 教学笔记 / 访谈整理 / 播客 shownotes）的 prompt 由 mimo **基于模板名 + 通用结构** 自己写一遍 system+user prompt 即可，**不要去翻找历史 plan 看以前有没有定义过**（容易找错版本）。
-- 每个 prompt 大概 5-15 行：「你是 X 写手，根据下面的素材内容（转录 + 截图描述 + 用户提供的背景）生成 X 风格的 markdown，包含 Y 结构」。
-- 用户验收时如果不满意 prompt 内容，可以单独迭代，**不阻塞本期完工**。
+文件：[backend/app/services/summary_templates.py](backend/app/services/summary_templates.py)（R18 时代留下）
+
+```python
+from backend.app.services.summary_templates import TEMPLATES, get_template, list_template_ids
+```
+
+9 个 template_id（key）：
+- `concise` 简洁摘要 / `detailed` 详细要点 / `quotes` 金句提取
+- `meeting` 会议纪要 / `xhs` 小红书风格 / `longform` 公众号长文
+- `lecture` 教学笔记 / `interview` 访谈整理 / `podcast` 播客 shownotes
+
+每个 `SummaryTemplate` 有 `system_prompt`、`user_prompt`（含 `{transcript}` 占位符）、`output_format` 字段。
+
+**不要重新写 prompt。** 测试已有：`backend/tests/services/test_summary_templates.py`，跑一下确认能 import + get_template + 9 个 id 都在。
+
+「总结用背景」字段在原模板没占位符，**默认把背景拼到 user_prompt 前面**（不要改 summary_templates.py）。要改告诉用户。
 
 ### A.5 边界条件（必须停下问用户）
 
