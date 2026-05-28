@@ -53,14 +53,15 @@ export default function ProcessingPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const state = location.state as LocationState | null
-  const workspaceId = state?.workspaceId
-  const itemId = state?.itemId
 
   const task = useTaskStore((s) => s.getTask(taskId))
   const addTask = useTaskStore((s) => s.addTask)
   const updateTask = useTaskStore((s) => s.updateTask)
   const cancelTask = useTaskStore((s) => s.cancelTask)
   const retryTask = useTaskStore((s) => s.retryTask)
+
+  const workspaceId = state?.workspaceId ?? task?.project_id
+  const itemId = state?.itemId ?? (task?.payload as Record<string, unknown>)?.item_id as string | undefined
 
   const isActive = task ? !isTaskTerminal(task.status) : false
   useTaskSse(taskId, isActive)
