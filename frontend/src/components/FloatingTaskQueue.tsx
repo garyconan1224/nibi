@@ -123,12 +123,23 @@ export function FloatingTaskQueue() {
       group.sort((a, b) => (statusPriority[b.status] || 0) - (statusPriority[a.status] || 0))
       const representative = group[0]
 
-      // 计算加权平均进度（download 30% + analyze 70%）
+      // 计算进度：根据实际存在的任务类型动态分配权重
       const downloadTask = group.find((t) => t.task_type === 'download')
       const analyzeTask = group.find((t) => t.task_type === 'analyze')
       const downloadProgress = downloadTask ? (downloadTask.progress ?? 0) : 0
       const analyzeProgress = analyzeTask ? (analyzeTask.progress ?? 0) : 0
-      const weightedProgress = downloadProgress * 0.3 + analyzeProgress * 0.7
+
+      // 动态权重：如果只有一个任务类型，权重为 100%
+      let weightedProgress: number
+      if (downloadTask && analyzeTask) {
+        weightedProgress = downloadProgress * 0.3 + analyzeProgress * 0.7
+      } else if (downloadTask) {
+        weightedProgress = downloadProgress
+      } else if (analyzeTask) {
+        weightedProgress = analyzeProgress
+      } else {
+        weightedProgress = 0
+      }
 
       return {
         task: representative,
