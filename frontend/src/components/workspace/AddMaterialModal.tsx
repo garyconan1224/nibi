@@ -417,7 +417,7 @@ export function AddMaterialModal({
     })
   }, [visionProviderId, providerModels])
 
-  // ── 内部 URL 变化时 debounced 嗅探 ──
+  // ── 内部 URL 变化时 debounced 嗅探 + 链接预填 ──
   const doSniff = useCallback(async (url: string) => {
     try {
       const result = await sniffUrl(url)
@@ -427,14 +427,38 @@ export function AddMaterialModal({
     }
   }, [])
 
+  const doLinkPreview = useCallback(async (url: string) => {
+    try {
+      const { fetchLinkPreview } = await import('@/services/linkPreview')
+      const result = await fetchLinkPreview(url)
+      if (result.title || result.description) {
+        setBackgroundForRecognition((prev) => {
+          if (prev.trim()) return prev // 已有内容不覆盖
+          return [result.title, result.description].filter(Boolean).join('\n\n')
+        })
+        const sourceMap: Record<string, string> = { bili: 'B 站', og: '网页', fallback: '' }
+        setLinkPreviewSource(sourceMap[result.source] || null)
+      }
+    } catch {
+      // 静默失败
+    }
+  }, [])
+
+  // ── 外部传入 urlValue 时触发链接预填 ──
+  useEffect(() => {
+    if (!open || !urlValue?.trim()) return
+    doLinkPreview(urlValue.trim())
+  }, [open, urlValue, doLinkPreview])
+
   useEffect(() => {
     if (!internalUrl.trim() || urlValue) return
     clearTimeout(sniffTimer.current)
     sniffTimer.current = setTimeout(() => {
       doSniff(internalUrl.trim())
+      doLinkPreview(internalUrl.trim())
     }, 500)
     return () => clearTimeout(sniffTimer.current)
-  }, [internalUrl, urlValue, doSniff])
+  }, [internalUrl, urlValue, doSniff, doLinkPreview])
 
   const handleInternalUrlChange = (value: string) => {
     setInternalUrl(value)
