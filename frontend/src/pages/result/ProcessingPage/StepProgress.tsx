@@ -104,8 +104,8 @@ function getLogsForStage(
   const keywords: Record<string, string[]> = {
     DOWNLOAD: ['download', 'yt-dlp', '下载'],
     PROBE: ['probe', 'ffprobe', '探测', '格式'],
-    ASR: ['whisper', 'asr', '转录', 'transcribe'],
-    FRAMES: ['frame', '截帧', 'ffmpeg'],
+    ASR: ['whisper', 'asr', '转录', 'transcribe', '转写', '解码', '字符', '段'],
+    FRAMES: ['frame', '截帧', 'ffmpeg', 'capture', '帧'],
     VLM: ['vlm', 'vision', '视觉', 'qwen'],
     SUM: ['summar', '总结', 'claude'],
     STORE: ['store', '入库', 'database'],
