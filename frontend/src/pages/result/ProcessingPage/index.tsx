@@ -21,6 +21,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { StepProgress } from './StepProgress'
 import SystemResourceCard from './SystemResourceCard'
+import { useGlobalEta } from '@/hooks/useGlobalEta'
 import TasksCard from './TasksCard'
 import { LiveLog } from './LiveLog'
 
@@ -204,10 +205,8 @@ export default function ProcessingPage() {
   const durationLabel = fmtDuration(durationSec)
   const framesCount: number = Number(result.frames_count as number) || 0
   const asrSegments: number = Number(result.asr_segments as number) || 0
-  // ETA = 剩余时间估算（基于 progress）；任务无总时长信息时不显示
-  const etaSec = durationSec && progress > 0 && progress < 1
-    ? Math.max(0, Math.round(durationSec * (1 - progress) / progress))
-    : 0
+  // 全局 ETA：所有活跃任务的剩余时间之和，每秒递减
+  const etaSec = useGlobalEta()
 
   return (
     <div className="vm-processing-scope">
