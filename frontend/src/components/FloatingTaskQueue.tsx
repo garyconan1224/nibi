@@ -17,6 +17,8 @@ interface QueueRow {
   status: string
   progress: number
   stage: string
+  workspaceId: string
+  itemId?: string
 }
 
 function displayState(status: string): DisplayState {
@@ -141,6 +143,7 @@ export function FloatingTaskQueue() {
       .map(({ task: t, progress }) => {
         const state = displayState(t.status)
         const displayProgress = Math.round(progress * 100)
+        const payload = (t.payload ?? {}) as Record<string, unknown>
         return {
           id: t.task_id,
           title: getTaskTitle(t),
@@ -148,6 +151,8 @@ export function FloatingTaskQueue() {
           status: t.status,
           progress: state === 'error' ? Math.max(displayProgress, 1) : displayProgress,
           stage: getStageLabel(t.status, t.error || undefined),
+          workspaceId: t.project_id,
+          itemId: payload?.item_id as string | undefined,
         }
       })
   }, [tasks])
@@ -161,9 +166,14 @@ export function FloatingTaskQueue() {
     ? Math.round(rows.reduce((a, r) => a + (r.progress || 0), 0) / total)
     : 0
 
-  const handleSelectTask = (taskId: string) => {
-    setCurrentTask(taskId)
-    navigate(`/processing/${taskId}`)
+  const handleSelectTask = (row: QueueRow) => {
+    setCurrentTask(row.id)
+    navigate(`/processing/${row.id}`, {
+      state: {
+        workspaceId: row.workspaceId,
+        itemId: row.itemId,
+      },
+    })
     setOpen(false)
   }
 
@@ -306,7 +316,7 @@ export function FloatingTaskQueue() {
               return (
                 <div
                   key={r.id}
-                  onClick={() => handleSelectTask(r.id)}
+                  onClick={() => handleSelectTask(r)}
                   style={{
                     padding: '10px 14px',
                     borderLeft: isActive ? '2px solid var(--accent)' : '2px solid transparent',
