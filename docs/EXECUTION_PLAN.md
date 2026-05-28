@@ -219,6 +219,7 @@
   - [x] **R21.P3.S1** AddMaterialModal 重构 —— 拆「采集参数」/ 视频用途模式 / 链接预填背景 — `docs/plans/phase-r21-p3-s1-add-material-restructure.md`，~6-9h
   - [x] **R21.P3.S2** 结果页「总结」tab + item_summaries 表 + 多版本 CRUD — `docs/plans/phase-r21-p3-s2-summaries-tab-and-table.md`，~8-12h，依赖 S1
   - [x] **R21.P3.S3** 总结对比模式 + 视频学习模式按需补图交互 — `docs/plans/phase-r21-p3-s3-compare-and-learning-mode.md`，~6-10h，依赖 S2
+  - [x] **R21.P3.S3 收尾** intent 链路修复 + av_combined 补图入口 — `docs/plans/phase-r21-p3-s3-followup.md`，`0cf1e76` `ef633de`
 - [ ] **R22**（押后）Pipeline 并行调度：截帧 + 转写同时跑 — `docs/plans/phase-r22-parallel-pipeline.md`，~6-10h，依赖 R21
 - [ ] **R23**（押后）设置面板：性能档位（CPU/GPU/内存→并发槽位）— `docs/plans/phase-r23-perf-tier-settings.md`，~4-6h，依赖 R22
 
