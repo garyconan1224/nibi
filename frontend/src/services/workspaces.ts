@@ -226,6 +226,8 @@ export interface VideoResultFrame {
   prompt_video: string
   tags: Record<string, string[]>
   image_path?: string
+  /** 后端物化时可能用 timestamp 而非 sec；前端优先用 sec */
+  timestamp?: number | string
 }
 
 export interface VideoResultTranscriptLine {

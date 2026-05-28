@@ -59,6 +59,19 @@ function formatSec(sec: number): string {
   return `${m.toString().padStart(2, '0')}:${r.toString().padStart(2, '0')}`
 }
 
+/** 解析 'MM:SS' / 'HH:MM:SS' / 纯数字字符串为秒数 */
+function parseTsStr(ts: string | number): number {
+  if (typeof ts === 'number') return ts
+  if (!ts) return 0
+  const parts = ts.trim().split(':')
+  try {
+    if (parts.length === 1) return parseFloat(parts[0]) || 0
+    if (parts.length === 2) return parseInt(parts[0]) * 60 + parseInt(parts[1])
+    if (parts.length === 3) return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2])
+  } catch { /* ignore */ }
+  return 0
+}
+
 export default function VideoResultPage() {
   const { workspaceId = '', itemId = '' } = useParams<{ workspaceId: string; itemId: string }>()
   const navigate = useNavigate()
@@ -402,7 +415,7 @@ export default function VideoResultPage() {
       if (!frames.length) return
       const nextIdx = Math.max(0, Math.min(frames.length - 1, activeFrame + delta))
       const nf = frames[nextIdx]
-      seekTo(nf.sec)
+      seekTo(nf.sec ?? parseTsStr(nf.ts ?? nf.timestamp ?? ''))
     },
     [frames, activeFrame, seekTo],
   )
@@ -617,7 +630,7 @@ export default function VideoResultPage() {
         {framePickerOpen && (
           <FramePickerModal
             frames={frames.map((f) => ({
-              timestamp: f.sec,
+              timestamp: f.sec ?? parseTsStr(f.ts ?? f.timestamp ?? ''),
               image_path: f.image_path || '',
               scene_description: f.description || '',
             }))}
@@ -736,7 +749,7 @@ export default function VideoResultPage() {
           transcript={transcript}
           activeFrame={activeFrame}
           currentSec={currentSec}
-          onFrameClick={(idx) => seekTo(frames[idx].sec)}
+          onFrameClick={(idx) => seekTo(frames[idx].sec ?? parseTsStr(frames[idx].ts ?? ''))}
           onTranscriptClick={(l) => seekTo(l.t_sec)}
         />
       </div>

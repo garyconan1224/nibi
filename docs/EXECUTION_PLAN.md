@@ -4,7 +4,7 @@
 >
 > **维护规则见 CLAUDE.md「项目执行计划维护流程」一节**。
 >
-> Last updated: 2026-05-28（R21.P3.S2 已完成；S3 pending）
+> Last updated: 2026-05-28（R21.P3.S3 已完成）
 
 ---
 
@@ -218,7 +218,7 @@
   - [x] R21.P2.v3 模型记忆即时存 + capability 过滤 + 砍细调 — `79eb2f5`
   - [x] **R21.P3.S1** AddMaterialModal 重构 —— 拆「采集参数」/ 视频用途模式 / 链接预填背景 — `docs/plans/phase-r21-p3-s1-add-material-restructure.md`，~6-9h
   - [x] **R21.P3.S2** 结果页「总结」tab + item_summaries 表 + 多版本 CRUD — `docs/plans/phase-r21-p3-s2-summaries-tab-and-table.md`，~8-12h，依赖 S1
-  - [ ] **R21.P3.S3** 总结对比模式 + 视频学习模式按需补图交互 — `docs/plans/phase-r21-p3-s3-compare-and-learning-mode.md`，~6-10h，依赖 S2
+  - [x] **R21.P3.S3** 总结对比模式 + 视频学习模式按需补图交互 — `docs/plans/phase-r21-p3-s3-compare-and-learning-mode.md`，~6-10h，依赖 S2
 - [ ] **R22**（押后）Pipeline 并行调度：截帧 + 转写同时跑 — `docs/plans/phase-r22-parallel-pipeline.md`，~6-10h，依赖 R21
 - [ ] **R23**（押后）设置面板：性能档位（CPU/GPU/内存→并发槽位）— `docs/plans/phase-r23-perf-tier-settings.md`，~4-6h，依赖 R22
 
