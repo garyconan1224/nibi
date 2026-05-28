@@ -93,9 +93,31 @@ export const useTaskStore = create<TaskStoreState>()(
 
       updateTask: (taskId, updates) =>
         set((state) => ({
-          tasks: state.tasks.map((t) =>
-            t.task_id === taskId ? { ...t, ...updates } : t
-          ),
+          tasks: state.tasks.map((t) => {
+            if (t.task_id !== taskId) return t
+
+            // last-writer-wins-by-timestamp：防止滞后的轮询响应覆盖 SSE 的实时更新
+            const existingUpdatedAt = new Date(t.updated_at || 0).getTime()
+            const incomingUpdatedAt = new Date(updates.updated_at || 0).getTime()
+
+            // 如果传入的 updated_at 更早，且 status/progress 没"往前"走，丢弃这次写入
+            if (incomingUpdatedAt < existingUpdatedAt) {
+              // progress 不能倒退
+              if (updates.progress !== undefined && updates.progress < (t.progress ?? 0)) {
+                return t
+              }
+              // status 不能从 SUCCESS 退回 RUNNING
+              if (updates.status === 'RUNNING' && t.status === 'SUCCESS') {
+                return t
+              }
+            }
+
+            return {
+              ...t,
+              ...updates,
+              _localUpdatedAt: Date.now(),
+            }
+          }),
         })),
 
       setCurrentTask: (taskId) => set({ currentTaskId: taskId }),
