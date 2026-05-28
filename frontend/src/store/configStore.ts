@@ -115,10 +115,10 @@ export interface ConfigState {
   textProviderId: string
   /** 双模型：文本处理模型 ID（脚本/摘要/总结） */
   textModelId: string
-  /** 双模型：视频处理模型 provider_id（视觉分析/抽帧描述，如 Qwen-VL） */
+  /** 双模型：视觉处理模型 provider_id（视觉分析/抽帧描述，如 Qwen-VL） */
   visionProviderId: string
-  /** 双模型：视频处理模型 ID（视觉分析/抽帧描述，如 Qwen-VL） */
-  videoModelId: string
+  /** 双模型：视觉处理模型 ID（视觉分析/抽帧描述，如 Qwen-VL） */
+  visionModelId: string
 
   /** 音频转写配置 */
   transcriber: TranscriberConfig
@@ -199,7 +199,7 @@ const DEFAULT_CONFIG: Omit<ConfigState, ConfigStateActionKey> = {
   textProviderId: '',
   textModelId: '',
   visionProviderId: '',
-  videoModelId: '',
+  visionModelId: '',
 
   // 音频转写配置（本地 Faster Whisper 为默认，medium 模型，中文）
   transcriber: {
@@ -289,7 +289,21 @@ export const useConfigStore = create<ConfigState>()(
         return next
       },
     }),
-    { name: 'config-storage' },
+    {
+      name: 'config-storage',
+      version: 1,
+      migrate: (persisted: unknown, fromVersion: number) => {
+        // v0 → v1：字段 videoModelId 改名为 visionModelId（命名修正）
+        if (fromVersion < 1 && persisted && typeof persisted === 'object') {
+          const obj = persisted as Record<string, unknown>
+          if ('videoModelId' in obj && !('visionModelId' in obj)) {
+            obj.visionModelId = obj.videoModelId
+            delete obj.videoModelId
+          }
+        }
+        return persisted as ConfigState
+      },
+    },
   ),
 )
 

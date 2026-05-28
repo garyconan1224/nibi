@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
  * - 当前默认态：按钮实心、violet 描边 + 背景。
  *
  * 写入 `configStore` 的 `textProviderId/textModelId` 或
- * `visionProviderId/videoModelId` 由调用方在 onToggle 回调里处理。
+ * `visionProviderId/visionModelId` 由调用方在 onToggle 回调里处理。
  */
 export interface ModelCardProps {
   /** 模型 id（唯一） */
