@@ -27,6 +27,8 @@ export interface ProviderItem {
 export interface Model {
   id: string    // 模型唯一 ID（传给后端的 model_name）
   name: string  // 显示名称
+  /** R21.P2.v3: 后端返回的模型能力标签（chat/vision/…），可能不存在 */
+  capabilities?: string[]
 }
 
 /** 新增 provider 的入参（对应后端 ProviderCreateRequest） */

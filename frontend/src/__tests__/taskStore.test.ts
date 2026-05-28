@@ -128,4 +128,50 @@ describe('taskStore smoke tests', () => {
 
     expect(useTaskStore.getState().tasks.map((t) => t.task_id)).toEqual(['t-visible'])
   })
+
+  it('updateTask: last-writer-wins-by-timestamp —— SSE 写 SUCCESS 100% 后，轮询 RUNNING 50% 被丢弃', () => {
+    // 模拟 SSE 先写 SUCCESS 100%
+    useTaskStore.getState().addTask(
+      makeTask({
+        task_id: 't-sse',
+        status: 'SUCCESS',
+        progress: 1.0,
+        updated_at: '2026-05-27T10:00:00Z',
+      }),
+    )
+
+    // 模拟轮询滞后响应 RUNNING 50%（updated_at 更早）
+    useTaskStore.getState().updateTask('t-sse', {
+      status: 'RUNNING',
+      progress: 0.5,
+      updated_at: '2026-05-27T09:00:00Z',
+    })
+
+    const t = useTaskStore.getState().getTask('t-sse')!
+    expect(t.status).toBe('SUCCESS')
+    expect(t.progress).toBe(1.0)
+  })
+
+  it('updateTask: last-writer-wins-by-timestamp —— 轮询更新 updated_at 更晚时正常写入', () => {
+    // 模拟 SSE 先写 RUNNING 50%
+    useTaskStore.getState().addTask(
+      makeTask({
+        task_id: 't-poll',
+        status: 'RUNNING',
+        progress: 0.5,
+        updated_at: '2026-05-27T10:00:00Z',
+      }),
+    )
+
+    // 模拟轮询更新 updated_at 更晚，progress 更高
+    useTaskStore.getState().updateTask('t-poll', {
+      status: 'SUCCESS',
+      progress: 1.0,
+      updated_at: '2026-05-27T10:05:00Z',
+    })
+
+    const t = useTaskStore.getState().getTask('t-poll')!
+    expect(t.status).toBe('SUCCESS')
+    expect(t.progress).toBe(1.0)
+  })
 })

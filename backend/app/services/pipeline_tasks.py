@@ -815,7 +815,18 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
         while not state.finished:
             if runner.is_cancel_requested(record.task_id):
                 break
-            time.sleep(0.3)
+            snaps = state.snapshot()
+            if snaps:
+                avg = sum(float(s["percent"]) for s in snaps) / max(len(snaps), 1) / 100.0
+                runner.set_progress(record.task_id, min(0.65, max(0.3, 0.3 + avg * 0.35)), "Analyzing video frames")
+                # 每 5% 或每 2 秒打一条日志
+                for s in snaps:
+                    if s["total_frames"] > 0:
+                        runner.append_log(
+                            task_id,
+                            f"🎬 截帧进度：{s['analyzed_frames']}/{s['total_frames']} 帧 ({s['percent']:.1f}%)"
+                        )
+            time.sleep(0.2)
         runner.set_progress(record.task_id, 0.7, "Generating combined summary")
 
         # 收集帧描述

@@ -53,7 +53,7 @@ interface StepWithState {
   pct: number
 }
 
-function deriveSteps(currentStatus: string, progress: number, taskType: string): StepWithState[] {
+export function deriveSteps(currentStatus: string, progress: number, taskType: string): StepWithState[] {
   const stages = visibleStages(taskType)
   const stageIds = stages.map((s) => s.id)
   const currentIdx = stageIds.indexOf(currentStatus as TaskStatus)
@@ -64,7 +64,7 @@ function deriveSteps(currentStatus: string, progress: number, taskType: string):
     let pct: number
 
     if (currentIdx < 0) {
-      if (progress >= 1) {
+      if (currentStatus === 'SUCCESS' && progress >= 1) {
         state = 'done'
         pct = 1
       } else {

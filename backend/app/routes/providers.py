@@ -83,8 +83,12 @@ async def get_provider_models(provider_id: str) -> Dict[str, Any]:
 
     # OpenAI 标准格式: {"data": [{"id": "...", "object": "model", ...}]}
     data_list: list = raw.get("data", []) if isinstance(raw, dict) else []
-    models: List[Dict[str, str]] = [
-        {"id": item["id"], "name": item.get("name") or item["id"]}
+    models: List[Dict[str, Any]] = [
+        {
+            "id": item["id"],
+            "name": item.get("name") or item["id"],
+            **({"capabilities": caps} if (caps := item.get("capabilities") or item.get("supported_modalities") or item.get("supported_inputs")) else {}),
+        }
         for item in data_list
         if isinstance(item, dict) and item.get("id")
     ]

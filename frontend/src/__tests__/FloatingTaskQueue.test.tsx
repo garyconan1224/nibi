@@ -140,4 +140,43 @@ describe('FloatingTaskQueue v2', () => {
 
     expect(screen.getByText('查看中')).toBeTruthy()
   })
+
+  it('同一 workspace 同一 url 的多个 task 合并成一行', () => {
+    useTaskStore.setState({
+      tasks: [
+        makeTask({
+          task_id: 'download-001',
+          project_id: 'workspace-1',
+          task_type: 'download',
+          payload: { url: 'https://www.bilibili.com/video/BV1LSRhBQErk' },
+          status: 'SUCCESS',
+          progress: 1.0,
+        }),
+        makeTask({
+          task_id: 'analyze-001',
+          project_id: 'workspace-1',
+          task_type: 'analyze',
+          payload: { url: 'https://www.bilibili.com/video/BV1LSRhBQErk' },
+          status: 'RUNNING',
+          progress: 0.5,
+        }),
+        makeTask({
+          task_id: 'av_synthesis-001',
+          project_id: 'workspace-1',
+          task_type: 'av_synthesis',
+          payload: { url: 'https://www.bilibili.com/video/BV1LSRhBQErk' },
+          status: 'PENDING',
+          progress: 0,
+        }),
+      ],
+    })
+
+    render(<FloatingTaskQueue />)
+    fireEvent.click(screen.getByRole('button', { name: /任务/ }))
+
+    // 应该只显示一行，而不是三行
+    // 查找所有取消任务按钮（排除批量操作按钮）
+    const cancelButtons = screen.getAllByRole('button', { name: /取消任务/ })
+    expect(cancelButtons.length).toBe(1)
+  })
 })
