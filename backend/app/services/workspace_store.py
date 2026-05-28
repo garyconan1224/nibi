@@ -21,6 +21,7 @@ from typing import Dict, List, Optional
 
 from backend.app.models.workspace import (
     ItemStatus,
+    ItemSummary,
     PromptVersion,
     WorkspaceBackground,
     WorkspaceItem,
@@ -231,3 +232,65 @@ class WorkspaceStore:
             if not any(it.item_id == item_id for it in rec.items):
                 raise KeyError(f"item not found: {item_id}")
             return list(rec.prompt_versions.get(item_id) or [])
+
+    # ── Summary 操作 ──────────────────────────────────────────
+
+    def get_item(self, workspace_id: str, item_id: str) -> WorkspaceItem:
+        """获取单个 item，找不到抛 KeyError。"""
+        with self._lock:
+            rec = self._records.get(workspace_id)
+            if rec is None:
+                raise KeyError(f"workspace not found: {workspace_id}")
+            item = next((it for it in rec.items if it.item_id == item_id), None)
+            if item is None:
+                raise KeyError(f"item not found: {item_id}")
+            return item
+
+    def next_version_for_template(
+        self, workspace_id: str, item_id: str, template_id: str
+    ) -> int:
+        """返回该 item + template 的下一个 version 号。"""
+        with self._lock:
+            rec = self._records.get(workspace_id)
+            if rec is None:
+                raise KeyError(f"workspace not found: {workspace_id}")
+            item = next((it for it in rec.items if it.item_id == item_id), None)
+            if item is None:
+                raise KeyError(f"item not found: {item_id}")
+            existing = [s for s in item.summaries if s.template == template_id]
+            return max((s.version for s in existing), default=0) + 1
+
+    def add_item_summary(
+        self, workspace_id: str, item_id: str, summary: ItemSummary
+    ) -> ItemSummary:
+        """向 item.summaries 追加一份总结并落盘。"""
+        with self._lock:
+            rec = self._records.get(workspace_id)
+            if rec is None:
+                raise KeyError(f"workspace not found: {workspace_id}")
+            item = next((it for it in rec.items if it.item_id == item_id), None)
+            if item is None:
+                raise KeyError(f"item not found: {item_id}")
+            item.summaries.append(summary)
+            item.updated_at = _now_iso()
+            self._save(rec)
+            return summary
+
+    def delete_item_summary(
+        self, workspace_id: str, item_id: str, summary_id: str
+    ) -> bool:
+        """硬删指定 summary，返回是否找到并删除。"""
+        with self._lock:
+            rec = self._records.get(workspace_id)
+            if rec is None:
+                raise KeyError(f"workspace not found: {workspace_id}")
+            item = next((it for it in rec.items if it.item_id == item_id), None)
+            if item is None:
+                raise KeyError(f"item not found: {item_id}")
+            before = len(item.summaries)
+            item.summaries = [s for s in item.summaries if s.summary_id != summary_id]
+            if len(item.summaries) == before:
+                return False
+            item.updated_at = _now_iso()
+            self._save(rec)
+            return True
