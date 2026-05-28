@@ -133,6 +133,15 @@ def _adapt_r8_frame_prompt(frame_prompt: Dict[str, Any]) -> Dict[str, Any]:
 def _augment_video_analyze_payload(payload: Dict[str, Any], item: WorkspaceItem) -> None:
     """Copy video preflight params used by the current analyze pipeline."""
     tasks = item.preflight.tasks or {}
+    preflight_params = tasks.get("preflight")
+    if isinstance(preflight_params, dict):
+        if preflight_params.get("intent"):
+            payload["intent"] = preflight_params["intent"]
+        if preflight_params.get("background_for_recognition"):
+            payload["background_for_recognition"] = preflight_params[
+                "background_for_recognition"
+            ]
+
     frame_prompts_params = tasks.get("frame_prompt")
     if isinstance(frame_prompts_params, dict):
         payload["frame_prompt"] = _adapt_r8_frame_prompt(frame_prompts_params)
