@@ -299,9 +299,13 @@ export default function ProcessingPage() {
                 <button
                   className="btn btn-primary"
                   onClick={() => {
-                    if (isSuccess && itemId) {
-                      const wid = workspaceId ?? 'default'
+                    if (!isSuccess) return
+                    const wid = workspaceId ?? 'default'
+                    if (itemId) {
                       navigate(`/workspaces/${wid}/items/${itemId}/overview`)
+                    } else {
+                      // 兜底：跳转到资料库，用户可从那里找到结果
+                      navigate('/library')
                     }
                   }}
                   style={{
