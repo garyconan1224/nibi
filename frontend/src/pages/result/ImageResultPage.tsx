@@ -25,6 +25,7 @@ import {
   savePromptFormatsConfig,
 } from '@/services/promptFormats'
 import { ASSOCIATION_DIRECTION_LABELS, type AssociationDirection } from '@/lib/preflightTasks'
+import { SummariesTab } from '@/components/SummariesTab'
 
 import './tokens.css'
 import './image-result.css'
@@ -55,6 +56,7 @@ export default function ImageResultPage() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerSelection, setPickerSelection] = useState<string[]>([])
   const [promptVersions, setPromptVersions] = useState<PromptVersion[]>([])
+  const [contentTab, setContentTab] = useState<'content' | 'summary'>('content')
 
   // N9: 多图对比
   const [compareOpen, setCompareOpen] = useState(false)
@@ -292,17 +294,26 @@ export default function ImageResultPage() {
         {/* tabs 按钮行 */}
         <div className="vd-tabs-row">
           {tabs.map((t) => (
-            <button key={t.key} className="vd-tab-btn" data-active={promptStyle === t.key} onClick={() => setPromptStyle(t.key)}>
+            <button key={t.key} className="vd-tab-btn" data-active={contentTab === 'content' && promptStyle === t.key} onClick={() => { setContentTab('content'); setPromptStyle(t.key) }}>
               {t.label}
             </button>
           ))}
-          {!tabs.length && (
+          <button className="vd-tab-btn" data-active={contentTab === 'summary'} onClick={() => setContentTab('summary')}>
+            总结
+          </button>
+          {!tabs.length && contentTab !== 'summary' && (
             <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>（提示词格式未加载）</span>
           )}
         </div>
 
         {/* 可滚动内容区 */}
         <div className="im-content-scroll">
+          {contentTab === 'summary' ? (
+            <div style={{ flex: 1, overflow: 'hidden', height: '100%' }}>
+              <SummariesTab workspaceId={workspaceId} itemId={itemId} />
+            </div>
+          ) : (
+          <>
           {/* 提示词文本 */}
           <div className="im-prompt-text">
             {promptText}
@@ -377,6 +388,8 @@ export default function ImageResultPage() {
               onAddVersion={handleAddPromptVersion}
             />
           </div>
+          </>
+          )}
         </div>
 
         {/* 底部操作按钮 */}

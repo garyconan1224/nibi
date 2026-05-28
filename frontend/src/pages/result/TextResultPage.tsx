@@ -18,6 +18,7 @@ import { PromptVersionStack } from '@/components/result/PromptVersionStack'
 import './tokens.css'
 import './text-result.css'
 import { ItemTagsPanel } from '@/components/workspace/ItemTagsPanel'
+import { SummariesTab } from '@/components/SummariesTab'
 
 function renderSummary(
   summary: string | StructuredSummary | null | undefined,
@@ -196,6 +197,7 @@ export default function TextResultPage() {
   const [assocOpen, setAssocOpen] = useState(true)
   const [rewriteOpen, setRewriteOpen] = useState(true)
   const [translateOpen, setTranslateOpen] = useState(true)
+  const [contentTab, setContentTab] = useState<'content' | 'summary'>('content')
 
   // N10: 多文对比弹窗
   const [compareState, setCompareState] = useState<
@@ -328,13 +330,28 @@ export default function TextResultPage() {
       {/* ════════ 右：摘要 + 联想 + 改写翻译 + 元信息 + 版本栈 ════════ */}
       <div className="tx-right">
         <div className="tx-right-header">
-          <span className="eyebrow">文本摘要</span>
-          <button className="tx-compare-btn" onClick={handleCompare}>
-            <Layers size={12} /> 多文对比
-          </button>
+          <div style={{ display: 'flex', gap: 0 }}>
+            <button className="vd-tab-btn" data-active={contentTab === 'content'} onClick={() => setContentTab('content')}>
+              摘要
+            </button>
+            <button className="vd-tab-btn" data-active={contentTab === 'summary'} onClick={() => setContentTab('summary')}>
+              总结
+            </button>
+          </div>
+          {contentTab === 'content' && (
+            <button className="tx-compare-btn" onClick={handleCompare}>
+              <Layers size={12} /> 多文对比
+            </button>
+          )}
         </div>
 
         <div className="tx-right-scroll">
+          {contentTab === 'summary' ? (
+            <div style={{ flex: 1, overflow: 'hidden', height: '100%' }}>
+              <SummariesTab workspaceId={workspaceId} itemId={itemId} />
+            </div>
+          ) : (
+          <>
           {/* 摘要 — T1.1: 支持结构化摘要 */}
           {renderSummary(result.summary, scrollToParagraph)}
 
@@ -421,6 +438,8 @@ export default function TextResultPage() {
             versions={promptVersions}
             onAddVersion={handleAddVersion}
           />
+          </>
+          )}
         </div>
 
         {/* 底部操作 */}

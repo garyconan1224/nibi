@@ -26,6 +26,7 @@ import {
 import { TripleTrack } from './TripleTrack'
 import { nearestFrameIdx } from './helpers'
 import { ItemTagsPanel } from '@/components/workspace/ItemTagsPanel'
+import { SummariesTab } from '@/components/SummariesTab'
 import { FramePickerModal, type FrameItem } from '@/components/FramePickerModal'
 import {
   type InlineFrame,
@@ -81,6 +82,7 @@ export default function VideoResultPage() {
   const [pickerSelection, setPickerSelection] = useState<string[]>([])
   const [promptVersions, setPromptVersions] = useState<PromptVersion[]>([])
   const [exportOpen, setExportOpen] = useState(false)
+  const [contentTab, setContentTab] = useState<'content' | 'summary'>('content')
 
   // 学习模式补图
   const [inlineFrames, setInlineFrames] = useState<InlineFrame[]>([])
@@ -506,8 +508,32 @@ export default function VideoResultPage() {
           <ItemTagsPanel workspaceId={workspaceId} itemId={itemId} />
         </div>
 
+        {/* 内容/总结 tab 切换 */}
+        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--line)', padding: '0 20px', flexShrink: 0 }}>
+          <button
+            className="vd-tab-btn"
+            data-active={contentTab === 'content'}
+            onClick={() => setContentTab('content')}
+          >
+            内容
+          </button>
+          <button
+            className="vd-tab-btn"
+            data-active={contentTab === 'summary'}
+            onClick={() => setContentTab('summary')}
+          >
+            总结
+          </button>
+        </div>
+
         {/* Main content */}
         <div className="vd-subtitle-content">
+          {contentTab === 'summary' ? (
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              <SummariesTab workspaceId={workspaceId} itemId={itemId} />
+            </div>
+          ) : (
+          <>
           {/* Summary card */}
           {result.summary && (
             <div className="vd-card">
@@ -582,6 +608,8 @@ export default function VideoResultPage() {
             <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--ink-4)' }}>
               暂无摘要和转录内容
             </div>
+          )}
+          </>
           )}
         </div>
 
@@ -752,15 +780,24 @@ export default function VideoResultPage() {
         </div>
         <div className="vd-tabs-row">
           {tabs.map((t) => (
-            <button key={t.key} className="vd-tab-btn" data-active={promptStyle === t.key} onClick={() => setPromptStyle(t.key)}>
+            <button key={t.key} className="vd-tab-btn" data-active={contentTab === 'content' && promptStyle === t.key} onClick={() => { setContentTab('content'); setPromptStyle(t.key) }}>
               {t.label}
             </button>
           ))}
-          {!tabs.length && (
+          <button className="vd-tab-btn" data-active={contentTab === 'summary'} onClick={() => setContentTab('summary')}>
+            总结
+          </button>
+          {!tabs.length && contentTab !== 'summary' && (
             <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>（提示词格式未加载）</span>
           )}
         </div>
 
+        {contentTab === 'summary' ? (
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <SummariesTab workspaceId={workspaceId} itemId={itemId} />
+          </div>
+        ) : (
+        <>
         <div className="vd-prompt-area">
           <div className="vd-prompt-text">{promptText}</div>
           <div style={{ marginTop: 14 }}>
@@ -788,6 +825,8 @@ export default function VideoResultPage() {
             </div>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       {pickerOpen && formatsCfg && (
