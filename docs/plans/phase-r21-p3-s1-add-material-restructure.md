@@ -143,3 +143,64 @@ user_source: 2026-05-28 用户第三轮反馈（结果导向重构）
 ## 给 owner 的提示词
 
 执行本 plan 时遵守 [CLAUDE.md](../../CLAUDE.md) §2 沟通规则、§4 红线、§5 子任务颗粒度。Step 1 + Step 2 + Step 3 + Step 4 各自一个 commit。完成后**不要自己合 main**，提醒用户验收后再 merge。
+
+---
+
+## 附录 A：mimo 执行预备信息（2026-05-28 Opus 预扫产物）
+
+### A.1 依赖现状（不用装新东西）
+
+`requirements.txt` 已含：
+- `httpx>=0.24.0` —— 异步 HTTP 抓取
+- `readability-lxml>=0.8.1` —— 网页正文抽取
+- `lxml>=5.0.0` —— HTML 解析 og 标签
+
+**不需要 `pip install` 任何东西。如发现还需新依赖必须停下问用户（CLAUDE.md §4 第 1 条）。**
+
+### A.2 B 站元数据：直接复用已有 downloader
+
+文件：`backend/app/downloaders/bilibili_nocookie.py`
+
+```python
+from app.downloaders.bilibili_nocookie import (
+    extract_bvid_from_url,        # 从 URL 抽 BV 号，非 B 站返回 None
+    BilibiliNoCookieDownloader,   # 含 .get_meta(url) -> VideoMeta（标题/简介/封面）
+)
+```
+
+**B 站链接直接走 `get_meta()`，不要重新写一遍 BV 解析。** 通用网页才走 og 抓取。
+
+### A.3 后端 router 注册位置
+
+- 新建文件：`backend/app/routes/link_preview.py`
+- 在 [backend/app/main.py:124](backend/app/main.py:124) 之后加 `app.include_router(link_preview_router)`
+- 路由前缀照同目录其他 router 风格（看 providers.py / templates.py 是怎么定义 router prefix 的）
+
+### A.4 ⚠️ payload 字段挂载位置（容易搞错）
+
+后端 pipeline payload 已有嵌套结构 `payload.preflight.{ocr, assoc, prompt, frame_prompt}`（看 [pipeline_tasks.py:1196](backend/app/services/pipeline_tasks.py:1196) 和 [pipeline_tasks.py:1899](backend/app/services/pipeline_tasks.py:1899)）。
+
+**新增字段必须挂在 `payload.preflight` 下：**
+```json
+{
+  "preflight": {
+    "intent": "learning" | "replica",          // 视频用途模式（仅 video 素材有）
+    "image_mode": "replica_prompt" | "ocr",    // 图片采集模式（仅 image 素材有）
+    "background_for_recognition": "..."        // 识别用背景（统一字段）
+  }
+}
+```
+
+**不要平铺到 payload 顶层。** 后端读时 `payload.get("preflight", {}).get("intent")`。
+
+### A.5 items 相关 API 在 workspaces.py 不是 items.py
+
+backend 没有独立的 `items.py` 路由文件，item CRUD 都在 `backend/app/routes/workspaces.py`。S1 本期不动 item API，只新增 `link_preview.py`，注意别误改。
+
+### A.6 mimo 执行边界（必须停下问用户的情况）
+
+除 CLAUDE.md §4 6 种通用情况外，**本 phase 额外**：
+1. 如果发现 `payload.preflight` 老字段（`ocr`/`assoc`/`frame_prompt` 等）与新字段（`intent`/`image_mode`）有命名冲突或语义重叠
+2. 如果 AddMaterialModal 现有 state 结构太复杂、直接重构会破坏现有功能（音乐分析、说话人区分等），考虑分两次 commit（先移除再新增）
+3. 如果链接预填的 debounce 时机和现有 sniff() 逻辑冲突
+4. 如果发现需要修改 `pipeline_tasks.py` 里学习/复刻模式的实际执行逻辑（**本期只透传 + log，不动执行**；真要动留给 S2）
