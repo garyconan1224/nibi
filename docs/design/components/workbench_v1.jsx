@@ -380,3 +380,4 @@ const Workbench = ({ onStart, onOpenWorkspace, onSeeAllWorkspaces }) => {
 };
 
 window.Workbench = Workbench;
+
