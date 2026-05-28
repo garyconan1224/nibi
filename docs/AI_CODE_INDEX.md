@@ -22,13 +22,18 @@
 | 工作台提交 | `frontend/src/pages/WorkbenchPage/Composer.tsx` | `normalizeMediaUrl`, `onSubmit`, `preflight` |
 | 前置配置抽屉 | `frontend/src/components/workspace/PreflightDrawer.tsx` | `tasks`, `audio`, `summary_path`, `payload` |
 | 处理中页 | `frontend/src/pages/result/ProcessingPage/index.tsx` | `useTaskSse`, `StepProgress`, `LiveLog`, `terminal` |
-| 结果总览 | `frontend/src/pages/result/ResultsOverviewPage.tsx` | `items`, `task`, `navigate`, `result` |
-| 视频结果 | `frontend/src/pages/result/VideoResultPage.tsx` | `summary_path`, `transcript`, `timeline`, `template` |
-| 音频结果 | `frontend/src/pages/result/AudioResultPage.tsx` | `speaker`, `music`, `subtitle`, `waveform` |
+| 结果总览 | `frontend/src/pages/result/ResultsOverview/index.tsx` | `items`, `task`, `navigate`, `result`, `processing` |
+| 视频结果 | `frontend/src/pages/result/VideoResultPage.tsx` | `summary_path`, `transcript`, `timeline`, `template`, `inline_frames`, `FramePickerModal` |
+| 音频结果 | `frontend/src/pages/result/AudioResultPage.tsx` | `speaker`, `music`, `subtitle`, `waveform`, `SummariesTab` |
 | 图片结果 | `frontend/src/pages/result/ImageResultPage.tsx` | `ocr`, `prompt`, `exif`, `compare` |
 | 文字结果 | `frontend/src/pages/result/TextResultPage.tsx` | `quote`, `source_excerpt`, `rewrite`, `translation` |
-| 资料库 | `frontend/src/pages/library/` | `LibraryPage`, `ItemCard`, `select`, `delete` |
-| Taskboard | `frontend/src/pages/workspace/TaskboardPage/` | `tabs`, `materials`, `compare`, `favorites` |
+| 资料库 | `frontend/src/pages/LibraryPage/` | `LibraryPage`, `ItemCard`, `select`, `delete` |
+| Taskboard | `frontend/src/pages/WorkspacePage/TaskboardPage/` | `tabs`, `materials`, `compare`, `favorites`, `QueueTab` |
+| 添加素材模态 | `frontend/src/components/workspace/AddMaterialModal.tsx` | `intent`, `tasks`, `preflight`, `link-preview`, `4-step` |
+| 前置配置抽屉 | `frontend/src/components/workspace/PreflightDrawer.tsx` | `media tabs`, `cascading lock`, `background`, `tasks payload` |
+| 任务队列浮窗 | `frontend/src/components/FloatingTaskQueue.tsx` | `groupKey`, `getTaskTitle`, `video_title`, `source_url` |
+| 多版本总结 Tab | `frontend/src/components/summaries/SummariesTab.tsx` | `ItemSummary`, `summary_templates`, `versions` |
+| 帧选择弹窗 | `frontend/src/pages/result/VideoResultPage.tsx`（FramePickerModal） | `inline_frames`, `segment_idx`, `suggested` |
 
 ## 文档入口
 
