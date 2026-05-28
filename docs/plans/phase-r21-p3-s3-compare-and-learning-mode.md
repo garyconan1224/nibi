@@ -1,12 +1,21 @@
 ---
 phase: R21.P3.S3
 title: 总结对比模式 + 视频学习模式按需补图 + SummariesTab 全素材类型覆盖
-status: ready
-owner: 待定（建议 mimo 执行，附录 A 已为它预扫）
+status: done
+owner: mimo
 estimated_hours: 8-12
+actual_hours: 2
 depends_on:
   - r21-p3-s2（已合 main）
 user_source: 2026-05-28 用户第三轮反馈
+completed_date: 2026-05-28
+commits:
+  - 7e0f10e feat(r21.P3.S3): Step 1 — 对比模式 UI 骨架
+  - 9e04a79 feat(r21.P3.S3): Step 2 — 对比模式测试 + 样式优化
+  - 52755d5 feat(r21.P3.S3): Step 3 — 后端 inline_frames 模型 + API + 推荐算法
+  - aaa88a2 feat(r21.P3.S3): Step 4 — FramePickerModal 帧选择器
+  - 7a89f64 feat(r21.P3.S3): Step 5 — VideoResultPage 集成按需补图
+  - aeb99c2 feat(r21.P3.S3): Step 6 — SummariesTab 覆盖 Video/Image/Text 结果页
 ---
 
 ## 目标（一句话）
@@ -201,15 +210,15 @@ inline_frames: List[InlineFrame] = field(default_factory=list)
 
 ## 验收标准
 
-- [ ] 总结列表能勾选 2-3 份进入对比模式，并排显示，独立滚动
-- [ ] 勾第 4 份时被禁用 + 提示
-- [ ] 「退出对比」回到单栏
-- [ ] 学习模式视频在转录段落旁出现「📷 插图」按钮，复刻模式 / 其他素材类型不出现
-- [ ] 点击插图按钮弹出帧选择器，系统推荐 ⭐ 标出
-- [ ] 选中帧插入后渲染在对应段落下方，刷新页面仍在
-- [ ] 删除已插入帧后立即从 UI 消失，刷新仍消失
-- [ ] Video / Image / Text 结果页都能看到「总结」tab
-- [ ] 所有新增 / 改动测试通过
+- [x] 总结列表能勾选 2-3 份进入对比模式，并排显示，独立滚动
+- [x] 勾第 4 份时被禁用 + 提示
+- [x] 「退出对比」回到单栏
+- [x] 学习模式视频在转录段落旁出现「📷 插图」按钮，复刻模式 / 其他素材类型不出现
+- [x] 点击插图按钮弹出帧选择器，系统推荐 ⭐ 标出
+- [x] 选中帧插入后渲染在对应段落下方，刷新页面仍在
+- [x] 删除已插入帧后立即从 UI 消失，刷新仍消失
+- [x] Video / Image / Text 结果页都能看到「总结」tab
+- [x] 所有新增 / 改动测试通过（前端 12 + 后端 15 = 27 个）
 
 ## 不在本期范围
 
