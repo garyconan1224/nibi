@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from backend.app.models.workspace import (
+    InlineFrame,
     ItemStatus,
     ItemSummary,
     PromptVersion,
@@ -294,3 +295,21 @@ class WorkspaceStore:
             item.updated_at = _now_iso()
             self._save(rec)
             return True
+
+    # ── InlineFrames ──────────────────────────────────────────
+
+    def save_inline_frames(
+        self, workspace_id: str, item_id: str, frames: List[InlineFrame]
+    ) -> List[InlineFrame]:
+        """整体覆盖 item.inline_frames 并落盘。"""
+        with self._lock:
+            rec = self._records.get(workspace_id)
+            if rec is None:
+                raise KeyError(f"workspace not found: {workspace_id}")
+            item = next((it for it in rec.items if it.item_id == item_id), None)
+            if item is None:
+                raise KeyError(f"item not found: {item_id}")
+            item.inline_frames = frames
+            item.updated_at = _now_iso()
+            self._save(rec)
+            return frames

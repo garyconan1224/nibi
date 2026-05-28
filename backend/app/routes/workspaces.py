@@ -41,6 +41,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from backend.app.models.workspace import (
+    InlineFrame,
     ItemStatus,
     ItemSummary,
     ItemType,
@@ -2366,3 +2367,78 @@ def delete_summary(workspace_id: str, item_id: str, summary_id: str) -> Dict[str
     if not deleted:
         raise HTTPException(status_code=404, detail=f"summary not found: {summary_id}")
     return {"status": "deleted", "summary_id": summary_id}
+
+
+# ── InlineFrames（学习模式视频按需补图）───────────────────────────
+
+
+@router.get("/{workspace_id}/items/{item_id}/inline-frames")
+def list_inline_frames(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
+    """列出已插入的帧（按 segment_idx 排序）。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+    frames = sorted(item.inline_frames, key=lambda f: f.segment_idx)
+    return [f.to_dict() for f in frames]
+
+
+@router.get("/{workspace_id}/items/{item_id}/inline-frames/suggested")
+def get_suggested_inline_frames(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
+    """临时计算返回系统推荐的帧位置（不持久化）。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+
+    if item.preflight.intent != "learning":
+        return []
+
+    results = item.results or {}
+    frames = results.get("transcript") and results.get("frames") or []
+    transcript = results.get("transcript") or []
+
+    if not frames or not transcript:
+        return []
+
+    from backend.app.services.inline_frame_suggester import suggest_inline_frames
+
+    # transcript 格式：Video 用 { t_sec, t_str, text }，转成 { start, text }
+    segments = []
+    for t in transcript:
+        start = t.get("t_sec") or _ts_str_to_sec(t.get("t_str", "0:00"))
+        segments.append({"start": start, "text": t.get("text", "")})
+
+    return suggest_inline_frames(frames, segments)
+
+
+def _ts_str_to_sec(ts: str) -> float:
+    """把 'MM:SS' 或 'HH:MM:SS' 转成秒数。"""
+    parts = str(ts).strip().split(":")
+    try:
+        if len(parts) == 2:
+            return int(parts[0]) * 60 + int(parts[1])
+        if len(parts) == 3:
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+    except ValueError:
+        pass
+    return 0.0
+
+
+class InlineFramesSaveRequest(BaseModel):
+    inline_frames: List[Dict[str, Any]]
+
+
+@router.put("/{workspace_id}/items/{item_id}/inline-frames")
+def save_inline_frames(
+    workspace_id: str, item_id: str, req: InlineFramesSaveRequest
+) -> Dict[str, Any]:
+    """整体覆盖式保存 inline_frames。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    _find_item(rec, item_id)
+
+    frames = [InlineFrame.from_dict(f) for f in req.inline_frames]
+    saved = _store.save_inline_frames(workspace_id, item_id, frames)
+    return {"status": "saved", "count": len(saved)}
