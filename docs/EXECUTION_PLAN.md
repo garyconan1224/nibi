@@ -4,7 +4,7 @@
 >
 > **维护规则见 CLAUDE.md「项目执行计划维护流程」一节**。
 >
-> Last updated: 2026-05-26
+> Last updated: 2026-05-27（R19 已合；R21 状态同步 bug 修计划就绪，等 mimo 开工）
 
 ---
 
@@ -209,8 +209,13 @@
   - [x] R17.5 新增单测 5 个（AddMaterialModal ×3 + preflightTasks ×2）
 - [x] **R18** 主 chip 重构（visual=1 / audio=2 / av+⭐综合）+ PreflightDrawer 细调（9 种总结模板 + 字幕精修 + 截帧细调挪位）— `docs/plans/phase-r18-preflight-drawer-templates.md`，owner: xiaomi mimo v2.5-pro，~8h
 - [ ] **R18.1** 本地 ASR（fast-whisper + mlx-whisper 兜底）+ 任务失败弹窗 + 模型下载进度 — `docs/plans/phase-r18.1-local-asr-and-failure-popup.md`，owner: xiaomi mimo v2.5-pro，~8h
-- [ ] **R19** 综合笔记 av_synthesis pipeline + Markdown 导出（骨架 C，无 OCR）— `docs/plans/phase-r19-av-synthesis-notes.md`，owner: xiaomi mimo v2.5-pro，~10h
-- [ ] **R20**（押后）综合笔记多格式导出：PDF / Word / Obsidian Vault — 等 R19 跑通后展开
+- [x] **R19** 综合笔记 av_synthesis pipeline + Markdown 导出（骨架 C，无 OCR）— `326eb12` `fdbf4a7`，owner: xiaomi mimo v2.5-pro
+- [ ] **R20**（押后）综合笔记多格式导出：PDF / Word / Obsidian Vault — 等 R21 状态同步 bug 修完后再排
+- [ ] **R21** R19 上线后流程状态同步 bug 修 + 进度/资料库行为收口 — `docs/plans/phase-r21-status-sync-bugfix.md`，owner: xiaomi mimo v2.5-pro，~10h
+  - A 类 bug：步骤全 DONE / 任务面板重复 3 行 / SSE↔轮询不同步 / 截帧进度卡 30% / "查看结果" 点不动
+  - B 类行为：未完成入口 disabled / 步骤日志补业务细节 / 右上角全局倒计时
+- [ ] **R22**（押后）Pipeline 并行调度：截帧 + 转写同时跑 — `docs/plans/phase-r22-parallel-pipeline.md`，~6-10h，依赖 R21
+- [ ] **R23**（押后）设置面板：性能档位（CPU/GPU/内存→并发槽位）— `docs/plans/phase-r23-perf-tier-settings.md`，~4-6h，依赖 R22
 
 ---
 
