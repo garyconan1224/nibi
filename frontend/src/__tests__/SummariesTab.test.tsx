@@ -25,7 +25,7 @@ vi.mock('@/services/summaries', () => ({
 }))
 
 vi.mock('sonner', () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
+  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }))
 
 /* ── fixtures ─────────────────────────────────────────────────── */
@@ -58,6 +58,16 @@ const SUMMARY_DETAILED: ItemSummary = {
   content_md: '## 要点\n\n- 要点1\n- 要点2',
   model_used: 'deepseek/deepseek-chat',
   created_at: '2026-05-28T14:00:00Z',
+}
+
+const SUMMARY_QUOTES: ItemSummary = {
+  summary_id: 's4',
+  template: 'quotes',
+  version: 1,
+  background_for_summary: '',
+  content_md: '> 金句一\n\n> 金句二',
+  model_used: 'openai/gpt-4o',
+  created_at: '2026-05-28T15:00:00Z',
 }
 
 /* ── tests ────────────────────────────────────────────────────── */
@@ -169,5 +179,64 @@ describe('SummariesTab', () => {
     await waitFor(() => {
       expect(screen.getByText(/暂无总结/)).toBeTruthy()
     })
+  })
+
+  it('勾选 2 份后进入对比模式，并排显示', async () => {
+    mocks.listSummaries.mockResolvedValue([SUMMARY_1, SUMMARY_2, SUMMARY_DETAILED])
+
+    render(<SummariesTab workspaceId="ws-1" itemId="item-1" />)
+
+    await waitFor(() => {
+      expect(screen.getByText('v2')).toBeTruthy()
+    })
+
+    // 找到所有 checkbox
+    const checkboxes = screen.getAllByRole('checkbox')
+    expect(checkboxes.length).toBeGreaterThanOrEqual(2)
+
+    // 勾选前两个
+    fireEvent.click(checkboxes[0])
+    fireEvent.click(checkboxes[1])
+
+    // 「进入对比」按钮出现
+    const enterBtn = screen.getByText(/进入对比/)
+    expect(enterBtn).toBeTruthy()
+
+    // 进入对比
+    fireEvent.click(enterBtn)
+
+    // 两份内容应同时显示（split view）
+    expect(screen.getByText(/这是第一版摘要/)).toBeTruthy()
+    expect(screen.getByText(/这是第二版/)).toBeTruthy()
+
+    // 退出对比按钮出现
+    expect(screen.getByText(/退出对比/)).toBeTruthy()
+  })
+
+  it('第 4 个勾选被禁用 + toast 提示', async () => {
+    mocks.listSummaries.mockResolvedValue(
+      [SUMMARY_1, SUMMARY_2, SUMMARY_DETAILED, SUMMARY_QUOTES],
+    )
+
+    render(<SummariesTab workspaceId="ws-1" itemId="item-1" />)
+
+    await waitFor(() => {
+      expect(screen.getByText('金句提取')).toBeTruthy()
+    })
+
+    const checkboxes = screen.getAllByRole('checkbox')
+    expect(checkboxes.length).toBe(4)
+
+    // 勾选 3 个
+    fireEvent.click(checkboxes[0])
+    fireEvent.click(checkboxes[1])
+    fireEvent.click(checkboxes[2])
+
+    // 第 4 个仍然可以点击（checkbox 本身不 disabled，但 title 提示）
+    // 点击后应触发 toast.warning
+    fireEvent.click(checkboxes[3])
+
+    const { toast } = await import('sonner')
+    expect(toast.warning).toHaveBeenCalledWith('最多对比 3 份')
   })
 })

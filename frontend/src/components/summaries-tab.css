@@ -332,3 +332,35 @@
   border-radius: 3px;
   font-size: 11px;
 }
+
+.sm-compare-col-actions {
+  padding: 8px 16px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.sm-compare-col-actions button {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg);
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.sm-compare-col-actions button:hover {
+  background: var(--bg-sunken);
+}
+
+/* 窄屏：3 栏最小宽度 240px，超出则横向滚动 */
+@media (max-width: 900px) {
+  .sm-compare-columns {
+    overflow-x: auto;
+  }
+  .sm-compare-col {
+    min-width: 240px;
+  }
+}

@@ -340,6 +340,16 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
                     {s.content_md}
                   </ReactMarkdown>
                 </div>
+                <div className="sm-compare-col-actions">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(s.content_md)
+                      toast.success('已复制')
+                    }}
+                  >
+                    复制 markdown
+                  </button>
+                </div>
               </div>
             ))}
           </div>
