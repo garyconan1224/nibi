@@ -12,6 +12,7 @@ type DisplayState = 'running' | 'queued' | 'error'
 
 interface QueueRow {
   id: string
+  groupKey: string
   title: string
   state: DisplayState
   status: string
@@ -48,7 +49,13 @@ function getTaskTitle(task: TaskRecord): string {
   const rTitle = result?.title as string | undefined
   if (rTitle?.trim()) return rTitle.trim()
 
-  const url = payload?.url as string | undefined
+  // analyze 任务 payload 带 video_title（download 阶段 yt-dlp 抽取），优先用它保证
+  // download→analyze 切换后标题不退化成 task_id hash
+  const vTitle = payload?.video_title as string | undefined
+  if (vTitle?.trim()) return vTitle.trim()
+
+  // download 用 url，analyze 用 source_url，两者都兜住
+  const url = ((payload?.url as string) || (payload?.source_url as string) || '') || undefined
   if (url?.trim()) {
     try {
       const segment = new URL(url.trim()).pathname.split('/').filter(Boolean).pop() || url
@@ -97,11 +104,11 @@ export function FloatingTaskQueue() {
   const currentTaskId = routeTaskId ?? storeCurrentTaskId
 
   const rows: QueueRow[] = useMemo(() => {
-    const activeTasks = tasks.filter((t) => !isTaskTerminal(t.status) || t.status === 'FAILED')
-
-    // 按 project_id + payload.url 分组
+    // 先按 project_id + url 把「全部」task 分组（含已 SUCCESS 的 download），
+    // 这样同一素材的 download + analyze 始终在一组：下载完成后该行不会脱组消失、
+    // 也不会换 React key 重建成「新任务」，而是连续推进到分析阶段。
     const groups = new Map<string, TaskRecord[]>()
-    for (const task of activeTasks) {
+    for (const task of tasks) {
       const payload = (task.payload ?? {}) as Record<string, unknown>
       const url = (payload?.url as string) || (payload?.source_url as string) || ''
       const key = `${task.project_id}::${url || task.task_id}`
@@ -109,6 +116,12 @@ export function FloatingTaskQueue() {
       group.push(task)
       groups.set(key, group)
     }
+
+    // 仅保留「整组未完成」的素材：组内任一 task 非终态，或有 FAILED。
+    // 全部 SUCCESS 的素材视为已完成，从活跃队列隐去。
+    const activeGroups = Array.from(groups.entries()).filter(([, group]) =>
+      group.some((t) => !isTaskTerminal(t.status) || t.status === 'FAILED'),
+    )
 
     // 每组取代表 task
     const statusPriority: Record<string, number> = {
@@ -118,8 +131,8 @@ export function FloatingTaskQueue() {
       SUCCESS: 1,
     }
 
-    const representativeTasks = Array.from(groups.values()).map((group) => {
-      // 按 status 优先级排序，取优先级最高的
+    const representativeTasks = activeGroups.map(([groupKey, group]) => {
+      // 按 status 优先级排序，取优先级最高的（运行中的 analyze 会盖过已完成的 download）
       group.sort((a, b) => (statusPriority[b.status] || 0) - (statusPriority[a.status] || 0))
       const representative = group[0]
 
@@ -142,6 +155,7 @@ export function FloatingTaskQueue() {
       }
 
       return {
+        groupKey,
         task: representative,
         progress: weightedProgress,
       }
@@ -151,12 +165,13 @@ export function FloatingTaskQueue() {
     return representativeTasks
       .sort((a, b) => timeOf(b.task.updated_at) - timeOf(a.task.updated_at))
       .slice(0, 8)
-      .map(({ task: t, progress }) => {
+      .map(({ groupKey, task: t, progress }) => {
         const state = displayState(t.status)
         const displayProgress = Math.round(progress * 100)
         const payload = (t.payload ?? {}) as Record<string, unknown>
         return {
           id: t.task_id,
+          groupKey,
           title: getTaskTitle(t),
           state,
           status: t.status,
@@ -326,7 +341,7 @@ export function FloatingTaskQueue() {
               const isActive = currentTaskId === r.id
               return (
                 <div
-                  key={r.id}
+                  key={r.groupKey}
                   onClick={() => handleSelectTask(r)}
                   style={{
                     padding: '10px 14px',

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, BookOpen, Clapperboard, Download, MessageSquare, RotateCcw, Star } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ArrowRight, BookOpen, Clapperboard, Download, Loader2, MessageSquare, RotateCcw, Star } from 'lucide-react'
 
 import {
   type AudioResult,
@@ -38,6 +38,7 @@ type ItemResult = VideoResult | AudioResult | ImageResult | TextResult
 type PageState =
   | { kind: 'loading' }
   | { kind: 'ready'; workspace: WorkspaceRecord; item: WorkspaceItem; result: ItemResult }
+  | { kind: 'processing'; workspace: WorkspaceRecord; item: WorkspaceItem }
   | { kind: 'task_failed'; workspace: WorkspaceRecord; item: WorkspaceItem; error: string; taskId?: string }
   | { kind: 'error'; message: string }
 
@@ -172,6 +173,12 @@ export default function ResultsOverview() {
           })
           return
         }
+        // 素材仍在处理中且后端尚未填充真数据（返回 demo fixture）时，不渲染 demo
+        // 假完成态，而是显示「分析进行中」并引导回处理页跟进度。
+        if (item.status === 'processing' && raw.source === 'demo_fixture') {
+          setPageState({ kind: 'processing', workspace: ws, item })
+          return
+        }
         setPageState({ kind: 'ready', workspace: ws, item, result })
       } catch (err: unknown) {
         if (cancelled) return
@@ -197,6 +204,36 @@ export default function ResultsOverview() {
     return (
       <div className="vm-overview-scope" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
         <span className="mono" style={{ color: 'var(--ink-3)' }}>加载结果总览…</span>
+      </div>
+    )
+  }
+
+  // ── Processing（分析进行中，尚无真数据）──
+  if (pageState.kind === 'processing') {
+    const { workspace, item } = pageState
+    const wid = workspace.workspace_id
+    const latestTaskId = item.related_task_ids[item.related_task_ids.length - 1]
+    return (
+      <div className="vm-overview-scope" style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+        <Loader2 size={32} className="animate-spin" style={{ color: 'var(--accent-green)' }} />
+        <span style={{ fontWeight: 600 }}>分析进行中…</span>
+        <span className="mono" style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+          结果尚未生成，请稍候或回到处理页查看进度
+        </span>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button className="btn-ghost" style={{ padding: '6px 12px' }} onClick={() => navigate(-1)}>
+            <ArrowLeft size={14} /> 返回
+          </button>
+          {latestTaskId && (
+            <button
+              className="btn-ghost"
+              style={{ padding: '6px 12px', border: '1px solid var(--line-strong)', borderRadius: 8 }}
+              onClick={() => navigate(`/processing/${latestTaskId}`, { state: { workspaceId: wid, itemId: item.item_id } })}
+            >
+              查看处理进度 <ArrowRight size={14} />
+            </button>
+          )}
+        </div>
       </div>
     )
   }

@@ -56,6 +56,7 @@ export default function ProcessingPage() {
   const state = location.state as LocationState | null
 
   const task = useTaskStore((s) => s.getTask(taskId))
+  const allTasks = useTaskStore((s) => s.tasks)
   const addTask = useTaskStore((s) => s.addTask)
   const updateTask = useTaskStore((s) => s.updateTask)
   const cancelTask = useTaskStore((s) => s.cancelTask)
@@ -84,6 +85,28 @@ export default function ProcessingPage() {
       })
     return () => { cancelled = true }
   }, [taskId, addTask, updateTask])
+
+  // X.5 任务链跟随：download 成功后会派生一个独立的 analyze 任务（见后端
+  // _on_download_success）。若用户停在 download 的处理页，下载完成时这里会显示
+  // 「下载成功」假完成态，点「查看结果」却进到空结果页。此处在 download SUCCESS 后
+  // 自动跳到同素材的 analyze 任务，让处理页连续跟到分析阶段。
+  useEffect(() => {
+    if (task?.task_type !== 'download' || task.status !== 'SUCCESS') return
+    const url = ((task.payload ?? {}) as Record<string, unknown>).url as string | undefined
+    if (!url?.trim()) return
+    const analyze = allTasks.find(
+      (t) =>
+        t.task_type === 'analyze' &&
+        t.project_id === task.project_id &&
+        (((t.payload ?? {}) as Record<string, unknown>).source_url as string) === url,
+    )
+    if (analyze && analyze.task_id !== taskId) {
+      navigate(`/processing/${analyze.task_id}`, {
+        replace: true,
+        state: { workspaceId, itemId },
+      })
+    }
+  }, [task, allTasks, taskId, navigate, workspaceId, itemId])
 
   const progress = task?.progress ?? 0
   const status = task?.status ?? 'PENDING'
