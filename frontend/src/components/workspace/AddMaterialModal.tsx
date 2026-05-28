@@ -8,7 +8,6 @@ import {
   FileText,
   FileVideo,
   Link2,
-  Settings2,
   Sparkles,
   X,
 } from 'lucide-react'
@@ -21,6 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { FEATURES_BY_SCOPE_V2, FEATURES_BY_TYPE, expandFeatureIds, type FeatureDef } from '@/lib/featuresToSteps'
+import { loadModelMemory, saveModelMemory, saveTextModel, saveVisionModel } from '@/lib/modelMemory'
 import type { SniffResult } from '@/services/workspaces'
 import {
   sniffUrl,
@@ -104,6 +104,126 @@ function getSniffTypes(sniffResult: SniffResult | null | undefined): ItemType[] 
   )
 }
 
+// ── R21.P2.v2: 任务旁 picker 组件 ─────────────────────────
+
+interface ModelPickerProps {
+  providerId: string
+  modelId: string
+  providers: Array<{ id: string; name: string }>
+  models: Array<{ id: string; name: string }>
+  loading?: boolean
+  onPickProvider: (id: string) => void
+  onPickModel: (id: string) => void
+}
+
+function TextModelPicker({ providerId, modelId, providers, models, loading, onPickProvider, onPickModel }: ModelPickerProps) {
+  return (
+    <div style={{ display: 'flex', gap: 8, marginTop: 6, marginBottom: 4 }}>
+      <select
+        className="field-input"
+        style={{ flex: 1 }}
+        value={providerId}
+        onChange={(e) => onPickProvider(e.target.value)}
+      >
+        <option value="">文本模型 Provider</option>
+        {providers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+      </select>
+      <select
+        className="field-input"
+        style={{ flex: 1 }}
+        value={modelId}
+        onChange={(e) => onPickModel(e.target.value)}
+        disabled={!providerId}
+      >
+        <option value="">{providerId ? '选择模型' : '请先选 Provider'}</option>
+        {loading ? <option value="" disabled>加载中…</option> : models.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+      </select>
+    </div>
+  )
+}
+
+function VisionModelPicker({ providerId, modelId, providers, models, loading, onPickProvider, onPickModel }: ModelPickerProps) {
+  return (
+    <div style={{ display: 'flex', gap: 8, marginTop: 6, marginBottom: 4 }}>
+      <select
+        className="field-input"
+        style={{ flex: 1 }}
+        value={providerId}
+        onChange={(e) => onPickProvider(e.target.value)}
+      >
+        <option value="">图片模型 Provider</option>
+        {providers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+      </select>
+      <select
+        className="field-input"
+        style={{ flex: 1 }}
+        value={modelId}
+        onChange={(e) => onPickModel(e.target.value)}
+        disabled={!providerId}
+      >
+        <option value="">{providerId ? '选择模型' : '请先选 Provider'}</option>
+        {loading ? <option value="" disabled>加载中…</option> : models.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+      </select>
+    </div>
+  )
+}
+
+function FrameModePicker({ params, onChange }: {
+  params: { frame_mode: 'AI 镜头分析' | '按秒截帧'; shot_frames: '2 帧 · 首+尾' | '3 帧 · 首+中+尾'; sec_per_frame: number; max_frames: number }
+  onChange: (p: { frame_mode: 'AI 镜头分析' | '按秒截帧'; shot_frames: '2 帧 · 首+尾' | '3 帧 · 首+中+尾'; sec_per_frame: number; max_frames: number }) => void
+}) {
+  return (
+    <div style={{ marginTop: 4, marginBottom: 4, padding: '8px 10px', background: 'var(--fill-1)', borderRadius: 8, fontSize: 12 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+          <input type="radio" name="frameMode" checked={params.frame_mode === 'AI 镜头分析'} onChange={() => onChange({ ...params, frame_mode: 'AI 镜头分析' })} />
+          AI 镜头分析
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+          <input type="radio" name="frameMode" checked={params.frame_mode === '按秒截帧'} onChange={() => onChange({ ...params, frame_mode: '按秒截帧' })} />
+          按秒截帧
+        </label>
+      </div>
+      {params.frame_mode === 'AI 镜头分析' ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ color: 'var(--ink-3)' }}>每镜头取</span>
+          <select
+            className="field-input"
+            style={{ width: 120 }}
+            value={params.shot_frames}
+            onChange={(e) => onChange({ ...params, shot_frames: e.target.value as typeof params.shot_frames })}
+          >
+            <option value="2 帧 · 首+尾">2 帧 · 首+尾</option>
+            <option value="3 帧 · 首+中+尾">3 帧 · 首+中+尾</option>
+          </select>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ color: 'var(--ink-3)' }}>间隔</span>
+          <input
+            type="number"
+            className="field-input"
+            style={{ width: 60 }}
+            min={1}
+            value={params.sec_per_frame}
+            onChange={(e) => onChange({ ...params, sec_per_frame: Number(e.target.value) })}
+          />
+          <span style={{ color: 'var(--ink-3)' }}>秒，最大</span>
+          <input
+            type="number"
+            className="field-input"
+            style={{ width: 60 }}
+            min={1}
+            value={params.max_frames}
+            onChange={(e) => onChange({ ...params, max_frames: Number(e.target.value) })}
+          />
+          <span style={{ color: 'var(--ink-3)' }}>帧</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── 组件 ──────────────────────────────────────────────────
 
 export function AddMaterialModal({
@@ -136,15 +256,33 @@ export function AddMaterialModal({
   const [bgOpen, setBgOpen] = useState(false)
   const [bgOverrides, setBgOverrides] = useState<Partial<WorkspaceBackground>>({})
 
-  // ── 模型选择（R21.P2 从细调挪到主界面）──
+  // ── 模型选择 + 截帧模式（R21.P2.v2：分散到任务旁）──
   const { providers, providerModels, fetchProviders, modelsLoading } = useProviderStore()
   const [textProviderId, setTextProviderId] = useState<string>('')
   const [textModelId, setTextModelId] = useState<string>('')
-  const [videoModelId, setVideoModelId] = useState<string>('')
+  const [visionProviderId, setVisionProviderId] = useState<string>('')
+  const [visionModelId, setVisionModelId] = useState<string>('')
+  const [framePromptParams, setFramePromptParams] = useState<{
+    frame_mode: 'AI 镜头分析' | '按秒截帧'
+    shot_frames: '2 帧 · 首+尾' | '3 帧 · 首+中+尾'
+    sec_per_frame: number
+    max_frames: number
+  }>({
+    frame_mode: 'AI 镜头分析',
+    shot_frames: '3 帧 · 首+中+尾',
+    sec_per_frame: 2,
+    max_frames: 120,
+  })
 
-  // ── 截帧模式（R21.P2 从细调挪到主界面）──
-  // 'scene' = AI 镜头分析（默认），'interval' = 按秒截帧
-  const [frameMode, setFrameMode] = useState<'scene' | 'interval'>('scene')
+  // ── R21.P2.v3: 高级选项（替代细调里的子字段）──
+  const [advOpts, setAdvOpts] = useState({
+    summary_depth: '详细' as string,
+    summary_template: 'concise' as string,
+    music_suno: true,
+    subtitle_with_ts: true,
+    speaker_diarize: false,
+  })
+  const setAdv = (patch: Partial<typeof advOpts>) => setAdvOpts((p) => ({ ...p, ...patch }))
 
   // ── 提交状态 ──
   const [submitting, setSubmitting] = useState(false)
@@ -200,7 +338,7 @@ export function AddMaterialModal({
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [open, urlValue])
 
-  // ── R21.P2: open 时拉 providers + 回填 models / frameMode ──
+  // ── R21.P2.v2: open 时拉 providers + 回填 models / framePromptParams ──
   useEffect(() => {
     if (!open) return
     if (providers.length === 0) fetchProviders()
@@ -209,23 +347,36 @@ export function AddMaterialModal({
   useEffect(() => {
     if (!open) return
     /* eslint-disable react-hooks/set-state-in-effect */
-    setTextModelId(initialStaged?.models?.text ?? '')
-    setVideoModelId(initialStaged?.models?.video ?? '')
-    // 从 staged 的 frame_prompt.frame_mode 回填
-    const stagedFramePrompt = (initialStaged?.tasks?.video?.frame_prompt ?? {}) as Record<string, unknown>
-    const stagedFrameMode = stagedFramePrompt.frame_mode
-    if (stagedFrameMode === '按秒截帧') setFrameMode('interval')
-    else setFrameMode('scene')
+    const mem = loadModelMemory()
+    setTextProviderId(initialStaged?.models?.textProviderId ?? mem.textProviderId ?? '')
+    setTextModelId(initialStaged?.models?.text ?? mem.textModelId ?? '')
+    setVisionProviderId(initialStaged?.models?.visionProviderId ?? mem.visionProviderId ?? '')
+    setVisionModelId(initialStaged?.models?.vision ?? mem.visionModelId ?? '')
+    // 从 staged 的 frame_prompt 回填
+    const stagedFp = (initialStaged?.tasks?.video?.frame_prompt ?? {}) as Record<string, unknown>
+    setFramePromptParams({
+      frame_mode: stagedFp.frame_mode === '按秒截帧' ? '按秒截帧' : 'AI 镜头分析',
+      shot_frames: stagedFp.shot_frames === '2 帧 · 首+尾' ? '2 帧 · 首+尾' : '3 帧 · 首+中+尾',
+      sec_per_frame: typeof stagedFp.sec_per_frame === 'number' ? stagedFp.sec_per_frame : 2,
+      max_frames: typeof stagedFp.max_frames === 'number' ? stagedFp.max_frames : 120,
+    })
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [open, initialStaged])
 
-  // 拉 text provider 的 models 列表（用户选定 provider 后触发）
+  // 拉 text/vision provider 的 models 列表（用户选定 provider 后触发）
   useEffect(() => {
     if (!open || !textProviderId) return
     if (!providerModels[textProviderId]) {
       useProviderStore.getState().fetchProviderModels(textProviderId)
     }
   }, [open, textProviderId, providerModels])
+
+  useEffect(() => {
+    if (!open || !visionProviderId) return
+    if (!providerModels[visionProviderId]) {
+      useProviderStore.getState().fetchProviderModels(visionProviderId)
+    }
+  }, [open, visionProviderId, providerModels])
 
   const enabledProviders = useMemo(
     () => providers.filter((p) => p.enabled && p.has_api_key),
@@ -235,7 +386,27 @@ export function AddMaterialModal({
     () => enabledProviders.filter((p) => (p.capabilities ?? []).includes('chat')),
     [enabledProviders],
   )
-  const textModels = textProviderId ? (providerModels[textProviderId] ?? []) : []
+  const textModels = useMemo(() => {
+    const all = textProviderId ? (providerModels[textProviderId] ?? []) : []
+    // R21.P2.v3: 按 capability 过滤 —— 有标签用标签，没标签排除 embedding/rerank
+    return all.filter((m) => {
+      if (m.capabilities?.length) return m.capabilities.some((c) => /chat|text|completion/i.test(c))
+      return !/embed|rerank/i.test(m.id)
+    })
+  }, [textProviderId, providerModels])
+  const visionProviders = useMemo(
+    () => enabledProviders.filter((p) => (p.capabilities ?? []).includes('vision')),
+    [enabledProviders],
+  )
+  const visionModels = useMemo(() => {
+    const all = visionProviderId ? (providerModels[visionProviderId] ?? []) : []
+    // R21.P2.v3: 按 capability 过滤 —— 有标签用标签，没标签用 id 启发式
+    return all.filter((m) => {
+      if (/embed|rerank/i.test(m.id)) return false
+      if (m.capabilities?.length) return m.capabilities.some((c) => /vision|image|multimodal/i.test(c))
+      return /vl|vision|gpt-4o|gemini.*pro|claude-3|claude-sonnet|qwen-vl|qwen2-vl|V[^.\d]/i.test(m.id) || /V$/.test(m.id)
+    })
+  }, [visionProviderId, providerModels])
 
   // ── 内部 URL 变化时 debounced 嗅探 ──
   const doSniff = useCallback(async (url: string) => {
@@ -382,26 +553,56 @@ export function AddMaterialModal({
             tasks.material_type = 'audio'
           }
 
-          // R21.P2: 写入主界面选的截帧模式（仅视频/视觉相关板块）
+          // R21.P2.v2: 写入截帧模式完整参数（仅视频/视觉相关板块）
           const isVideoLike = type === 'video' || summaryPath === 'visual_only' || summaryPath === 'av_combined'
-          if (isVideoLike) {
-            const fp = (tasks.frame_prompt ?? {}) as Record<string, unknown>
+          const visualAnalysisOn = features[type]?.['visual_analysis'] ?? false
+          if (isVideoLike && visualAnalysisOn) {
             tasks.frame_prompt = {
-              ...fp,
-              frame_mode: frameMode === 'interval' ? '按秒截帧' : 'AI 镜头分析',
+              ...(tasks.frame_prompt as Record<string, unknown> || {}),
+              on: true,
+              frame_mode: framePromptParams.frame_mode,
+              shot_frames: framePromptParams.shot_frames,
+              sec_per_frame: framePromptParams.sec_per_frame,
+              max_frames: framePromptParams.max_frames,
             }
           }
 
-          // R21.P2: 合并主界面选的模型，优先级 主界面 > initialStaged
+          // R21.P2.v2: 合并主界面选的模型，优先级 主界面 > initialStaged（不含 video）
           const mergedModels: Record<string, string> = { ...(initialStaged?.models ?? {}) }
           if (textModelId) mergedModels.text = textModelId
-          if (videoModelId) mergedModels.video = videoModelId
+          if (visionModelId) mergedModels.vision = visionModelId
+
+          // R21.P2.v3: 合并高级选项到 tasks
+          const enabledSet = new Set(enabledFeatures)
+          if (enabledSet.has('video_summary')) {
+            tasks.summary = { ...(tasks.summary as Record<string, unknown> || {}), summary_depth: advOpts.summary_depth }
+          }
+          if (enabledSet.has('transcribe_summary')) {
+            tasks.transcribe_summary = {
+              ...(tasks.transcribe_summary as Record<string, unknown> || {}),
+              summary_template: advOpts.summary_template,
+              speaker_diarize: advOpts.speaker_diarize,
+            }
+            if (enabledSet.has('subtitle_export')) {
+              tasks.subtitle_export = {
+                ...(tasks.subtitle_export as Record<string, unknown> || {}),
+                on: true,
+                include_timestamps: advOpts.subtitle_with_ts,
+              }
+            }
+          }
+          if (enabledSet.has('music_analysis')) {
+            tasks.music = { ...(tasks.music as Record<string, unknown> || {}), on: true, music_suno: advOpts.music_suno }
+          }
 
           await savePreflight(wsId, itemId, {
             background_overrides: effectiveBackground,
             models: mergedModels,
             tasks,
           })
+
+          // R21.P2.v2: 记忆本次选择到 localStorage
+          saveModelMemory({ textProviderId, textModelId, visionProviderId, visionModelId })
 
           // 4. startItemPipeline
           const { task_id } = await startItemPipeline(wsId, itemId)
@@ -470,6 +671,9 @@ export function AddMaterialModal({
     }
     return n
   }, [selectedTypes, features])
+
+  // R21.P2.v3: 高级选项可见性 —— 任一选中类型含对应 feature 即显示
+  const anyHas = (fid: string) => selectedTypes.some((t) => features[t]?.[fid])
 
   const sourceSummary = effectiveSniff?.title
     ? `${effectiveSniff.platform ?? '未知平台'} · ${effectiveSniff.title}`
@@ -702,6 +906,18 @@ export function AddMaterialModal({
                         )}
                       </div>
                     )}
+                    {/* R21.P2.v2: 综合笔记勾选时，下方显示文本模型选择 */}
+                    {synthesisOn && (
+                      <TextModelPicker
+                        providerId={textProviderId}
+                        modelId={textModelId}
+                        providers={textProviders}
+                        models={textModels}
+                        loading={modelsLoading[textProviderId]}
+                        onPickProvider={(id) => { setTextProviderId(id); setTextModelId(''); saveTextModel(id, '') }}
+                        onPickModel={(id) => { setTextModelId(id); saveTextModel(textProviderId, id) }}
+                      />
+                    )}
                     {/* 视频侧 */}
                     {videoSideFeats.length > 0 && (
                       <>
@@ -709,9 +925,28 @@ export function AddMaterialModal({
                         <div className="task-chips" style={{ marginBottom: 4 }}>
                           {videoSideFeats.map(renderChip)}
                         </div>
+                        {/* R21.P2.v2: 画面分析勾选时，下方显示图片模型 + 截帧模式 */}
+                        {visualOn && (
+                          <>
+                            <VisionModelPicker
+                              providerId={visionProviderId}
+                              modelId={visionModelId}
+                              providers={visionProviders}
+                              models={visionModels}
+                              loading={modelsLoading[visionProviderId]}
+                              onPickProvider={(id) => { setVisionProviderId(id); setVisionModelId(''); saveVisionModel(id, '') }}
+                              onPickModel={(id) => { setVisionModelId(id); saveVisionModel(visionProviderId, id) }}
+                            />
+                            <FrameModePicker
+                              params={framePromptParams}
+                              onChange={(p) => setFramePromptParams(p)}
+                            />
+                          </>
+                        )}
                       </>
                     )}
                     {/* 音频侧 */}
+                    {/* TODO(r21.P2): ASR 模型选择暂不暴露（方案 A），等用户反馈后再加引擎/模型下拉 */}
                     {audioSideFeats.length > 0 && (
                       <>
                         <div className="mono" style={{ fontSize: 9, color: 'var(--ink-4)', marginBottom: 3 }}>音频侧</div>
@@ -722,9 +957,40 @@ export function AddMaterialModal({
                     )}
                     {/* 非 av_combined 模式：直接渲染全部 chip */}
                     {!splitScopeFeats && (
-                      <div className="task-chips">
-                        {normalFeats.map(renderChip)}
-                      </div>
+                      <>
+                        <div className="task-chips">
+                          {normalFeats.map(renderChip)}
+                        </div>
+                        {/* R21.P2.v2: 非 av_combined 时也显示对应 picker */}
+                        {synthesisOn && (
+                          <TextModelPicker
+                            providerId={textProviderId}
+                            modelId={textModelId}
+                            providers={textProviders}
+                            models={textModels}
+                            loading={modelsLoading[textProviderId]}
+                            onPickProvider={(id) => { setTextProviderId(id); setTextModelId(''); saveTextModel(id, '') }}
+                            onPickModel={(id) => { setTextModelId(id); saveTextModel(textProviderId, id) }}
+                          />
+                        )}
+                        {visualOn && (
+                          <>
+                            <VisionModelPicker
+                              providerId={visionProviderId}
+                              modelId={visionModelId}
+                              providers={visionProviders}
+                              models={visionModels}
+                              loading={modelsLoading[visionProviderId]}
+                              onPickProvider={(id) => { setVisionProviderId(id); setVisionModelId(''); saveVisionModel(id, '') }}
+                              onPickModel={(id) => { setVisionModelId(id); saveVisionModel(visionProviderId, id) }}
+                            />
+                            <FrameModePicker
+                              params={framePromptParams}
+                              onChange={setFramePromptParams}
+                            />
+                          </>
+                        )}
+                      </>
                     )}
                   </div>
                 )
@@ -732,99 +998,84 @@ export function AddMaterialModal({
             </div>
           )}
 
-          {/* ⑤ 模型选择（R21.P2 从细调挪到主界面）*/}
-          <div className="m-section">
-            <div className="eyebrow" style={{ marginBottom: 10 }}>⑤ 模型选择 · 仅可选已配置 Provider</div>
-            {enabledProviders.length === 0 ? (
-              <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '8px 0' }}>
-                还没有可用的 provider，请先到「设置 → 模型」配置 API Key
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div>
-                  <div className="field-label">
-                    文本大模型 <span style={{ opacity: 0.5 }}>· 总结 / 章节 / 笔记</span>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <select
-                      className="field-input"
-                      style={{ flex: 1 }}
-                      value={textProviderId}
-                      onChange={(e) => { setTextProviderId(e.target.value); setTextModelId('') }}
-                    >
-                      <option value="">选择 Provider</option>
-                      {textProviders.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                    <select
-                      className="field-input"
-                      style={{ flex: 1 }}
-                      value={textModelId}
-                      onChange={(e) => setTextModelId(e.target.value)}
-                      disabled={!textProviderId}
-                    >
-                      <option value="">{textProviderId ? '选择模型' : '请先选 Provider'}</option>
-                      {modelsLoading[textProviderId] ? (
-                        <option value="" disabled>加载中…</option>
-                      ) : (
-                        textModels.map((m) => (
-                          <option key={m.id} value={m.id}>{m.name}</option>
-                        ))
-                      )}
-                    </select>
-                  </div>
-                </div>
-                {/* 视频大模型（仅 visual_only / av_combined 板块）*/}
-                {(analysisScope === 'visual_only' || analysisScope === 'av_combined') && (
+          {/* R21.P2.v3: 高级选项（替代细调）*/}
+          {(anyHas('video_summary') || anyHas('transcribe_summary') || anyHas('music_analysis')) && (
+            <details className="m-section" style={{ marginTop: 8 }}>
+              <summary style={{ cursor: 'pointer', fontSize: 13, color: 'var(--ink-2)', userSelect: 'none' }}>
+                高级选项（总结模板 / 字幕 / 音乐提示词）
+              </summary>
+              <div style={{ marginTop: 12, display: 'grid', gap: 12 }}>
+                {/* 总结深度 —— 视频文案总结 */}
+                {anyHas('video_summary') && (
                   <div>
-                    <div className="field-label">
-                      视频大模型 <span style={{ opacity: 0.5 }}>· 可选 · 整段视频直接分析路径</span>
+                    <div className="field-label">总结深度</div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {['简洁', '详细', '带画面引用'].map((v) => (
+                        <button key={v} type="button" className="task-chip"
+                          data-on={advOpts.summary_depth === v ? 'true' : 'false'}
+                          onClick={() => setAdv({ summary_depth: v })}
+                        >{v}</button>
+                      ))}
                     </div>
-                    <select
-                      className="field-input"
-                      style={{ width: '100%' }}
-                      value={videoModelId}
-                      onChange={(e) => setVideoModelId(e.target.value)}
-                    >
-                      <option value="">默认（不使用视频大模型，走截帧 + VLM 路径）</option>
-                      <option value="Gemini 1.5 Pro · Google">Gemini 1.5 Pro · Google</option>
-                      <option value="Qwen-VL-Max · 阿里">Qwen-VL-Max · 阿里</option>
-                      <option value="GPT-4o · OpenAI">GPT-4o · OpenAI</option>
-                    </select>
+                  </div>
+                )}
+                {/* 总结模板 —— 音频转写+总结 */}
+                {anyHas('transcribe_summary') && (
+                  <div>
+                    <div className="field-label">总结模板</div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {[
+                        { v: 'concise', l: '简洁摘要' },
+                        { v: 'detailed', l: '详细要点' },
+                        { v: 'quotes', l: '金句提取' },
+                        { v: 'meeting', l: '会议纪要' },
+                        { v: 'xhs', l: '小红书风格' },
+                        { v: 'longform', l: '公众号长文' },
+                        { v: 'lecture', l: '教学笔记' },
+                        { v: 'interview', l: '访谈整理' },
+                        { v: 'shownotes', l: '播客 shownotes' },
+                      ].map(({ v, l }) => (
+                        <button key={v} type="button" className="task-chip"
+                          data-on={advOpts.summary_template === v ? 'true' : 'false'}
+                          onClick={() => setAdv({ summary_template: v })}
+                        >{l}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* 字幕选项 —— 音频有字幕导出时 */}
+                {anyHas('subtitle_export') && (
+                  <div>
+                    <div className="field-label">字幕选项</div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--ink-2)', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={advOpts.subtitle_with_ts}
+                        onChange={(e) => setAdv({ subtitle_with_ts: e.target.checked })} />
+                      含时间轴（.srt）；取消则导出纯文本 .txt
+                    </label>
+                  </div>
+                )}
+                {/* 说话人音色 —— 音频有转写时 */}
+                {anyHas('transcribe_summary') && (
+                  <div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--ink-2)', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={advOpts.speaker_diarize}
+                        onChange={(e) => setAdv({ speaker_diarize: e.target.checked })} />
+                      区分说话人音色（声纹聚类 → 给 segment 加标签）
+                    </label>
+                  </div>
+                )}
+                {/* 音乐 Suno 提示词 */}
+                {anyHas('music_analysis') && (
+                  <div>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--ink-2)', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={advOpts.music_suno}
+                        onChange={(e) => setAdv({ music_suno: e.target.checked })} />
+                      同时生成 Suno / Udio 格式提示词
+                    </label>
                   </div>
                 )}
               </div>
-            )}
-          </div>
-
-          {/* ⑥ 截帧模式（仅 visual_only / av_combined 板块）*/}
-          {(analysisScope === 'visual_only' || analysisScope === 'av_combined') && (
-            <div className="m-section">
-              <div className="eyebrow" style={{ marginBottom: 10 }}>⑥ 截帧模式</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <button
-                  type="button"
-                  className="type-card"
-                  data-active={frameMode === 'scene' ? 'true' : 'false'}
-                  onClick={() => setFrameMode('scene')}
-                  style={{ minHeight: 64 }}
-                >
-                  <div className="tc-l">AI 镜头分析</div>
-                  <div className="mono tc-en">PySceneDetect · 镜头边界自动切帧（默认）</div>
-                </button>
-                <button
-                  type="button"
-                  className="type-card"
-                  data-active={frameMode === 'interval' ? 'true' : 'false'}
-                  onClick={() => setFrameMode('interval')}
-                  style={{ minHeight: 64 }}
-                >
-                  <div className="tc-l">按秒截帧</div>
-                  <div className="mono tc-en">固定间隔抽帧 · 细节可在「细调」里调</div>
-                </button>
-              </div>
-            </div>
+            </details>
           )}
 
           {/* ④ 背景信息 */}
@@ -968,15 +1219,6 @@ export function AddMaterialModal({
               : `已勾选 ${enabledCount} 项 · ${selectedTypes.length} 种素材类型`}
           </span>
           <div className="modal-actions">
-            <button
-              type="button"
-              className="btn"
-              onClick={handleFineTune}
-              disabled={!hasContent || !onFineTune}
-            >
-              <Settings2 size={14} />
-              细调…
-            </button>
             <button
               type="button"
               className="btn btn-primary"

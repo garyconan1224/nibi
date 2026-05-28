@@ -18,6 +18,11 @@ vi.mock('@/services/workspaces', () => ({
   startItemPipeline: vi.fn(),
 }))
 
+vi.mock('@/lib/modelMemory', () => ({
+  loadModelMemory: vi.fn(() => ({ textProviderId: '', textModelId: '', visionProviderId: '', visionModelId: '' })),
+  saveModelMemory: vi.fn(),
+}))
+
 describe('AddMaterialModal', () => {
   it('sniff 返回 image+text 两种类型时应默认全选', () => {
     render(
@@ -280,5 +285,109 @@ describe('AddMaterialModal', () => {
     // 综合笔记应恢复默认勾选
     const synthesisChip = screen.getByText(/综合笔记/).closest('button')!
     expect(synthesisChip.dataset.on).toBe('true')
+  })
+
+  // ── R21.P2.v2: 任务旁模型/截帧 picker ──
+
+  it('av_combined 勾选画面分析 → 显示图片模型下拉 + 截帧模式', () => {
+    render(
+      <AddMaterialModal
+        open={true}
+        onOpenChange={vi.fn()}
+        workspaceIds={['ws-1']}
+        sniffResult={{
+          primary_type: 'video',
+          possible_types: ['video', 'audio'],
+          platform: 'bilibili',
+          title: 'test',
+          thumbnail: null,
+          content_type_header: null,
+        }}
+      />,
+    )
+
+    // 画面分析默认勾上 → picker 出现
+    const visualChip = screen.getByText('画面分析').closest('button')!
+    expect(visualChip.dataset.on).toBe('true')
+    // 图片模型 provider 下拉
+    expect(screen.getByDisplayValue('图片模型 Provider')).toBeTruthy()
+    // 截帧模式 radio
+    expect(screen.getByLabelText('AI 镜头分析')).toBeTruthy()
+    expect(screen.getByLabelText('按秒截帧')).toBeTruthy()
+  })
+
+  it('av_combined 不勾画面分析 → 图片模型下拉 + 截帧模式消失', () => {
+    render(
+      <AddMaterialModal
+        open={true}
+        onOpenChange={vi.fn()}
+        workspaceIds={['ws-1']}
+        sniffResult={{
+          primary_type: 'video',
+          possible_types: ['video', 'audio'],
+          platform: 'bilibili',
+          title: 'test',
+          thumbnail: null,
+          content_type_header: null,
+        }}
+      />,
+    )
+
+    // 先取消画面分析
+    const visualChip = screen.getByText('画面分析').closest('button')!
+    fireEvent.click(visualChip)
+    expect(visualChip.dataset.on).toBe('false')
+
+    // 图片模型 provider 下拉应不存在
+    expect(screen.queryByDisplayValue('图片模型 Provider')).toBeNull()
+    expect(screen.queryByLabelText('AI 镜头分析')).toBeNull()
+  })
+
+  it('av_combined 勾选综合笔记 → 显示文本模型下拉', () => {
+    render(
+      <AddMaterialModal
+        open={true}
+        onOpenChange={vi.fn()}
+        workspaceIds={['ws-1']}
+        sniffResult={{
+          primary_type: 'video',
+          possible_types: ['video', 'audio'],
+          platform: 'bilibili',
+          title: 'test',
+          thumbnail: null,
+          content_type_header: null,
+        }}
+      />,
+    )
+
+    // 综合笔记默认勾上 → 文本模型下拉出现
+    expect(screen.getByDisplayValue('文本模型 Provider')).toBeTruthy()
+
+    // 取消综合笔记 → 下拉消失
+    const synthesisChip = screen.getByText(/综合笔记/).closest('button')!
+    fireEvent.click(synthesisChip)
+    expect(screen.queryByDisplayValue('文本模型 Provider')).toBeNull()
+  })
+
+  it('sniff 单一 image 类型 → 无视频/音频 chip → 无模型 picker', () => {
+    render(
+      <AddMaterialModal
+        open={true}
+        onOpenChange={vi.fn()}
+        workspaceIds={['ws-1']}
+        sniffResult={{
+          primary_type: 'image',
+          possible_types: ['image'],
+          platform: null,
+          title: null,
+          thumbnail: null,
+          content_type_header: null,
+        }}
+      />,
+    )
+
+    // image 类型没有综合笔记/画面分析 chip → 无 picker
+    expect(screen.queryByDisplayValue('文本模型 Provider')).toBeNull()
+    expect(screen.queryByDisplayValue('图片模型 Provider')).toBeNull()
   })
 })
