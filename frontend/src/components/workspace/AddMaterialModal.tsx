@@ -34,6 +34,7 @@ import type {
   ItemType,
   WorkspaceBackground,
 } from '@/types/workspace'
+import { useProviderStore } from '@/store/providerStore'
 
 const TYPE_META: Record<ItemType, { icon: typeof FileVideo; label: string; sub: string }> = {
   video: { icon: FileVideo, label: '视频', sub: 'Video · URL/文件' },
@@ -135,6 +136,16 @@ export function AddMaterialModal({
   const [bgOpen, setBgOpen] = useState(false)
   const [bgOverrides, setBgOverrides] = useState<Partial<WorkspaceBackground>>({})
 
+  // ── 模型选择（R21.P2 从细调挪到主界面）──
+  const { providers, providerModels, fetchProviders, modelsLoading } = useProviderStore()
+  const [textProviderId, setTextProviderId] = useState<string>('')
+  const [textModelId, setTextModelId] = useState<string>('')
+  const [videoModelId, setVideoModelId] = useState<string>('')
+
+  // ── 截帧模式（R21.P2 从细调挪到主界面）──
+  // 'scene' = AI 镜头分析（默认），'interval' = 按秒截帧
+  const [frameMode, setFrameMode] = useState<'scene' | 'interval'>('scene')
+
   // ── 提交状态 ──
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -188,6 +199,43 @@ export function AddMaterialModal({
     setInternalSniff(null)
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [open, urlValue])
+
+  // ── R21.P2: open 时拉 providers + 回填 models / frameMode ──
+  useEffect(() => {
+    if (!open) return
+    if (providers.length === 0) fetchProviders()
+  }, [open, providers.length, fetchProviders])
+
+  useEffect(() => {
+    if (!open) return
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setTextModelId(initialStaged?.models?.text ?? '')
+    setVideoModelId(initialStaged?.models?.video ?? '')
+    // 从 staged 的 frame_prompt.frame_mode 回填
+    const stagedFramePrompt = (initialStaged?.tasks?.video?.frame_prompt ?? {}) as Record<string, unknown>
+    const stagedFrameMode = stagedFramePrompt.frame_mode
+    if (stagedFrameMode === '按秒截帧') setFrameMode('interval')
+    else setFrameMode('scene')
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [open, initialStaged])
+
+  // 拉 text provider 的 models 列表（用户选定 provider 后触发）
+  useEffect(() => {
+    if (!open || !textProviderId) return
+    if (!providerModels[textProviderId]) {
+      useProviderStore.getState().fetchProviderModels(textProviderId)
+    }
+  }, [open, textProviderId, providerModels])
+
+  const enabledProviders = useMemo(
+    () => providers.filter((p) => p.enabled && p.has_api_key),
+    [providers],
+  )
+  const textProviders = useMemo(
+    () => enabledProviders.filter((p) => (p.capabilities ?? []).includes('chat')),
+    [enabledProviders],
+  )
+  const textModels = textProviderId ? (providerModels[textProviderId] ?? []) : []
 
   // ── 内部 URL 变化时 debounced 嗅探 ──
   const doSniff = useCallback(async (url: string) => {
@@ -333,9 +381,25 @@ export function AddMaterialModal({
           } else if (summaryPath === 'audio_only') {
             tasks.material_type = 'audio'
           }
+
+          // R21.P2: 写入主界面选的截帧模式（仅视频/视觉相关板块）
+          const isVideoLike = type === 'video' || summaryPath === 'visual_only' || summaryPath === 'av_combined'
+          if (isVideoLike) {
+            const fp = (tasks.frame_prompt ?? {}) as Record<string, unknown>
+            tasks.frame_prompt = {
+              ...fp,
+              frame_mode: frameMode === 'interval' ? '按秒截帧' : 'AI 镜头分析',
+            }
+          }
+
+          // R21.P2: 合并主界面选的模型，优先级 主界面 > initialStaged
+          const mergedModels: Record<string, string> = { ...(initialStaged?.models ?? {}) }
+          if (textModelId) mergedModels.text = textModelId
+          if (videoModelId) mergedModels.video = videoModelId
+
           await savePreflight(wsId, itemId, {
             background_overrides: effectiveBackground,
-            models: initialStaged?.models ?? {},
+            models: mergedModels,
             tasks,
           })
 
@@ -665,6 +729,101 @@ export function AddMaterialModal({
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {/* ⑤ 模型选择（R21.P2 从细调挪到主界面）*/}
+          <div className="m-section">
+            <div className="eyebrow" style={{ marginBottom: 10 }}>⑤ 模型选择 · 仅可选已配置 Provider</div>
+            {enabledProviders.length === 0 ? (
+              <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '8px 0' }}>
+                还没有可用的 provider，请先到「设置 → 模型」配置 API Key
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div>
+                  <div className="field-label">
+                    文本大模型 <span style={{ opacity: 0.5 }}>· 总结 / 章节 / 笔记</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <select
+                      className="field-input"
+                      style={{ flex: 1 }}
+                      value={textProviderId}
+                      onChange={(e) => { setTextProviderId(e.target.value); setTextModelId('') }}
+                    >
+                      <option value="">选择 Provider</option>
+                      {textProviders.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                    <select
+                      className="field-input"
+                      style={{ flex: 1 }}
+                      value={textModelId}
+                      onChange={(e) => setTextModelId(e.target.value)}
+                      disabled={!textProviderId}
+                    >
+                      <option value="">{textProviderId ? '选择模型' : '请先选 Provider'}</option>
+                      {modelsLoading[textProviderId] ? (
+                        <option value="" disabled>加载中…</option>
+                      ) : (
+                        textModels.map((m) => (
+                          <option key={m.id} value={m.id}>{m.name}</option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+                </div>
+                {/* 视频大模型（仅 visual_only / av_combined 板块）*/}
+                {(analysisScope === 'visual_only' || analysisScope === 'av_combined') && (
+                  <div>
+                    <div className="field-label">
+                      视频大模型 <span style={{ opacity: 0.5 }}>· 可选 · 整段视频直接分析路径</span>
+                    </div>
+                    <select
+                      className="field-input"
+                      style={{ width: '100%' }}
+                      value={videoModelId}
+                      onChange={(e) => setVideoModelId(e.target.value)}
+                    >
+                      <option value="">默认（不使用视频大模型，走截帧 + VLM 路径）</option>
+                      <option value="Gemini 1.5 Pro · Google">Gemini 1.5 Pro · Google</option>
+                      <option value="Qwen-VL-Max · 阿里">Qwen-VL-Max · 阿里</option>
+                      <option value="GPT-4o · OpenAI">GPT-4o · OpenAI</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ⑥ 截帧模式（仅 visual_only / av_combined 板块）*/}
+          {(analysisScope === 'visual_only' || analysisScope === 'av_combined') && (
+            <div className="m-section">
+              <div className="eyebrow" style={{ marginBottom: 10 }}>⑥ 截帧模式</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <button
+                  type="button"
+                  className="type-card"
+                  data-active={frameMode === 'scene' ? 'true' : 'false'}
+                  onClick={() => setFrameMode('scene')}
+                  style={{ minHeight: 64 }}
+                >
+                  <div className="tc-l">AI 镜头分析</div>
+                  <div className="mono tc-en">PySceneDetect · 镜头边界自动切帧（默认）</div>
+                </button>
+                <button
+                  type="button"
+                  className="type-card"
+                  data-active={frameMode === 'interval' ? 'true' : 'false'}
+                  onClick={() => setFrameMode('interval')}
+                  style={{ minHeight: 64 }}
+                >
+                  <div className="tc-l">按秒截帧</div>
+                  <div className="mono tc-en">固定间隔抽帧 · 细节可在「细调」里调</div>
+                </button>
+              </div>
             </div>
           )}
 

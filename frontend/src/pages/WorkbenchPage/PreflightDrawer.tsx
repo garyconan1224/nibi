@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, ArrowRight, Loader2, Settings, Check } from 'lucide-react'
+import { X, ArrowRight, Loader2, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { useProviderStore } from '@/store/providerStore'
 import {
@@ -113,7 +113,8 @@ export function PreflightDrawer({
   onCreated,
 }: PreflightDrawerProps) {
   // ── Old state (kept for R8.2-R8.6 old ad-hoc sections) ──
-  const [textProviderId, setTextProviderId] = useState('')
+  // R21.P2: textProviderId 已无 UI 入口，仅保留 setter 为 reset 兼容
+  const [, setTextProviderId] = useState('')
   const [textModelId, setTextModelId] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const navigate = useNavigate()
@@ -141,7 +142,8 @@ export function PreflightDrawer({
 
   const sc = stagedConfig
 
-  const { providers, providerModels, fetchProviders, modelsLoading } = useProviderStore()
+  // R21.P2: 仍保留 fetchProviders 用于回填 sc.models 兼容；providerModels 由主界面拉取
+  const { providers, fetchProviders } = useProviderStore()
   useEffect(() => {
     if (open && providers.length === 0) fetchProviders()
   }, [open, providers.length, fetchProviders])
@@ -256,12 +258,8 @@ export function PreflightDrawer({
   }, [open])
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const enabledProviders = providers.filter((p) => p.enabled && p.has_api_key)
-  const textProviders = useMemo(
-    () => enabledProviders.filter((p) => (p.capabilities ?? []).includes('chat')),
-    [enabledProviders],
-  )
-  const textModels = textProviderId ? (providerModels[textProviderId] ?? []) : []
+  // R21.P2: Section 02 模型选择已迁至「添加素材」主界面，
+  // enabledProviders/textProviders/textModels/modelsLoading 已废弃
 
   const normalizeItemType = (type: string): ItemType => ITEM_TYPE_ALIASES[type] ?? (type as ItemType)
 
@@ -492,55 +490,10 @@ export function PreflightDrawer({
             </PFField>
           </PFSection>
 
-          {/* ── Section 02: 模型选择 ── */}
-          <PFSection num="02" title="模型选择" sub="Models · 仅可选已配置项" extra={
-            <button className="btn btn-ghost" style={{ height: 26, padding: '0 10px', fontSize: 11 }}>
-              <Settings size={11} />
-              管理模型
-            </button>
-          }>
-            {enabledProviders.length === 0 ? (
-              <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '8px 0' }}>
-                还没有可用的 provider，请先去设置页面添加
-              </div>
-            ) : (
-              <>
-                <PFField label="文本大模型" hint="LLM · 总结 / 归纳 / 对话">
-                  <div className="pf-model-row">
-                    <select value={textProviderId} onChange={(e) => { setTextProviderId(e.target.value); setTextModelId('') }}>
-                      <option value="">选择 provider</option>
-                      {textProviders.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                    <select value={textModelId} onChange={(e) => setTextModelId(e.target.value)} disabled={!textProviderId}>
-                      <option value="">选择模型</option>
-                      {modelsLoading[textProviderId] ? (
-                        <option value="" disabled>加载中…</option>
-                      ) : (
-                        textModels.map((m) => (
-                          <option key={m.id} value={m.id}>{m.name}</option>
-                        ))
-                      )}
-                    </select>
-                  </div>
-                </PFField>
-                {(kind === 'video' && (effState.summary as Record<string, unknown>)?.on && (effState.summary as Record<string, unknown>)?.summary_path === '视频模型直接分析') && (
-                  <PFField label="视频大模型" hint="路径 3 · 整段视频直送">
-                    <select className="pf-sel" value={models.video} onChange={e => setModels(s => ({ ...s, video: e.target.value }))}>
-                      <option value="">默认</option>
-                      <option value="Gemini 1.5 Pro · Google">Gemini 1.5 Pro · Google</option>
-                      <option value="Qwen-VL-Max · 阿里">Qwen-VL-Max · 阿里</option>
-                      <option value="GPT-4o · OpenAI">GPT-4o · OpenAI</option>
-                    </select>
-                  </PFField>
-                )}
-              </>
-            )}
-          </PFSection>
+          {/* Section 02 模型选择已迁至「添加素材」主界面（R21.P2）*/}
 
-          {/* ── Section 03: 任务勾选 ── */}
-          <PFSection num="03" title="任务勾选" sub={`Tasks · 已选 ${enabledCount} / ${groups.length} · 依赖级联自动锁定`}>
+          {/* ── Section 02: 任务勾选 ── */}
+          <PFSection num="02" title="任务勾选" sub={`Tasks · 已选 ${enabledCount} / ${groups.length} · 依赖级联自动锁定`}>
             <PresetBar current={activePreset} onPick={applyPreset} />
             <div style={{ height: 1, background: 'var(--line)', margin: '4px 0' }} />
             <div style={{ display: 'grid', gap: 10 }}>
