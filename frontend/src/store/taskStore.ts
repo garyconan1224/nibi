@@ -54,6 +54,22 @@ export const useTaskStore = create<TaskStoreState>()(
           const mergedIncoming = visibleIncoming.map((t) => {
             const existing = existingById.get(t.task_id)
             if (!existing) return t
+
+            // last-writer-wins：轮询数据若比本地旧，且本地状态更"前进"，保留本地
+            const existingTs = new Date(existing.updated_at || 0).getTime()
+            const incomingTs = new Date(t.updated_at || 0).getTime()
+            if (incomingTs < existingTs) {
+              // progress 不能倒退
+              if (t.progress !== undefined && t.progress < (existing.progress ?? 0)) {
+                return { ...existing, result: existing.result, log: existing.log }
+              }
+              // status 不能从 SUCCESS/FAILED 退回 RUNNING/PENDING
+              const higherStatus = new Set(['SUCCESS', 'FAILED', 'CANCELLED'])
+              if (higherStatus.has(existing.status) && !higherStatus.has(t.status)) {
+                return { ...existing, result: existing.result, log: existing.log }
+              }
+            }
+
             return {
               ...existing,
               ...t,

@@ -152,6 +152,32 @@ describe('taskStore smoke tests', () => {
     expect(t.progress).toBe(1.0)
   })
 
+  it('setTasks: last-writer-wins —— 滞后轮询不覆盖 SSE 的 SUCCESS', () => {
+    // 模拟 SSE 先把 task 更新为 SUCCESS 100%（updated_at 较晚）
+    useTaskStore.getState().addTask(
+      makeTask({
+        task_id: 't-sse-success',
+        status: 'SUCCESS',
+        progress: 1.0,
+        updated_at: '2026-05-27T10:00:00Z',
+      }),
+    )
+
+    // 模拟轮询返回旧数据（updated_at 更早，status=RUNNING）
+    useTaskStore.getState().setTasks([
+      makeTask({
+        task_id: 't-sse-success',
+        status: 'RUNNING',
+        progress: 0.5,
+        updated_at: '2026-05-27T09:00:00Z',
+      }),
+    ])
+
+    const t = useTaskStore.getState().getTask('t-sse-success')!
+    expect(t.status).toBe('SUCCESS')
+    expect(t.progress).toBe(1.0)
+  })
+
   it('updateTask: last-writer-wins-by-timestamp —— 轮询更新 updated_at 更晚时正常写入', () => {
     // 模拟 SSE 先写 RUNNING 50%
     useTaskStore.getState().addTask(
