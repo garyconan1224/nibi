@@ -41,11 +41,13 @@ describe('AddMaterialModal', () => {
       />,
     )
 
-    const cards = screen.getAllByRole('button', { name: /图片|文字/ })
-    expect(cards).toHaveLength(2)
-    for (const card of cards) {
-      expect(card.dataset.active).toBe('true')
-    }
+    // ① 区域：图片和文字类型卡都应该 active
+    const imageCard = screen.getByRole('button', { name: /^图片/ })
+    const textCard = screen.getByRole('button', { name: /^文字/ })
+    expect(imageCard.dataset.active).toBe('true')
+    expect(textCard.dataset.active).toBe('true')
+    // 图片采集模式应显示
+    expect(screen.getByText('图片采集模式')).toBeTruthy()
   })
 
   it('sniff 返回单一类型时 locked 单选', () => {
@@ -316,7 +318,7 @@ describe('AddMaterialModal', () => {
     expect(screen.getByLabelText('按秒截帧')).toBeTruthy()
   })
 
-  it('av_combined 不勾画面分析 → 图片模型下拉 + 截帧模式消失', () => {
+  it('av_combined 不勾画面分析 → 图片模型下拉消失', () => {
     render(
       <AddMaterialModal
         open={true}
@@ -340,7 +342,8 @@ describe('AddMaterialModal', () => {
 
     // 图片模型 provider 下拉应不存在
     expect(screen.queryByDisplayValue('图片模型 Provider')).toBeNull()
-    expect(screen.queryByLabelText('AI 镜头分析')).toBeNull()
+    // 截帧模式仍在③-b 视频用途模式的复刻模式下显示，不受影响
+    expect(screen.getByLabelText('AI 镜头分析')).toBeTruthy()
   })
 
   it('av_combined 勾选综合笔记 → 显示文本模型下拉', () => {
