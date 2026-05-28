@@ -101,6 +101,7 @@ export interface ItemAddRequest {
 
 /** 保存前置配置请求体 */
 export interface PreflightSaveRequest {
+  intent?: string
   background_overrides?: Partial<WorkspaceBackground>
   models?: PreflightConfig['models']
   tasks?: PreflightConfig['tasks']

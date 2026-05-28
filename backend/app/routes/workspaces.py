@@ -333,6 +333,7 @@ class ItemAddRequest(BaseModel):
 class PreflightSaveRequest(BaseModel):
     """前置配置保存请求体（设计文档第 4 章）。"""
 
+    intent: str = Field(default="", description='"learning" | "replica" | ""')
     background_overrides: Dict[str, Any] = Field(default_factory=dict)
     models: Dict[str, str] = Field(
         default_factory=dict,
@@ -1315,6 +1316,7 @@ def save_preflight(
         raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
     target = _find_item(rec, item_id)
     target.preflight = PreflightConfig(
+        intent=req.intent,
         background_overrides=req.background_overrides,
         models=req.models,
         tasks=req.tasks,
