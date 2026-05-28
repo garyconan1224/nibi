@@ -1,7 +1,7 @@
 ---
 phase: R21.P3.S1
 title: AddMaterialModal 重构 —— 拆「采集参数」/ 视频用途模式 / 链接预填背景
-status: ready
+status: done
 owner: 待定（建议 Opus，涉及前端结构性改动 + 后端新增 link-preview）
 estimated_hours: 6-9
 depends_on:
@@ -117,14 +117,14 @@ user_source: 2026-05-28 用户第三轮反馈（结果导向重构）
 
 ## 验收标准
 
-- [ ] AddMaterialModal 不再出现「总结模板」chip 行
-- [ ] AddMaterialModal 不再出现「背景信息」字段，取而代之是「识别用背景」
-- [ ] 文字素材添加时跳过参数页
-- [ ] 图片素材必须选「复刻 or OCR」其一才能提交
-- [ ] 视频素材必须选「学习 or 复刻」其一，子参数随之切换
-- [ ] B 站 / YouTube / 通用网页链接粘贴后能自动预填识别用背景
-- [ ] 全部新增/改动单测通过
-- [ ] 后端老 API 兼容：旧前端调用（不带 videoIntent / imageMode）后端走默认（视频→复刻、图片→OCR），不报错
+- [x] AddMaterialModal 不再出现「总结模板」chip 行
+- [x] AddMaterialModal 不再出现「背景信息」字段，取而代之是「识别用背景」
+- [x] 文字素材添加时跳过参数页
+- [x] 图片素材必须选「复刻 or OCR」其一才能提交
+- [x] 视频素材必须选「学习 or 复刻」其一，子参数随之切换
+- [x] B 站 / YouTube / 通用网页链接粘贴后能自动预填识别用背景
+- [x] 全部新增/改动单测通过
+- [x] 后端老 API 兼容：旧前端调用（不带 videoIntent / imageMode）后端走默认（视频→复刻、图片→OCR），不报错
 
 ## 不在本期范围（明确推到 S2/S3）
 
