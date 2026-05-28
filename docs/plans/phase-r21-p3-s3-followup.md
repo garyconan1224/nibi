@@ -1,11 +1,16 @@
 ---
 name: phase-r21-p3-s3-followup
 title: R21.P3.S3 收尾 — 学习视频补图 intent 链路修复 + av_combined 补图入口
-status: ready
+status: done
 owner: mimo 2.5pro
 branch: fix/r21-p3-s3-followup
 depends_on: 已 merge 的 R21 主体（A1-A6 + B1-B3）+ R21.P3.S3
 created_date: 2026-05-29
+completed_date: 2026-05-29
+commits:
+  - 0cf1e76
+  - ef633de
+  - 09563e7
 ---
 
 # R21.P3.S3 收尾计划（交给 mimo 2.5pro 执行）
