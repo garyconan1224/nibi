@@ -235,6 +235,7 @@ export function AddMaterialModal({
   onAdded,
   onFineTune,
 }: AddMaterialModalProps) {
+  void onFineTune // 保留 prop 供 Composer 调用，当前 modal 内未直接使用
   const navigate = useNavigate()
   // ── 类型选择 ──
   const propInitial = useMemo(() => resolveInitialTypes(sniffResult), [sniffResult])
@@ -677,23 +678,6 @@ export function AddMaterialModal({
     } finally {
       setSubmitting(false)
     }
-  }
-
-  // ── 细调 ──
-  const handleFineTune = () => {
-    const staged: StagedConfig = {
-      types: selectedTypes,
-      features,
-      tasks: initialStaged?.tasks,
-      models: initialStaged?.models,
-      background: {},
-      workspaceIds,
-      urlValue: effectiveUrl,
-      analysisScope: showScopeCards ? analysisScope : undefined,
-      videoIntent,
-      imageMode,
-    }
-    onFineTune?.(staged)
   }
 
   // ── 派生值 ──

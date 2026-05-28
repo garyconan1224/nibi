@@ -1,5 +1,7 @@
 /** 前端 link preview fetcher — 调用后端 GET /link-preview */
 
+import { http } from './client'
+
 export interface LinkPreviewResult {
   title: string | null
   description: string | null
@@ -8,9 +10,10 @@ export interface LinkPreviewResult {
 }
 
 export async function fetchLinkPreview(url: string): Promise<LinkPreviewResult> {
-  const resp = await fetch(`/link-preview?url=${encodeURIComponent(url)}`)
-  if (!resp.ok) {
+  try {
+    const { data } = await http.get<LinkPreviewResult>('/link-preview', { params: { url } })
+    return data
+  } catch {
     return { title: null, description: null, image_url: null, source: 'fallback' }
   }
-  return resp.json()
 }
