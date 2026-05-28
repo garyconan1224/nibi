@@ -1219,13 +1219,24 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             capture_params=capture_params,
         )
 
+        _last_logged_pct = -1.0
         while not state.finished:
             if runner.is_cancel_requested(task_id):
                 break
             snaps = state.snapshot()
             if snaps:
                 avg = sum(float(s["percent"]) for s in snaps) / max(len(snaps), 1) / 100.0
-                runner.set_progress(task_id, min(0.85, 0.50 + avg * 0.35), "视觉帧分析中...")
+                cur_pct = min(0.85, 0.50 + avg * 0.35)
+                runner.set_progress(task_id, cur_pct, "视觉帧分析中...")
+                # 每 5% 或首尾打一条帧级日志，避免刷屏
+                if cur_pct - _last_logged_pct >= 0.05 or _last_logged_pct < 0:
+                    _last_logged_pct = cur_pct
+                    for s in snaps:
+                        if s.get("total_frames", 0) > 0:
+                            runner.append_log(
+                                task_id,
+                                f"🎬 截帧进度：{s['analyzed_frames']}/{s['total_frames']} 帧 ({s['percent']:.1f}%)",
+                            )
             time.sleep(0.2)
 
         # 收集分析产出的 markdown 文件
