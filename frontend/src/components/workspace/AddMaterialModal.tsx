@@ -631,6 +631,7 @@ export function AddMaterialModal({
           }
 
           await savePreflight(wsId, itemId, {
+            intent: type === 'video' ? videoIntent : undefined,
             background_overrides: effectiveBackground,
             models: mergedModels,
             tasks,

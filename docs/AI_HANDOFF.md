@@ -1,21 +1,24 @@
 # AI Handoff
 
-Last updated: 2026-05-25（**当前阶段 = Phase R12 merge 前收口**）
+Last updated: 2026-05-29（**当前阶段 = R21.P3.S3 followup 待 merge；下一步音视频端到端打通**）
 
 ---
 
-## 🔴 当前状态（2026-05-25）
+## 🔴 当前状态（2026-05-29）
 
-**Phase R12 已在 `feat/phase-r12-processing-page-replica` 完成并通过验证；等待用户授权本地 merge 到 `main`。不 push origin。**
+**R14~R21 全系列已合入 main；当前分支 `fix/r21-p3-s3-followup` 的 R21.P3.S3 followup 已 `status: done`，待 merge 进 main。不 push origin。**
 
-- R0~R6：Composer 瘦身、AddMaterialModal 4 步合一、单 URL 多类型循环入队、PreflightDrawer 接管细粒度参数、端到端冒烟、文档同步均已完成。
-- R7：输入流统一收尾，包含单 URL 多类型默认全勾、Composer URL modal 简化、PreflightDrawer stage 模式、Hero 文案精简。
-- R8：PreflightDrawer Remix 复刻，包含 media kind tabs、背景 5 字段、任务卡片、级联锁定、footer 状态 pill、R8 tasks payload 序列化。
-- R10：平台 URL 音频任务改走 yt-dlp bestaudio；FloatingTaskQueue v2 已补视觉骨架、取消、重试、FAILED 本地隐藏、批量按钮、当前任务高亮。
-- R11：设计稿同步 canonicalize 已合入 local main（`7ec9914`）。
-- R12：ProcessingPage 1:1 复刻已完成：真实标题/封面/stats、step-stream 日志、系统资源卡、任务侧栏卡。
-- R12 验证：`.venv/bin/python -m pytest tests/backend -q` 320 passed / 2 skipped；`pnpm test --run` 47 passed；`pnpm build` 通过；R12 touched files targeted eslint 通过。
-- `pnpm lint` 全量仍有 47 errors / 1 warning，属于项目存量 lint 基线，不在 R12 touched files。
+- R10~R13.6：输入层重构 / ProcessingPage 1:1 复刻 / 元数据贯通已全部合入。
+- R14~R16：多类型 dedup UX / early-metadata / ProcessingPage 音频适配 ✅
+- R17：chip 重构，引入 av_synthesis「综合笔记」chip ✅
+- R18 / R18.1：PreflightDrawer Remix 复刻 + 本地 ASR + 失败弹窗 ✅
+- R19 / R19d：av_synthesis 图文笔记 pipeline + Markdown 导出 + export endpoint ✅
+- R21.A1~A6 + B1~B3：2026-05-27 用户 11 条反馈中的 9 条（状态同步 6 bug + 行为收口 3 项）✅
+- R21.P2 / P2.v3：模型选择挪到主界面 + capability 过滤 ✅
+- R21.P3.S1 / S2 / S3：添加素材拆参数 / 多版本总结 SummariesTab / 对比 + 学习视频补图 ✅
+- R21.P3.S3 followup（当前分支）：preflight 顶层 intent 链路修复 + av_combined 结果页补图入口，done 待 merge。
+
+**下一步方向（用户 2026-05-29 决议）**：先把音频 + 视频从输入链接 → 任务 → 落地页完整端到端打通，确保音视频闭环到位，再做文字 / 图片深化。
 
 ---
 
@@ -102,11 +105,11 @@ git branch --show-current
 
 ## 下一步（按 ROI 排序，明天接力会话直接选）
 
-### 🥇 当前立即下一步：R12 本地 merge 收口
+### 🥇 当前立即下一步：followup merge + 音视频端到端回归
 
-- 分支：`feat/phase-r12-processing-page-replica`
-- 状态：R12.1~R12.6 已完成，Codex QA 收口验证通过。
-- 操作边界：用户授权后 merge 到 local main；不 push origin。
+- 分支：`fix/r21-p3-s3-followup`（R21.P3.S3 followup，`status: done`）→ 用户授权后 merge 到 local main，不 push origin。
+- 随后：粘真实 B站/油管 URL 跑音视频端到端冒烟（download→ASR→frames→VLM→落地页），记录断点。
+- 闭环缺口待办：N7b 路径3 视频大模型后端（卡 API 选型 Gemini/GPT-4o/Qwen-VL）/ N8b librosa 后端 / R20 笔记多格式导出。
 
 ### ✅ Phase L 资料库聚合页（2026-05-22 已完成）
 

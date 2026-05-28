@@ -54,7 +54,7 @@ const ModelManagementPage = () => {
   const textProviderId = useConfigStore((s) => s.textProviderId)
   const textModelId = useConfigStore((s) => s.textModelId)
   const visionProviderId = useConfigStore((s) => s.visionProviderId)
-  const videoModelId = useConfigStore((s) => s.videoModelId)
+  const visionModelId = useConfigStore((s) => s.visionModelId)
   const setConfig = useConfigStore((s) => s.setConfig)
 
   /* ── 加载提供商列表 ── */
@@ -160,8 +160,8 @@ const ModelManagementPage = () => {
     } else {
       setConfig(
         next
-          ? { visionProviderId: providerId, videoModelId: modelId }
-          : { visionProviderId: '', videoModelId: '' },
+          ? { visionProviderId: providerId, visionModelId: modelId }
+          : { visionProviderId: '', visionModelId: '' },
       )
       toast.success(
         next ? t('model.defaultVision.saved') : t('model.defaultVision.cleared'),
@@ -296,7 +296,7 @@ const ModelManagementPage = () => {
               onToggleExpand={() => toggleProvider(g.id)}
               onRefresh={() => refreshModels(g.id)}
               defaultText={{ providerId: textProviderId, modelId: textModelId }}
-              defaultVision={{ providerId: visionProviderId, modelId: videoModelId }}
+              defaultVision={{ providerId: visionProviderId, modelId: visionModelId }}
               onSetDefault={(role, modelId, next) =>
                 setAsDefault(g.id, role, modelId, next)
               }

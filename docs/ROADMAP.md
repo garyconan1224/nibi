@@ -117,38 +117,34 @@ git log --oneline -10
 
 ## 11. 推荐执行顺序
 
-> ⚠️ **2026-05-24 插队**：**Phase IR 首页输入层重构**（in_progress，分支 `feat/phase-r-input-refactor`）暂时阻塞下方所有未完项。
-> - 计划：[`docs/plans/phase-r-input-refactor.md`](plans/phase-r-input-refactor.md)（R0~R6 子任务）
-> - 归属：Track F（修首页死按钮 / 三层配置压一层 / 单链接多类型循环入队）
-> - **命名提醒**：本文件 §8 的「Track R 复刻 / AI 导演 [C]」是另一回事，不要混淆——文件名 `phase-r-input-refactor` 里的 R 指 Refactor。
-> - IR 完成并 merge 进 main 后，再继续走下方顺序。
+> ✅ **2026-05-29 对账更新**：Phase IR 输入层重构（R0~R13.6）+ R14~R21 全系列已合入 main（以 git log 为准）。
+> - **当前阶段 = 音频 + 视频端到端闭环打通**（用户 2026-05-29 决议）：从输入链接 → 任务 → 落地页全链路无断点，再做文字 / 图片深化。
+> - 闭环缺口：N7b 路径3 视频大模型后端（卡 API 选型 Gemini/GPT-4o/Qwen-VL）/ N8b librosa 后端 / R20 笔记多格式导出。
+> - **命名提醒**：§8「Track R 复刻 / AI 导演 [C]」与文件名 `phase-r-input-refactor` 的 R(Refactor) 不是一回事，勿混淆。
 
 ```
-IR 首页输入层重构                       ← 当前阶段 (in_progress)
+IR 首页输入层重构 (R0~R13.6)            ← 已完成
   ↓
-F1 流程缺口补齐 (IP.9 Tier A UI)        ← 已完成 (f33db14)
+R14~R21 系列（dedup/元数据/av_synthesis/状态同步/添加素材/总结页/学习补图）← 已完成
   ↓
-F1 Tier B 后端（路径 1 + 字幕清洗已完成；路径 3 Gemini 待用户拍板）
+F2 端到端冒烟 + 状态同步 bug 修         ← 已完成 (R21.A/B)
   ↓
-F1.7 URL 规整 + 真实前端冒烟          ← 已完成 (170ec0b)
+🔴 音视频端到端闭环（输入→任务→落地页）  ← 当前阶段 (2026-05-29)
+   ├─ N7b 路径3 视频大模型后端（卡 API 选型）
+   ├─ N8b librosa 6 维度音频后端
+   └─ R20 笔记 PDF/Word/Obsidian 导出
   ↓
-F2 端到端冒烟 + bug 修
+T1~T3 文字深化（多文对比 / 网页抓取扩展）
   ↓
-A1 + V1 + I1（音视图三个 UI 层一起做完，前端可并行）*N7b/N8b UI 已就绪*
+I2~I3 图片深化（EXIF / 批量任务 / 风格 DNA）
+  ↓
+R22 并行调度 + R23 性能档位（体验优化，对应 5/27 反馈 issue 6/9）
   ↓
 F3 错误体验优化
   ↓
-V2 + V3（视频深化）
+[C] R1~R5 复刻 · AI 导演大集成（需先补设计稿，后续 Claude Design 更新）
   ↓
-A2 + A3 + A4（音频深化）
-  ↓
-T1 + T2 + T3（文字深化）
-  ↓
-I2 + I3（图片深化 + 风格 DNA）
-  ↓
-R1~R5（复刻 / AI 导演 大集成）
-  ↓
-[D] 开源准备
+[D] 安全 + 开源准备
 ```
 
 ---

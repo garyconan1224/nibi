@@ -1,7 +1,15 @@
 import { useMemo } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useTaskStore } from '@/store/taskStore'
-import { isTaskTerminal, getStatusText } from '@/types/task'
+import { isTaskTerminal, getStatusText, type TaskRecord } from '@/types/task'
+
+/** 任务在「同素材一行」聚合时的状态排序：运行中 > 排队 > 失败 > 已完成 */
+function statusRank(status: string): number {
+  if (status === 'FAILED') return 2
+  if (isTaskTerminal(status)) return 1 // SUCCESS / CANCELLED
+  if (status === 'PENDING') return 3
+  return 4 // DOWNLOAD / ASR / VLM / FRAMES / SUM / RUNNING…
+}
 
 const STATE_DOT: Record<string, string> = {
   running: 'var(--ink)',
@@ -25,13 +33,41 @@ export function QueueTab({ workspaceId }: QueueTabProps) {
     [allTasks, workspaceId],
   )
 
-  const active = tasks.filter((t) => !isTaskTerminal(t.status))
-  const errored = tasks.filter((t) => t.status === 'FAILED')
-  const rows = [...active, ...errored]
+  // 同素材的 download + analyze 是两个独立 task，按 project_id + url 归并成一行，
+  // 避免「下载完成→脱组→冒出新分析任务」的重复行；进度按 download 30% + analyze 70% 加权。
+  const rows = useMemo(() => {
+    const groups = new Map<string, TaskRecord[]>()
+    for (const t of tasks) {
+      const payload = (t.payload ?? {}) as Record<string, unknown>
+      const url = (payload.url as string) || (payload.source_url as string) || ''
+      const key = `${t.project_id}::${url || t.task_id}`
+      const group = groups.get(key) || []
+      group.push(t)
+      groups.set(key, group)
+    }
+    // 整组未完成（任一非终态，或有 FAILED）才显示
+    const activeGroups = Array.from(groups.entries()).filter(([, g]) =>
+      g.some((t) => !isTaskTerminal(t.status) || t.status === 'FAILED'),
+    )
+    return activeGroups.map(([groupKey, g]) => {
+      g.sort((a, b) => statusRank(b.status) - statusRank(a.status))
+      const representative = g[0]
+      const downloadTask = g.find((t) => t.task_type === 'download')
+      const analyzeTask = g.find((t) => t.task_type === 'analyze')
+      const dl = downloadTask ? (downloadTask.progress ?? 0) : 0
+      const an = analyzeTask ? (analyzeTask.progress ?? 0) : 0
+      let progress: number
+      if (downloadTask && analyzeTask) progress = dl * 0.3 + an * 0.7
+      else if (downloadTask) progress = dl
+      else if (analyzeTask) progress = an
+      else progress = representative.progress ?? 0
+      return { groupKey, task: representative, progress }
+    })
+  }, [tasks])
 
-  const running = rows.filter((r) => r.status === 'running' || r.status === 'DOWNLOAD' || r.status === 'ASR' || r.status === 'VLM' || r.status === 'FRAMES' || r.status === 'SUM').length
-  const queued = rows.filter((r) => r.status === 'PENDING').length
-  const failed = errored.length
+  const running = rows.filter((r) => statusRank(r.task.status) === 4).length
+  const queued = rows.filter((r) => r.task.status === 'PENDING').length
+  const failed = rows.filter((r) => r.task.status === 'FAILED').length
 
   if (rows.length === 0) {
     return (
@@ -84,18 +120,20 @@ export function QueueTab({ workspaceId }: QueueTabProps) {
 
       {/* Queue rows */}
       <div className="qp-list">
-        {rows.map((t) => {
+        {rows.map(({ groupKey, task: t, progress }) => {
           const isRunning = !isTaskTerminal(t.status) && t.status !== 'PENDING'
           const isQueued = t.status === 'PENDING'
           const isFailed = t.status === 'FAILED'
-          const pct = isRunning ? Math.round(t.progress * 100) : 0
+          const payload = (t.payload ?? {}) as Record<string, unknown>
+          const pct = isRunning ? Math.round(progress * 100) : 0
+          const title = (payload.name as string) || (payload.video_title as string) || t.task_type
 
           return (
-            <div key={t.task_id} className="qp-row" data-state={isFailed ? 'error' : isQueued ? 'queued' : 'running'}>
+            <div key={groupKey} className="qp-row" data-state={isFailed ? 'error' : isQueued ? 'queued' : 'running'}>
               <div className="qp-dot" data-state={isFailed ? 'error' : isQueued ? 'queued' : 'running'} />
               <div className="qp-t">
                 <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {(t.payload?.name as string) ?? t.task_type}
+                  {title}
                 </div>
                 <div className="mono" style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>
                   {getStatusText(t.status)}{t.error ? ` · ${t.error}` : ''}

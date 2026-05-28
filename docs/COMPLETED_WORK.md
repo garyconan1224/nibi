@@ -1020,3 +1020,38 @@ WorkspaceItem.tags = {
 
 ### 留给后续的影响
 - download handler 暂不消费 quality 等参数（`_resolve_download_kwargs` 只读 format_selector），等 yt-dlp format 映射后再启用
+
+---
+
+## R21.P3.S3 收尾 — intent 链路修复 + av_combined 补图入口
+
+**完成日期**：2026-05-29
+**模型 / 工具**：mimo 2.5pro
+**分支**：fix/r21-p3-s3-followup
+**提交**：
+- `0cf1e76` fix(r21.P3.S3): 打通 preflight 顶层 intent 字段，修复学习视频补图推荐恒空
+- `ef633de` feat(r21.P3.S3): av_combined 结果页补充按需补图入口
+
+### 问题
+学习视频的"按需补图"链路断在 intent 字段写读不一致：
+- 前端写入 `tasks.preflight.intent`（嵌套）
+- 后端 `PreflightSaveRequest` 没有顶层 `intent` 字段 → `item.preflight.intent` 永远是空串
+- 推荐帧接口 `get_suggested_inline_frames` 读顶层 intent → 永远 return []
+
+另外 av_combined 帧分析路径没有转录列表，补图按钮无处挂载。
+
+### 影响范围
+- **后端 workspaces.py**：`PreflightSaveRequest` 加 `intent` 字段；`save_preflight` 构造 `PreflightConfig` 时传入 `intent`
+- **前端 workspace.ts**：`PreflightSaveRequest` 类型加 `intent`
+- **前端 AddMaterialModal.tsx**：`savePreflight` 调用时额外传顶层 `intent`
+- **前端 VideoResultPage.tsx**：帧分析路径右侧面板加「📷 补图」按钮 + 挂载 `FramePickerModal`
+
+### 关键改动
+- 后端请求体加顶层 `intent: str = ""` 字段，`save_preflight` 传入 `PreflightConfig`
+- 前端保存时同时写嵌套（analyze pipeline 读源）和顶层（推荐帧接口读源）
+- 帧分析路径复用字幕路径已有的 `suggestedFrames`、`handleInsertFrame`、`FramePickerModal`
+- 补图按钮用 `activeFrame` 作为 `segment_idx`
+
+### 验证
+- `cd frontend && npx tsc --noEmit`：EXIT=0
+- `.venv/bin/python -m pytest tests/ -q`：354 passed / 2 skipped

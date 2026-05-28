@@ -4,7 +4,7 @@
 >
 > **维护规则见 CLAUDE.md「项目执行计划维护流程」一节**。
 >
-> Last updated: 2026-05-28（R21.P3.S3 已完成）
+> Last updated: 2026-05-29（全量对账：R14~R21 系列已对齐 git log；当前 = R21.P3.S3 followup 待 merge）
 
 ---
 
@@ -19,11 +19,12 @@
 
 ---
 
-## 当前执行入口（用户 2026-05-26 指定）
+## 当前执行入口（2026-05-29 对账更新）
 
-> 这是当前插队执行项，放在总进度前面，避免新会话按旧的未完成 N7b/N8b 误开工。
+> 真实状态以 git log 为准。最新合入 main 的是 R21.P3.S3（+ 状态同步 bugfix）；当前分支 `fix/r21-p3-s3-followup` 已 `status: done`，待 merge。
+> **下一步方向见本文件下方「当前下一步」段**：音频 + 视频两条线端到端打通优先（用户 2026-05-29 决议），再做文字 / 图片深化。
 
-- [x] **L5 Library Remix Polish** — 保留当前 `/library` 真实功能，对齐最新 Remix 资料库设计稿（header / controls / item card / rich workspace card / empty state / delete feedback）。详细计划：[docs/plans/phase-l5-library-remix-polish.md](plans/phase-l5-library-remix-polish.md)。模型：deepseek v4-pro；分支：`feat/phase-l5-library-remix-polish`；不改 API/schema，不 push。
+- [x] **L5 Library Remix Polish**（已完成并合入 main）—— `/library` 资料库聚合页对齐 Remix 设计稿。
 
 ---
 
@@ -173,20 +174,30 @@
 - 阻塞 bug 修复：TaskRunner.append_log / PreflightDrawer 绕过桥接 ✅
 - 清理：H2.6 删旧 WorkspaceDetail（-680 行）✅
 
-**当前 local main**：`7ec9914` — R11 设计稿同步已合入；R12 分支已完成并等待本地 merge 授权。
+**R14~R21 系列全部完工并合入 main**（2026-05-25 ~ 2026-05-29，以 git log 为准对账）：
+- R14 多类型 dedup UX / R15 early-metadata / R16 ProcessingPage 音频适配 ✅
+- R17 chip 重构（引入 av_synthesis 综合笔记 chip）✅
+- R18 / R18.1 PreflightDrawer Remix 复刻 + 本地 ASR + 失败弹窗 ✅
+- R19 / R19d av_synthesis 图文笔记 pipeline + Markdown 导出 + export endpoint ✅
+- R21.A1~A6 状态同步 6 bug + B1~B3 行为收口（2026-05-27 用户 11 条反馈中的 9 条已修）✅
+- R21.P2 / P2.v3 模型选择挪到主界面 + capability 过滤 ✅
+- R21.P3.S1 / S2 / S3 添加素材拆参数 / 多版本总结 SummariesTab / 对比 + 学习视频补图 ✅
 
-下一步候选（按 ROI 排序）：
-1. 🥇 **R12 本地 merge 收口**：确认 `feat/phase-r12-processing-page-replica` 后 merge 到 local main（不 push）
-2. 🥇 **端到端冒烟测试**（用户自己跑，~30min）—— 粘真实 URL 走 `/processing/<id>` 验证 R12 页面数据
-3. 🥈 **[C] AI 导演模块**（4-7 天 Opus）—— 需先补设计稿 + 拍板生成模型 API
-4. 🥈 **[D] 开源准备**（2-3 天）—— 加密 / CI / push / 仓库整理
-5. 🥉 **N7b 后端** 视频总结路径 1/3 handler（UI 已就绪，依赖字幕抽取 + 视频大模型 API 决策）
-6. 🥉 **N8b 后端** 音频 librosa 分析（UI 已就绪）
+**当前 HEAD**：分支 `fix/r21-p3-s3-followup`，R21.P3.S3 followup（preflight 顶层 intent 链路修复 + av_combined 补图入口）已 `status: done`，**待 merge 进 main**。
 
-延后子阶段：
-- **N7b 后端**（P2，8-12h）— UI 已就绪（IP.9.3），后端 handler 待实现
-- **N8b 后端**（P3，6-8h）— UI 已就绪（IP.9.2），后端 librosa 分析待实现
-- **[C] AI 导演模块**（需先补设计稿）
+**当前下一步方向（用户 2026-05-29 决议）**：先把**音频 + 视频两条线从输入链接 → 任务 → 落地页完整端到端打通**，确保音视频闭环到位，再做文字 / 图片深化。性能优化（R22/R23）、AI 导演 [C]、开源 [D] 往后排。
+
+短期任务池（按依赖排序）：
+1. 🥇 **followup 分支 merge 进 main**（5min）—— R21.P3.S3 收尾收口
+2. 🥇 **音视频端到端冒烟回归**（用户跑，~30min）—— 粘真实 B站/油管 URL，走完 download→ASR→frames→VLM→落地页，记录断点
+3. 🥈 **N7b 路径3 视频大模型直接分析后端**（8-12h，Opus）—— UI 已就绪，**卡在 API 选型**（Gemini / GPT-4o / Qwen-VL，待用户拍板）
+4. 🥈 **N8b 音频 librosa 6 维度切分后端**（6-8h，Sonnet）—— UI 已就绪
+5. 🥉 **R20 笔记 PDF / Word / Obsidian 导出**（R19 押后项）
+
+延后（音视频闭环后再做）：
+- **T 文字深化 / I 图片深化**（EXIF / 批量 / 风格 DNA）
+- **R22** 并行调度（issue 6）/ **R23** 性能档位（issue 9）—— 体验优化
+- **[C] AI 导演模块**（需先补设计稿，后续用 Claude Design 更新）
 - **[D] 安全 + 开源准备**
 
 ---
@@ -219,6 +230,7 @@
   - [x] **R21.P3.S1** AddMaterialModal 重构 —— 拆「采集参数」/ 视频用途模式 / 链接预填背景 — `docs/plans/phase-r21-p3-s1-add-material-restructure.md`，~6-9h
   - [x] **R21.P3.S2** 结果页「总结」tab + item_summaries 表 + 多版本 CRUD — `docs/plans/phase-r21-p3-s2-summaries-tab-and-table.md`，~8-12h，依赖 S1
   - [x] **R21.P3.S3** 总结对比模式 + 视频学习模式按需补图交互 — `docs/plans/phase-r21-p3-s3-compare-and-learning-mode.md`，~6-10h，依赖 S2
+  - [x] **R21.P3.S3 收尾** intent 链路修复 + av_combined 补图入口 — `docs/plans/phase-r21-p3-s3-followup.md`，`0cf1e76` `ef633de`
 - [ ] **R22**（押后）Pipeline 并行调度：截帧 + 转写同时跑 — `docs/plans/phase-r22-parallel-pipeline.md`，~6-10h，依赖 R21
 - [ ] **R23**（押后）设置面板：性能档位（CPU/GPU/内存→并发槽位）— `docs/plans/phase-r23-perf-tier-settings.md`，~4-6h，依赖 R22
 
