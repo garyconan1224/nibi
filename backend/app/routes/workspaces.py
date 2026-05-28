@@ -133,6 +133,15 @@ def _adapt_r8_frame_prompt(frame_prompt: Dict[str, Any]) -> Dict[str, Any]:
 def _augment_video_analyze_payload(payload: Dict[str, Any], item: WorkspaceItem) -> None:
     """Copy video preflight params used by the current analyze pipeline."""
     tasks = item.preflight.tasks or {}
+    preflight_params = tasks.get("preflight")
+    if isinstance(preflight_params, dict):
+        if preflight_params.get("intent"):
+            payload["intent"] = preflight_params["intent"]
+        if preflight_params.get("background_for_recognition"):
+            payload["background_for_recognition"] = preflight_params[
+                "background_for_recognition"
+            ]
+
     frame_prompts_params = tasks.get("frame_prompt")
     if isinstance(frame_prompts_params, dict):
         payload["frame_prompt"] = _adapt_r8_frame_prompt(frame_prompts_params)
@@ -1357,6 +1366,13 @@ def _bridge_to_pipeline_payload(
             params = tasks.get(task_id)
             if isinstance(params, dict):
                 payload[task_id] = params
+        # R21.P3.S1: 透传 preflight 新字段（image_mode / background_for_recognition）
+        _preflight = tasks.get("preflight")
+        if isinstance(_preflight, dict):
+            if _preflight.get("image_mode"):
+                payload["image_mode"] = _preflight["image_mode"]
+            if _preflight.get("background_for_recognition"):
+                payload["background_for_recognition"] = _preflight["background_for_recognition"]
         return "image", payload
 
     if item.type == ItemType.AUDIO.value:
@@ -1394,6 +1410,11 @@ def _bridge_to_pipeline_payload(
         _copy_task_config(payload, "vocal_separation", tasks, "vocal_separation")
         _copy_task_config(payload, "music_transcribe", tasks, "music_transcribe")
         _copy_task_config(payload, "prompt_generation", tasks, "prompt_generation")
+        # R21.P3.S1: 透传 preflight 新字段（background_for_recognition）
+        _preflight = tasks.get("preflight")
+        if isinstance(_preflight, dict):
+            if _preflight.get("background_for_recognition"):
+                payload["background_for_recognition"] = _preflight["background_for_recognition"]
         return "audio", payload
 
     if item.type not in (ItemType.VIDEO.value,):
@@ -1411,6 +1432,14 @@ def _bridge_to_pipeline_payload(
         for k in ("quality", "frame_mode", "frame_interval_sec", "max_frames", "enabled_steps", "prompt_style"):
             if k in bg:
                 payload[k] = bg[k]
+        # R21.P3.S1: 透传 preflight 新字段（intent / background_for_recognition）
+        tasks = item.preflight.tasks or {}
+        _preflight = tasks.get("preflight")
+        if isinstance(_preflight, dict):
+            if _preflight.get("intent"):
+                payload["intent"] = _preflight["intent"]
+            if _preflight.get("background_for_recognition"):
+                payload["background_for_recognition"] = _preflight["background_for_recognition"]
         return "download", payload
 
     # local：直接走 analyze

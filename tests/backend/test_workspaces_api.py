@@ -299,6 +299,10 @@ def test_download_success_inherits_video_summary_preflight(tmp_path: Path) -> No
         related_task_ids=["download-1"],
         preflight=PreflightConfig(
             tasks={
+                "preflight": {
+                    "intent": "learning",
+                    "background_for_recognition": "Pocket 4, D-Log M",
+                },
                 "summary": {
                     "enabled": True,
                     "path": "video_model",
@@ -334,6 +338,8 @@ def test_download_success_inherits_video_summary_preflight(tmp_path: Path) -> No
     assert payload["video_basenames"] == ["downloaded-video.mp4"]
     assert payload["summary_path"] == "video_model"
     assert payload["video_template"] == "访谈"
+    assert payload["intent"] == "learning"
+    assert payload["background_for_recognition"] == "Pocket 4, D-Log M"
     assert isolated_store.get("ws-video").items[0].related_task_ids == [
         "download-1",
         "analyze-1",
@@ -865,6 +871,26 @@ def test_augment_video_analyze_payload_r8_frame_prompt_adaptation() -> None:
     assert fp.get("max_frames") == 60
     assert "frame_mode" not in fp
     assert "sec_per_frame" not in fp
+
+
+def test_augment_video_analyze_payload_r21_p3_preflight_fields() -> None:
+    """R21.P3.S1 video intent / recognition background should reach analyze."""
+    from backend.app.routes.workspaces import _augment_video_analyze_payload
+
+    item = WorkspaceItem(
+        item_id="v4", type="video", source="local",
+        source_value="/tmp/local.mp4", name="v",
+        preflight=PreflightConfig(tasks={
+            "preflight": {
+                "intent": "learning",
+                "background_for_recognition": "课程专有名词 ABC",
+            },
+        }),
+    )
+    payload: dict = {}
+    _augment_video_analyze_payload(payload, item)
+    assert payload["intent"] == "learning"
+    assert payload["background_for_recognition"] == "课程专有名词 ABC"
 
 
 # ── _video_result_has_real_data 新路径 ──────────────────────────────────────

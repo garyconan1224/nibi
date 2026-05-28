@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Check,
-  ChevronDown,
   FileAudio,
   FileImage,
   FileText,
@@ -43,9 +42,6 @@ const TYPE_META: Record<ItemType, { icon: typeof FileVideo; label: string; sub: 
   text:  { icon: FileText,  label: '文字', sub: 'Text · 链接/粘贴' },
 }
 
-const BG_CONTENT_TYPES = ['课程', '会议', '宣传片', 'Vlog', '访谈', '纯音乐', '新闻报道']
-const BG_PURPOSES = ['复刻参考', '竞品分析', '内容总结', '学习研究']
-
 // ── Analysis Scope ─────────────────────────────────────────
 
 const SCOPE_META: Record<AnalysisScope, { icon: typeof FileVideo; label: string; sub: string; itemType: ItemType }> = {
@@ -65,6 +61,8 @@ export interface StagedConfig {
   workspaceIds: string[]
   urlValue?: string
   analysisScope?: AnalysisScope
+  videoIntent?: 'learning' | 'replica'
+  imageMode?: 'replica_prompt' | 'ocr'
 }
 
 interface AddMaterialModalProps {
@@ -237,6 +235,7 @@ export function AddMaterialModal({
   onAdded,
   onFineTune,
 }: AddMaterialModalProps) {
+  void onFineTune // 保留 prop 供 Composer 调用，当前 modal 内未直接使用
   const navigate = useNavigate()
   // ── 类型选择 ──
   const propInitial = useMemo(() => resolveInitialTypes(sniffResult), [sniffResult])
@@ -248,13 +247,21 @@ export function AddMaterialModal({
     () => buildDefaults(propInitial.types),
   )
 
-  // ── 背景信息 ──
+  // ── 识别用背景 ──
+  const [backgroundForRecognition, setBackgroundForRecognition] = useState('')
+
+  // ── 视频用途模式 + 图片采集模式 ──
+  const [videoIntent, setVideoIntent] = useState<'learning' | 'replica'>('replica')
+  const [imageMode, setImageMode] = useState<'replica_prompt' | 'ocr'>('replica_prompt')
+
+  // ── 链接预填来源 hint ──
+  const [linkPreviewSource, setLinkPreviewSource] = useState<string | null>(null)
+
+  // ── 背景信息（legacy，保留用于 workspaceBackgrounds 回填）──
   const mergedBg = useMemo(() => {
     if (!workspaceBackgrounds || workspaceIds.length === 0) return undefined
     return workspaceBackgrounds[workspaceIds[0]]
   }, [workspaceBackgrounds, workspaceIds])
-  const [bgOpen, setBgOpen] = useState(false)
-  const [bgOverrides, setBgOverrides] = useState<Partial<WorkspaceBackground>>({})
 
   // ── 模型选择 + 截帧模式（R21.P2.v2：分散到任务旁）──
   const { providers, providerModels, fetchProviders, modelsLoading } = useProviderStore()
@@ -314,17 +321,20 @@ export function AddMaterialModal({
         ...buildDefaults(resetTypes, scope),
         ...(initialStaged.features ?? {}),
       })
-      setBgOverrides(initialStaged.background ?? {})
       setAnalysisScope(scope ?? 'av_combined')
+      setVideoIntent(initialStaged.videoIntent ?? 'replica')
+      setImageMode(initialStaged.imageMode ?? 'replica_prompt')
     } else {
       const scope = showScopeCards ? 'av_combined' : undefined
       const resetTypes = scope ? [SCOPE_META[scope].itemType] : types
       setSelectedTypes(resetTypes)
       setFeatures(buildDefaults(resetTypes, scope))
-      setBgOverrides({})
       setAnalysisScope(scope ?? 'av_combined')
+      setVideoIntent('replica')
+      setImageMode('replica_prompt')
     }
-    setBgOpen(false)
+    setBackgroundForRecognition('')
+    setLinkPreviewSource(null)
     setError(null)
     setSubmitting(false)
     /* eslint-enable react-hooks/set-state-in-effect */
@@ -408,7 +418,7 @@ export function AddMaterialModal({
     })
   }, [visionProviderId, providerModels])
 
-  // ── 内部 URL 变化时 debounced 嗅探 ──
+  // ── 内部 URL 变化时 debounced 嗅探 + 链接预填 ──
   const doSniff = useCallback(async (url: string) => {
     try {
       const result = await sniffUrl(url)
@@ -418,14 +428,38 @@ export function AddMaterialModal({
     }
   }, [])
 
+  const doLinkPreview = useCallback(async (url: string) => {
+    try {
+      const { fetchLinkPreview } = await import('@/services/linkPreview')
+      const result = await fetchLinkPreview(url)
+      if (result.title || result.description) {
+        setBackgroundForRecognition((prev) => {
+          if (prev.trim()) return prev // 已有内容不覆盖
+          return [result.title, result.description].filter(Boolean).join('\n\n')
+        })
+        const sourceMap: Record<string, string> = { bili: 'B 站', og: '网页', fallback: '' }
+        setLinkPreviewSource(sourceMap[result.source] || null)
+      }
+    } catch {
+      // 静默失败
+    }
+  }, [])
+
+  // ── 外部传入 urlValue 时触发链接预填 ──
+  useEffect(() => {
+    if (!open || !urlValue?.trim()) return
+    doLinkPreview(urlValue.trim())
+  }, [open, urlValue, doLinkPreview])
+
   useEffect(() => {
     if (!internalUrl.trim() || urlValue) return
     clearTimeout(sniffTimer.current)
     sniffTimer.current = setTimeout(() => {
       doSniff(internalUrl.trim())
+      doLinkPreview(internalUrl.trim())
     }, 500)
     return () => clearTimeout(sniffTimer.current)
-  }, [internalUrl, urlValue, doSniff])
+  }, [internalUrl, urlValue, doSniff, doLinkPreview])
 
   const handleInternalUrlChange = (value: string) => {
     setInternalUrl(value)
@@ -467,11 +501,6 @@ export function AddMaterialModal({
     })
   }
 
-  // ── 背景字段更新 ──
-  const updateBg = <K extends keyof WorkspaceBackground>(key: K, value: WorkspaceBackground[K]) => {
-    setBgOverrides((prev) => ({ ...prev, [key]: value }))
-  }
-
   // ── 一键解析（标准 workspace flow）──
   const handleQuickSubmit = async () => {
     if (!effectiveUrl) {
@@ -499,10 +528,7 @@ export function AddMaterialModal({
         toast.info(`已自动创建工作空间「${ws.name}」`)
       }
 
-      const effectiveBackground: Partial<WorkspaceBackground> = {
-        ...(mergedBg ?? {}),
-        ...bgOverrides,
-      }
+      const effectiveBackground: Partial<WorkspaceBackground> = mergedBg ?? {}
       let firstTaskId: string | null = null
       let firstItemId: string | null = null
       let succeeded = 0
@@ -595,6 +621,15 @@ export function AddMaterialModal({
             tasks.music = { ...(tasks.music as Record<string, unknown> || {}), on: true, music_suno: advOpts.music_suno }
           }
 
+          // R21.P3.S1: 写入 preflight 新字段（intent / image_mode / background_for_recognition）
+          const preflight: Record<string, unknown> = {}
+          if (type === 'video') preflight.intent = videoIntent
+          if (type === 'image') preflight.image_mode = imageMode
+          if (backgroundForRecognition.trim()) preflight.background_for_recognition = backgroundForRecognition.trim()
+          if (Object.keys(preflight).length > 0) {
+            tasks.preflight = { ...(tasks.preflight as Record<string, unknown> || {}), ...preflight }
+          }
+
           await savePreflight(wsId, itemId, {
             background_overrides: effectiveBackground,
             models: mergedModels,
@@ -643,21 +678,6 @@ export function AddMaterialModal({
     } finally {
       setSubmitting(false)
     }
-  }
-
-  // ── 细调 ──
-  const handleFineTune = () => {
-    const staged: StagedConfig = {
-      types: selectedTypes,
-      features,
-      tasks: initialStaged?.tasks,
-      models: initialStaged?.models,
-      background: bgOverrides,
-      workspaceIds,
-      urlValue: effectiveUrl,
-      analysisScope: showScopeCards ? analysisScope : undefined,
-    }
-    onFineTune?.(staged)
   }
 
   // ── 派生值 ──
@@ -823,13 +843,14 @@ export function AddMaterialModal({
             )}
           </div>
 
-          {/* ③ 分析任务 */}
-          {selectedTypes.length > 0 && (
+          {/* ③ 分析任务（文字素材跳过） */}
+          {selectedTypes.length > 0 && !selectedTypes.every(t => t === 'text') && (
             <div className="m-section">
               <div className="eyebrow" style={{ marginBottom: 10 }}>
                 ③ 勾选分析任务 · 已按类型智能默认
               </div>
               {selectedTypes.map((type) => {
+                if (type === 'text') return null
                 const meta = TYPE_META[type]
                 const Icon = meta.icon
                 const isScopedType = showScopeCards && type === SCOPE_META[analysisScope].itemType
@@ -925,23 +946,17 @@ export function AddMaterialModal({
                         <div className="task-chips" style={{ marginBottom: 4 }}>
                           {videoSideFeats.map(renderChip)}
                         </div>
-                        {/* R21.P2.v2: 画面分析勾选时，下方显示图片模型 + 截帧模式 */}
+                        {/* R21.P2.v2: 画面分析勾选时，下方显示图片模型 */}
                         {visualOn && (
-                          <>
-                            <VisionModelPicker
-                              providerId={visionProviderId}
-                              modelId={visionModelId}
-                              providers={visionProviders}
-                              models={visionModels}
-                              loading={modelsLoading[visionProviderId]}
-                              onPickProvider={(id) => { setVisionProviderId(id); setVisionModelId(''); saveVisionModel(id, '') }}
-                              onPickModel={(id) => { setVisionModelId(id); saveVisionModel(visionProviderId, id) }}
-                            />
-                            <FrameModePicker
-                              params={framePromptParams}
-                              onChange={(p) => setFramePromptParams(p)}
-                            />
-                          </>
+                          <VisionModelPicker
+                            providerId={visionProviderId}
+                            modelId={visionModelId}
+                            providers={visionProviders}
+                            models={visionModels}
+                            loading={modelsLoading[visionProviderId]}
+                            onPickProvider={(id) => { setVisionProviderId(id); setVisionModelId(''); saveVisionModel(id, '') }}
+                            onPickModel={(id) => { setVisionModelId(id); saveVisionModel(visionProviderId, id) }}
+                          />
                         )}
                       </>
                     )}
@@ -974,21 +989,15 @@ export function AddMaterialModal({
                           />
                         )}
                         {visualOn && (
-                          <>
-                            <VisionModelPicker
-                              providerId={visionProviderId}
-                              modelId={visionModelId}
-                              providers={visionProviders}
-                              models={visionModels}
-                              loading={modelsLoading[visionProviderId]}
-                              onPickProvider={(id) => { setVisionProviderId(id); setVisionModelId(''); saveVisionModel(id, '') }}
-                              onPickModel={(id) => { setVisionModelId(id); saveVisionModel(visionProviderId, id) }}
-                            />
-                            <FrameModePicker
-                              params={framePromptParams}
-                              onChange={setFramePromptParams}
-                            />
-                          </>
+                          <VisionModelPicker
+                            providerId={visionProviderId}
+                            modelId={visionModelId}
+                            providers={visionProviders}
+                            models={visionModels}
+                            loading={modelsLoading[visionProviderId]}
+                            onPickProvider={(id) => { setVisionProviderId(id); setVisionModelId(''); saveVisionModel(id, '') }}
+                            onPickModel={(id) => { setVisionModelId(id); saveVisionModel(visionProviderId, id) }}
+                          />
                         )}
                       </>
                     )}
@@ -998,51 +1007,88 @@ export function AddMaterialModal({
             </div>
           )}
 
-          {/* R21.P2.v3: 高级选项（替代细调）*/}
-          {(anyHas('video_summary') || anyHas('transcribe_summary') || anyHas('music_analysis')) && (
+          {/* ③-b 视频用途模式（仅视频素材） */}
+          {selectedTypes.includes('video') && (
+            <div className="m-section">
+              <div className="eyebrow" style={{ marginBottom: 10 }}>视频用途模式</div>
+              <div className="type-row">
+                {[
+                  { v: 'learning' as const, label: '学习/课程', sub: '转录为主轴 · 画面按需补图' },
+                  { v: 'replica' as const, label: '复刻/创作', sub: '每帧 VLM 描述 + 提示词' },
+                ].map(({ v, label, sub }) => (
+                  <button
+                    key={v}
+                    type="button"
+                    className="type-card"
+                    data-active={videoIntent === v ? 'true' : 'false'}
+                    onClick={() => setVideoIntent(v)}
+                  >
+                    <div className="tc-l">{label}</div>
+                    <div className="mono tc-en">{sub}</div>
+                  </button>
+                ))}
+              </div>
+              {/* 学习模式子参数 */}
+              {videoIntent === 'learning' && (
+                <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ink-2)' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <input type="checkbox" checked disabled /> ASR 转写（学习模式必开）
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <input type="checkbox" checked={advOpts.speaker_diarize}
+                      onChange={(e) => setAdv({ speaker_diarize: e.target.checked })} />
+                    区分说话人音色
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input type="checkbox" checked={advOpts.music_suno}
+                      onChange={(e) => setAdv({ music_suno: e.target.checked })} />
+                    音乐分析
+                  </label>
+                </div>
+              )}
+              {/* 复刻模式子参数 */}
+              {videoIntent === 'replica' && (
+                <div style={{ marginTop: 8 }}>
+                  <FrameModePicker
+                    params={framePromptParams}
+                    onChange={setFramePromptParams}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ③-c 图片采集模式（仅图片素材） */}
+          {selectedTypes.includes('image') && !selectedTypes.includes('video') && (
+            <div className="m-section">
+              <div className="eyebrow" style={{ marginBottom: 10 }}>图片采集模式</div>
+              <div className="type-row">
+                {[
+                  { v: 'replica_prompt' as const, label: '提示词复刻', sub: 'VLM 生成图生图提示词' },
+                  { v: 'ocr' as const, label: 'OCR 识别', sub: '提取图中文字' },
+                ].map(({ v, label, sub }) => (
+                  <button
+                    key={v}
+                    type="button"
+                    className="type-card"
+                    data-active={imageMode === v ? 'true' : 'false'}
+                    onClick={() => setImageMode(v)}
+                  >
+                    <div className="tc-l">{label}</div>
+                    <div className="mono tc-en">{sub}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* R21.P2.v3: 高级选项（字幕 / 音乐提示词；总结模板移到 S2 结果页）*/}
+          {(anyHas('subtitle_export') || anyHas('transcribe_summary') || anyHas('music_analysis')) && (
             <details className="m-section" style={{ marginTop: 8 }}>
               <summary style={{ cursor: 'pointer', fontSize: 13, color: 'var(--ink-2)', userSelect: 'none' }}>
-                高级选项（总结模板 / 字幕 / 音乐提示词）
+                高级选项（字幕 / 说话人 / 音乐提示词）
               </summary>
               <div style={{ marginTop: 12, display: 'grid', gap: 12 }}>
-                {/* 总结深度 —— 视频文案总结 */}
-                {anyHas('video_summary') && (
-                  <div>
-                    <div className="field-label">总结深度</div>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {['简洁', '详细', '带画面引用'].map((v) => (
-                        <button key={v} type="button" className="task-chip"
-                          data-on={advOpts.summary_depth === v ? 'true' : 'false'}
-                          onClick={() => setAdv({ summary_depth: v })}
-                        >{v}</button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {/* 总结模板 —— 音频转写+总结 */}
-                {anyHas('transcribe_summary') && (
-                  <div>
-                    <div className="field-label">总结模板</div>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {[
-                        { v: 'concise', l: '简洁摘要' },
-                        { v: 'detailed', l: '详细要点' },
-                        { v: 'quotes', l: '金句提取' },
-                        { v: 'meeting', l: '会议纪要' },
-                        { v: 'xhs', l: '小红书风格' },
-                        { v: 'longform', l: '公众号长文' },
-                        { v: 'lecture', l: '教学笔记' },
-                        { v: 'interview', l: '访谈整理' },
-                        { v: 'shownotes', l: '播客 shownotes' },
-                      ].map(({ v, l }) => (
-                        <button key={v} type="button" className="task-chip"
-                          data-on={advOpts.summary_template === v ? 'true' : 'false'}
-                          onClick={() => setAdv({ summary_template: v })}
-                        >{l}</button>
-                      ))}
-                    </div>
-                  </div>
-                )}
                 {/* 字幕选项 —— 音频有字幕导出时 */}
                 {anyHas('subtitle_export') && (
                   <div>
@@ -1078,136 +1124,26 @@ export function AddMaterialModal({
             </details>
           )}
 
-          {/* ④ 背景信息 */}
-          <div className="m-section">
-            <button
-              type="button"
-              onClick={() => setBgOpen((o) => !o)}
-              className="bg-toggle"
-            >
-              <Sparkles size={14} className="bg-toggle-icon" />
-              <span className="mono bg-toggle-label">
-                ④ 背景信息（可选 · 强烈推荐）
-              </span>
-              <span className="kw bg-toggle-tag">
-                注入所有 AI 调用
-              </span>
-              <ChevronDown
-                size={12}
-                className="bg-toggle-chevron"
-                data-open={bgOpen ? 'true' : 'false'}
-              />
-            </button>
-
-            {bgOpen && (
-              <div className="bg-panel" style={{ marginTop: 10 }}>
-                {/* 内容类型 */}
-                <div>
-                  <div className="field-label">
-                    内容类型 <span style={{ opacity: 0.5 }}>· 影响分析视角</span>
-                  </div>
-                  <div className="pill-row">
-                    {BG_CONTENT_TYPES.map((ct) => {
-                      const current = bgOverrides.content_type ?? mergedBg?.content_type
-                      const on = current === ct
-                      return (
-                        <button
-                          key={ct}
-                          type="button"
-                          className="pill"
-                          data-on={on ? 'true' : 'false'}
-                          onClick={() =>
-                            updateBg('content_type', on ? '' : ct)
-                          }
-                        >
-                          {ct}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                {/* 参与人物 */}
-                <div>
-                  <div className="field-label">
-                    参与人物 <span style={{ opacity: 0.5 }}>· 用于说话人识别匹配</span>
-                  </div>
-                  <input
-                    className="field-input"
-                    placeholder={mergedBg?.participants?.join(', ') || '张总、李总、产品负责人…'}
-                    value={bgOverrides.participants?.join(', ') ?? ''}
-                    onChange={(e) =>
-                      updateBg(
-                        'participants',
-                        e.target.value ? e.target.value.split(/[,，]/).map((s) => s.trim()) : [],
-                      )
-                    }
-                  />
-                </div>
-
-                {/* 主题背景 */}
-                <div>
-                  <div className="field-label">
-                    主题背景 <span style={{ opacity: 0.5 }}>· 注入 LLM 上下文</span>
-                  </div>
-                  <input
-                    className="field-input"
-                    placeholder={mergedBg?.topic || 'Q3 战略会议 · AI 工具评测…'}
-                    value={bgOverrides.topic ?? ''}
-                    onChange={(e) => updateBg('topic', e.target.value)}
-                  />
-                </div>
-
-                {/* 专有名词 */}
-                <div>
-                  <div className="field-label">
-                    专有名词 <span style={{ opacity: 0.5 }}>· 提升 Whisper 识别准确率</span>
-                  </div>
-                  <input
-                    className="field-input"
-                    placeholder={mergedBg?.glossary?.join(', ') || 'Pocket 4, D-Log M, ProRes RAW…'}
-                    value={bgOverrides.glossary?.join(', ') ?? ''}
-                    onChange={(e) =>
-                      updateBg(
-                        'glossary',
-                        e.target.value ? e.target.value.split(/[,，]/).map((s) => s.trim()) : [],
-                      )
-                    }
-                  />
-                </div>
-
-                {/* 分析目的 */}
-                <div>
-                  <div className="field-label">
-                    分析目的 <span style={{ opacity: 0.5 }}>· 影响总结侧重点</span>
-                  </div>
-                  <div className="pill-row">
-                    {BG_PURPOSES.map((p) => {
-                      const current = bgOverrides.purpose ?? mergedBg?.purpose
-                      const on = current === p
-                      return (
-                        <button
-                          key={p}
-                          type="button"
-                          className="pill"
-                          data-on={on ? 'true' : 'false'}
-                          onClick={() =>
-                            updateBg('purpose', on ? '' : p)
-                          }
-                        >
-                          {p}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                <div className="mono" style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 2 }}>
-                  以上信息将注入到所有后续 AI 调用（视觉分析 · 文本总结 · LLM 对话），提升准确率。
-                </div>
+          {/* ④ 识别用背景（文字素材跳过） */}
+          {!selectedTypes.every(t => t === 'text') && (
+            <div className="m-section">
+              <div className="eyebrow" style={{ marginBottom: 10 }}>
+                ④ 识别用背景（可选 · 喂给 ASR/VLM 提升专有名词识别）
               </div>
-            )}
-          </div>
+              <textarea
+                className="field-input"
+                style={{ minHeight: 60, resize: 'vertical', width: '100%' }}
+                placeholder="主题背景、参与人物、专有名词…（如：Q3 战略会议，张总介绍 Pocket 4 拍摄技巧）"
+                value={backgroundForRecognition}
+                onChange={(e) => setBackgroundForRecognition(e.target.value)}
+              />
+              {linkPreviewSource && (
+                <div className="mono" style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 4 }}>
+                  已自动从{linkPreviewSource}抓取，可手动修改
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ── m-foot ── */}

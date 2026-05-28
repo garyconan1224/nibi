@@ -23,6 +23,10 @@ vi.mock('@/lib/modelMemory', () => ({
   saveModelMemory: vi.fn(),
 }))
 
+vi.mock('@/services/linkPreview', () => ({
+  fetchLinkPreview: vi.fn(),
+}))
+
 describe('AddMaterialModal', () => {
   it('sniff 返回 image+text 两种类型时应默认全选', () => {
     render(
@@ -41,11 +45,13 @@ describe('AddMaterialModal', () => {
       />,
     )
 
-    const cards = screen.getAllByRole('button', { name: /图片|文字/ })
-    expect(cards).toHaveLength(2)
-    for (const card of cards) {
-      expect(card.dataset.active).toBe('true')
-    }
+    // ① 区域：图片和文字类型卡都应该 active
+    const imageCard = screen.getByRole('button', { name: /^图片/ })
+    const textCard = screen.getByRole('button', { name: /^文字/ })
+    expect(imageCard.dataset.active).toBe('true')
+    expect(textCard.dataset.active).toBe('true')
+    // 图片采集模式应显示
+    expect(screen.getByText('图片采集模式')).toBeTruthy()
   })
 
   it('sniff 返回单一类型时 locked 单选', () => {
@@ -316,7 +322,7 @@ describe('AddMaterialModal', () => {
     expect(screen.getByLabelText('按秒截帧')).toBeTruthy()
   })
 
-  it('av_combined 不勾画面分析 → 图片模型下拉 + 截帧模式消失', () => {
+  it('av_combined 不勾画面分析 → 图片模型下拉消失', () => {
     render(
       <AddMaterialModal
         open={true}
@@ -340,7 +346,8 @@ describe('AddMaterialModal', () => {
 
     // 图片模型 provider 下拉应不存在
     expect(screen.queryByDisplayValue('图片模型 Provider')).toBeNull()
-    expect(screen.queryByLabelText('AI 镜头分析')).toBeNull()
+    // 截帧模式仍在③-b 视频用途模式的复刻模式下显示，不受影响
+    expect(screen.getByLabelText('AI 镜头分析')).toBeTruthy()
   })
 
   it('av_combined 勾选综合笔记 → 显示文本模型下拉', () => {
@@ -389,5 +396,128 @@ describe('AddMaterialModal', () => {
     // image 类型没有综合笔记/画面分析 chip → 无 picker
     expect(screen.queryByDisplayValue('文本模型 Provider')).toBeNull()
     expect(screen.queryByDisplayValue('图片模型 Provider')).toBeNull()
+  })
+
+  // ── R21.P3.S1 新增用例 ──
+
+  it('文字素材跳过③④区域，直接显示提交按钮', () => {
+    render(
+      <AddMaterialModal
+        open={true}
+        onOpenChange={vi.fn()}
+        workspaceIds={['ws-1']}
+        sniffResult={{
+          primary_type: 'text',
+          possible_types: ['text'],
+          platform: null,
+          title: null,
+          thumbnail: null,
+          content_type_header: null,
+        }}
+      />,
+    )
+
+    // 文字素材不显示③ 分析任务和④ 识别用背景
+    expect(screen.queryByText(/勾选分析任务/)).toBeNull()
+    expect(screen.queryByText(/识别用背景/)).toBeNull()
+    // 但仍显示提交按钮
+    expect(screen.getByText('一键解析')).toBeTruthy()
+  })
+
+  it('图片素材必须选「复刻 or OCR」其一', () => {
+    render(
+      <AddMaterialModal
+        open={true}
+        onOpenChange={vi.fn()}
+        workspaceIds={['ws-1']}
+        sniffResult={{
+          primary_type: 'image',
+          possible_types: ['image'],
+          platform: null,
+          title: null,
+          thumbnail: null,
+          content_type_header: null,
+        }}
+      />,
+    )
+
+    // 图片采集模式应显示
+    expect(screen.getByText('图片采集模式')).toBeTruthy()
+    // 默认选中「提示词复刻」
+    const replicaBtn = screen.getByRole('button', { name: /提示词复刻/ })
+    expect(replicaBtn.dataset.active).toBe('true')
+    // 切换到 OCR
+    const ocrBtn = screen.getByRole('button', { name: /OCR 识别/ })
+    fireEvent.click(ocrBtn)
+    expect(ocrBtn.dataset.active).toBe('true')
+    expect(replicaBtn.dataset.active).toBe('false')
+  })
+
+  it('视频素材学习/复刻切换 → 子参数变化', () => {
+    render(
+      <AddMaterialModal
+        open={true}
+        onOpenChange={vi.fn()}
+        workspaceIds={['ws-1']}
+        sniffResult={{
+          primary_type: 'video',
+          possible_types: ['video'],
+          platform: 'bilibili',
+          title: 'test video',
+          thumbnail: null,
+          content_type_header: null,
+        }}
+      />,
+    )
+
+    // 视频用途模式应显示
+    expect(screen.getByText('视频用途模式')).toBeTruthy()
+    // 默认选中「复刻/创作」
+    const replicaBtn = screen.getByRole('button', { name: /复刻\/创作/ })
+    expect(replicaBtn.dataset.active).toBe('true')
+    // 复刻模式下应显示截帧策略
+    expect(screen.getByLabelText('AI 镜头分析')).toBeTruthy()
+
+    // 切换到学习模式
+    const learningBtn = screen.getByRole('button', { name: /学习\/课程/ })
+    fireEvent.click(learningBtn)
+    expect(learningBtn.dataset.active).toBe('true')
+    // 学习模式下应显示 ASR 必开 + 说话人 + 音乐分析
+    expect(screen.getByText(/ASR 转写（学习模式必开）/)).toBeTruthy()
+    expect(screen.getByText(/区分说话人音色/)).toBeTruthy()
+    // 音乐分析在③ 区域和③-b 区域都可能出现，用 getAllByText
+    expect(screen.getAllByText(/音乐分析/).length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('链接预填回填识别用背景', async () => {
+    const { fetchLinkPreview } = await import('@/services/linkPreview')
+    vi.mocked(fetchLinkPreview).mockResolvedValue({
+      title: '测试标题',
+      description: '测试描述',
+      image_url: null,
+      source: 'og',
+    })
+
+    render(
+      <AddMaterialModal
+        open={true}
+        onOpenChange={vi.fn()}
+        workspaceIds={['ws-1']}
+        urlValue="https://example.com/article"
+        sniffResult={{
+          primary_type: 'video',
+          possible_types: ['video'],
+          platform: null,
+          title: null,
+          thumbnail: null,
+          content_type_header: null,
+        }}
+      />,
+    )
+
+    // 等待 debounce + 异步回填
+    const textarea = await screen.findByDisplayValue(/测试标题/)
+    expect(textarea).toBeTruthy()
+    expect(screen.getByText(/已自动从网页抓取/)).toBeTruthy()
   })
 })
