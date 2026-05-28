@@ -42,6 +42,7 @@ from pydantic import BaseModel, Field
 
 from backend.app.models.workspace import (
     ItemStatus,
+    ItemSummary,
     ItemType,
     PreflightConfig,
     WorkspaceBackground,
@@ -50,6 +51,8 @@ from backend.app.models.workspace import (
     WorkspaceStatus,
 )
 from backend.app.services.audio_result_demo import build_demo_audio_result
+from backend.app.services.summary_generator import generate_summary
+from backend.app.services.summary_templates import list_template_ids
 from backend.app.services.video_result_demo import build_demo_video_result
 from backend.app.services.workspace_search_service import search_one_workspace
 from backend.app.services.workspace_store import WorkspaceStore
@@ -2276,3 +2279,90 @@ def update_speaker_map(
     results["speaker_map"] = req.speaker_map
     _store.update_item(workspace_id, item_id, results=results)
     return {"speaker_map": req.speaker_map}
+
+
+# ── 总结 CRUD ──────────────────────────────────────────────────
+
+
+class SummaryCreateRequest(BaseModel):
+    """生成总结请求体。"""
+
+    template: str = Field(..., description="模板 id（concise / detailed / ...）")
+    background_for_summary: str = Field("", description="总结用背景信息（可选）")
+
+
+def _ensure_valid_template(template_id: str) -> None:
+    if template_id not in list_template_ids():
+        raise HTTPException(
+            status_code=400,
+            detail=f"未知模板: {template_id}，可用: {', '.join(list_template_ids())}",
+        )
+
+
+@router.get("/{workspace_id}/items/{item_id}/summaries")
+def list_summaries(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
+    """列出该 item 的所有总结（按 template 分组，按 version 排序）。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+    # 按 template 分组再按 version 排序
+    sorted_summaries = sorted(item.summaries, key=lambda s: (s.template, s.version))
+    return [s.to_dict() for s in sorted_summaries]
+
+
+@router.post("/{workspace_id}/items/{item_id}/summaries", status_code=201)
+async def create_summary(
+    workspace_id: str, item_id: str, req: SummaryCreateRequest
+) -> Dict[str, Any]:
+    """同步生成一份总结并落盘。LLM 调用可能耗时 5-15s。"""
+    from fastapi.concurrency import run_in_threadpool
+
+    _ensure_valid_template(req.template)
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+
+    next_ver = _store.next_version_for_template(workspace_id, item_id, req.template)
+
+    def _do_generate() -> ItemSummary:
+        summary = generate_summary(item, req.template, req.background_for_summary)
+        summary.version = next_ver
+        return summary
+
+    try:
+        summary = await run_in_threadpool(_do_generate)
+    except RuntimeError as err:
+        raise HTTPException(status_code=500, detail=str(err)) from err
+    except Exception as err:
+        raise HTTPException(status_code=502, detail=f"LLM 调用失败: {err}") from err
+
+    _store.add_item_summary(workspace_id, item_id, summary)
+    return summary.to_dict()
+
+
+@router.get("/{workspace_id}/items/{item_id}/summaries/{summary_id}")
+def get_summary(workspace_id: str, item_id: str, summary_id: str) -> Dict[str, Any]:
+    """取单份总结详情。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+    summary = next((s for s in item.summaries if s.summary_id == summary_id), None)
+    if summary is None:
+        raise HTTPException(status_code=404, detail=f"summary not found: {summary_id}")
+    return summary.to_dict()
+
+
+@router.delete("/{workspace_id}/items/{item_id}/summaries/{summary_id}")
+def delete_summary(workspace_id: str, item_id: str, summary_id: str) -> Dict[str, str]:
+    """硬删指定总结。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    _find_item(rec, item_id)  # 确认 item 存在
+    deleted = _store.delete_item_summary(workspace_id, item_id, summary_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"summary not found: {summary_id}")
+    return {"status": "deleted", "summary_id": summary_id}
