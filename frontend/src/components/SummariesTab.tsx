@@ -20,6 +20,10 @@ import {
 
 import './summaries-tab.css'
 
+// remarkGfm 类型与 react-markdown 不完全兼容，统一 cast 一次
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const remarkPlugins: any[] = [remarkGfm]
+
 /* ── 模板选项（与 backend summary_templates.py 对齐） ────────── */
 
 const TEMPLATE_OPTIONS: { value: string; label: string }[] = [
@@ -262,7 +266,7 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
               </span>
             </div>
             <div className="sm-main-content">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <ReactMarkdown remarkPlugins={remarkPlugins}>
                 {selected.content_md}
               </ReactMarkdown>
             </div>
