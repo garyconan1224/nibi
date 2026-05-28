@@ -1730,6 +1730,7 @@ def get_item_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
                 "transcript_count": len(payload.get("transcript", [])),
             },
         )
+        payload.setdefault("intent", item.preflight.intent)
         return payload
 
     return build_demo_video_result(item.item_id, item.name)

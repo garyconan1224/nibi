@@ -26,6 +26,14 @@ import {
 import { TripleTrack } from './TripleTrack'
 import { nearestFrameIdx } from './helpers'
 import { ItemTagsPanel } from '@/components/workspace/ItemTagsPanel'
+import { FramePickerModal, type FrameItem } from '@/components/FramePickerModal'
+import {
+  type InlineFrame,
+  type SuggestedFrame,
+  listInlineFrames,
+  getSuggestedFrames,
+  saveInlineFrames,
+} from '@/services/inlineFrames'
 
 import './tokens.css'
 import './result.css'
@@ -73,6 +81,12 @@ export default function VideoResultPage() {
   const [pickerSelection, setPickerSelection] = useState<string[]>([])
   const [promptVersions, setPromptVersions] = useState<PromptVersion[]>([])
   const [exportOpen, setExportOpen] = useState(false)
+
+  // 学习模式补图
+  const [inlineFrames, setInlineFrames] = useState<InlineFrame[]>([])
+  const [suggestedFrames, setSuggestedFrames] = useState<SuggestedFrame[]>([])
+  const [framePickerOpen, setFramePickerOpen] = useState(false)
+  const [framePickerSegmentIdx, setFramePickerSegmentIdx] = useState(0)
 
   const handleExportSubtitles = async (format: 'srt' | 'vtt' | 'ass') => {
     setExportOpen(false)
@@ -124,6 +138,62 @@ export default function VideoResultPage() {
   const frames = useMemo(() => result?.frames ?? [], [result])
   const transcript = useMemo(() => result?.transcript ?? [], [result])
   const totalSec = result?.tracks_meta.total_sec ?? 0
+  const isLearning = result?.intent === 'learning'
+
+  // 加载 inline_frames + 推荐（仅学习模式）
+  useEffect(() => {
+    if (!isLearning) return
+    let cancelled = false
+    listInlineFrames(workspaceId, itemId)
+      .then((data) => { if (!cancelled) setInlineFrames(data) })
+      .catch(() => {})
+    getSuggestedFrames(workspaceId, itemId)
+      .then((data) => { if (!cancelled) setSuggestedFrames(data) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [workspaceId, itemId, isLearning])
+
+  // inline_frames 保存（防抖 500ms）
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const debouncedSave = useCallback(
+    (frames: InlineFrame[]) => {
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+      saveTimer.current = setTimeout(() => {
+        saveInlineFrames(workspaceId, itemId, frames).catch(() => {
+          toast.error('保存插图失败')
+        })
+      }, 500)
+    },
+    [workspaceId, itemId],
+  )
+
+  const handleInsertFrame = useCallback(
+    (frame: FrameItem) => {
+      const newFrame: InlineFrame = {
+        segment_idx: framePickerSegmentIdx,
+        frame_timestamp: frame.timestamp,
+        frame_path: frame.image_path,
+        source: 'user',
+        created_at: new Date().toISOString(),
+      }
+      const next = [...inlineFrames, newFrame]
+      setInlineFrames(next)
+      debouncedSave(next)
+      setFramePickerOpen(false)
+      toast.success('已插入帧')
+    },
+    [inlineFrames, framePickerSegmentIdx, debouncedSave],
+  )
+
+  const handleDeleteInlineFrame = useCallback(
+    (segmentIdx: number) => {
+      const next = inlineFrames.filter((f) => f.segment_idx !== segmentIdx)
+      setInlineFrames(next)
+      debouncedSave(next)
+      toast.success('已删除插图')
+    },
+    [inlineFrames, debouncedSave],
+  )
 
   // currentSec → activeFrame 派生（避免在 effect 里 setState 产生级联渲染）
   const activeFrame = useMemo(() => {
@@ -461,12 +531,48 @@ export default function VideoResultPage() {
                 </span>
               </div>
               <div style={{ maxHeight: 400, overflow: 'auto' }}>
-                {transcript.map((line, idx) => (
-                  <div key={idx} className="vd-transcript-line">
-                    <span className="vd-transcript-ts">{line.t_str}</span>
-                    <span className="vd-transcript-text">{line.text}</span>
-                  </div>
-                ))}
+                {transcript.map((line, idx) => {
+                  const insertedFrame = inlineFrames.find((f) => f.segment_idx === idx)
+                  return (
+                    <div key={idx}>
+                      <div className="vd-transcript-line">
+                        <span className="vd-transcript-ts">{line.t_str}</span>
+                        <span className="vd-transcript-text">{line.text}</span>
+                        {isLearning && (
+                          <button
+                            className="vd-insert-frame-btn"
+                            title="插入关键帧截图"
+                            onClick={() => {
+                              setFramePickerSegmentIdx(idx)
+                              setFramePickerOpen(true)
+                            }}
+                          >
+                            📷
+                          </button>
+                        )}
+                      </div>
+                      {insertedFrame && (
+                        <div className="vd-inline-frame">
+                          <img
+                            src={insertedFrame.frame_path}
+                            alt=""
+                            className="vd-inline-frame-img"
+                          />
+                          <span className="vd-inline-frame-ts">
+                            {formatSec(insertedFrame.frame_timestamp)}
+                          </span>
+                          <button
+                            className="vd-inline-frame-del"
+                            onClick={() => handleDeleteInlineFrame(idx)}
+                            title="删除插图"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -478,6 +584,21 @@ export default function VideoResultPage() {
             </div>
           )}
         </div>
+
+        {/* 帧选择器弹窗 */}
+        {framePickerOpen && (
+          <FramePickerModal
+            frames={frames.map((f) => ({
+              timestamp: f.sec,
+              image_path: f.image_path || '',
+              scene_description: f.description || '',
+            }))}
+            suggested={suggestedFrames}
+            currentSegmentIdx={framePickerSegmentIdx}
+            onSelect={handleInsertFrame}
+            onClose={() => setFramePickerOpen(false)}
+          />
+        )}
       </div>
     )
   }
