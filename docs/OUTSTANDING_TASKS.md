@@ -2,22 +2,22 @@
 
 > 本文件是「下一步该做什么」的快照。写入前必须先 `git log --oneline -20` 对账，避免把已完成阶段当作待办。
 
-Last updated: 2026-05-25（**当前阶段 = Phase R12 merge 前收口**）
+Last updated: 2026-05-29（**当前阶段 = R21.P3.S3 followup 待 merge → 音视频端到端打通**）
 
 ---
 
 ## 🔴 当前阶段（一切让路）
 
-**Phase R12 已在 `feat/phase-r12-processing-page-replica` 完成并通过验证，下一步是用户授权后本地 merge 到 `main`。不 push origin。**
+**R14~R21 全系列已合入 main（以 git log 为准）；分支 `fix/r21-p3-s3-followup`（R21.P3.S3 followup，preflight intent 链路修复 + av_combined 补图入口）已 `status: done`，下一步用户授权后本地 merge 到 `main`。不 push origin。**
 
-- R0~R6 已完成：输入层重构、AddMaterialModal 4 步合一、PreflightDrawer 接管细粒度参数、端到端冒烟。
-- R7 已完成：输入流统一收尾。
-- R8 已完成：PreflightDrawer Remix 复刻 + R8 tasks payload 落地。
-- R10 已完成：平台 URL 音频 hotfix + FloatingTaskQueue v2。
-- R11 已完成并合入 local main：设计稿同步 / token 文档 canonicalize。
-- R12 已完成：ProcessingPage 真实标题/封面/stats、step-stream 日志、系统资源卡、任务侧栏卡。
-- R12 验证：后端 pytest 320 passed / 2 skipped；前端 vitest 47 passed；前端 build passed；R12 touched files targeted eslint passed。
-- `pnpm lint` 全量仍有 47 errors / 1 warning，属于项目存量 lint 基线。
+下一步方向（用户 2026-05-29 决议）：**音频 + 视频两条线从输入链接 → 任务 → 落地页完整端到端打通**，确保音视频闭环到位，再做文字 / 图片深化。
+
+短期任务池（按依赖排序）：
+1. followup 分支 merge 进 main（5min）
+2. 音视频端到端冒烟回归（用户跑，~30min，记录断点）
+3. N7b 路径3 视频大模型直接分析后端（8-12h，**卡 API 选型** Gemini/GPT-4o/Qwen-VL）
+4. N8b 音频 librosa 6 维度切分后端（6-8h）
+5. R20 笔记 PDF/Word/Obsidian 导出（R19 押后项）
 
 ---
 
@@ -32,7 +32,7 @@ Last updated: 2026-05-25（**当前阶段 = Phase R12 merge 前收口**）
 - **N7b/N8b UI 已就绪**，后端 handler 待实现：
   - N7b 路径 3（视频模型直接）— 依赖 Gemini / GPT-4o / Qwen-VL API 集成决策
   - N8b 音频 librosa 分析（6 维度切分）
-- **推荐下一步：R12 本地 merge 收口** — 确认 `feat/phase-r12-processing-page-replica` 后 merge 到 local main；不 push origin。
+- **推荐下一步：followup merge + 音视频端到端回归** — merge `fix/r21-p3-s3-followup` 到 local main 后，跑音视频端到端冒烟记录断点；不 push origin。
 - Push 策略不变：所有 `git push origin` 暂缓到 `[D]` 开源准备阶段。
 
 ## P0 — 已知收口事项
