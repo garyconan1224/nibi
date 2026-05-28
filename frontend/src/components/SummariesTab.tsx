@@ -11,6 +11,8 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { toast } from 'sonner'
 
+const MAX_COMPARE = 3
+
 import {
   createSummary,
   deleteSummary,
@@ -83,6 +85,10 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
   const [selected, setSelected] = useState<ItemSummary | null>(null)
   const [showNew, setShowNew] = useState(false)
   const [creating, setCreating] = useState(false)
+
+  // 对比模式
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isCompareMode, setIsCompareMode] = useState(false)
 
   // 新建表单状态
   const [newTemplate, setNewTemplate] = useState('concise')
@@ -160,9 +166,39 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
     }
   }, [selected])
 
+  /* ── 对比模式 ────────────────────────────────────────────── */
+
+  const toggleSelect = useCallback((summaryId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(summaryId)) {
+        next.delete(summaryId)
+      } else if (next.size < MAX_COMPARE) {
+        next.add(summaryId)
+      } else {
+        toast.warning(`最多对比 ${MAX_COMPARE} 份`)
+      }
+      return next
+    })
+  }, [])
+
+  const enterCompare = useCallback(() => {
+    setIsCompareMode(true)
+  }, [])
+
+  const exitCompare = useCallback(() => {
+    setIsCompareMode(false)
+    setSelectedIds(new Set())
+  }, [])
+
   /* ── 分组 ────────────────────────────────────────────────── */
 
   const groups = useMemo(() => groupByTemplate(summaries), [summaries])
+
+  const compareItems = useMemo(
+    () => summaries.filter((s) => selectedIds.has(s.summary_id)),
+    [summaries, selectedIds],
+  )
 
   /* ── 渲染 ────────────────────────────────────────────────── */
 
@@ -176,13 +212,25 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
       <aside className="sm-sidebar">
         <div className="sm-sidebar-header">
           <span style={{ fontWeight: 600, fontSize: 13 }}>总结列表</span>
-          <button
-            className="sm-btn-new"
-            onClick={() => setShowNew(!showNew)}
-            title="新建总结"
-          >
-            + 新建
-          </button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {selectedIds.size >= 2 && !isCompareMode && (
+              <button className="sm-btn-compare" onClick={enterCompare}>
+                ⇄ 进入对比 ({selectedIds.size})
+              </button>
+            )}
+            {isCompareMode && (
+              <button className="sm-btn-compare" onClick={exitCompare}>
+                ✕ 退出对比
+              </button>
+            )}
+            <button
+              className="sm-btn-new"
+              onClick={() => setShowNew(!showNew)}
+              title="新建总结"
+            >
+              + 新建
+            </button>
+          </div>
         </div>
 
         {/* 新建面板 */}
@@ -235,6 +283,18 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
                 className={`sm-version-item ${selected?.summary_id === s.summary_id ? 'active' : ''}`}
                 onClick={() => setSelected(s)}
               >
+                <input
+                  type="checkbox"
+                  className="sm-checkbox"
+                  checked={selectedIds.has(s.summary_id)}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={() => toggleSelect(s.summary_id)}
+                  title={
+                    !selectedIds.has(s.summary_id) && selectedIds.size >= MAX_COMPARE
+                      ? `最多对比 ${MAX_COMPARE} 份`
+                      : undefined
+                  }
+                />
                 <span>v{s.version}</span>
                 <button
                   className="sm-btn-delete"
@@ -253,8 +313,48 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
       </aside>
 
       {/* 右侧主显示 */}
-      <main className="sm-main">
-        {selected ? (
+      <main className={`sm-main ${isCompareMode ? 'sm-compare' : ''}`}>
+        {isCompareMode ? (
+          /* 对比模式：多栏并排 */
+          <div className="sm-compare-columns">
+            {compareItems.map((s) => (
+              <div key={s.summary_id} className="sm-compare-col">
+                <div className="sm-compare-col-head">
+                  <span className="sm-main-title">
+                    {templateLabel(s.template)} v{s.version}
+                  </span>
+                  <span className="sm-main-meta">
+                    {new Date(s.created_at).toLocaleString()}
+                    {s.model_used && ` · ${s.model_used}`}
+                  </span>
+                  <button
+                    className="sm-btn-delete"
+                    onClick={() => handleDelete(s.summary_id)}
+                    title="删除"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="sm-compare-col-body">
+                  <ReactMarkdown remarkPlugins={remarkPlugins}>
+                    {s.content_md}
+                  </ReactMarkdown>
+                </div>
+                <div className="sm-compare-col-actions">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(s.content_md)
+                      toast.success('已复制')
+                    }}
+                  >
+                    复制 markdown
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : selected ? (
+          /* 单栏模式 */
           <>
             <div className="sm-main-header">
               <span className="sm-main-title">

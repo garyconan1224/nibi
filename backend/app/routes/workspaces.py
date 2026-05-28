@@ -41,6 +41,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from backend.app.models.workspace import (
+    InlineFrame,
     ItemStatus,
     ItemSummary,
     ItemType,
@@ -1547,6 +1548,21 @@ def _video_result_has_real_data(results: Dict[str, Any]) -> bool:
     return bool(frames) and isinstance(frames, list) and isinstance(transcript, list)
 
 
+def _parse_ts_to_sec(ts: str) -> float:
+    """把 'MM:SS' 或 'HH:MM:SS' 或纯数字字符串转成秒数。"""
+    parts = ts.strip().split(":")
+    try:
+        if len(parts) == 1:
+            return float(parts[0])
+        if len(parts) == 2:
+            return int(parts[0]) * 60 + int(parts[1])
+        if len(parts) == 3:
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+    except (ValueError, IndexError):
+        pass
+    return 0.0
+
+
 def _materialize_video_results_from_analyze(
     results: Dict[str, Any],
     preferred_basenames: Optional[List[str]] = None,
@@ -1635,12 +1651,31 @@ def _materialize_video_results_from_analyze(
                     img_path = "/static/" + str(candidate.relative_to(data_root)).replace("\\", "/")
                 except ValueError:
                     img_path = ""
+        raw_ts = fr.get("timestamp", "")
+        # 统一成数值 sec（前端 VideoResultFrame.sec 期望 number）
+        if isinstance(raw_ts, (int, float)):
+            sec_val = float(raw_ts)
+        elif isinstance(raw_ts, str) and raw_ts.strip():
+            sec_val = _parse_ts_to_sec(raw_ts.strip())
+        else:
+            sec_val = float(idx)  # fallback: 帧序号当秒数
         frames.append({
+            "idx": idx,
+            "sec": sec_val,
+            "ts": raw_ts if isinstance(raw_ts, str) else str(raw_ts),
             "frame_index": idx,
-            "timestamp": fr.get("timestamp", ""),
+            "timestamp": raw_ts,
             "description": fr.get("description_zh") or fr.get("description") or "",
             "frame_image_path": img_path,
             "image_path": img_path,
+            # 兼容前端 VideoResultFrame 的可选字段
+            "shot_type": fr.get("shot_type", ""),
+            "title": fr.get("title", ""),
+            "subtitle": fr.get("subtitle", ""),
+            "prompt_mj": fr.get("prompt_mj", ""),
+            "prompt_sd": fr.get("prompt_sd", {"positive": "", "negative": ""}),
+            "prompt_video": fr.get("prompt_video", ""),
+            "tags": fr.get("tags", {}),
         })
     return {
         **results,
@@ -1729,6 +1764,7 @@ def get_item_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
                 "transcript_count": len(payload.get("transcript", [])),
             },
         )
+        payload.setdefault("intent", item.preflight.intent)
         return payload
 
     return build_demo_video_result(item.item_id, item.name)
@@ -2366,3 +2402,81 @@ def delete_summary(workspace_id: str, item_id: str, summary_id: str) -> Dict[str
     if not deleted:
         raise HTTPException(status_code=404, detail=f"summary not found: {summary_id}")
     return {"status": "deleted", "summary_id": summary_id}
+
+
+# ── InlineFrames（学习模式视频按需补图）───────────────────────────
+
+
+@router.get("/{workspace_id}/items/{item_id}/inline-frames")
+def list_inline_frames(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
+    """列出已插入的帧（按 segment_idx 排序）。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+    frames = sorted(item.inline_frames, key=lambda f: f.segment_idx)
+    return [f.to_dict() for f in frames]
+
+
+@router.get("/{workspace_id}/items/{item_id}/inline-frames/suggested")
+def get_suggested_inline_frames(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
+    """临时计算返回系统推荐的帧位置（不持久化）。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+
+    if item.preflight.intent != "learning":
+        return []
+
+    results = item.results or {}
+    # av_combined 路径的 frames 在 json_outputs 里，需要物化
+    if not results.get("frames") and results.get("json_outputs"):
+        results = _materialize_video_results_from_analyze(results)
+    frames = results.get("frames") or []
+    transcript = results.get("transcript") or []
+
+    if not frames or not transcript:
+        return []
+
+    from backend.app.services.inline_frame_suggester import suggest_inline_frames
+
+    # transcript 格式：Video 用 { t_sec, t_str, text }，转成 { start, text }
+    segments = []
+    for t in transcript:
+        start = t.get("t_sec") or _ts_str_to_sec(t.get("t_str", "0:00"))
+        segments.append({"start": start, "text": t.get("text", "")})
+
+    return suggest_inline_frames(frames, segments)
+
+
+def _ts_str_to_sec(ts: str) -> float:
+    """把 'MM:SS' 或 'HH:MM:SS' 转成秒数。"""
+    parts = str(ts).strip().split(":")
+    try:
+        if len(parts) == 2:
+            return int(parts[0]) * 60 + int(parts[1])
+        if len(parts) == 3:
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+    except ValueError:
+        pass
+    return 0.0
+
+
+class InlineFramesSaveRequest(BaseModel):
+    inline_frames: List[Dict[str, Any]]
+
+
+@router.put("/{workspace_id}/items/{item_id}/inline-frames")
+def save_inline_frames(
+    workspace_id: str, item_id: str, req: InlineFramesSaveRequest
+) -> Dict[str, Any]:
+    """整体覆盖式保存 inline_frames。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    _find_item(rec, item_id)
+
+    frames = [InlineFrame.from_dict(f) for f in req.inline_frames]
+    saved = _store.save_inline_frames(workspace_id, item_id, frames)
+    return {"status": "saved", "count": len(saved)}

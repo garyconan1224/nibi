@@ -26,6 +26,15 @@ import {
 import { TripleTrack } from './TripleTrack'
 import { nearestFrameIdx } from './helpers'
 import { ItemTagsPanel } from '@/components/workspace/ItemTagsPanel'
+import { SummariesTab } from '@/components/SummariesTab'
+import { FramePickerModal, type FrameItem } from '@/components/FramePickerModal'
+import {
+  type InlineFrame,
+  type SuggestedFrame,
+  listInlineFrames,
+  getSuggestedFrames,
+  saveInlineFrames,
+} from '@/services/inlineFrames'
 
 import './tokens.css'
 import './result.css'
@@ -48,6 +57,19 @@ function formatSec(sec: number): string {
   const m = Math.floor(s / 60)
   const r = s % 60
   return `${m.toString().padStart(2, '0')}:${r.toString().padStart(2, '0')}`
+}
+
+/** 解析 'MM:SS' / 'HH:MM:SS' / 纯数字字符串为秒数 */
+function parseTsStr(ts: string | number): number {
+  if (typeof ts === 'number') return ts
+  if (!ts) return 0
+  const parts = ts.trim().split(':')
+  try {
+    if (parts.length === 1) return parseFloat(parts[0]) || 0
+    if (parts.length === 2) return parseInt(parts[0]) * 60 + parseInt(parts[1])
+    if (parts.length === 3) return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2])
+  } catch { /* ignore */ }
+  return 0
 }
 
 export default function VideoResultPage() {
@@ -73,6 +95,13 @@ export default function VideoResultPage() {
   const [pickerSelection, setPickerSelection] = useState<string[]>([])
   const [promptVersions, setPromptVersions] = useState<PromptVersion[]>([])
   const [exportOpen, setExportOpen] = useState(false)
+  const [contentTab, setContentTab] = useState<'content' | 'summary'>('content')
+
+  // 学习模式补图
+  const [inlineFrames, setInlineFrames] = useState<InlineFrame[]>([])
+  const [suggestedFrames, setSuggestedFrames] = useState<SuggestedFrame[]>([])
+  const [framePickerOpen, setFramePickerOpen] = useState(false)
+  const [framePickerSegmentIdx, setFramePickerSegmentIdx] = useState(0)
 
   const handleExportSubtitles = async (format: 'srt' | 'vtt' | 'ass') => {
     setExportOpen(false)
@@ -124,6 +153,62 @@ export default function VideoResultPage() {
   const frames = useMemo(() => result?.frames ?? [], [result])
   const transcript = useMemo(() => result?.transcript ?? [], [result])
   const totalSec = result?.tracks_meta.total_sec ?? 0
+  const isLearning = result?.intent === 'learning'
+
+  // 加载 inline_frames + 推荐（仅学习模式）
+  useEffect(() => {
+    if (!isLearning) return
+    let cancelled = false
+    listInlineFrames(workspaceId, itemId)
+      .then((data) => { if (!cancelled) setInlineFrames(data) })
+      .catch(() => {})
+    getSuggestedFrames(workspaceId, itemId)
+      .then((data) => { if (!cancelled) setSuggestedFrames(data) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [workspaceId, itemId, isLearning])
+
+  // inline_frames 保存（防抖 500ms）
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const debouncedSave = useCallback(
+    (frames: InlineFrame[]) => {
+      if (saveTimer.current) clearTimeout(saveTimer.current)
+      saveTimer.current = setTimeout(() => {
+        saveInlineFrames(workspaceId, itemId, frames).catch(() => {
+          toast.error('保存插图失败')
+        })
+      }, 500)
+    },
+    [workspaceId, itemId],
+  )
+
+  const handleInsertFrame = useCallback(
+    (frame: FrameItem) => {
+      const newFrame: InlineFrame = {
+        segment_idx: framePickerSegmentIdx,
+        frame_timestamp: frame.timestamp,
+        frame_path: frame.image_path,
+        source: 'user',
+        created_at: new Date().toISOString(),
+      }
+      const next = [...inlineFrames, newFrame]
+      setInlineFrames(next)
+      debouncedSave(next)
+      setFramePickerOpen(false)
+      toast.success('已插入帧')
+    },
+    [inlineFrames, framePickerSegmentIdx, debouncedSave],
+  )
+
+  const handleDeleteInlineFrame = useCallback(
+    (segmentIdx: number) => {
+      const next = inlineFrames.filter((f) => f.segment_idx !== segmentIdx)
+      setInlineFrames(next)
+      debouncedSave(next)
+      toast.success('已删除插图')
+    },
+    [inlineFrames, debouncedSave],
+  )
 
   // currentSec → activeFrame 派生（避免在 effect 里 setState 产生级联渲染）
   const activeFrame = useMemo(() => {
@@ -330,7 +415,7 @@ export default function VideoResultPage() {
       if (!frames.length) return
       const nextIdx = Math.max(0, Math.min(frames.length - 1, activeFrame + delta))
       const nf = frames[nextIdx]
-      seekTo(nf.sec)
+      seekTo(nf.sec ?? parseTsStr(nf.ts ?? nf.timestamp ?? ''))
     },
     [frames, activeFrame, seekTo],
   )
@@ -436,8 +521,32 @@ export default function VideoResultPage() {
           <ItemTagsPanel workspaceId={workspaceId} itemId={itemId} />
         </div>
 
+        {/* 内容/总结 tab 切换 */}
+        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--line)', padding: '0 20px', flexShrink: 0 }}>
+          <button
+            className="vd-tab-btn"
+            data-active={contentTab === 'content'}
+            onClick={() => setContentTab('content')}
+          >
+            内容
+          </button>
+          <button
+            className="vd-tab-btn"
+            data-active={contentTab === 'summary'}
+            onClick={() => setContentTab('summary')}
+          >
+            总结
+          </button>
+        </div>
+
         {/* Main content */}
         <div className="vd-subtitle-content">
+          {contentTab === 'summary' ? (
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              <SummariesTab workspaceId={workspaceId} itemId={itemId} />
+            </div>
+          ) : (
+          <>
           {/* Summary card */}
           {result.summary && (
             <div className="vd-card">
@@ -461,12 +570,48 @@ export default function VideoResultPage() {
                 </span>
               </div>
               <div style={{ maxHeight: 400, overflow: 'auto' }}>
-                {transcript.map((line, idx) => (
-                  <div key={idx} className="vd-transcript-line">
-                    <span className="vd-transcript-ts">{line.t_str}</span>
-                    <span className="vd-transcript-text">{line.text}</span>
-                  </div>
-                ))}
+                {transcript.map((line, idx) => {
+                  const insertedFrame = inlineFrames.find((f) => f.segment_idx === idx)
+                  return (
+                    <div key={idx}>
+                      <div className="vd-transcript-line">
+                        <span className="vd-transcript-ts">{line.t_str}</span>
+                        <span className="vd-transcript-text">{line.text}</span>
+                        {isLearning && (
+                          <button
+                            className="vd-insert-frame-btn"
+                            title="插入关键帧截图"
+                            onClick={() => {
+                              setFramePickerSegmentIdx(idx)
+                              setFramePickerOpen(true)
+                            }}
+                          >
+                            📷
+                          </button>
+                        )}
+                      </div>
+                      {insertedFrame && (
+                        <div className="vd-inline-frame">
+                          <img
+                            src={insertedFrame.frame_path}
+                            alt=""
+                            className="vd-inline-frame-img"
+                          />
+                          <span className="vd-inline-frame-ts">
+                            {formatSec(insertedFrame.frame_timestamp)}
+                          </span>
+                          <button
+                            className="vd-inline-frame-del"
+                            onClick={() => handleDeleteInlineFrame(idx)}
+                            title="删除插图"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -477,7 +622,24 @@ export default function VideoResultPage() {
               暂无摘要和转录内容
             </div>
           )}
+          </>
+          )}
         </div>
+
+        {/* 帧选择器弹窗 */}
+        {framePickerOpen && (
+          <FramePickerModal
+            frames={frames.map((f) => ({
+              timestamp: f.sec ?? parseTsStr(f.ts ?? f.timestamp ?? ''),
+              image_path: f.image_path || '',
+              scene_description: f.description || '',
+            }))}
+            suggested={suggestedFrames}
+            currentSegmentIdx={framePickerSegmentIdx}
+            onSelect={handleInsertFrame}
+            onClose={() => setFramePickerOpen(false)}
+          />
+        )}
       </div>
     )
   }
@@ -587,7 +749,7 @@ export default function VideoResultPage() {
           transcript={transcript}
           activeFrame={activeFrame}
           currentSec={currentSec}
-          onFrameClick={(idx) => seekTo(frames[idx].sec)}
+          onFrameClick={(idx) => seekTo(frames[idx].sec ?? parseTsStr(frames[idx].ts ?? ''))}
           onTranscriptClick={(l) => seekTo(l.t_sec)}
         />
       </div>
@@ -631,15 +793,24 @@ export default function VideoResultPage() {
         </div>
         <div className="vd-tabs-row">
           {tabs.map((t) => (
-            <button key={t.key} className="vd-tab-btn" data-active={promptStyle === t.key} onClick={() => setPromptStyle(t.key)}>
+            <button key={t.key} className="vd-tab-btn" data-active={contentTab === 'content' && promptStyle === t.key} onClick={() => { setContentTab('content'); setPromptStyle(t.key) }}>
               {t.label}
             </button>
           ))}
-          {!tabs.length && (
+          <button className="vd-tab-btn" data-active={contentTab === 'summary'} onClick={() => setContentTab('summary')}>
+            总结
+          </button>
+          {!tabs.length && contentTab !== 'summary' && (
             <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>（提示词格式未加载）</span>
           )}
         </div>
 
+        {contentTab === 'summary' ? (
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <SummariesTab workspaceId={workspaceId} itemId={itemId} />
+          </div>
+        ) : (
+        <>
         <div className="vd-prompt-area">
           <div className="vd-prompt-text">{promptText}</div>
           <div style={{ marginTop: 14 }}>
@@ -667,6 +838,8 @@ export default function VideoResultPage() {
             </div>
           </div>
         </div>
+        </>
+        )}
       </div>
 
       {pickerOpen && formatsCfg && (

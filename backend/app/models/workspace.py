@@ -69,6 +69,7 @@ class PreflightConfig:
     background_overrides: Dict[str, Any] = field(default_factory=dict)
     models: Dict[str, str] = field(default_factory=dict)  # {vision: id, text: id, video: id}
     tasks: Dict[str, Any] = field(default_factory=dict)   # 与 item.type 关联的勾选 + 子参数
+    intent: str = ""  # "learning" | "replica" | ""
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -81,6 +82,7 @@ class PreflightConfig:
             background_overrides=dict(data.get("background_overrides") or {}),
             models=dict(data.get("models") or {}),
             tasks=dict(data.get("tasks") or {}),
+            intent=str(data.get("intent") or ""),
         )
 
 
@@ -133,6 +135,30 @@ class ItemSummary:
 
 
 @dataclass
+class InlineFrame:
+    """学习模式视频在转录正文中插入的截图。"""
+
+    segment_idx: int                  # 关联第几段转录
+    frame_timestamp: float            # 帧的视频时间戳（秒）
+    frame_path: str                   # 帧图片路径（相对 workspace 根）
+    source: str = "user"              # "user" (用户手选) | "suggested" (系统推荐被采纳)
+    created_at: str = field(default_factory=_now_iso)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "InlineFrame":
+        return cls(
+            segment_idx=int(data.get("segment_idx") or 0),
+            frame_timestamp=float(data.get("frame_timestamp") or 0),
+            frame_path=str(data.get("frame_path") or ""),
+            source=str(data.get("source") or "user"),
+            created_at=str(data.get("created_at") or _now_iso()),
+        )
+
+
+@dataclass
 class WorkspaceItem:
     """工作空间内单个素材。"""
 
@@ -147,6 +173,7 @@ class WorkspaceItem:
     related_task_ids: List[str] = field(default_factory=list)
     tags: Dict[str, Any] = field(default_factory=dict)
     summaries: List[ItemSummary] = field(default_factory=list)
+    inline_frames: List[InlineFrame] = field(default_factory=list)
     created_at: str = field(default_factory=_now_iso)
     updated_at: str = field(default_factory=_now_iso)
 
@@ -162,6 +189,12 @@ class WorkspaceItem:
         summaries: List[ItemSummary] = []
         if isinstance(raw_summaries, list):
             summaries = [ItemSummary.from_dict(s) for s in raw_summaries if isinstance(s, dict)]
+
+        # 解析 inline_frames 列表
+        raw_inline = data.get("inline_frames")
+        inline_frames: List[InlineFrame] = []
+        if isinstance(raw_inline, list):
+            inline_frames = [InlineFrame.from_dict(f) for f in raw_inline if isinstance(f, dict)]
 
         # 运行时迁移：老数据没有 summaries 但 results["summary"] 有内容 → 构造 legacy v1
         if not summaries:
@@ -186,6 +219,7 @@ class WorkspaceItem:
             related_task_ids=list(data.get("related_task_ids") or []),
             tags=dict(data.get("tags") or {}),
             summaries=summaries,
+            inline_frames=inline_frames,
             created_at=str(data.get("created_at") or _now_iso()),
             updated_at=str(data.get("updated_at") or _now_iso()),
         )

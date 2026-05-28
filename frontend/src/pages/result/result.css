@@ -398,3 +398,54 @@
   font-size: 13px;
   line-height: 1.6;
 }
+
+.vm-video-result-scope .vd-insert-frame-btn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0.5;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.vm-video-result-scope .vd-insert-frame-btn:hover {
+  opacity: 1;
+  border-color: var(--accent);
+}
+
+.vm-video-result-scope .vd-inline-frame {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0 6px 52px;
+  border-bottom: 1px solid var(--line);
+}
+
+.vm-video-result-scope .vd-inline-frame-img {
+  width: 120px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.vm-video-result-scope .vd-inline-frame-ts {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-4);
+}
+
+.vm-video-result-scope .vd-inline-frame-del {
+  background: none;
+  border: none;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--ink-4);
+  padding: 2px 6px;
+}
+
+.vm-video-result-scope .vd-inline-frame-del:hover {
+  color: var(--accent);
+}

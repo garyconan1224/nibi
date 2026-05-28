@@ -226,6 +226,8 @@ export interface VideoResultFrame {
   prompt_video: string
   tags: Record<string, string[]>
   image_path?: string
+  /** 后端物化时可能用 timestamp 而非 sec；前端优先用 sec */
+  timestamp?: number | string
 }
 
 export interface VideoResultTranscriptLine {
@@ -258,6 +260,8 @@ export interface VideoResult {
   video_template?: string
   /** V3.3: LLM 自动检测到的模板名 */
   detected_template?: string
+  /** R21.P3.S3: 素材意图（learning / replica / 空） */
+  intent?: string
 }
 
 /** GET /workspaces/{id}/items/{itemId}/result — 视频三轨聚合数据 */
