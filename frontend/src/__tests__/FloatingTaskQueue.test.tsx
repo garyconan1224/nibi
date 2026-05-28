@@ -179,4 +179,33 @@ describe('FloatingTaskQueue v2', () => {
     const cancelButtons = screen.getAllByRole('button', { name: /取消任务/ })
     expect(cancelButtons.length).toBe(1)
   })
+
+  it('analyze 任务用 source_url 而非 url 时也能正确合并', () => {
+    useTaskStore.setState({
+      tasks: [
+        makeTask({
+          task_id: 'download-002',
+          project_id: 'workspace-1',
+          task_type: 'download',
+          payload: { url: 'https://www.bilibili.com/video/BV1LSRhBQErk' },
+          status: 'SUCCESS',
+          progress: 1.0,
+        }),
+        makeTask({
+          task_id: 'analyze-002',
+          project_id: 'workspace-1',
+          task_type: 'analyze',
+          payload: { source_url: 'https://www.bilibili.com/video/BV1LSRhBQErk' },
+          status: 'RUNNING',
+          progress: 0.5,
+        }),
+      ],
+    })
+
+    render(<FloatingTaskQueue />)
+    fireEvent.click(screen.getByRole('button', { name: /任务/ }))
+
+    const cancelButtons = screen.getAllByRole('button', { name: /取消任务/ })
+    expect(cancelButtons.length).toBe(1)
+  })
 })
