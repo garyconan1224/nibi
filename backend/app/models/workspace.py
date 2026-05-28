@@ -105,6 +105,34 @@ class PromptVersion:
 
 
 @dataclass
+class ItemSummary:
+    """单份总结产物（多模板、多版本并存）。"""
+
+    summary_id: str  # uuid4
+    template: str  # 模板 id（concise / detailed / ...）
+    version: int  # 同 template 自增，1, 2, 3 ...
+    background_for_summary: str = ""  # 这次生成用的「总结用背景」
+    content_md: str = ""  # LLM 产出的 markdown
+    model_used: str = ""  # provider/model（审计用）
+    created_at: str = field(default_factory=_now_iso)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ItemSummary":
+        return cls(
+            summary_id=str(data.get("summary_id") or ""),
+            template=str(data.get("template") or "concise"),
+            version=int(data.get("version") or 1),
+            background_for_summary=str(data.get("background_for_summary") or ""),
+            content_md=str(data.get("content_md") or ""),
+            model_used=str(data.get("model_used") or ""),
+            created_at=str(data.get("created_at") or _now_iso()),
+        )
+
+
+@dataclass
 class WorkspaceItem:
     """工作空间内单个素材。"""
 
@@ -118,16 +146,34 @@ class WorkspaceItem:
     results: Dict[str, Any] = field(default_factory=dict)
     related_task_ids: List[str] = field(default_factory=list)
     tags: Dict[str, Any] = field(default_factory=dict)
+    summaries: List[ItemSummary] = field(default_factory=list)
     created_at: str = field(default_factory=_now_iso)
     updated_at: str = field(default_factory=_now_iso)
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
-        # asdict 会把 preflight 自动展开成 dict，无需额外处理
+        # asdict 会把 preflight、summaries 自动展开成 dict，无需额外处理
         return d
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "WorkspaceItem":
+        # 解析 summaries 列表
+        raw_summaries = data.get("summaries")
+        summaries: List[ItemSummary] = []
+        if isinstance(raw_summaries, list):
+            summaries = [ItemSummary.from_dict(s) for s in raw_summaries if isinstance(s, dict)]
+
+        # 运行时迁移：老数据没有 summaries 但 results["summary"] 有内容 → 构造 legacy v1
+        if not summaries:
+            legacy_content = (data.get("results") or {}).get("summary") or ""
+            if legacy_content.strip():
+                summaries = [ItemSummary(
+                    summary_id="legacy",
+                    template="legacy",
+                    version=1,
+                    content_md=legacy_content,
+                )]
+
         return cls(
             item_id=str(data.get("item_id") or ""),
             type=str(data.get("type") or ItemType.VIDEO.value),
@@ -139,6 +185,7 @@ class WorkspaceItem:
             results=dict(data.get("results") or {}),
             related_task_ids=list(data.get("related_task_ids") or []),
             tags=dict(data.get("tags") or {}),
+            summaries=summaries,
             created_at=str(data.get("created_at") or _now_iso()),
             updated_at=str(data.get("updated_at") or _now_iso()),
         )
