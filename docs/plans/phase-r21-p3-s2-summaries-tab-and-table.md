@@ -1,12 +1,19 @@
 ---
 phase: R21.P3.S2
 title: 结果页「总结」tab + WorkspaceItem.summaries 字段 + 多版本 CRUD
-status: ready
-owner: 待定（建议 mimo 执行，附录 A 已为它预扫）
+status: done
+owner: mimo
 estimated_hours: 8-12
+actual_hours: 2
 depends_on:
   - r21-p3-s1（必须先合 main）
 user_source: 2026-05-28 用户第三轮反馈
+completed_date: 2026-05-28
+commits:
+  - 8feeebb Step 1 — ItemSummary dataclass + WorkspaceItem.summaries + 老数据迁移
+  - b569899 Step 2 — summary_generator + workspace_store summary helpers
+  - 4f5f2df Step 3 — 4 个 summary API endpoint
+  - 80dc470 Step 4 — 前端 SummariesTab + service + 集成到 AudioResultPage
 ---
 
 ## 目标（一句话）
@@ -192,14 +199,14 @@ from backend.app.services.summary_templates import get_template, list_template_i
 
 ## 验收标准
 
-- [ ] `WorkspaceItem` 新增 `summaries` 字段，老数据自动迁移成 legacy v1
-- [ ] 4 个 API endpoint 工作正常，单测通过
-- [ ] 结果页能看到「总结」tab
-- [ ] 能新建多模板多版本，全部并存
-- [ ] 能删除单份总结（硬删，立即生效）
-- [ ] POST 生成总结时前端有 loading 状态，不会卡死 UI
-- [ ] 老 item 打开结果页能看到 legacy v1，markdown 正确渲染
-- [ ] 所有新增/改动单测通过
+- [x] `WorkspaceItem` 新增 `summaries` 字段，老数据自动迁移成 legacy v1
+- [x] 4 个 API endpoint 工作正常，单测通过
+- [x] 结果页能看到「总结」tab（AudioResultPage 已集成）
+- [x] 能新建多模板多版本，全部并存
+- [x] 能删除单份总结（硬删，立即生效）
+- [x] POST 生成总结时前端有 loading 状态（"生成中…" 按钮 disabled）
+- [x] 老 item 打开结果页能看到 legacy v1，markdown 正确渲染
+- [x] 所有新增/改动单测通过（71 后端 + 6 前端 = 77 个测试）
 
 ## 不在本期范围（明确推到 S3）
 
