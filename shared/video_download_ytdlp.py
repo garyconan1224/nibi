@@ -267,29 +267,33 @@ def _build_attempts(
                 attempts.append({**core, **bili_extras})
             attempts.append({**core})
 
-        for cookie_path in _existing_bili_cookie_files(cookie_base_dirs_list):
-            _append_bili_variants({**direct_opts, "cookiefile": cookie_path})
-        _append_bili_variants({**direct_opts})
-        _append_bili_variants({**direct_opts, "cookiesfrombrowser": (browser,)})
-
-        proxied: dict[str, Any] | None = None
-        if normalized_proxy:
-            proxied = {**direct_opts, "proxy": normalized_proxy}
-            for cookie_path in _existing_bili_cookie_files(cookie_base_dirs_list):
-                _append_bili_variants({**proxied, "cookiefile": cookie_path})
-            _append_bili_variants({**proxied})
-            _append_bili_variants({**proxied, "cookiesfrombrowser": (browser,)})
-
+        # B站优先用去掉 format 参数的 attempts（减少 412 重试）
         if _is_bilibili_url(url) and format_selector:
             stripped = {k: v for k, v in direct_opts.items() if k != "format"}
             for cookie_path in _existing_bili_cookie_files(cookie_base_dirs_list):
                 _append_bili_variants({**stripped, "cookiefile": cookie_path})
             _append_bili_variants({**stripped})
-            if proxied is not None:
-                ps = {k: v for k, v in proxied.items() if k != "format"}
+            _append_bili_variants({**stripped, "cookiesfrombrowser": (browser,)})
+            if normalized_proxy:
+                ps = {k: v for k, v in direct_opts.items() if k != "format"}
+                ps["proxy"] = normalized_proxy
                 for cookie_path in _existing_bili_cookie_files(cookie_base_dirs_list):
                     _append_bili_variants({**ps, "cookiefile": cookie_path})
                 _append_bili_variants({**ps})
+                _append_bili_variants({**ps, "cookiesfrombrowser": (browser,)})
+        else:
+            for cookie_path in _existing_bili_cookie_files(cookie_base_dirs_list):
+                _append_bili_variants({**direct_opts, "cookiefile": cookie_path})
+            _append_bili_variants({**direct_opts})
+            _append_bili_variants({**direct_opts, "cookiesfrombrowser": (browser,)})
+
+            proxied: dict[str, Any] | None = None
+            if normalized_proxy:
+                proxied = {**direct_opts, "proxy": normalized_proxy}
+                for cookie_path in _existing_bili_cookie_files(cookie_base_dirs_list):
+                    _append_bili_variants({**proxied, "cookiefile": cookie_path})
+                _append_bili_variants({**proxied})
+                _append_bili_variants({**proxied, "cookiesfrombrowser": (browser,)})
     return attempts
 
 
