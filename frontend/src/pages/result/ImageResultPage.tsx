@@ -370,13 +370,42 @@ export default function ImageResultPage() {
             </div>
           )}
 
-          {/* EXIF 信息 */}
-          {(result.exif?.time || result.exif?.location) && (
+          {/* 基本信息 */}
+          {result.dimensions && (
             <div className="im-section">
-              <div className="eyebrow im-section-label">EXIF 信息</div>
-              <div className="im-exif-body">
-                {result.exif?.time && <div>拍摄时间：{result.exif.time}</div>}
-                {result.exif?.location && <div>拍摄地点：{result.exif.location}</div>}
+              <div className="eyebrow im-section-label">基本信息</div>
+              <div className="im-kv">
+                <span className="im-kv-label">分辨率</span>
+                <span className="im-kv-value">{result.dimensions.width} × {result.dimensions.height}</span>
+                <span className="im-kv-label">格式</span>
+                <span className="im-kv-value">{result.dimensions.format}</span>
+                <span className="im-kv-label">大小</span>
+                <span className="im-kv-value">{result.dimensions.size_kb >= 1024
+                  ? `${(result.dimensions.size_kb / 1024).toFixed(1)} MB`
+                  : `${result.dimensions.size_kb} KB`}</span>
+              </div>
+            </div>
+          )}
+
+          {/* EXIF 拍摄信息 */}
+          {result.exif && Object.keys(result.exif).length > 0 && (
+            <div className="im-section">
+              <div className="eyebrow im-section-label">EXIF 拍摄信息</div>
+              <div className="im-kv">
+                {result.exif.device && (<><span className="im-kv-label">设备</span><span className="im-kv-value">{result.exif.device}</span></>)}
+                {result.exif.lens && (<><span className="im-kv-label">镜头</span><span className="im-kv-value mono">{result.exif.lens}</span></>)}
+                {result.exif.shutter && (<><span className="im-kv-label">快门</span><span className="im-kv-value mono">{result.exif.shutter}</span></>)}
+                {result.exif.iso && (<><span className="im-kv-label">ISO</span><span className="im-kv-value mono">{result.exif.iso}</span></>)}
+                {result.exif.aperture && (<><span className="im-kv-label">光圈</span><span className="im-kv-value mono">{result.exif.aperture}</span></>)}
+                {result.exif.time && (<><span className="im-kv-label">时间</span><span className="im-kv-value mono">{result.exif.time}</span></>)}
+                {result.exif.gps && (
+                  <>
+                    <span className="im-kv-label">地点</span>
+                    <span className="im-kv-value">
+                      {result.exif.gps.lat.toFixed(4)}, {result.exif.gps.lon.toFixed(4)}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           )}
