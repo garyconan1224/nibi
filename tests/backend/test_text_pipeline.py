@@ -117,6 +117,71 @@ def test_load_url_happy(monkeypatch: pytest.MonkeyPatch) -> None:
     assert doc.meta["http_status"] == 200
 
 
+def test_load_url_wechat_js_content(monkeypatch: pytest.MonkeyPatch) -> None:
+    """微信公众号：#js_content 存在 → 走专门 xpath 抽取，parser=wechat。"""
+    wx_html = (
+        '<html><body>'
+        '<h1 id="activity-name">测试标题</h1>'
+        '<div id="js_content"><p>这是微信正文内容。</p></div>'
+        '</body></html>'
+    ).encode("utf-8")
+
+    class _FakeResp:
+        status_code = 200
+        content = wx_html
+        text = wx_html.decode("utf-8")
+        headers = {"content-type": "text/html"}
+        url = "https://mp.weixin.qq.com/s/abc123"
+
+    class _FakeClient:
+        def __init__(self, *a: Any, **kw: Any) -> None:
+            pass
+        def __enter__(self):
+            return self
+        def __exit__(self, *exc):
+            return False
+        def get(self, url: str):
+            return _FakeResp()
+
+    monkeypatch.setattr("shared.text_loader.httpx.Client", _FakeClient)
+
+    doc = load_url("https://mp.weixin.qq.com/s/abc123")
+    assert doc.meta["parser"] == "wechat"
+    assert doc.title == "测试标题"
+    assert "微信正文内容" in doc.content
+
+
+def test_load_url_wechat_no_js_content_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    """微信域名但无 #js_content → 回落 readability，不报错。"""
+    normal_html = (
+        "<html><head><title>Fallback Page</title></head>"
+        "<body><article><p>普通正文内容。</p></article></body></html>"
+    ).encode("utf-8")
+
+    class _FakeResp:
+        status_code = 200
+        content = normal_html
+        text = normal_html.decode("utf-8")
+        headers = {"content-type": "text/html"}
+        url = "https://mp.weixin.qq.com/s/xyz789"
+
+    class _FakeClient:
+        def __init__(self, *a: Any, **kw: Any) -> None:
+            pass
+        def __enter__(self):
+            return self
+        def __exit__(self, *exc):
+            return False
+        def get(self, url: str):
+            return _FakeResp()
+
+    monkeypatch.setattr("shared.text_loader.httpx.Client", _FakeClient)
+
+    doc = load_url("https://mp.weixin.qq.com/s/xyz789")
+    assert "parser" not in doc.meta  # 没走微信专门路径
+    assert "普通正文" in doc.content
+
+
 # ── handle_text_task 集成（mock load_auto）─────────────────
 
 
