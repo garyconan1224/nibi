@@ -898,7 +898,7 @@ WorkspaceItem.tags = {
 - 后端：`backend/app/routes/workspaces.py`、`backend/app/services/pipeline_tasks.py`
 - 前端：`frontend/src/pages/result/ResultsOverview/`、`frontend/src/pages/result/AudioResultPage.tsx`、`frontend/src/pages/result/ProcessingPage/index.tsx`、`frontend/src/router.tsx`、`frontend/src/components/workspace/PreflightTaskDetails.tsx`、`frontend/src/lib/preflightTasks.ts`、`frontend/src/services/workspaces.ts`
 - 测试：`tests/backend/test_pipeline_tasks.py`、`tests/backend/test_workspaces_api.py`
-- 文档：`docs/plans/phase-ip9-flow-gaps.md`
+- 文档：`docs/plans/archive/phase-ip9-flow-gaps.md`
 
 ### 关键改动
 - **Results 总览页**（IP.9.1）：新增 `/workspaces/:id/results` 路由，展示所有 item 的分析结果汇总（视频/音频/图片/文字四类卡片），修复从 Taskboard 跳转 Processing 的 bug
@@ -907,7 +907,7 @@ WorkspaceItem.tags = {
 - **Payload 对齐**（fix）：前端 Preflight 参数与后端 pipeline payload 字段名对齐（`video_path_mode` → `analysis_mode`，`audio_tasks` → `enabled_tasks`）
 
 ### 为什么这么做
-- **Flow Gaps 文档先行**：先用 `docs/plans/phase-ip9-flow-gaps.md` 落盘 6 处缺口（流程图 + 代码位置），再逐个补齐，避免遗漏
+- **Flow Gaps 文档先行**：先用 `docs/plans/archive/phase-ip9-flow-gaps.md` 落盘 6 处缺口（流程图 + 代码位置），再逐个补齐，避免遗漏
 - **Results 总览页独立路由**：SPEC s05 要求"结果总览"，原 ProcessingPage 只显示进度不展示结果，需要独立页面聚合四类结果
 - **路径选择 vs 全选**：N7b 视频分析 3 条路径互斥（字幕直接 vs 镜头分析 vs 视频模型），用 radio 而非 checkbox 避免用户混淆
 - **字段名对齐**：前端和后端对同一参数用了不同命名（如 `video_path_mode` vs `analysis_mode`），统一为后端命名减少桥接层转换
@@ -976,7 +976,7 @@ WorkspaceItem.tags = {
 ### 影响范围
 - 前端：`frontend/src/pages/WorkbenchPage/PreflightDrawer.tsx`、`frontend/src/pages/WorkbenchPage/preflightTasks.ts`、`frontend/src/components/workspace/AddMaterialModal.tsx`、`frontend/src/components/workspace/PreflightConfigPanel.tsx`、`frontend/src/pages/WorkbenchPage/Composer.tsx`、`frontend/src/pages/WorkbenchPage/Hero.tsx`、`frontend/src/pages/WorkbenchPage/workbench.css`
 - 测试：`frontend/src/__tests__/PreflightDrawer.test.tsx`、`frontend/src/__tests__/AddMaterialModal.test.tsx`、`frontend/src/__tests__/preflightTasks.test.ts`
-- 文档：`docs/plans/phase-r7-input-flow-unify.md`、`docs/plans/phase-r8-preflight-remix-replica.md`
+- 文档：`docs/plans/archive/phase-r7-input-flow-unify.md`、`docs/plans/archive/phase-r8-preflight-remix-replica.md`
 
 ### 关键改动
 - **R7 输入流统一**：AddMaterialModal 单 URL 多类型默认全勾；Composer 传入 URL 时 modal 不再重复输入框；PreflightDrawer 增加 `mode="stage"`，从首页细调时只回写配置，不直接启动 pipeline。

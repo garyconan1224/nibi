@@ -43,6 +43,7 @@ Last updated: 2026-05-29（**当前阶段 = R21.P3.S3 followup 待 merge → 音
 ## P0 — 已知收口事项
 
 - `.git` 当前约 `278M`，原因是早期历史包含 `.venv/` 和 `backend/app/services/test_note_output/`。清理方案是 `git filter-repo`，但必须等用户明确说「做」。
+- 视频结果 frames 数据契约待查：ResultsOverview timeline frames 为空对象 `[{}]`，`f.idx` / `f.ts` / `f.shot_type` 全 undefined（S0.4 仅兜底了 key，未修数据源）。
 - `docs/EXECUTION_PLAN.md` 是当前最准确的执行状态来源。
 - `docs/WORKFLOW.md`、`CLAUDE.md`、`AGENTS.md`、`docs/AI_HANDOFF.md` 应保持与 N11 后状态一致。
 

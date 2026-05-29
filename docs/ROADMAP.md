@@ -48,7 +48,7 @@ git log --oneline -10
 
 **总体节奏**：F → V → A → T → I → R（先打通整体路径，再逐个深化分支，最后 R 收官）
 
-> 🔴 **当前阶段（2026-05-24 起）**：**Phase IR 首页输入层重构**（属 Track F 子项，但因横跨 Composer/Modal/Preflight 单独立项）。计划见 [`docs/plans/phase-r-input-refactor.md`](plans/phase-r-input-refactor.md)。IR 未完工前不要并行启动其他 track 的新 phase。
+> 🔴 **当前阶段（2026-05-24 起）**：**Phase IR 首页输入层重构**（属 Track F 子项，但因横跨 Composer/Modal/Preflight 单独立项）。计划见 [`docs/plans/archive/phase-r-input-refactor.md`](plans/archive/phase-r-input-refactor.md)。IR 未完工前不要并行启动其他 track 的新 phase。
 
 ---
 

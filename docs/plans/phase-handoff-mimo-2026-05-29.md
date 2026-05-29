@@ -92,46 +92,46 @@ mkdir -p docs/plans/archive
 **归档清单**（status=done 且早于 R20 的）：
 
 ```
-docs/plans/phase-r-input-refactor.md        # R0~R6
-docs/plans/phase-r7-input-flow-unify.md
-docs/plans/phase-r8-preflight-remix-replica.md
-docs/plans/phase-r9-floating-task-queue.md
-docs/plans/phase-r10-hotfix-and-queue-v2.md
-docs/plans/phase-r12-processing-page-replica.md
-docs/plans/phase-r13-processing-metadata-followup.md
-docs/plans/phase-r13.6-metadata-coverage-hotfix.md
-docs/plans/phase-r14-multi-type-dedup-ux.md
-docs/plans/phase-h1-workbench.md
-docs/plans/phase-h2-taskboard.md
-docs/plans/phase-h3-processing.md
-docs/plans/phase-h4-results.md
-docs/plans/phase-h5-storyboard.md
-docs/plans/phase-ip7-preflight-fix.md
-docs/plans/phase-ip8-connection-audit.md
-docs/plans/phase-ip9-flow-gaps.md
-docs/plans/phase-integration-pass.md
-docs/plans/phase-n1b-workspace-layout.md
-docs/plans/phase-n5-preflight.md
-docs/plans/phase-n6-task-chat.md
-docs/plans/phase-n7-video-branch.md
-docs/plans/phase-n8-audio-branch.md
-docs/plans/phase-n10-text-branch.md
-docs/plans/phase-l-library.md
-docs/plans/phase-l5-library-remix-polish.md
-docs/plans/phase-f2-smoke.md
-docs/plans/phase-f4-content-sniff.md
-docs/plans/phase-v3-video-templates.md
-docs/plans/phase-r17-add-material-scope-features.md
-docs/plans/phase-r18-preflight-drawer-templates.md
-docs/plans/phase-r18.1-local-asr-and-failure-popup.md
-docs/plans/phase-r19-av-synthesis-notes.md
-docs/plans/phase-r21-p2-revisions.md
-docs/plans/phase-r21-p2-revisions-v3.md
-docs/plans/phase-r21-p3-s1-add-material-restructure.md
-docs/plans/phase-r21-p3-s2-summaries-tab-and-table.md
-docs/plans/phase-r21-p3-s3-compare-and-learning-mode.md
-docs/plans/phase-r21-p3-s3-followup.md
-docs/plans/phase-r21-status-sync-bugfix.md
+docs/plans/archive/phase-r-input-refactor.md        # R0~R6
+docs/plans/archive/phase-r7-input-flow-unify.md
+docs/plans/archive/phase-r8-preflight-remix-replica.md
+docs/plans/archive/phase-r9-floating-task-queue.md
+docs/plans/archive/phase-r10-hotfix-and-queue-v2.md
+docs/plans/archive/phase-r12-processing-page-replica.md
+docs/plans/archive/phase-r13-processing-metadata-followup.md
+docs/plans/archive/phase-r13.6-metadata-coverage-hotfix.md
+docs/plans/archive/phase-r14-multi-type-dedup-ux.md
+docs/plans/archive/phase-h1-workbench.md
+docs/plans/archive/phase-h2-taskboard.md
+docs/plans/archive/phase-h3-processing.md
+docs/plans/archive/phase-h4-results.md
+docs/plans/archive/phase-h5-storyboard.md
+docs/plans/archive/phase-ip7-preflight-fix.md
+docs/plans/archive/phase-ip8-connection-audit.md
+docs/plans/archive/phase-ip9-flow-gaps.md
+docs/plans/archive/phase-integration-pass.md
+docs/plans/archive/phase-n1b-workspace-layout.md
+docs/plans/archive/phase-n5-preflight.md
+docs/plans/archive/phase-n6-task-chat.md
+docs/plans/archive/phase-n7-video-branch.md
+docs/plans/archive/phase-n8-audio-branch.md
+docs/plans/archive/phase-n10-text-branch.md
+docs/plans/archive/phase-l-library.md
+docs/plans/archive/phase-l5-library-remix-polish.md
+docs/plans/archive/phase-f2-smoke.md
+docs/plans/archive/phase-f4-content-sniff.md
+docs/plans/archive/phase-v3-video-templates.md
+docs/plans/archive/phase-r17-add-material-scope-features.md
+docs/plans/archive/phase-r18-preflight-drawer-templates.md
+docs/plans/archive/phase-r18.1-local-asr-and-failure-popup.md
+docs/plans/archive/phase-r19-av-synthesis-notes.md
+docs/plans/archive/phase-r21-p2-revisions.md
+docs/plans/archive/phase-r21-p2-revisions-v3.md
+docs/plans/archive/phase-r21-p3-s1-add-material-restructure.md
+docs/plans/archive/phase-r21-p3-s2-summaries-tab-and-table.md
+docs/plans/archive/phase-r21-p3-s3-compare-and-learning-mode.md
+docs/plans/archive/phase-r21-p3-s3-followup.md
+docs/plans/archive/phase-r21-status-sync-bugfix.md
 ```
 
 **保留**（pending / 当前相关）：
@@ -145,8 +145,8 @@ docs/plans/phase-r21-status-sync-bugfix.md
 
 ```bash
 # 示例：先 check 一个
-head -5 docs/plans/phase-r12-processing-page-replica.md  # 确认 status: done
-git mv docs/plans/phase-r12-processing-page-replica.md docs/plans/archive/
+head -5 docs/plans/archive/phase-r12-processing-page-replica.md  # 确认 status: done
+git mv docs/plans/archive/phase-r12-processing-page-replica.md docs/plans/archive/
 
 # 全部移完后跑 git status 确认改动
 git status --short docs/plans/
