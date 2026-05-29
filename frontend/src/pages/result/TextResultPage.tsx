@@ -527,7 +527,7 @@ function TextCompareContent({ data }: { data: TextCompareResult }) {
             <tr key={t.item_id} data-current={t.is_current}>
               <td className="name-cell" data-current={t.is_current}>{t.name}</td>
               <td>{t.char_count.toLocaleString()}</td>
-              <td className="summary-cell">{t.summary}</td>
+              <td className="summary-cell">{typeof t.summary === 'string' ? t.summary : (t.summary?.abstract ?? '')}</td>
             </tr>
           ))}
         </tbody>
