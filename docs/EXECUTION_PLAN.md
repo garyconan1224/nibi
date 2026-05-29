@@ -39,7 +39,7 @@
 
 **P1 · 搭架构 + 整理仓库**
 - [x] S1 plans 老 done 归档 + 死链修复
-- [x] S2 Streamlit 入口冻结标记（no-op：文件已在 Phase 1J 删除）
+- [x] S2 Streamlit 入口冻结标记（Streamlit 不存在，改为修正 CLAUDE.md §1）
 - [x] S3 未用 assets 清理（删 icons.svg + 修正 CLAUDE.md §1 Streamlit 描述）
 - [ ] S4 N7b 路径3 Gemini 后端骨架 + mock 单测（无 API；**开工前先确认接口形态**）
 - [ ] 核实 N8b librosa 6 维真实缺口（⚠️ 已大部分实现，先核实别从零做）
