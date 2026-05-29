@@ -438,8 +438,8 @@ export default function ResultsOverview() {
               </span>
             </div>
             <div className="ov-timeline-strip">
-              {(result as VideoResult).frames.slice(0, 10).map((f) => (
-                <div key={f.idx} className="ov-tl-frame">
+              {(result as VideoResult).frames.slice(0, 10).map((f, idx) => (
+                <div key={f.idx ?? `frame-${idx}`} className="ov-tl-frame">
                   <div className="ov-tl-thumb">{f.ts}</div>
                   <div className="ov-tl-ts">{f.shot_type}</div>
                 </div>
