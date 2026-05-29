@@ -260,6 +260,37 @@ def load_url(url: str, *, timeout: float = _DEFAULT_TIMEOUT_S) -> TextDocument:
     # readability 期望字符串；httpx.Response.text 会按 charset / chardet 解码
     html_text = resp.text if isinstance(resp.text, str) else raw.decode("utf-8", errors="replace")
 
+    # 微信公众号：正文在 #js_content，readability 抽不干净 → 专门 xpath 抽取
+    if "mp.weixin.qq.com" in str(resp.url):
+        try:
+            from lxml import html as lxml_html
+
+            wx_tree = lxml_html.fromstring(html_text)
+            wx_content = wx_tree.xpath('//div[@id="js_content"]')
+            if wx_content:
+                wx_title_nodes = wx_tree.xpath(
+                    '//h1[@id="activity-name"]/text()'
+                    ' | //h2[contains(@class,"rich_media_title")]/text()'
+                )
+                wx_title = (wx_title_nodes[0].strip() if wx_title_nodes else "") or url
+                wx_text = _normalize(wx_content[0].text_content())
+                if wx_text:
+                    return TextDocument(
+                        title=wx_title,
+                        content=wx_text,
+                        source_type="url",
+                        source=url,
+                        char_count=len(wx_text),
+                        meta={
+                            "http_status": resp.status_code,
+                            "final_url": str(resp.url),
+                            "content_type": resp.headers.get("content-type", ""),
+                            "parser": "wechat",
+                        },
+                    )
+        except Exception:
+            pass  # 微信抽取失败 → 回落 readability（继续往下，不 return）
+
     try:
         doc = ReadabilityDoc(html_text)
         title = (doc.short_title() or doc.title() or "").strip()
