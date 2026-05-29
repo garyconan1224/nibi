@@ -640,3 +640,24 @@ export async function downloadAVSynthesisMd(workspaceId: string): Promise<void> 
   a.remove()
   URL.revokeObjectURL(url)
 }
+
+/** POST /workspaces/{id}/notes/export — 综合笔记多格式导出 */
+export async function exportNotes(
+  workspaceId: string,
+  format: 'pdf' | 'docx' | 'obsidian',
+): Promise<void> {
+  const extMap = { pdf: 'pdf', docx: 'docx', obsidian: 'zip' }
+  const res = await http.post(
+    `${BASE}/${workspaceId}/notes/export`,
+    { format },
+    { responseType: 'blob' },
+  )
+  const url = URL.createObjectURL(res.data as Blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `综合笔记.${extMap[format]}`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}

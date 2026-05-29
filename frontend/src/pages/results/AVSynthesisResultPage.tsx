@@ -14,6 +14,7 @@ import {
 import {
   getAVSynthesisMarkdown,
   downloadAVSynthesisMd,
+  exportNotes,
 } from '@/services/workspaces'
 
 import './av-synthesis-result.css'
@@ -109,6 +110,15 @@ export default function AVSynthesisResultPage() {
     }
   }, [workspaceId])
 
+  // R20: 多格式导出
+  const handleExport = useCallback(async (format: 'pdf' | 'docx' | 'obsidian') => {
+    try {
+      await exportNotes(workspaceId, format)
+    } catch {
+      // exportNotes already handles errors via blob
+    }
+  }, [workspaceId])
+
   // ── Render ──────────────────────────────────
   return (
     <div className="vm-av-synth-scope">
@@ -198,25 +208,22 @@ export default function AVSynthesisResultPage() {
                   <span className="av-export-label">Markdown</span>
                 </button>
 
-                {/* PDF — 灰态 */}
-                <button className="av-export-btn" disabled>
+                {/* PDF */}
+                <button className="av-export-btn" onClick={() => handleExport('pdf')}>
                   <FileDown size={14} />
                   <span className="av-export-label">PDF</span>
-                  <span className="av-export-tag">R20</span>
                 </button>
 
-                {/* Word — 灰态 */}
-                <button className="av-export-btn" disabled>
+                {/* Word */}
+                <button className="av-export-btn" onClick={() => handleExport('docx')}>
                   <FileSpreadsheet size={14} />
                   <span className="av-export-label">Word</span>
-                  <span className="av-export-tag">R20</span>
                 </button>
 
-                {/* Obsidian Vault — 灰态 */}
-                <button className="av-export-btn" disabled>
+                {/* Obsidian Vault */}
+                <button className="av-export-btn" onClick={() => handleExport('obsidian')}>
                   <BookOpenCheck size={14} />
                   <span className="av-export-label">Obsidian Vault</span>
-                  <span className="av-export-tag">R20</span>
                 </button>
               </div>
             </div>
