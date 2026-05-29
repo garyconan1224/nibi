@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Trash2, Plus, Inbox, Filter } from 'lucide-react'
+import { Trash2, Plus, Inbox, Filter, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { fetchLibrary, deleteItem, batchDeleteItems, type LibraryItem, type LibraryResponse } from '@/services/library'
-import { deleteWorkspace } from '@/services/workspaces'
+import { deleteWorkspace, startItemPipeline } from '@/services/workspaces'
 import { useLibraryStore, type SortBy } from '@/store/libraryStore'
 import { FilterChips } from './FilterChips'
 import { SortMenu } from './SortMenu'
@@ -72,6 +72,7 @@ export default function LibraryPage() {
   const [selecting, setSelecting] = useState(false)
   const [selectedSet, setSelectedSet] = useState<Set<string>>(new Set())
   const [deleting, setDeleting] = useState(false)
+  const [analyzing, setAnalyzing] = useState(false)
 
   const selectedFilters = useLibraryStore((s) => s.selectedFilters)
   const sortBy = useLibraryStore((s) => s.sortBy)
@@ -219,6 +220,35 @@ export default function LibraryPage() {
     }
   }, [selectedSet, load])
 
+  // I2.1: 批量分析（仅图片）— 对选中 image 素材循环调 start，复用已存 preflight + 浮动队列
+  const handleBatchAnalyze = useCallback(async () => {
+    if (selectedSet.size === 0) return
+    const imageItems = filteredItems.filter(
+      (it) => it.type === 'image' && selectedSet.has(selectionKey(it.workspace_id, it.item_id)),
+    )
+    if (imageItems.length === 0) {
+      toast.error('请选择图片素材（仅图片支持批量分析）')
+      return
+    }
+    setAnalyzing(true)
+    try {
+      let ok = 0
+      for (const it of imageItems) {
+        try {
+          await startItemPipeline(it.workspace_id, it.item_id)
+          ok++
+        } catch {
+          /* 单个失败不中断其余 */
+        }
+      }
+      toast.success(`已触发 ${ok}/${imageItems.length} 个图片分析，进度见右上角任务队列`)
+      setSelectedSet(new Set())
+      load()
+    } finally {
+      setAnalyzing(false)
+    }
+  }, [selectedSet, filteredItems, load])
+
 
 
   const chipCounts = useMemo(() => {
@@ -309,6 +339,22 @@ export default function LibraryPage() {
                   >
                     <Trash2 size={13} />
                     删除 {selectedSet.size > 0 ? `(${selectedSet.size})` : ''}
+                  </button>
+                  <button
+                    className="btn"
+                    style={{
+                      fontSize: 12,
+                      height: 32,
+                      color: selectedSet.size > 0 ? 'var(--accent-3)' : 'var(--ink-4)',
+                      borderColor: selectedSet.size > 0 ? 'var(--accent-3)' : 'var(--line)',
+                      opacity: analyzing || selectedSet.size === 0 ? 0.5 : 1,
+                    }}
+                    onClick={handleBatchAnalyze}
+                    disabled={analyzing || selectedSet.size === 0}
+                    title="仅对选中的图片素材触发分析（按已存配置），进度见右上角任务队列"
+                  >
+                    <Sparkles size={13} />
+                    {analyzing ? '分析中…' : '批量分析'}
                   </button>
                 </>
               ) : (
