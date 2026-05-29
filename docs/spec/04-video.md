@@ -92,6 +92,7 @@
 - 整段视频送入模型（无需截帧）
 - 输出：视频简单描述（质量依赖模型）
 - 界面标注"所用模型名称"
+- ⚠️ **骨架就绪**（2026-05-29，N7b.S4）：`shared/gemini_client.py` + `pipeline_tasks._run_video_model_path` 已实现，联调需装 `google-genai` + 配 `GEMINI_API_KEY`
 
 #### 4.3.3 视频类型 → 总结模板
 
