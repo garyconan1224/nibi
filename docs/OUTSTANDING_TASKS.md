@@ -13,11 +13,16 @@ Last updated: 2026-05-29（**当前阶段 = R21.P3.S3 followup 待 merge → 音
 下一步方向（用户 2026-05-29 决议）：**音频 + 视频两条线从输入链接 → 任务 → 落地页完整端到端打通**，确保音视频闭环到位，再做文字 / 图片深化。
 
 短期任务池（按依赖排序）：
-1. followup 分支 merge 进 main（5min）
-2. 音视频端到端冒烟回归（用户跑，~30min，记录断点）
-3. N7b 路径3 视频大模型直接分析后端（8-12h，**卡 API 选型** Gemini/GPT-4o/Qwen-VL）
-4. N8b 音频 librosa 6 维度切分后端（6-8h）
-5. R20 笔记 PDF/Word/Obsidian 导出（R19 押后项）
+1. **🔴 S0 E2E bugfix（必修）** — 见 [`docs/plans/phase-e2e-bugfix-2026-05-29.md`](plans/phase-e2e-bugfix-2026-05-29.md)
+   - S0.1 `/subtitles` 端口删 demo 兜底（P1，1-2h）
+   - S0.2 audio_result has_real 认 transcript_segments（P1，0.5h）
+   - S0.3 visual_only 前端禁 SRT 按钮（P1+，0.5h）
+   - S0.4 ResultsOverview React key（P2，0.5h）
+   - S0.5~S0.8 P3（可选，2-3h）
+2. S1-S3 清理（plans 归档 / Streamlit 冻结 / 未用 assets）
+3. S4 N7b 路径3 Gemini 后端骨架（无 API，已定方向）
+4. S5 N8b 音频 librosa 6 维度后端
+5. S6 R20 笔记 PDF/Word/Obsidian 导出
 
 ---
 

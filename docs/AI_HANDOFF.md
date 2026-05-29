@@ -105,11 +105,13 @@ git branch --show-current
 
 ## 下一步（按 ROI 排序，明天接力会话直接选）
 
-### 🥇 当前立即下一步：followup merge + 音视频端到端回归
+### 🥇 当前立即下一步：E2E bugfix S0（音视频端到端冒烟已跑，7 问题待修）
 
-- 分支：`fix/r21-p3-s3-followup`（R21.P3.S3 followup，`status: done`）→ 用户授权后 merge 到 local main，不 push origin。
-- 随后：粘真实 B站/油管 URL 跑音视频端到端冒烟（download→ASR→frames→VLM→落地页），记录断点。
-- 闭环缺口待办：N7b 路径3 视频大模型后端（卡 API 选型 Gemini/GPT-4o/Qwen-VL）/ N8b librosa 后端 / R20 笔记多格式导出。
+- E2E 报告：[`docs/e2e-test/E2E_TEST_REPORT.md`](e2e-test/E2E_TEST_REPORT.md)（已 commit `267d426`，含 29 张截图 + Opus 4.7 用 codegraph 定位的 P1 根因）
+- 修复计划：[`docs/plans/phase-e2e-bugfix-2026-05-29.md`](plans/phase-e2e-bugfix-2026-05-29.md)（S0.1-S0.8，每个 step 独立分支）
+- 必修：S0.1 `/subtitles` 删 demo 兜底 + S0.2 audio_result 认 transcript_segments + S0.3 visual_only 禁 SRT 按钮 + S0.4 ResultsOverview React key
+- 然后进 [`phase-handoff-mimo-2026-05-29.md`](plans/phase-handoff-mimo-2026-05-29.md) S1 清理 → S6 R20
+- N7b 路径3 已定 Gemini，但**没 API**，S4 只做代码骨架，API 到位再做联调
 
 ### ✅ Phase L 资料库聚合页（2026-05-22 已完成）
 

@@ -59,9 +59,12 @@ sed -n '1,40p' docs/EXECUTION_PLAN.md
 
 ## 2. Step 总览
 
+> 🔴 **2026-05-29 插队 S0**：mimo 跑 E2E 测试发现 7 个问题（2 P1 数据串扰 + 1 P2 + 4 P3）。**S0 必须先于 S1-S6 执行**，详细 plan：[`phase-e2e-bugfix-2026-05-29.md`](phase-e2e-bugfix-2026-05-29.md)。原因：S4 N7b Gemini 骨架要建立在「真实数据正确返回到结果页」基础上，否则等于在 demo fixture 上加新功能。
+
 | Step | 主题 | 工时 | 依赖 | 推荐分支 |
 |---|---|---|---|---|
-| S1 | 清理 A：plans 老 done 归档 | ~1h | — | `chore/cleanup-plans-archive` |
+| **S0** | **E2E bugfix（P1 demo fixture 兜底过宽 + P2/P3）** | **6-8h** | E2E 报告已 commit (`267d426`) | 见 e2e-bugfix plan（每问题独立分支） |
+| S1 | 清理 A：plans 老 done 归档 | ~1h | S0 完成 | `chore/cleanup-plans-archive` |
 | S2 | 清理 B：旧 Streamlit 入口冻结标记 | 1-2h | — | `chore/cleanup-streamlit-frozen` |
 | S3 | 清理 C：未用 assets / 实验代码 | 1-2h | — | `chore/cleanup-unused-assets` |
 | S4 | N7b 路径3 Gemini 后端骨架（无 API） | 6-8h | — | `feat/phase-n7b-path3-gemini-skeleton` |
