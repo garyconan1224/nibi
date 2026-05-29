@@ -113,7 +113,7 @@
   - [ ] H2.5+ Style + A/B 对比（押后到 [C] 一起做）
   - [x] H2.6 删除旧 WorkspaceDetail.tsx + WorkspaceSearchBar.tsx（-680 行）
 
-详细执行计划：[docs/plans/phase-h2-taskboard.md](plans/phase-h2-taskboard.md)
+详细执行计划：[docs/plans/archive/phase-h2-taskboard.md](plans/archive/phase-h2-taskboard.md)
 - [x] **H3** Processing 处理中页面 1:1 复刻 — `4-6h` P2（方案 A 新路由）
   - [x] H3.1 ProcessingPage 骨架 + SSE 接线（⭐ 小米）
 
@@ -128,9 +128,9 @@
   - [x] H5.2 StoryboardPage 方案 A markdown 直展（Opus 4.7）
   - [ ] ~~H5.3 生成按钮~~ → 押后到 [C]（按钮已禁用 + PHASE C pill）
 
-详细执行计划：[docs/plans/phase-h3-processing.md](plans/phase-h3-processing.md) / [phase-h4-results.md](plans/phase-h4-results.md) / [phase-h5-storyboard.md](plans/phase-h5-storyboard.md)
+详细执行计划：[docs/plans/archive/phase-h3-processing.md](plans/archive/phase-h3-processing.md) / [phase-h4-results.md](plans/archive/phase-h4-results.md) / [phase-h5-storyboard.md](plans/archive/phase-h5-storyboard.md)
 
-详细执行计划：[docs/plans/phase-h1-workbench.md](plans/phase-h1-workbench.md)
+详细执行计划：[docs/plans/archive/phase-h1-workbench.md](plans/archive/phase-h1-workbench.md)
 
 ### 延后阶段（N1~N11 + H 系列完成后）
 
@@ -159,7 +159,7 @@
 - [x] IP.9.3 N7b 视频路径选择 UI（3 路径 + 视频类型模板）
 - [x] IP.9.fix align Tier A UI with pipeline payloads
 
-**Phase R 输入层重构**（2026-05-24 启动）：Composer 瘦身 + AddMaterialModal 4 步合一 + 单链接多类型循环入队。详细计划：[docs/plans/phase-r-input-refactor.md](plans/phase-r-input-refactor.md)
+**Phase R 输入层重构**（2026-05-24 启动）：Composer 瘦身 + AddMaterialModal 4 步合一 + 单链接多类型循环入队。详细计划：[docs/plans/archive/phase-r-input-refactor.md](plans/archive/phase-r-input-refactor.md)
 - [x] R0 准备分支 `feat/phase-r-input-refactor`
 - [x] R1 Composer 瘦身（删 6 块死 UI）
 - [x] R2 AddMaterialModal 重写为 4 步合一统一入口
@@ -237,19 +237,19 @@
   - [x] R17.3 `preflightTasks.ts` `applyCascades` 增 scope 参数 + visual_only/av_combined 级联
   - [x] R17.4 PreflightDrawer 透传 scope
   - [x] R17.5 新增单测 5 个（AddMaterialModal ×3 + preflightTasks ×2）
-- [x] **R18** 主 chip 重构（visual=1 / audio=2 / av+⭐综合）+ PreflightDrawer 细调（9 种总结模板 + 字幕精修 + 截帧细调挪位）— `docs/plans/phase-r18-preflight-drawer-templates.md`，owner: xiaomi mimo v2.5-pro，~8h
-- [ ] **R18.1** 本地 ASR（fast-whisper + mlx-whisper 兜底）+ 任务失败弹窗 + 模型下载进度 — `docs/plans/phase-r18.1-local-asr-and-failure-popup.md`，owner: xiaomi mimo v2.5-pro，~8h
+- [x] **R18** 主 chip 重构（visual=1 / audio=2 / av+⭐综合）+ PreflightDrawer 细调（9 种总结模板 + 字幕精修 + 截帧细调挪位）— `docs/plans/archive/phase-r18-preflight-drawer-templates.md`，owner: xiaomi mimo v2.5-pro，~8h
+- [ ] **R18.1** 本地 ASR（fast-whisper + mlx-whisper 兜底）+ 任务失败弹窗 + 模型下载进度 — `docs/plans/archive/phase-r18.1-local-asr-and-failure-popup.md`，owner: xiaomi mimo v2.5-pro，~8h
 - [x] **R19** 综合笔记 av_synthesis pipeline + Markdown 导出（骨架 C，无 OCR）— `326eb12` `fdbf4a7`，owner: xiaomi mimo v2.5-pro
 - [ ] **R20**（押后）综合笔记多格式导出：PDF / Word / Obsidian Vault — 等 R21 状态同步 bug 修完后再排
-- [ ] **R21** R19 上线后流程状态同步 bug 修 + 进度/资料库行为收口 — `docs/plans/phase-r21-status-sync-bugfix.md`，owner: xiaomi mimo v2.5-pro，~10h
+- [ ] **R21** R19 上线后流程状态同步 bug 修 + 进度/资料库行为收口 — `docs/plans/archive/phase-r21-status-sync-bugfix.md`，owner: xiaomi mimo v2.5-pro，~10h
   - A 类 bug：步骤全 DONE / 任务面板重复 3 行 / SSE↔轮询不同步 / 截帧进度卡 30% / "查看结果" 点不动
   - B 类行为：未完成入口 disabled / 步骤日志补业务细节 / 右上角全局倒计时
   - [x] R21.P2 模型选择 + 截帧模式从细调挪到「添加素材」主界面 — `98e5f9d`
   - [x] R21.P2.v3 模型记忆即时存 + capability 过滤 + 砍细调 — `79eb2f5`
-  - [x] **R21.P3.S1** AddMaterialModal 重构 —— 拆「采集参数」/ 视频用途模式 / 链接预填背景 — `docs/plans/phase-r21-p3-s1-add-material-restructure.md`，~6-9h
-  - [x] **R21.P3.S2** 结果页「总结」tab + item_summaries 表 + 多版本 CRUD — `docs/plans/phase-r21-p3-s2-summaries-tab-and-table.md`，~8-12h，依赖 S1
-  - [x] **R21.P3.S3** 总结对比模式 + 视频学习模式按需补图交互 — `docs/plans/phase-r21-p3-s3-compare-and-learning-mode.md`，~6-10h，依赖 S2
-  - [x] **R21.P3.S3 收尾** intent 链路修复 + av_combined 补图入口 — `docs/plans/phase-r21-p3-s3-followup.md`，`0cf1e76` `ef633de`
+  - [x] **R21.P3.S1** AddMaterialModal 重构 —— 拆「采集参数」/ 视频用途模式 / 链接预填背景 — `docs/plans/archive/phase-r21-p3-s1-add-material-restructure.md`，~6-9h
+  - [x] **R21.P3.S2** 结果页「总结」tab + item_summaries 表 + 多版本 CRUD — `docs/plans/archive/phase-r21-p3-s2-summaries-tab-and-table.md`，~8-12h，依赖 S1
+  - [x] **R21.P3.S3** 总结对比模式 + 视频学习模式按需补图交互 — `docs/plans/archive/phase-r21-p3-s3-compare-and-learning-mode.md`，~6-10h，依赖 S2
+  - [x] **R21.P3.S3 收尾** intent 链路修复 + av_combined 补图入口 — `docs/plans/archive/phase-r21-p3-s3-followup.md`，`0cf1e76` `ef633de`
 - [ ] **R22**（押后）Pipeline 并行调度：截帧 + 转写同时跑 — `docs/plans/phase-r22-parallel-pipeline.md`，~6-10h，依赖 R21
 - [ ] **R23**（押后）设置面板：性能档位（CPU/GPU/内存→并发槽位）— `docs/plans/phase-r23-perf-tier-settings.md`，~4-6h，依赖 R22
 

@@ -166,7 +166,7 @@ git branch --show-current
 
 ### ✅ F2 真端到端冒烟测试（2026-05-22 已完成 8/10）
 
-**结果**：8/10 URL 通过，3 个 Bug 已修。详细记录在 `docs/plans/phase-f2-smoke.md`。
+**结果**：8/10 URL 通过，3 个 Bug 已修。详细记录在 `docs/plans/archive/phase-f2-smoke.md`。
 
 **已修 Bug**：
 - `00bc28c` Bug A：task_runner 硬编码 DOWNLOAD → 按 task_type 映射初始状态

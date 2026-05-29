@@ -7,7 +7,7 @@
 
 ## F1 流程缺口补齐（IP.9）
 
-**索引**：`docs/plans/phase-ip9-flow-gaps.md`
+**索引**：`docs/plans/archive/phase-ip9-flow-gaps.md`
 **前置**：IP.8 已合并 ✅
 **模型分配**：UI 层 ⭐ deepseek v4-pro；后端层 Sonnet / Opus
 **分支**：`feat/ip9-flow-gaps`（已合并入 main）
@@ -42,7 +42,7 @@
 **前置**：F1 完成
 **模型**：用户自己跑 + ⭐ deepseek v4-pro 修小 bug
 **状态**：✅ 8/10 URL 通过，3 Bug 已修（2026-05-22）
-**索引**：`docs/plans/phase-f2-smoke.md`
+**索引**：`docs/plans/archive/phase-f2-smoke.md`
 **已修 Bug**：
 - `00bc28c` Bug A：task_runner 所有任务硬编码 DOWNLOAD，改为按 task_type 映射
 - `489cc76` Bug B：preflight 布尔型 transcribe+summarize 未触发 N7b 字幕路径
@@ -78,7 +78,7 @@
 **目标**：用户粘 URL 后自动识别内容类型（video/audio/image/text），不再强制手动选类型
 **模型**：Opus 4.7（3 层策略 + 混合内容拆分逻辑复杂）
 **分支**：`feat/f4-content-sniff`（已合并入 main）
-**索引**：`docs/plans/phase-f4-content-sniff.md`
+**索引**：`docs/plans/archive/phase-f4-content-sniff.md`
 
 **子任务**：
 - [x] F4.1 URL 内容类型嗅探端点 — `ff1d593`
@@ -107,7 +107,7 @@
 **目标**：统一的资料库汇总视图——跨 workspace 浏览所有已分析内容，按类型/工作空间筛选，多维度排序，点卡片下钻 Results
 **模型**：⭐ deepseek v4-pro（4 子任务均 <5 文件）
 **分支**：直接打 main
-**索引**：`docs/plans/phase-l-library.md`
+**索引**：`docs/plans/archive/phase-l-library.md`
 
 **子任务**：
 - [x] L1 后端聚合端点 `GET /workspaces/library` — `826c311`
