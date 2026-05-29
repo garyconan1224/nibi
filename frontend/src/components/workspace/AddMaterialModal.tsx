@@ -257,6 +257,10 @@ export function AddMaterialModal({
   // ── 链接预填来源 hint ──
   const [linkPreviewSource, setLinkPreviewSource] = useState<string | null>(null)
 
+  // ── T2.2: 网页正文预览（仅文字素材）──
+  const [contentPreview, setContentPreview] = useState<{ content: string; wordCount: number } | null>(null)
+  const [contentLoading, setContentLoading] = useState(false)
+
   // ── 背景信息（legacy，保留用于 workspaceBackgrounds 回填）──
   const mergedBg = useMemo(() => {
     if (!workspaceBackgrounds || workspaceIds.length === 0) return undefined
@@ -450,6 +454,36 @@ export function AddMaterialModal({
     if (!open || !urlValue?.trim()) return
     doLinkPreview(urlValue.trim())
   }, [open, urlValue, doLinkPreview])
+
+  // ── T2.2: 文字素材 + URL 时加载正文预览 ──
+  useEffect(() => {
+    if (!open || !selectedTypes.includes('text')) {
+      setContentPreview(null)
+      return
+    }
+    const url = (urlValue ?? internalUrl).trim()
+    if (!url) {
+      setContentPreview(null)
+      return
+    }
+    let cancelled = false
+    setContentLoading(true)
+    import('@/services/linkPreview').then(({ fetchLinkPreviewWithContent }) =>
+      fetchLinkPreviewWithContent(url)
+    ).then((result) => {
+      if (cancelled) return
+      if (result.content) {
+        setContentPreview({ content: result.content, wordCount: result.word_count })
+      } else {
+        setContentPreview(null)
+      }
+    }).catch(() => {
+      if (!cancelled) setContentPreview(null)
+    }).finally(() => {
+      if (!cancelled) setContentLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [open, selectedTypes, urlValue, internalUrl])
 
   useEffect(() => {
     if (!internalUrl.trim() || urlValue) return
@@ -843,6 +877,47 @@ export function AddMaterialModal({
             </div>
             )}
           </div>
+
+          {/* T2.2: 正文预览（仅文字素材 + URL） */}
+          {selectedTypes.includes('text') && (urlValue || internalUrl.trim()) && (
+            <div className="m-section">
+              <div className="eyebrow" style={{ marginBottom: 10 }}>正文预览</div>
+              {contentLoading ? (
+                <div className="mono" style={{ fontSize: 12, color: 'var(--ink-4)', padding: '12px 0' }}>
+                  正在提取正文…
+                </div>
+              ) : contentPreview ? (
+                <div>
+                  <div
+                    style={{
+                      maxHeight: 160,
+                      overflow: 'auto',
+                      background: 'var(--bg-sunken)',
+                      borderRadius: 'var(--radius)',
+                      padding: '10px 14px',
+                      fontSize: 12,
+                      lineHeight: 1.7,
+                      color: 'var(--ink-2)',
+                    }}
+                  >
+                    {contentPreview.content.split(/\n{2,}/).slice(0, 5).map((para, i) => (
+                      <p key={i} style={{ margin: '0 0 8px' }}>{para}</p>
+                    ))}
+                    {contentPreview.content.split(/\n{2,}/).length > 5 && (
+                      <span style={{ color: 'var(--ink-4)' }}>…</span>
+                    )}
+                  </div>
+                  <div className="mono" style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 6 }}>
+                    {contentPreview.wordCount.toLocaleString()} 字 · 可直接提交
+                  </div>
+                </div>
+              ) : (
+                <div className="mono" style={{ fontSize: 12, color: 'var(--ink-4)', padding: '12px 0' }}>
+                  无法提取正文（可能是动态加载页面），将使用链接直接入库
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ③ 分析任务（文字素材跳过） */}
           {selectedTypes.length > 0 && !selectedTypes.every(t => t === 'text') && (
