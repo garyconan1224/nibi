@@ -19,8 +19,11 @@ from datetime import date
 from typing import Any, Dict, List
 from urllib.parse import quote
 
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from shared.audio_analyzer import export_srt, export_vtt, export_ass
 from backend.app.models.workspace import ItemType, WorkspaceItem, WorkspaceRecord
@@ -560,3 +563,67 @@ def export_av_synthesis_md(workspace_id: str):
             "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
         },
     )
+
+
+# ── R20: 笔记多格式导出 ────────────────────────────────
+
+
+class NotesExportRequest(BaseModel):
+    format: str  # "pdf" | "docx" | "obsidian"
+
+
+@router.post("/{workspace_id}/notes/export")
+def export_notes(workspace_id: str, body: NotesExportRequest):
+    """综合笔记多格式导出：PDF / Word / Obsidian Vault。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+
+    ws_root = get_workspace_root(workspace_id)
+    md_path = ws_root / "av_synthesis.md"
+    if not md_path.exists():
+        raise HTTPException(status_code=404, detail="综合笔记尚未生成")
+
+    content = md_path.read_text(encoding="utf-8")
+    from backend.app.services.av_synthesis.md_parser import parse_av_synthesis_md
+    notes = parse_av_synthesis_md(content)
+
+    fmt = body.format.lower().strip()
+    if fmt == "pdf":
+        return _build_notes_pdf(notes, ws_root)
+    elif fmt == "docx":
+        return _build_notes_docx(notes, ws_root)
+    elif fmt == "obsidian":
+        return _build_notes_obsidian(notes, ws_root)
+    else:
+        raise HTTPException(status_code=400, detail=f"不支持的导出格式: {body.format!r}，可选 pdf/docx/obsidian")
+
+
+def _resolve_image(ws_root: Path, rel_path: str) -> Path | None:
+    """解析图片相对路径，返回绝对路径（不存在则 None）。"""
+    if not rel_path:
+        return None
+    full = ws_root / rel_path
+    if full.exists():
+        return full
+    # 尝试去掉前导 ./
+    full = ws_root / rel_path.lstrip("./")
+    return full if full.exists() else None
+
+
+def _build_notes_pdf(notes: Any, ws_root: Path) -> StreamingResponse:
+    """PDF 导出：Jinja2 HTML 模板 + playwright chromium 渲染。"""
+    from backend.app.services.av_synthesis.pdf_builder import build_pdf
+    return build_pdf(notes, ws_root)
+
+
+def _build_notes_docx(notes: Any, ws_root: Path) -> StreamingResponse:
+    """Word 导出：python-docx 构建。"""
+    from backend.app.services.av_synthesis.docx_builder import build_docx
+    return build_docx(notes, ws_root)
+
+
+def _build_notes_obsidian(notes: Any, ws_root: Path) -> StreamingResponse:
+    """Obsidian Vault 导出：zip 含 markdown + frames/。"""
+    from backend.app.services.av_synthesis.obsidian_builder import build_obsidian_zip
+    return build_obsidian_zip(notes, ws_root)
