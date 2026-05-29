@@ -182,6 +182,73 @@ def test_load_url_wechat_no_js_content_fallback(monkeypatch: pytest.MonkeyPatch)
     assert "普通正文" in doc.content
 
 
+def test_load_url_wechat_title_by_class(monkeypatch: pytest.MonkeyPatch) -> None:
+    """微信标题 h1 只有 class 无 id → 也能抽到标题（不兜底 URL）。"""
+    wx_html = (
+        '<html><body>'
+        '<h1 class="rich_media_title">纯 class 标题</h1>'
+        '<div id="js_content"><p>正文。</p></div>'
+        '</body></html>'
+    ).encode("utf-8")
+
+    class _FakeResp:
+        status_code = 200
+        content = wx_html
+        text = wx_html.decode("utf-8")
+        headers = {"content-type": "text/html"}
+        url = "https://mp.weixin.qq.com/s/class-only"
+
+    class _FakeClient:
+        def __init__(self, *a: Any, **kw: Any) -> None:
+            pass
+        def __enter__(self):
+            return self
+        def __exit__(self, *exc):
+            return False
+        def get(self, url: str):
+            return _FakeResp()
+
+    monkeypatch.setattr("shared.text_loader.httpx.Client", _FakeClient)
+
+    doc = load_url("https://mp.weixin.qq.com/s/class-only")
+    assert doc.title == "纯 class 标题"
+    assert doc.meta["parser"] == "wechat"
+
+
+def test_load_url_wechat_title_nested_span(monkeypatch: pytest.MonkeyPatch) -> None:
+    """微信标题文字在 span 子元素里 → text_content() 能拿到完整标题。"""
+    wx_html = (
+        '<html><body>'
+        '<h1 class="rich_media_title " id="activity-name">'
+        '<span class="js_title_inner">嵌套标题内容</span></h1>'
+        '<div id="js_content"><p>正文。</p></div>'
+        '</body></html>'
+    ).encode("utf-8")
+
+    class _FakeResp:
+        status_code = 200
+        content = wx_html
+        text = wx_html.decode("utf-8")
+        headers = {"content-type": "text/html"}
+        url = "https://mp.weixin.qq.com/s/nested-span"
+
+    class _FakeClient:
+        def __init__(self, *a: Any, **kw: Any) -> None:
+            pass
+        def __enter__(self):
+            return self
+        def __exit__(self, *exc):
+            return False
+        def get(self, url: str):
+            return _FakeResp()
+
+    monkeypatch.setattr("shared.text_loader.httpx.Client", _FakeClient)
+
+    doc = load_url("https://mp.weixin.qq.com/s/nested-span")
+    assert doc.title == "嵌套标题内容"
+    assert doc.meta["parser"] == "wechat"
+
+
 # ── handle_text_task 集成（mock load_auto）─────────────────
 
 

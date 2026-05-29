@@ -268,11 +268,14 @@ def load_url(url: str, *, timeout: float = _DEFAULT_TIMEOUT_S) -> TextDocument:
             wx_tree = lxml_html.fromstring(html_text)
             wx_content = wx_tree.xpath('//div[@id="js_content"]')
             if wx_content:
-                wx_title_nodes = wx_tree.xpath(
-                    '//h1[@id="activity-name"]/text()'
-                    ' | //h2[contains(@class,"rich_media_title")]/text()'
+                wx_title_el = wx_tree.xpath(
+                    '//h1[@id="activity-name"]'
+                    ' | //h1[contains(@class,"rich_media_title")]'
                 )
-                wx_title = (wx_title_nodes[0].strip() if wx_title_nodes else "") or url
+                wx_title = ""
+                if wx_title_el:
+                    wx_title = wx_title_el[0].text_content().strip()
+                wx_title = wx_title or url
                 wx_text = _normalize(wx_content[0].text_content())
                 if wx_text:
                     return TextDocument(
