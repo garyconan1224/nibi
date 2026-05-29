@@ -177,6 +177,121 @@ def _format_sec_short(sec: float) -> str:
     return f"{s // 60:02d}:{s % 60:02d}"
 
 
+def _gemini_segments_to_transcript(
+    segments: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """将 Gemini 返回的 segments [{start, end, text}] 映射为 VideoResultTranscriptLine[]。"""
+    return [
+        {
+            "t_sec": float(seg.get("start", 0)),
+            "t_str": _format_sec_short(float(seg.get("start", 0))),
+            "text": str(seg.get("text", "")),
+        }
+        for seg in segments
+        if seg.get("text")
+    ]
+
+
+def _get_video_model_prompt(intent: str) -> str:
+    """根据视频意图生成 video_model 路径的 prompt 模板。"""
+    base = (
+        "请分析这段视频的完整内容，输出严格的 JSON 格式：\n"
+        '{"summary": "视频内容的结构化摘要", '
+        '"segments": [{"start": 秒数, "end": 秒数, "text": "该时间段的内容文字"}]}\n'
+        "要求：\n"
+        "1. summary 用中文，200-500 字，覆盖视频核心信息\n"
+        "2. segments 按时间顺序，每个 10-60 秒，覆盖视频全程\n"
+        "3. text 是该时间段的口播/画面内容转写\n"
+    )
+    if intent == "learning":
+        return (
+            "你是一个课堂/讲座视频分析专家。\n"
+            + base
+            + "4. 重点提取知识点、公式、定义、示例\n"
+            + "5. summary 按「主题 → 核心要点 → 关键结论」组织\n"
+        )
+    if intent == "replica":
+        return (
+            "你是一个视频拆片/翻拍分析专家。\n"
+            + base
+            + "4. 标注镜头切换、转场、画面构图变化\n"
+            + "5. summary 按「结构 → 每段作用 → 拍摄手法」组织\n"
+        )
+    return base
+
+
+def _run_video_model_path(
+    videos: List[Path],
+    payload: Dict[str, Any],
+    task_id: str,
+    project_json_dir: Path,
+    runner: Any,
+) -> Dict[str, Any]:
+    """N7b 路径 3：Gemini 视频模型直接分析。"""
+    from shared.gemini_client import GeminiVideoClient, GeminiVideoResponse
+
+    runner.append_log(task_id, "🎬 路径 3 视频模型直传 | 初始化 Gemini 客户端…")
+    runner.set_progress(task_id, 0.05, "Initializing Gemini client")
+
+    # 构造客户端（缺 key 在此 raise → 任务 FAILED 带明确错误）
+    model_override = str(payload.get("video_model") or "").strip()
+    try:
+        client = GeminiVideoClient(model=model_override or "gemini-2.5-flash")
+    except RuntimeError as e:
+        raise ValueError(str(e))
+
+    intent = str(payload.get("video_intent") or "learning").strip()
+    prompt_template = _get_video_model_prompt(intent)
+
+    runner.append_log(task_id, f"📹 开始分析 {len(videos)} 个视频 | model={client.model} | intent={intent}")
+
+    all_transcript_lines: List[Dict[str, Any]] = []
+    all_transcript_segments: List[Dict[str, Any]] = []
+    summaries: List[str] = []
+
+    for i, video_path in enumerate(videos):
+        runner.append_log(task_id, f"📤 上传视频 [{i+1}/{len(videos)}]: {video_path.name}")
+        runner.set_progress(task_id, 0.1 + 0.7 * (i / max(len(videos), 1)), f"Analyzing {video_path.name}")
+
+        try:
+            result: GeminiVideoResponse = client.analyze_video(
+                video_path=video_path,
+                intent=intent,
+                prompt_template=prompt_template,
+            )
+        except Exception as e:
+            runner.append_log(task_id, f"❌ 视频 {video_path.name} 分析失败: {e}")
+            raise
+
+        segments = result.segments
+        all_transcript_segments.extend(segments)
+        all_transcript_lines.extend(_gemini_segments_to_transcript(segments))
+        if result.summary:
+            summaries.append(result.summary)
+        runner.append_log(task_id, f"✅ {video_path.name} 分析完成 | {len(segments)} 个片段")
+
+    runner.set_progress(task_id, 0.95, "Building final result")
+
+    transcript_text = "\n".join(line["text"] for line in all_transcript_lines)
+    combined_summary = "\n\n".join(summaries) if summaries else ""
+
+    final_result: Dict[str, Any] = {
+        "json_outputs": [],
+        "json_output_basenames": [],
+        "json_output_dir": str(project_json_dir.resolve()),
+        "summary_path": "video_model",
+        "transcript": all_transcript_lines,
+        "transcript_text": transcript_text,
+        "transcript_segments": all_transcript_segments,
+        "summary": combined_summary,
+        "intent": intent,
+    }
+
+    runner.set_progress(task_id, 1.0, "video_model analysis finished")
+    runner.append_log(task_id, f"✅ 路径 3 完成 | summary {len(combined_summary)} 字 | {len(all_transcript_lines)} 个转写片段")
+    return final_result
+
+
 def _extract_audio_from_video(
     video_path: Path,
     output_path: Path,
@@ -744,10 +859,8 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
     settings = load_settings()
     api_key = str(payload.get("api_key") or "").strip() or settings.openai_api_key.strip()
     summary_path = str(payload.get("summary_path") or "").strip()
-    if summary_path == "video_model":
-        raise ValueError("video_model 路径尚未实现，请选择其他分析范围（visual_only / subtitle / av_combined）")
-    # subtitle 路径不需要 API key（仅规则清洗即可运行），其他路径需要
-    if not api_key and summary_path != "subtitle":
+    # subtitle 路径不需要 API key（仅规则清洗即可运行），video_model 用 GEMINI_API_KEY，其他路径用 OpenAI key
+    if not api_key and summary_path not in ("subtitle", "video_model"):
         raise ValueError("analyze requires api_key in payload or settings")
     vision_model = str(payload.get("vision_model") or "").strip() or settings.vision_model
     text_model = str(payload.get("text_model") or "").strip() or settings.text_model
@@ -773,6 +886,10 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
         videos = [v for v in videos if v.name in allowed]
     if not videos:
         raise ValueError(f"no videos found in {project_video_dir}")
+
+    # N7b path 3: video_model (Gemini 直传) — 在 videos 加载后执行
+    if summary_path == "video_model":
+        return _run_video_model_path(videos, payload, task_id, project_json_dir, runner)
 
     # N7b path 1 (subtitle): ASR/text-only, no VLM frame analysis needed
     # av_combined: ASR first, then VLM, then combined LLM summary
