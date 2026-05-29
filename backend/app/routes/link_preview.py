@@ -21,6 +21,12 @@ except ImportError:
     def extract_bvid_from_url(url: str) -> None:  # type: ignore[misc]
         return None
 
+try:
+    from shared.text_loader import load_url as _load_url, TextLoaderError
+    _HAS_LOADER = True
+except ImportError:
+    _HAS_LOADER = False
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/link-preview", tags=["link-preview"])
@@ -63,11 +69,16 @@ def _extract_og(page_html: str) -> dict[str, Optional[str]]:
 
 
 @router.get("")
-async def link_preview(url: str = Query(..., description="待预览的链接")):
+async def link_preview(
+    url: str = Query(..., description="待预览的链接"),
+    include_content: bool = Query(False, description="是否返回 readability 正文"),
+):
     """抓取链接的 og 元数据。
 
     返回 { title, description, image_url, source }。
     source: "bili" | "og" | "fallback"
+
+    当 include_content=True 时，额外返回 { content, word_count }。
     """
     if not url.strip():
         raise HTTPException(status_code=400, detail="url 参数不能为空")
@@ -77,12 +88,16 @@ async def link_preview(url: str = Query(..., description="待预览的链接")):
         try:
             dl = BilibiliNoCookieDownloader()
             meta = dl.get_meta(url)
-            return {
+            result = {
                 "title": meta.title or None,
                 "description": meta.description or None,
                 "image_url": meta.cover_url or None,
                 "source": "bili",
             }
+            if include_content:
+                result["content"] = ""
+                result["word_count"] = 0
+            return result
         except Exception as exc:
             logger.warning("B 站预览失败，降级到 og: %s", exc)
             # 降级到通用 og（B 站页面也有 og 标签）
@@ -98,12 +113,16 @@ async def link_preview(url: str = Query(..., description="待预览的链接")):
             resp.raise_for_status()
     except Exception as exc:
         logger.warning("网页抓取失败: %s", exc)
-        return {
+        result = {
             "title": None,
             "description": None,
             "image_url": None,
             "source": "fallback",
         }
+        if include_content:
+            result["content"] = ""
+            result["word_count"] = 0
+        return result
 
     og = _extract_og(resp.text)
 
@@ -112,4 +131,23 @@ async def link_preview(url: str = Query(..., description="待预览的链接")):
     else:
         og["source"] = "fallback"
 
+    # ── 可选：readability 正文提取 ──
+    if include_content:
+        content, word_count = _extract_content(url)
+        og["content"] = content
+        og["word_count"] = word_count
+
     return og
+
+
+def _extract_content(url: str) -> tuple[str, int]:
+    """用 readability 提取正文，失败返回空串。"""
+    if not _HAS_LOADER:
+        logger.warning("text_loader 不可用，跳过正文提取")
+        return "", 0
+    try:
+        doc = _load_url(url, timeout=10)
+        return doc.content, doc.char_count
+    except (TextLoaderError, Exception) as exc:
+        logger.warning("readability 正文提取失败: %s", exc)
+        return "", 0
