@@ -24,7 +24,6 @@ from fastapi.responses import StreamingResponse
 
 from shared.audio_analyzer import export_srt, export_vtt, export_ass
 from backend.app.models.workspace import ItemType, WorkspaceItem, WorkspaceRecord
-from backend.app.services.audio_result_demo import build_demo_audio_result
 from backend.app.services.video_result_demo import build_demo_video_result
 from backend.app.routes.workspaces import _store, _sync_item_with_tasks
 from shared.config import get_workspace_root
@@ -484,17 +483,16 @@ def export_subtitles(
             if original and original in raw_speaker_map:
                 seg["speaker"] = raw_speaker_map[original]
 
-    # demo fixture 降级：result 页面展示的 demo 字幕，导出时也下发
-    if not segments and item.type == ItemType.VIDEO.value:
-        raw = build_demo_video_result(item.item_id, item.name).get("transcript") or []
-        segments = _normalize_segments(raw)
-    if not segments and item.type == ItemType.AUDIO.value:
-        raw = build_demo_audio_result(item.item_id, item.name).get("transcript") or []
-        segments = _normalize_segments(raw)
+    # 无 transcript 时返回空 SRT（不走 demo fixture，避免 visual_only 路径数据串扰）
     if not segments:
-        raise HTTPException(
-            status_code=404,
-            detail="此素材尚无字幕数据，请先执行分析任务（视频路径 1「字幕直接总结」或音频「转写+总结」）",
+        empty_srt = "1\n00:00:00,000 --> 00:00:00,000\n\n"
+        return StreamingResponse(
+            io.BytesIO(empty_srt.encode("utf-8")),
+            media_type=_SUBTITLE_MIME[format],
+            headers={
+                "Content-Disposition": f'attachment; filename*=UTF-8\'\'{quote("empty.srt")}',
+                "X-Subtitle-Status": "empty",
+            },
         )
 
     title = item.name or "untitled"
