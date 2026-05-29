@@ -708,7 +708,15 @@ export default function VideoResultPage() {
           <ItemTagsPanel workspaceId={workspaceId} itemId={itemId} />
         </div>
 
-        {/* 播放器 */}
+        {/* 播放器 / visual_only placeholder */}
+        {isVisualOnly ? (
+          <div className="vd-player-wrap" style={{ display: 'grid', placeItems: 'center', minHeight: 240 }}>
+            <div style={{ textAlign: 'center', color: 'var(--ink-3)', fontFamily: 'var(--display)', fontSize: 18, letterSpacing: '-0.01em', lineHeight: 1.6 }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📽️</div>
+              仅画面分析模式 · 不含视频播放
+            </div>
+          </div>
+        ) : (
         <div className="vd-player-wrap">
           <div className="vd-player" onClick={togglePlay}>
             {hasVideoSource ? (
@@ -743,6 +751,7 @@ export default function VideoResultPage() {
             </span>
           </div>
         </div>
+        )}
 
         {/* 三轨 */}
         <TripleTrack
