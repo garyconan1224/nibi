@@ -96,7 +96,7 @@ git branch --show-current
 - VideoResult 类型扩展（summary_path / summary / video_template）
 - 文档残留修复（待提交 → 9e8667e）
 
-**N7b 路径 3 待实现**：视频模型直接分析（依赖 Gemini / GPT-4o / Qwen-VL API 集成决策）
+**N7b 路径 3 骨架已联调**：PROCESSING→ACTIVE 轮询 + JSON fence 容错 + 中文文件名处理已实现并合入 main。真实视频 generate_content 受 Gemini free tier 视频配额限制（503/429），需升级付费或换时段重试。
 **N8b 待实现**：音频 librosa 分析（6 维度切分）
 
 具体执行索引去 `docs/ROADMAP.md` §3~§8 看对应 track，再去 plan md 看子任务步骤。
@@ -111,7 +111,7 @@ git branch --show-current
 - 修复计划：[`docs/plans/phase-e2e-bugfix-2026-05-29.md`](plans/phase-e2e-bugfix-2026-05-29.md)（S0.1-S0.8，每个 step 独立分支）
 - 必修：S0.1 `/subtitles` 删 demo 兜底 + S0.2 audio_result 认 transcript_segments + S0.3 visual_only 禁 SRT 按钮 + S0.4 ResultsOverview React key
 - 然后进 [`phase-handoff-mimo-2026-05-29.md`](plans/phase-handoff-mimo-2026-05-29.md) S1 清理 → S6 R20
-- N7b 路径3 已定 Gemini，但**没 API**，S4 只做代码骨架，API 到位再做联调
+- N7b 路径3 Gemini 骨架已联调（PROCESSING→ACTIVE + JSON fence + 中文文件名），**真实视频 generate_content 受 free tier 配额限制**，需付费升级或换时段重试
 
 ### ✅ Phase L 资料库聚合页（2026-05-22 已完成）
 
@@ -259,7 +259,7 @@ git branch --show-current
 
 ### 🥉 独立小活（任意穿插，不影响冒烟路线）
 
-- **N7b 路径 3** 视频模型直接分析（8-12h，依赖 Gemini / GPT-4o / Qwen-VL API 集成决策）
+- **N7b 路径 3** 视频模型直接分析（骨架已联调，真实视频 generate_content 受 Gemini free tier 配额限制）
 - **N8b** 音频前端交互（6-8h，无人声切音乐弹窗 / 说话人修正 / 6 维度切分）
 
 ---
