@@ -1,7 +1,7 @@
 ---
 name: phase-e2e-bugfix-2026-05-29
 title: E2E 测试发现的 7 问题修复 — P1 数据串扰必修 + P2/P3 体验优化
-status: in_progress
+status: done
 owner: xiaomi mimo 2.5pro（ccswitch 中转）
 estimated_hours: 6-8（P1+P2 必修 ~3h；P3 全选 ~3-5h）
 depends_on:
@@ -17,7 +17,11 @@ commits:
   - S0.1: e6e2173 fix(e2e.p1): /subtitles 端口删 demo fixture 兜底，无 transcript 返回空 SRT
   - S0.2: b94f6c7 fix(e2e.p1): audio_result has_real 认 transcript_segments，修复 demo 兜底误触发
   - S0.3: a368370 fix(e2e.p1+): VideoResultPage visual_only 模式禁用字幕导出按钮
-completed_date: 2026-05-29（S0.1-S0.3；S0.4-S0.8 待续）
+  - S0.4: 9cefd2a fix(e2e.p2): ResultsOverview 补 unique key + AppShell stats 防御
+  - S0.5: 78c107c fix(e2e.p3): visual_only 隐藏播放器，改显仅画面分析模式提示
+  - S0.6: 272610e fix(e2e.p3): B站 yt-dlp format 前置，减少412重试
+  - S0.7: 849571d fix(e2e.p3): VLM 进度每5%上报，消除"卡住后秒满"假象
+completed_date: 2026-05-29（S0.1-S0.7 全部完成；S0.8 跳过）
 ---
 
 # E2E Bugfix 计划（2026-05-29 Opus 4.7 拆解）

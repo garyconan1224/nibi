@@ -32,7 +32,10 @@
 - [x] S0.2 `get_audio_result` 的 has_real 认 transcript_segments（🔴P1）→ `fix/e2e-p1-audio-result-has-real`
 - [x] S0.3 visual_only 前端禁 SRT 按钮（🟠P1+）→ `fix/e2e-p1-visual-only-srt-disabled`
 - [x] S0.4 ResultsOverview React key 警告（🟡P2）→ `fix/e2e-p2-results-overview-key`（真凶：frames 的 key={f.idx} 在 idx 未定义时失效，已修复 + AppShell stats 防御 + vite proxy 加 /admin）
-- [ ] S0.5~S0.8 隐藏播放器 / B站412重试 / VLM进度 / URL input（⚪P3，可选）
+- [x] S0.5 visual_only 隐藏播放器（⚪P3）→ `fix/e2e-p3-visual-only-no-player`
+- [x] S0.6 B站 yt-dlp 412 前置（⚪P3）→ `fix/e2e-p3-bilibili-format-precedence`
+- [x] S0.7 VLM 进度每 5% 上报（⚪P3）→ `fix/e2e-p3-vlm-progress-granular`
+- [ ] S0.8 Composer URL input（⚪P3，默认跳过）
 
 **P1 · 搭架构 + 整理仓库**
 - [ ] S1-S3 仓库清理（plans 归档 / Streamlit 冻结 / 未用 assets）
