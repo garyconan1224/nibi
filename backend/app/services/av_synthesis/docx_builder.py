@@ -133,13 +133,15 @@ def build_docx(notes: Any, ws_root: Path) -> StreamingResponse:
     doc.save(buf)
     buf.seek(0)
 
+    from urllib.parse import quote
     safe_title = (notes.title or "笔记").replace("/", "_").replace("\\", "_")[:50]
     filename = f"{safe_title}.docx"
+    filename_star = f"UTF-8''{quote(filename)}"
 
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={
-            "Content-Disposition": f"attachment; filename*=UTF-8''{filename}",
+            "Content-Disposition": f"attachment; filename*= {filename_star}",
         },
     )

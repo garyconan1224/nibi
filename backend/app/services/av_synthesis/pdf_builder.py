@@ -102,13 +102,15 @@ def build_pdf(notes: Any, ws_root: Path) -> StreamingResponse:
             )
         raise HTTPException(status_code=500, detail=f"PDF 渲染失败: {msg}")
 
+    from urllib.parse import quote
     safe_title = (notes.title or "笔记").replace("/", "_").replace("\\", "_")[:50]
     filename = f"{safe_title}.pdf"
+    filename_star = f"UTF-8''{quote(filename)}"
 
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f"attachment; filename*=UTF-8''{filename}",
+            "Content-Disposition": f"attachment; filename*= {filename_star}",
         },
     )

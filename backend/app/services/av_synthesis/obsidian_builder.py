@@ -139,12 +139,14 @@ def build_obsidian_zip(notes: Any, ws_root: Path) -> StreamingResponse:
                 zf.write(img_full, img_rel)
 
     buf.seek(0)
+    from urllib.parse import quote
     filename = f"{safe_title}_obsidian.zip"
+    filename_star = f"UTF-8''{quote(filename)}"
 
     return StreamingResponse(
         buf,
         media_type="application/zip",
         headers={
-            "Content-Disposition": f"attachment; filename*=UTF-8''{filename}",
+            "Content-Disposition": f"attachment; filename*= {filename_star}",
         },
     )
