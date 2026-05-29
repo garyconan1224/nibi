@@ -812,13 +812,17 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
             target_json_dir=project_json_dir,
             capture_params=capture_params,
         )
+        last_reported_pct = -100.0
         while not state.finished:
             if runner.is_cancel_requested(record.task_id):
                 break
             snaps = state.snapshot()
             if snaps:
                 avg = sum(float(s["percent"]) for s in snaps) / max(len(snaps), 1) / 100.0
-                runner.set_progress(record.task_id, min(0.65, max(0.3, 0.3 + avg * 0.35)), "Analyzing video frames")
+                current_pct = avg * 100
+                if current_pct - last_reported_pct >= 5:
+                    runner.set_progress(record.task_id, min(0.65, max(0.3, 0.3 + avg * 0.35)), "Analyzing video frames")
+                    last_reported_pct = current_pct
                 # 每 5% 或每 2 秒打一条日志
                 for s in snaps:
                     if s["total_frames"] > 0:
@@ -880,13 +884,17 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
         target_json_dir=project_json_dir,
         capture_params=capture_params,
     )
+    last_reported_pct = -100.0
     while not state.finished:
         if runner.is_cancel_requested(record.task_id):
             break
         snaps = state.snapshot()
         if snaps:
             avg = sum(float(s["percent"]) for s in snaps) / max(len(snaps), 1) / 100.0
-            runner.set_progress(record.task_id, min(0.95, max(0.1, avg)), "Analyzing video frames")
+            current_pct = avg * 100
+            if current_pct - last_reported_pct >= 5:
+                runner.set_progress(record.task_id, min(0.95, max(0.1, avg)), "Analyzing video frames")
+                last_reported_pct = current_pct
         live = state.live_frames_snapshot()
         tail = live[-12:] if live else []
         rec = runner.store.get(record.task_id)
