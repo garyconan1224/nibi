@@ -478,6 +478,7 @@ export default function VideoResultPage() {
 
   // N7b 路径 1：字幕直接总结模式（无帧，展示 summary + transcript）
   const isSubtitlePath = result.summary_path === 'subtitle'
+  const isVisualOnly = result.summary_path === 'visual_only'
   if (isSubtitlePath) {
     return (
       <div className="vm-video-result-scope vd-subtitle-layout">
@@ -682,7 +683,7 @@ export default function VideoResultPage() {
           )}
           <div style={{ marginLeft: 'auto' }} />
           <div style={{ position: 'relative' }}>
-            <button className="btn-ghost" style={{ height: 28, padding: '0 10px', fontSize: 12 }} onClick={() => setExportOpen(!exportOpen)} title="导出字幕">
+            <button className="btn-ghost" style={{ height: 28, padding: '0 10px', fontSize: 12, opacity: isVisualOnly ? 0.5 : 1 }} onClick={() => !isVisualOnly && setExportOpen(!exportOpen)} title={isVisualOnly ? "仅画面分析模式无字幕数据" : "导出字幕"} disabled={isVisualOnly}>
               <Download size={13} /> 字幕
             </button>
             {exportOpen && (
