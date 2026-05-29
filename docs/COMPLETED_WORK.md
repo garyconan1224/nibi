@@ -1267,3 +1267,35 @@ E2E 报告问题3：ResultsOverview 页面控制台报 "Each child in a list sho
 
 ### 留给后续的影响
 - ⚠️ **验证教训**：`tsc --noEmit` 不等于 `npm run build`（`tsc -b`）。发布前 / 改前端类型后应跑 `npm run build` 才能抓到 project references 范围的类型错误。
+
+---
+
+## Phase T2.2 — 网页抓取预览模态
+
+**完成日期**：2026-05-29
+**模型 / 工具**：xiaomi mimo 2.5pro
+**分支**：feat/phase-t2.2-fetch-preview
+**提交**：
+- `0e90622` feat(t2.2): link_preview 可选返回 readability 正文
+- `8c708d2` feat(t2.2): AddMaterialModal 网页正文预览确认
+
+### 问题
+T2.2 核实发现：link_preview.py 只返回 og 元数据（title/description/image_url），不返回正文；用户粘贴 URL 后直接入库，没有"先预览正文再确认"的 UI。
+
+### 影响范围
+- **后端 link_preview.py**：新增 `?include_content=true` 查询参数，复用 `shared/text_loader.load_url` 提取正文，返回 `content` + `word_count`。正文提取失败兜底返回空串（不报 500）。
+- **后端测试**：新增 2 个测试（test_include_content / test_include_content_extraction_fail），覆盖正常 + 异常路径。
+- **前端 linkPreview.ts**：新增 `fetchLinkPreviewWithContent` 函数 + `LinkPreviewWithContent` 接口。
+- **前端 AddMaterialModal.tsx**：新增 `contentPreview` / `contentLoading` 状态 + effect 自动加载 + 预览 UI（前 5 段可滚动 + 字数）。
+
+### 关键改动
+- link_preview endpoint 加 `_extract_content(url)` 内部函数，调用 `load_url(url, timeout=10)` 提取正文，失败返回空串。
+- AddMaterialModal 预览区落点：② 输入源与③分析任务之间，仅 `selectedTypes.includes('text')` 且有 URL 时显示。
+- 预览加载失败时显示"无法提取正文（可能是动态加载页面），将使用链接直接入库"，不阻断提交流程。
+
+### 验证
+- `.venv/bin/python -m pytest backend/tests/test_link_preview.py -v`：6 passed
+- `cd frontend && npx tsc --noEmit`：passed
+
+### 留给后续的影响
+- T2.2 完成；文字链路 T 的网页抓取扩展部分进度更新（T2.1 ✅ / T2.2 ✅ / T2.3 部分）。
