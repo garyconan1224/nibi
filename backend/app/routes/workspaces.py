@@ -2060,7 +2060,9 @@ def get_audio_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
     # X.1 bridge: overlay task results so audio_result sees real data
     a_overlay = _sync_item_with_tasks(item)
     results = dict(a_overlay.get("results", {})) if a_overlay and a_overlay.get("results") else dict(item.results or {})
-    has_real = isinstance(results, dict) and results.get("transcript")
+    has_real = isinstance(results, dict) and (
+        results.get("transcript") or results.get("transcript_segments")
+    )
     if has_real:
         payload = dict(results)
         payload.setdefault("source", "item_results")
@@ -2081,7 +2083,7 @@ def get_audio_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
             "tracks_meta",
             {
                 "total_sec": results.get("tracks_meta", {}).get("total_sec", 0),
-                "transcript_count": len(results.get("transcript", [])),
+                "transcript_count": len(results.get("transcript") or results.get("transcript_segments") or []),
             },
         )
         return payload
