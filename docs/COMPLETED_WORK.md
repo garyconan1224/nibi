@@ -1299,3 +1299,28 @@ T2.2 核实发现：link_preview.py 只返回 og 元数据（title/description/i
 
 ### 留给后续的影响
 - T2.2 完成；文字链路 T 的网页抓取扩展部分进度更新（T2.1 ✅ / T2.2 ✅ / T2.3 部分）。
+
+---
+
+## Phase T2.3 — 微信公众号适配
+
+**日期**：2026-05-29
+**分支**：`feat/phase-t2.3-wechat`
+**Commits**：`ff71ff3` `37fbb8a`
+
+### 背景
+微信公众号正文在 `<div id="js_content">`，readability-lxml 抽取不干净（会混入导航、广告等），需要域名分支专门 xpath 抽取。
+
+### 关键改动
+- `shared/text_loader.py` `load_url()` 在 `html_text` 赋值后、readability 之前，检测 `mp.weixin.qq.com` 域名，用 lxml xpath 直抽 `#js_content`。
+- 标题优先取 `h1#activity-name` 或 `h2.rich_media_title`，取不到回落 URL。
+- 抽到非空才 return；失败或异常回落 readability（不 break 通用路径）。
+- `meta["parser"] = "wechat"` 标记走了专门路径。
+
+### 验证
+- `pytest tests/backend/test_text_pipeline.py`：30 passed（含 2 个新增微信单测）
+- 真实 URL 实测：`parser=wechat`，`char_count=5192`，正文完整
+
+### 留给后续的影响
+- 文字链路 T 进度更新：T2.1 ✅ / T2.2 ✅ / T2.3 ✅。
+- 标题抽取可后续扩展更多 xpath 规则（当前不同微信模板标题 HTML 结构不统一）。

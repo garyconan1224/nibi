@@ -253,6 +253,7 @@
   - [x] **R21.P3.S3** 总结对比模式 + 视频学习模式按需补图交互 — `docs/plans/archive/phase-r21-p3-s3-compare-and-learning-mode.md`，~6-10h，依赖 S2
   - [x] **R21.P3.S3 收尾** intent 链路修复 + av_combined 补图入口 — `docs/plans/archive/phase-r21-p3-s3-followup.md`，`0cf1e76` `ef633de`
 - [x] **T2.2** 网页抓取预览模态 — link_preview 可选返回 readability 正文 + AddMaterialModal 正文预览区 — `feat/phase-t2.2-fetch-preview`，`0e90622` `8c708d2`
+- [x] **T2.3** 微信公众号适配 — text_loader 检测 mp.weixin.qq.com 域名，xpath 直抽 #js_content 正文，回落 readability — `feat/phase-t2.3-wechat`，`ff71ff3` `37fbb8a`
 - [ ] **R22**（押后）Pipeline 并行调度：截帧 + 转写同时跑 — `docs/plans/phase-r22-parallel-pipeline.md`，~6-10h，依赖 R21
 - [ ] **R23**（押后）设置面板：性能档位（CPU/GPU/内存→并发槽位）— `docs/plans/phase-r23-perf-tier-settings.md`，~4-6h，依赖 R22
 
