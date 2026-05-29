@@ -4,7 +4,7 @@
 >
 > **维护规则**：每完成一个子任务，在本文件**追加**一段（不删旧记录），格式见下方"记录模板"。
 >
-> Last updated: 2026-05-26 (Phase R13.6 metadata coverage hotfix)
+> Last updated: 2026-05-29（补录 S0.5-S0.7 / S4 N7b 骨架 / N8b 映射 / build hotfix；handoff S0-S6 音视频闭环完成）
 
 ---
 
@@ -1172,3 +1172,98 @@ E2E 报告问题3：ResultsOverview 页面控制台报 "Each child in a list sho
 - md→html 方案选择 Jinja2 直接渲染 HTML（零新依赖），而非安装 markdown 解析库
 - 图片用 base64 data URI 内嵌 HTML，避免 playwright 文件路径问题
 - playwright 仅声明到 requirements.txt（环境已有），chromium 未安装时返回明确错误提示
+
+---
+
+## S0.5-S0.7 — E2E Bugfix P3 收尾（隐藏播放器 / B站412 / VLM 进度）
+
+**完成日期**：2026-05-29
+**模型 / 工具**：xiaomi mimo 2.5pro
+**分支**：fix/e2e-p3-visual-only-no-player / fix/e2e-p3-bilibili-format-precedence / fix/e2e-p3-vlm-progress-granular
+**提交**：
+- `78c107c` fix(e2e.p3): visual_only 隐藏播放器，改显「仅画面分析模式」提示
+- `272610e` fix(e2e.p3): B站 yt-dlp format 前置，减少 412 重试
+- `849571d` fix(e2e.p3): VLM 进度每 5% 上报，消除「卡住后秒满」假象
+
+### 影响范围
+- 前端 `VideoResultPage.tsx`（S0.5）/ 后端 `shared/video_download_ytdlp.py`（S0.6）/ `backend/app/services/pipeline_tasks.py`（S0.7）
+
+### 关键改动
+- **S0.5**：`isVisualOnly` 时渲染 placeholder（不含播放器），否则正常播放器。
+- **S0.6**：`_build_attempts` 对 B站 URL **只用去掉 `format` 参数的 attempts**（带 format 在 B站必 412），非 B站走原逻辑（移入 else）。实测尝试次数 7→1。
+- **S0.7**：VLM 逐帧循环加 `last_reported_pct` 节流，相邻差 ≥5% 才 `set_progress`（两处循环都改）。
+- **S0.8**（Composer URL input）按计划默认跳过，留给后续测试基础设施 phase。
+
+### 为什么这么做
+- E2E 报告的 P3 体验问题；S0.6 经 context7 查 yt-dlp B站策略后定方案。
+
+### 留给后续的影响
+- ⚠️ S0.5 placeholder 文案带了 `📽️` emoji，违反 DESIGN_TOKENS §8.9（UI 不写 emoji），后续 Claude Design 更新时去掉。
+
+---
+
+## S4 — N7b 路径 3 视频大模型直接分析（Gemini 后端骨架）
+
+**完成日期**：2026-05-29
+**模型 / 工具**：xiaomi mimo 2.5pro
+**分支**：feat/phase-n7b-path3-gemini-skeleton
+**提交**：
+- `e5bbdd9` feat(n7b.s4): Gemini client 封装骨架 — 新建 shared/gemini_client.py
+- `d596003` feat(n7b.s4): pipeline_tasks video_model 路径接 client
+- `bc03189` test(n7b.s4): Gemini 视频分析骨架单测
+- `a9ffd31` docs(n7b.s4): spec 标注路径 3 骨架就绪
+
+### 影响范围
+- 后端 `shared/gemini_client.py`（新建）/ `pipeline_tasks.py`（video_model 路径）/ `tests/backend/test_n7b_path3_gemini_skeleton.py`（14 单测）/ `docs/spec/04-video.md`
+
+### 关键改动
+- `GeminiVideoClient`：google-genai 新 SDK，File API（`files.upload` → `generate_content` → `files.delete`），`response_schema` 强制结构化 JSON `{summary, segments:[{start,end,text}]}`，默认 `gemini-2.5-flash`。缺 `GEMINI_API_KEY` 构造即 `raise RuntimeError`（明确提示）。延迟 import 不强依赖。
+- pipeline `summary_path=="video_model"` 占位 raise 替换为真实调用；`_gemini_segments_to_transcript` 把 segments 映射成 `{t_sec, t_str, text}`，**精确对齐前端 VideoResultPage 读的字段**。
+
+### 为什么这么做
+- 用户决议视频大模型选 Gemini，但当前无 API key → 本期只做「骨架 + 接口预留 + mock 单测」，API 到位后填实现即可，无需新 phase。
+- 接口形态（File API / 结构化 JSON / flash）由用户拍板。
+
+### 留给后续的影响
+- 联调前置：装 `google-genai`（venv 已有 1.75.0，requirements 暂未声明）+ 配 `GEMINI_API_KEY` 到 .env，再把 mock 单测替换为真实联调。
+
+---
+
+## N8b — music_segments 映射修复（多段音乐分析全链路打通）
+
+**完成日期**：2026-05-29
+**模型 / 工具**：xiaomi mimo 2.5pro
+**提交**：`bdd3fb3` fix(n8b): result 补 music_segments 顶层映射，修复多段音乐分析不显示
+
+### 影响范围
+- 后端 `pipeline_tasks.py`（音频 result 组装，一行）
+
+### 关键改动
+- result dict 加 `"music_segments": music_dict.get("segments", []) if music_dict else []`，把嵌套的 `music.segments` 展平到顶层。
+
+### 为什么这么做
+- 核实「N8b 6 维度」时发现：6 维（genre/mood/instruments/atmosphere + 声学）的后端（`audio_analyzer.py` MusicSegment + segment_audio + analyze_music_segments）和前端（`AudioResultPage.tsx:557` 渲染）**早在 A3.3 就实现了**，唯一断点是 pipeline 返回 `music.segments`（嵌套）而前端读 `result.music_segments`（顶层）→ 永远 undefined。
+- handoff §7 设想的「新增 onset density / tempo variance / style label」是**未核实代码的错误计划**（与实际 6 维完全不同），已标作废，避免重复造轮子。
+
+### 留给后续的影响
+- N8b 全链路打通；音频 Track 实际进度上调（ROADMAP §2 60%→80%）。
+
+---
+
+## build hotfix — LibraryItem 补 related_task_ids（修前端 build 失败）
+
+**完成日期**：2026-05-29
+**模型 / 工具**：Opus 4.8（主协调会话直接修）
+**提交**：`669c4d1` fix(library): LibraryItem 补 related_task_ids 字段，修复前端 build 失败
+
+### 影响范围
+- 前端 `services/library.ts`（`LibraryItem` 接口，一行）
+
+### 关键改动
+- `LibraryItem` 加 `related_task_ids?: string[]`（可选，匹配 `ItemCard.tsx:41` 的可选链用法）。
+
+### 为什么这么做
+- `ItemCard.tsx:41` 引用 `item.related_task_ids` 但 `LibraryItem` 未声明 → `tsc -b`（`npm run build`）报 TS2339。此 baseline 错误自 `6ebc2ba`（R21.B1）潜伏，因日常用 `tsc --noEmit`（根 tsconfig，不走 project references）验证未覆盖到。
+
+### 留给后续的影响
+- ⚠️ **验证教训**：`tsc --noEmit` 不等于 `npm run build`（`tsc -b`）。发布前 / 改前端类型后应跑 `npm run build` 才能抓到 project references 范围的类型错误。

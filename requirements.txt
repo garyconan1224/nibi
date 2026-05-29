@@ -65,6 +65,8 @@ marker-pdf>=1.10.0  # N10: PDF → Markdown，保留图片+表格，扫描件 OC
 # ── PDF 导出（R20）─────────────────────────────────────────────
 # playwright：HTML→PDF 渲染（需额外运行 playwright install chromium）
 playwright>=1.40.0
+# Jinja2：PDF 导出的 HTML 模板渲染（环境已有，显式声明直接依赖）
+Jinja2>=3.1.0
 
 # ── 测试 ──────────────────────────────────────────────────────
 pytest>=8.0.0
