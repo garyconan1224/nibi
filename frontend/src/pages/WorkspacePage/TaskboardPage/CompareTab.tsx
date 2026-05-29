@@ -301,7 +301,7 @@ function TextCompareView({
                   )}
                 </td>
                 <td style={{ fontSize: 12, maxWidth: 280 }}>
-                  {txt.summary || <span style={{ color: 'var(--ink-4)' }}>—</span>}
+                  {(typeof txt.summary === 'string' ? txt.summary : txt.summary?.abstract) || <span style={{ color: 'var(--ink-4)' }}>—</span>}
                 </td>
                 <td style={{ fontSize: 12, maxWidth: 300 }}>
                   {txt.content_preview || <span style={{ color: 'var(--ink-4)' }}>—</span>}

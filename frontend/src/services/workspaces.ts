@@ -347,7 +347,7 @@ export interface TextCompareItem {
   name: string
   is_current: boolean
   source_value: string
-  summary: string
+  summary: string | { abstract?: string; key_points?: any[]; golden_quotes?: any[] }
   content_preview: string
   associations: Record<string, string>
   rewrites: Record<string, string>
