@@ -1055,3 +1055,38 @@ WorkspaceItem.tags = {
 ### 验证
 - `cd frontend && npx tsc --noEmit`：EXIT=0
 - `.venv/bin/python -m pytest tests/ -q`：354 passed / 2 skipped
+
+
+---
+
+## S0 E2E Bugfix — P1 数据串扰修复（S0.1-S0.3）
+
+**完成日期**：2026-05-29
+**模型 / 工具**：xiaomi mimo 2.5pro
+**分支**：
+- `fix/e2e-p1-subtitles-no-demo`（S0.1）
+- `fix/e2e-p1-audio-result-has-real`（S0.2）
+- `fix/e2e-p1-visual-only-srt-disabled`（S0.3）
+**提交**：
+- S0.1：`e6e2173` fix(e2e.p1): /subtitles 端口删 demo fixture 兜底，无 transcript 返回空 SRT
+- S0.2：`b94f6c7` fix(e2e.p1): audio_result has_real 认 transcript_segments，修复 demo 兜底误触发
+- S0.3：`a368370` fix(e2e.p1+): VideoResultPage visual_only 模式禁用字幕导出按钮
+
+### 问题
+E2E 测试发现 7 个问题，其中 3 个 P1 级数据串扰：visual_only 路径用户点 SRT 导出拿到「大疆 Pocket 4」demo 字符串；音频任务跑完 transcript 空 → fall through 到 demo 显示错误内容。
+
+### 影响范围
+- **后端 export.py**：删除 `/subtitles` 端口的 demo fixture 降级逻辑，无 transcript 时返回空 SRT + `X-Subtitle-Status: empty` header
+- **后端 workspaces.py**：`get_audio_result` 的 `has_real` 判断同时认 `transcript` 和 `transcript_segments`；`tracks_meta.transcript_count` 兜底用 segments 长度
+- **前端 VideoResultPage.tsx**：`isVisualOnly` 判断 → 字幕导出按钮 disabled + tooltip「仅画面分析模式无字幕数据」
+
+### 关键改动
+- S0.1：删除 `build_demo_audio_result` import + demo fixture 三段降级逻辑 → 空 SRT 返回
+- S0.2：`has_real = ... and (results.get("transcript") or results.get("transcript_segments"))` 兜底 whisper 写入路径
+- S0.3：按钮 `disabled={isVisualOnly}` + `opacity: 0.5` + `title` 提示
+
+### 验证
+- `.venv/bin/python -m pytest tests/backend -q -k "subtitle"`：16 passed
+- `.venv/bin/python -m pytest tests/backend -q -k "audio_result"`：3 passed
+- `cd frontend && npx tsc --noEmit`：EXIT=0
+- S0.3 按钮禁用属 UI 交互，需用户帮看一眼确认 visual_only 任务按钮灰显

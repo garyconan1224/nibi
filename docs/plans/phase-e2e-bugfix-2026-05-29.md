@@ -1,7 +1,7 @@
 ---
 name: phase-e2e-bugfix-2026-05-29
 title: E2E 测试发现的 7 问题修复 — P1 数据串扰必修 + P2/P3 体验优化
-status: ready
+status: in_progress
 owner: xiaomi mimo 2.5pro（ccswitch 中转）
 estimated_hours: 6-8（P1+P2 必修 ~3h；P3 全选 ~3-5h）
 depends_on:
@@ -13,6 +13,11 @@ references:
   - docs/rules/mimo-onboarding.md（启动必读）
   - docs/plans/phase-handoff-mimo-2026-05-29.md（后续 S1-S6 总计划）
 priority: 🔴 紧急 — 本计划必须先于 S1-S6 执行（音视频闭环的实际数据基线）
+commits:
+  - S0.1: e6e2173 fix(e2e.p1): /subtitles 端口删 demo fixture 兜底，无 transcript 返回空 SRT
+  - S0.2: b94f6c7 fix(e2e.p1): audio_result has_real 认 transcript_segments，修复 demo 兜底误触发
+  - S0.3: a368370 fix(e2e.p1+): VideoResultPage visual_only 模式禁用字幕导出按钮
+completed_date: 2026-05-29（S0.1-S0.3；S0.4-S0.8 待续）
 ---
 
 # E2E Bugfix 计划（2026-05-29 Opus 4.7 拆解）

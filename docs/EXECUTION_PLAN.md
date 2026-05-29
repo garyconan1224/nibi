@@ -19,10 +19,26 @@
 
 ---
 
-## 当前执行入口（2026-05-29 对账更新）
+## 当前执行入口（2026-05-29 对账更新 · followup 已 merge）
 
-> 真实状态以 git log 为准。最新合入 main 的是 R21.P3.S3（+ 状态同步 bugfix）；当前分支 `fix/r21-p3-s3-followup` 已 `status: done`，待 merge。
-> **下一步方向见本文件下方「当前下一步」段**：音频 + 视频两条线端到端打通优先（用户 2026-05-29 决议），再做文字 / 图片深化。
+> 真实状态以 git log 为准。R21.P3.S3 followup 已 merge（`6740a3a`）。下一步 = **音视频端到端闭环**，先修 S0 数据基线 bug（用户 2026-05-29 决议：先修当前问题 → 搭架构 → 按使用流程逐链路优化）。
+> - 合并视图（先读）：[`docs/PROJECT_STATUS.md`](PROJECT_STATUS.md)
+> - S0 详细计划：[`docs/plans/phase-e2e-bugfix-2026-05-29.md`](plans/phase-e2e-bugfix-2026-05-29.md)（`status: ready`，可直接执行）
+> - S1-S6 详细计划：[`docs/plans/phase-handoff-mimo-2026-05-29.md`](plans/phase-handoff-mimo-2026-05-29.md)
+> - ⚠️ **对账差异（执行前必看 PROJECT_STATUS §5）**：N8b librosa 6 维**已大部分实现**（勿从零做）/ R20 是在 export.py 上**加格式** / N7b 路径3 仍是 stub（卡 Gemini API）。
+
+**P0 · 修复当前问题（S0 E2E bugfix，先做、必修）**
+- [x] S0.1 删 `/subtitles` demo 兜底（🔴P1）→ 分支 `fix/e2e-p1-subtitles-no-demo`
+- [x] S0.2 `get_audio_result` 的 has_real 认 transcript_segments（🔴P1）→ `fix/e2e-p1-audio-result-has-real`
+- [x] S0.3 visual_only 前端禁 SRT 按钮（🟠P1+）→ `fix/e2e-p1-visual-only-srt-disabled`
+- [ ] S0.4 ResultsOverview React key 警告（🟡P2）→ `fix/e2e-p2-results-overview-key`
+- [ ] S0.5~S0.8 隐藏播放器 / B站412重试 / VLM进度 / URL input（⚪P3，可选）
+
+**P1 · 搭架构 + 整理仓库**
+- [ ] S1-S3 仓库清理（plans 归档 / Streamlit 冻结 / 未用 assets）
+- [ ] S4 N7b 路径3 Gemini 后端骨架 + mock 单测（无 API；**开工前先确认接口形态**）
+- [ ] 核实 N8b librosa 6 维真实缺口（⚠️ 已大部分实现，先核实别从零做）
+- [ ] S6 R20 笔记 pdf/docx/obsidian 导出（**装 reportlab/python-docx 前停下问用户**）
 
 - [x] **L5 Library Remix Polish**（已完成并合入 main）—— `/library` 资料库聚合页对齐 Remix 设计稿。
 
