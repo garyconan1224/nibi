@@ -12,7 +12,7 @@
 - **使用对象**：本地优先的桌面创作者工具（非 SaaS）
 - **用户特征**：编程新手，**需要每一步都解释清楚在做什么**
 
-**当前主线**：FastAPI 后端 + React/Vite 前端。`app.py`、`pages/`、`src/vidmirror/ui/` 是 Streamlit legacy 兼容，**新功能不要加到这里**。
+**当前主线**：FastAPI 后端 + React/Vite 前端。Streamlit 旧入口已于 Phase 1J 移除，当前纯 FastAPI 后端 + React/Vite 前端。
 **当前阶段**：F1（IP.9 流程缺口补齐）。H1~H5 + IP.1~IP.8 已合 main。具体 track 看 `docs/ROADMAP.md`。
 
 ---
