@@ -1346,3 +1346,25 @@ T2.2 核实发现：link_preview.py 只返回 og 元数据（title/description/i
 
 ### 留给后续的影响
 - 图片 track I：**I1 ✅**；I2 批量任务（落点在 LibraryPage 而非 ImageResultPage，ROADMAP I2.1 描述不准）；I3 风格 DNA 建议缓到 [C] 复刻一起做（ROADMAP 标注重叠）。
+
+---
+
+## Phase I2.1 — 资料库批量分析（仅图片）
+
+**日期**：2026-05-29
+**分支**：`feat/phase-i2-image-batch`
+**Commits**：`5a3650b`
+
+### 关键改动
+- `frontend/src/pages/LibraryPage/index.tsx`：
+  - `handleBatchAnalyze`：从 `selectedSet` 中过滤 `type === 'image'` 的素材，循环调 `startItemPipeline`；非图片 toast.error 提示；全部完成后 toast.success + 清选中态 + 刷新列表。
+  - 选择模式工具栏：「删除」按钮旁新增「批量分析」按钮（Sparkles 图标），disabled 条件 = `analyzing || selectedSet.size === 0`。
+  - 复用已有浮动任务队列 + 结果页，零后端改动。
+
+### 验证
+- Playwright E2E：选择模式 → 工具栏出现「批量分析」按钮 ✅；勾选非图片 → 点批量分析 → toast「请选择图片素材」✅；`npx tsc --noEmit` EXIT=0 ✅。
+- ⚠️ 资料库当前 0 张图片，无法实测实际触发分析流程。
+- ⚠️ 已知行为：URL 来源图片触发后会重新下载（`handle_image_task` 设计如此，FETCH 阶段总是从 source 拉取）。
+
+### 留给后续的影响
+- 图片 track I：**I1 ✅ / I2.1 ✅**；I2.2（如果有）可考虑对已有本地文件跳过 FETCH 直接进 OCR/VLM。
