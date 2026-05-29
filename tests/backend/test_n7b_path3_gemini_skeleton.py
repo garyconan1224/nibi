@@ -1,19 +1,27 @@
-"""N7b 路径 3 — Gemini 视频直接分析骨架测试。
+"""N7b 路径 3 — Gemini 视频直接分析测试。
 
 覆盖：
   GeminiVideoClient 缺 GEMINI_API_KEY 时构造 raise RuntimeError
   _run_video_model_path 正确调用 client 并映射返回结构
   _gemini_segments_to_transcript 正确映射 segments → VideoResultTranscriptLine[]
   _get_video_model_prompt 按 intent 返回不同 prompt
+  PROCESSING→ACTIVE 轮询逻辑
+  _parse_json_safely JSON fence 容错
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from shared.gemini_client import DEFAULT_VIDEO_MODEL, GeminiVideoClient, GeminiVideoResponse
+from shared.gemini_client import (
+    DEFAULT_VIDEO_MODEL,
+    GeminiVideoClient,
+    GeminiVideoResponse,
+    _parse_json_safely,
+)
 
 
 # ── GeminiVideoClient 构造测试 ─────────────────────────────────────────
@@ -229,3 +237,168 @@ class TestRunVideoModelPath:
         # 验证日志中包含 override model 名称
         log_calls = [str(c) for c in mock_runner.append_log.call_args_list]
         assert any("gemini-2.5-pro" in c for c in log_calls)
+
+
+# ── PROCESSING→ACTIVE 轮询测试 ─────────────────────────────────────────
+
+
+class _FakeState:
+    """模拟 google-genai File.state 对象。"""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
+class _FakeFile:
+    """模拟 google-genai File 对象。"""
+
+    def __init__(self, name: str = "files/abc123", state_name: str = "ACTIVE") -> None:
+        self.name = name
+        self.state = _FakeState(state_name)
+
+
+class TestGeminiPolling:
+    """File API PROCESSING→ACTIVE 轮询逻辑。
+
+    analyze_video 内部用延迟 import（from google import genai），
+    所以必须通过 sys.modules 拦截，不能 patch 模块级属性。
+    """
+
+    def _make_genai_mock(
+        self,
+        upload_file: _FakeFile,
+        get_returns: list[_FakeFile] | None = None,
+        generate_text: str = '{"summary":"ok","segments":[]}',
+    ) -> tuple[MagicMock, MagicMock]:
+        """构造 mock genai module + mock types module。"""
+        mock_genai = MagicMock()
+        mock_genai.Client.return_value.files.upload.return_value = upload_file
+        if get_returns is not None:
+            mock_genai.Client.return_value.files.get.side_effect = get_returns
+        mock_genai.Client.return_value.models.generate_content.return_value.text = generate_text
+        mock_types = MagicMock()
+        return mock_genai, mock_types
+
+    def test_polls_until_active(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """模拟 PROCESSING → PROCESSING → ACTIVE 三次轮询。"""
+        monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+
+        processing_file = _FakeFile(state_name="PROCESSING")
+        active_file = _FakeFile(state_name="ACTIVE")
+
+        mock_genai, mock_types = self._make_genai_mock(
+            upload_file=processing_file,
+            get_returns=[processing_file, active_file],
+        )
+
+        fake_google = MagicMock()
+        fake_google.genai = mock_genai
+        import time as real_time
+
+        with patch.dict("sys.modules", {"google": fake_google, "google.genai": mock_types}):
+            with patch("shared.gemini_client.time") as mock_time:
+                # 保留 sleep 的 side_effect 让 time.sleep(3) 不阻塞
+                mock_time.sleep = MagicMock()
+                client = GeminiVideoClient()
+                result = client.analyze_video(
+                    video_path=Path("/tmp/test.mp4"),
+                    intent="learning",
+                    prompt_template="test prompt",
+                )
+
+        assert result.summary == "ok"
+        assert mock_genai.Client.return_value.files.get.call_count == 2
+        mock_time.sleep.assert_called_with(3)
+
+    def test_skips_polling_when_immediately_active(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """上传后直接 ACTIVE，无需轮询。"""
+        monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+
+        active_file = _FakeFile(state_name="ACTIVE")
+        mock_genai, mock_types = self._make_genai_mock(upload_file=active_file)
+
+        fake_google = MagicMock()
+        fake_google.genai = mock_genai
+
+        with patch.dict("sys.modules", {"google": fake_google, "google.genai": mock_types}):
+            with patch("shared.gemini_client.time") as mock_time:
+                client = GeminiVideoClient()
+                result = client.analyze_video(
+                    video_path=Path("/tmp/test.mp4"),
+                    intent="learning",
+                    prompt_template="test",
+                )
+
+        assert result.summary == "ok"
+        mock_genai.Client.return_value.files.get.assert_not_called()
+        mock_time.sleep.assert_not_called()
+
+    def test_raises_on_failed_state(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """文件处理失败时 raise RuntimeError。"""
+        monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+
+        failed_file = _FakeFile(state_name="FAILED")
+        mock_genai, mock_types = self._make_genai_mock(upload_file=failed_file)
+
+        fake_google = MagicMock()
+        fake_google.genai = mock_genai
+
+        with patch.dict("sys.modules", {"google": fake_google, "google.genai": mock_types}):
+            with patch("shared.gemini_client.time"):
+                client = GeminiVideoClient()
+                with pytest.raises(RuntimeError, match="处理失败"):
+                    client.analyze_video(
+                        video_path=Path("/tmp/test.mp4"),
+                        intent="learning",
+                        prompt_template="test",
+                    )
+
+    def test_raises_on_timeout(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """轮询超时（>180s）时 raise RuntimeError。"""
+        monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+
+        processing_file = _FakeFile(state_name="PROCESSING")
+        mock_genai, mock_types = self._make_genai_mock(
+            upload_file=processing_file,
+            get_returns=[processing_file] * 100,  # 永远 PROCESSING
+        )
+
+        fake_google = MagicMock()
+        fake_google.genai = mock_genai
+
+        with patch.dict("sys.modules", {"google": fake_google, "google.genai": mock_types}):
+            with patch("shared.gemini_client.time") as mock_time:
+                client = GeminiVideoClient()
+                with pytest.raises(RuntimeError, match="超时"):
+                    client.analyze_video(
+                        video_path=Path("/tmp/test.mp4"),
+                        intent="learning",
+                        prompt_template="test",
+                    )
+                # 180s / 3s = 60 次 sleep
+                assert mock_time.sleep.call_count == 60
+
+
+# ── _parse_json_safely 测试 ────────────────────────────────────────────
+
+
+class TestParseJsonSafely:
+    """JSON fence 容错解析。"""
+
+    def test_plain_json(self) -> None:
+        data = _parse_json_safely('{"summary": "ok", "segments": []}')
+        assert data["summary"] == "ok"
+
+    def test_json_with_code_fence(self) -> None:
+        text = '```json\n{"summary": "fenced", "segments": []}\n```'
+        data = _parse_json_safely(text)
+        assert data["summary"] == "fenced"
+
+    def test_json_with_code_fence_no_lang(self) -> None:
+        text = '```\n{"summary": "no-lang", "segments": []}\n```'
+        data = _parse_json_safely(text)
+        assert data["summary"] == "no-lang"
+
+    def test_invalid_json_raises(self) -> None:
+        with pytest.raises(json.JSONDecodeError):
+            _parse_json_safely("not json at all")
