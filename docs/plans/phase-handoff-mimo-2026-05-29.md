@@ -352,6 +352,8 @@ sed -n '741,830p' backend/app/services/pipeline_tasks.py
 
 ## 7. Step 5：N8b 音频 librosa 6 维度后端
 
+> **【2026-05-29 作废】** N8b 6 维度实际已由 A3.3 完整实现（MusicSegment genre/mood/instruments/atmosphere + segment_audio + AudioResultPage:557）。本节原计划基于未核实假设（onset_density/tempo_variance/style_label），与实际 6 维完全不同，不执行。本次 S5 仅修 result→UI 的 `music_segments` 映射断裂（pipeline 返回 `music.segments`，前端读顶层 `music_segments`）。
+
 ### 目标
 
 `shared/audio_analyzer.py:195` 已有基础 `analyze_music`（librosa BPM / 调性 / 能量曲线）。本 Step 扩展为 **6 维度切分**：

@@ -94,7 +94,7 @@
 - [x] **N7b 路径 1** 视频字幕直接总结 — `4h` P2（`f17c04a` `aac4578` `9e8667e` `92fbdb9` `bf995d7`）。音频提取 → Whisper 转写 → 6 种模板 LLM 总结，transcript 数组契约已对齐 + UI 收口。
 - [ ] **N7b 路径 3** 视频模型直接分析 — `8-12h` P2（依赖视频大模型 API 集成决策：Gemini / GPT-4o / Qwen-VL-Max）。*UI 已就绪（IP.9.3），后端 handler 待实现*
 - [x] **N8** 音频分支补全：VAD（silero）/ pyannote 说话人 / 音乐分析（librosa + Suno/Udio）— `8-10h` P2
-- [ ] **N8b** 音频前端交互：无人声切音乐模式弹窗 / 说话人标签人工修正 UI / 多段音乐 6 维度切分 — `6-8h` P3 *UI 已就绪（IP.9.2），后端 librosa 分析待实现*
+- [x] **N8b** 音频前端交互：无人声切音乐模式弹窗 / 说话人标签人工修正 UI / 多段音乐 6 维度切分 — `6-8h` P3 *后端+UI 已实现（A3.3），本次修 music_segments 映射 bug 收尾*
 - [x] **N9** 图片分支补全：PaddleOCR / 4 联想方向 / 多图对比 — `6-8h` P2
 - [x] **N10** 文字分支补全：marker/docling PDF / 改写翻译并排对照 / 多文对比 — `6-8h` P2
 - [x] **N11** 砍掉的 UI 清理（仅入口隐藏，代码留备份）— `1-2h` P3

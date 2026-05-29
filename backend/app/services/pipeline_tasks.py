@@ -2694,6 +2694,7 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         "vad": vad_result.to_dict(),
         "diarization": diarization_dict,
         "music": music_dict,
+        "music_segments": music_dict.get("segments", []) if music_dict else [],
         "music_mode": bool(_music_confirmed or (music_dict and music_dict.get("music_mode"))),
         "subtitle_paths": subtitle_paths,
     }
