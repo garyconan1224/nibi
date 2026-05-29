@@ -58,7 +58,12 @@ def test_image_result_happy_path(client: TestClient) -> None:
         assert key in body["tags"]
     # exif
     assert body["exif"]["time"]
-    assert body["exif"]["location"]
+    assert body["exif"]["device"]
+    assert body["exif"]["aperture"]
+    assert body["exif"]["gps"]["lat"]
+    # dimensions
+    assert body["dimensions"]["width"] == 6000
+    assert body["dimensions"]["format"] == "JPEG"
     # description / ocr_text
     assert body["description"]
     assert "ocr_text" in body

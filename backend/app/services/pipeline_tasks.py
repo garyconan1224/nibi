@@ -2097,6 +2097,87 @@ def handle_image_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     img_b64 = base64.b64encode(image_bytes).decode()
     log(f"📦 图片已加载，{len(image_bytes)//1024} KB，mime={mime}")
 
+    # ── 1.2 EXIF + 基本信息提取（I1） ────────────────────────
+    import io
+    from PIL import Image
+    from PIL.ExifTags import TAGS, GPSTAGS
+
+    dimensions: Dict[str, Any] = {}
+    exif_data: Dict[str, Any] = {}
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as img:
+            dimensions = {
+                "width": img.width,
+                "height": img.height,
+                "format": img.format or mime.split("/")[-1].upper(),
+                "size_kb": round(len(image_bytes) / 1024, 1),
+            }
+            raw_exif = img.getexif()
+            if raw_exif:
+                # 基础 TAGS
+                tag_map = {TAGS.get(k, k): v for k, v in raw_exif.items()}
+                make = str(tag_map.get("Make", "")).strip()
+                model = str(tag_map.get("Model", "")).strip()
+                if make and model and model.lower().startswith(make.lower()):
+                    exif_data["device"] = model
+                elif make or model:
+                    exif_data["device"] = f"{make} {model}".strip()
+                exif_data["lens"] = str(tag_map.get("LensModel", "")).strip() or None
+                dt = str(tag_map.get("DateTimeOriginal", "")).strip()
+                if dt:
+                    exif_data["time"] = dt
+
+                # ExifIFD 子 IFD（光圈/快门/ISO）
+                exif_ifd = raw_exif.get_ifd(0x8769)
+                fn = exif_ifd.get(33437)  # FNumber
+                if fn:
+                    try:
+                        exif_data["aperture"] = f"f/{float(fn):.1f}"
+                    except (TypeError, ValueError):
+                        pass
+                et = exif_ifd.get(33434)  # ExposureTime
+                if et:
+                    try:
+                        exif_data["shutter"] = (
+                            f"1/{int(round(1 / float(et)))}s"
+                            if float(et) < 1
+                            else f"{float(et)}s"
+                        )
+                    except (TypeError, ValueError, ZeroDivisionError):
+                        pass
+                iso = exif_ifd.get(34855)  # ISOSpeedRatings
+                if iso:
+                    exif_data["iso"] = f"ISO {iso}"
+
+                # GPS
+                gps_ifd = raw_exif.get_ifd(0x8825)
+                if gps_ifd:
+                    def _to_deg(vals):
+                        try:
+                            d, m, s = float(vals[0]), float(vals[1]), float(vals[2])
+                            return d + m / 60 + s / 3600
+                        except Exception:
+                            return None
+
+                    lat_v = gps_ifd.get(2)
+                    lat_ref = gps_ifd.get(1, "N")
+                    lon_v = gps_ifd.get(4)
+                    lon_ref = gps_ifd.get(3, "E")
+                    if lat_v and lon_v:
+                        lat = _to_deg(lat_v)
+                        lon = _to_deg(lon_v)
+                        if lat is not None and lon is not None:
+                            if lat_ref == "S":
+                                lat = -lat
+                            if lon_ref == "W":
+                                lon = -lon
+                            exif_data["gps"] = {"lat": round(lat, 6), "lon": round(lon, 6)}
+
+                # 清理空值
+                exif_data = {k: v for k, v in exif_data.items() if v}
+    except Exception as exc:
+        log(f"⚠️  EXIF 提取失败（不影响主流程）：{exc}")
+
     # ── 1.5 OCR（N9: PaddleOCR，独立于 VLM） ───────────────
     ocr_text = ""
     if ocr_enabled:
@@ -2259,6 +2340,10 @@ def handle_image_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         "prompts": prompts,
         "tags": tags,
     }
+    if exif_data:
+        result["exif"] = exif_data
+    if dimensions:
+        result["dimensions"] = dimensions
     if associations:
         result["associations"] = associations
     # URL 图片可直接用源地址做缩略图

@@ -925,3 +925,92 @@ class TestImageTask:
             )
 
         assert result == []
+
+    def test_exif_and_dimensions_extraction(self, tmp_path: Path) -> None:
+        """JPEG 带 EXIF → result 包含 exif + dimensions 字段。"""
+        import io
+        from PIL import Image
+        from PIL.ExifTags import Base as ExifBase
+
+        from backend.app.services.pipeline_tasks import handle_image_task
+
+        # 构造带 EXIF 的 JPEG，写到真实文件
+        img = Image.new("RGB", (4032, 3024), color=(100, 150, 200))
+        from PIL.Image import Exif
+
+        exif = Exif()
+        exif[ExifBase.Make] = "Apple"
+        exif[ExifBase.Model] = "iPhone 15 Pro Max"
+        exif[ExifBase.LensModel] = "iPhone 15 Pro Max back triple camera 6.765mm f/1.78"
+        exif[ExifBase.DateTimeOriginal] = "2026:05:20 14:30:00"
+        exif_ifd = exif.get_ifd(0x8769)
+        exif_ifd[33437] = 1.78  # FNumber
+        exif_ifd[33434] = 0.001  # ExposureTime (1/1000s)
+        exif_ifd[34855] = 50  # ISO
+        exif[0x8769] = exif_ifd
+
+        jpeg_path = tmp_path / "test_exif.jpg"
+        img.save(str(jpeg_path), format="JPEG", exif=exif.tobytes())
+
+        image_dir = tmp_path / "image"
+        image_dir.mkdir(parents=True, exist_ok=True)
+        runner = MagicMock()
+        rec = self._make_image_rec(str(jpeg_path), source_type="local")
+
+        with (
+            patch("shared.config.get_workspace_root", return_value=tmp_path),
+            patch("backend.app.services.pipeline_tasks.load_settings",
+                  return_value=self._fake_settings),
+            patch("backend.app.services.pipeline_tasks.create_default_registry",
+                  return_value=MagicMock(
+                      resolve_default_profile=MagicMock(return_value=MagicMock(
+                          default_models=MagicMock(get=MagicMock(return_value=None)))),
+                  )),
+        ):
+            result = handle_image_task(rec, runner)
+
+        # dimensions
+        dims = result["dimensions"]
+        assert dims["width"] == 4032
+        assert dims["height"] == 3024
+        assert dims["format"] == "JPEG"
+        assert dims["size_kb"] > 0
+
+        # exif
+        exif_out = result["exif"]
+        assert "iPhone 15 Pro Max" in exif_out["device"]
+        assert "6.765mm" in exif_out["lens"]
+        assert exif_out["time"] == "2026:05:20 14:30:00"
+        assert exif_out["aperture"] == "f/1.8"
+        assert exif_out["shutter"] == "1/1000s"
+        assert exif_out["iso"] == "ISO 50"
+
+    def test_png_no_exif_returns_empty(self, tmp_path: Path) -> None:
+        """PNG 无 EXIF → exif 为空/不出现，dimensions 正常。"""
+        from backend.app.services.pipeline_tasks import handle_image_task
+
+        png_path = tmp_path / "test.png"
+        png_path.write_bytes(self.FAKE_PNG)
+
+        image_dir = tmp_path / "image"
+        image_dir.mkdir(parents=True, exist_ok=True)
+        runner = MagicMock()
+        rec = self._make_image_rec(str(png_path), source_type="local")
+
+        with (
+            patch("shared.config.get_workspace_root", return_value=tmp_path),
+            patch("backend.app.services.pipeline_tasks.load_settings",
+                  return_value=self._fake_settings),
+            patch("backend.app.services.pipeline_tasks.create_default_registry",
+                  return_value=MagicMock(
+                      resolve_default_profile=MagicMock(return_value=MagicMock(
+                          default_models=MagicMock(get=MagicMock(return_value=None)))),
+                  )),
+        ):
+            result = handle_image_task(rec, runner)
+
+        assert result["dimensions"]["width"] == 1
+        assert result["dimensions"]["height"] == 1
+        assert result["dimensions"]["format"] == "PNG"
+        # PNG 无 EXIF
+        assert result.get("exif") in ({}, None)

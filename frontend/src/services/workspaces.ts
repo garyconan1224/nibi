@@ -286,7 +286,21 @@ export interface ImageResult {
   }
   description: string
   ocr_text: string
-  exif: { time: string; location: string }
+  exif?: {
+    device?: string
+    lens?: string
+    time?: string
+    aperture?: string
+    shutter?: string
+    iso?: string
+    gps?: { lat: number; lon: number }
+  }
+  dimensions?: {
+    width: number
+    height: number
+    format: string
+    size_kb: number
+  }
   prompts: {
     mj: string
     sd: { positive: string; negative: string }

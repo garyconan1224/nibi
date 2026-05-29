@@ -1791,8 +1791,19 @@ def _build_demo_image_result(item_id: str, item_name: str) -> Dict[str, Any]:
         "description": "壮丽的山脉倒映在平静的湖面上，前景是翠绿的草地，天空呈现金色日落。画面构图采用三分法，前景草地、中景湖泊、远景山脉层次分明。",
         "ocr_text": "",
         "exif": {
+            "device": "Canon EOS R5",
+            "lens": "RF 24-70mm f/2.8 L IS USM",
             "time": "2024-08-15 18:32:05",
-            "location": "瑞士·因特拉肯",
+            "aperture": "f/8.0",
+            "shutter": "1/250s",
+            "iso": "ISO 100",
+            "gps": {"lat": 46.6863, "lon": 7.8632},
+        },
+        "dimensions": {
+            "width": 6000,
+            "height": 4000,
+            "format": "JPEG",
+            "size_kb": 8520.3,
         },
         "prompts": {
             "mj": "majestic mountain reflection on calm lake, green meadow foreground, golden hour sunset, Swiss Alps, photorealistic, landscape photography, --ar 3:2 --style raw --v 6",
