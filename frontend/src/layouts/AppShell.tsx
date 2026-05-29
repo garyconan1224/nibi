@@ -170,7 +170,7 @@ export function AppShell({ children }: AppShellProps) {
             后端 {BACKEND_ADDR} · {online ? 'online' : 'offline'}
           </span>
           {/* 系统指标 chip */}
-          {stats && (
+          {stats?.cpu && stats?.memory && (
             <span
               className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs"
               style={{
