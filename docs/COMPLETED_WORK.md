@@ -1142,3 +1142,33 @@ E2E 报告问题3：ResultsOverview 页面控制台报 "Each child in a list sho
 - 死链检查：0 命中
 - `ls docs/plans/*.md`：仅剩 5 个保留文件（a2 / e2e-bugfix / handoff / r22 / r23）
 - `npm run build`：tsc 报 `ItemCard.tsx` 预存类型错误（main 同样，与本次清理无关）
+
+---
+
+## S6 — R20 综合笔记多格式导出（PDF / Word / Obsidian）
+
+**完成日期**：2026-05-29
+**模型 / 工具**：xiaomi mimo 2.5pro
+**分支**：feat/phase-r20-notes-export
+**提交**：
+- `6d0a35e` feat(r20): notes export endpoint + 格式分发
+- `92de019` feat(r20): PDF 导出 — Jinja2 HTML 模板 + playwright chromium 渲染
+- `a2724b2` feat(r20): Word 导出 — python-docx 构建
+- `a6766a3` feat(r20): Obsidian Vault 导出 — zip 含 markdown + frames/
+- `e9e539a` feat(r20): 前端 PDF/Word/Obsidian 下载按钮
+- `82ec453` test(r20): export 单测 — md_parser + 3 格式 Content-Type + 错误码
+- `f0e15f5` fix(r20): Content-Disposition 用 RFC5987 编码中文文件名
+
+### 关键改动
+- **后端**：`POST /{workspace_id}/notes/export`，body `{format:"pdf"|"docx"|"obsidian"}`
+- **md_parser.py**：从 av_synthesis.md 提取结构化数据（标题/元信息/摘要/画廊/章节/转写/综合）
+- **pdf_builder.py**：Jinja2 HTML 模板（`lecture.html.j2`）+ playwright chromium 渲染 A4 PDF，图片 base64 内嵌
+- **docx_builder.py**：python-docx 构建 Word 文档，中文默认字体，图片内嵌，表格 Light Grid 样式
+- **obsidian_builder.py**：zip 含 YAML frontmatter markdown + frames/ 帧图目录，[[wiki链接]]
+- **前端**：AVSynthesisResultPage 启用 3 个导出按钮（移除 disabled + R20 标签）
+- **测试**：13 个用例（md_parser 7 + endpoint 6）
+
+### 设计决策
+- md→html 方案选择 Jinja2 直接渲染 HTML（零新依赖），而非安装 markdown 解析库
+- 图片用 base64 data URI 内嵌 HTML，避免 playwright 文件路径问题
+- playwright 仅声明到 requirements.txt（环境已有），chromium 未安装时返回明确错误提示
