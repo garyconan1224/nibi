@@ -42,7 +42,7 @@
 - [x] S2 Streamlit 入口冻结标记（Streamlit 不存在，改为修正 CLAUDE.md §1）
 - [x] S3 未用 assets 清理（删 icons.svg + 修正 CLAUDE.md §1 Streamlit 描述）
 - [x] S4 N7b 路径3 Gemini 后端骨架 + mock 单测（无 API；**开工前先确认接口形态**）
-- [ ] 核实 N8b librosa 6 维真实缺口（⚠️ 已大部分实现，先核实别从零做）
+- [x] 核实 N8b librosa 6 维真实缺口 — S5 已核实（后端+UI 早在 A3.3 实现）+ 修 music_segments 映射 bug（`bdd3fb3`）
 - [x] S6 R20 笔记 pdf/docx/obsidian 导出（**装 reportlab/python-docx 前停下问用户**）
 
 - [x] **L5 Library Remix Polish**（已完成并合入 main）—— `/library` 资料库聚合页对齐 Remix 设计稿。
@@ -92,7 +92,7 @@
 - [x] **N6** 任务级 LLM 对话上下文素材多选 chip + RAG 兜底 — `6-8h` P1
 - [x] **N7** 视频分支补全：PySceneDetect AI 镜头分析（路径 1 & 3 拆出 N7b）— `8-10h` P2
 - [x] **N7b 路径 1** 视频字幕直接总结 — `4h` P2（`f17c04a` `aac4578` `9e8667e` `92fbdb9` `bf995d7`）。音频提取 → Whisper 转写 → 6 种模板 LLM 总结，transcript 数组契约已对齐 + UI 收口。
-- [ ] **N7b 路径 3** 视频模型直接分析 — `8-12h` P2（依赖视频大模型 API 集成决策：Gemini / GPT-4o / Qwen-VL-Max）。*UI 已就绪（IP.9.3），后端 handler 待实现*
+- [ ] **N7b 路径 3** 视频模型直接分析（Gemini）— 骨架 + 真实联调代码**已就绪**（ACTIVE 轮询 / JSON 容错 / 中文文件名，381 单测绿，`2b5ac3d`）；**搁置待付费 Gemini API**（free tier 视频配额墙，代码到位即可端到端通）。
 - [x] **N8** 音频分支补全：VAD（silero）/ pyannote 说话人 / 音乐分析（librosa + Suno/Udio）— `8-10h` P2
 - [x] **N8b** 音频前端交互：无人声切音乐模式弹窗 / 说话人标签人工修正 UI / 多段音乐 6 维度切分 — `6-8h` P3 *后端+UI 已实现（A3.3），本次修 music_segments 映射 bug 收尾*
 - [x] **N9** 图片分支补全：PaddleOCR / 4 联想方向 / 多图对比 — `6-8h` P2
