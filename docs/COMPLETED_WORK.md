@@ -1114,3 +1114,31 @@ E2E 报告问题3：ResultsOverview 页面控制台报 "Each child in a list sho
 ### 验证
 - Playwright dev console：0 errors, 0 warnings（修复前有 1 error = key 警告）
 - `npx tsc --noEmit`：EXIT=0
+
+
+---
+
+## P1 仓库清理（S1-S3）— plans 归档 + 死链修复 + 未用资源清理
+
+**完成日期**：2026-05-29
+**模型 / 工具**：xiaomi mimo 2.5pro
+**分支**：`chore/cleanup-plans-archive` / `chore/cleanup-unused-assets`
+
+### S1 plans 老 done 归档 + 死链修复
+- 39 个已归档 phase md（R0~R21）引用路径从 `plans/phase-xxx.md` 修正为 `plans/archive/phase-xxx.md`
+- 涉及文件：EXECUTION_PLAN / AI_HANDOFF / COMPLETED_WORK / ROADMAP / track-F-flow / handoff 计划 / OUTSTANDING_TASKS
+- 死链检查：0 命中
+
+### S2 Streamlit 入口冻结标记
+- **no-op**：Streamlit 文件（`app.py`、`pages/`、`src/vidmirror/ui/`）已于 Phase 1J（`de41e94`）删除，不存在
+- 改为修正 CLAUDE.md §1 过时描述："Streamlit 旧入口已于 Phase 1J 移除，当前纯 FastAPI 后端 + React/Vite 前端"
+
+### S3 未用 assets 清理
+- 扫描结果：frontend/public 2 候选（icons.svg / favicon.svg），backend 0 候选，pages 0 候选
+- 全仓 rg 确认：icons.svg 0 引用（可删），favicon.svg 1 引用（index.html，不删）
+- 删除 `frontend/public/icons.svg`（Vite 模板默认社交图标 sprite）
+
+### 验证
+- 死链检查：0 命中
+- `ls docs/plans/*.md`：仅剩 5 个保留文件（a2 / e2e-bugfix / handoff / r22 / r23）
+- `npm run build`：tsc 报 `ItemCard.tsx` 预存类型错误（main 同样，与本次清理无关）
