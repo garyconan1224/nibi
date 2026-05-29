@@ -1324,3 +1324,25 @@ T2.2 核实发现：link_preview.py 只返回 og 元数据（title/description/i
 ### 留给后续的影响
 - 文字链路 T 进度更新：T2.1 ✅ / T2.2 ✅ / T2.3 ✅。
 - 标题抽取可后续扩展更多 xpath 规则（当前不同微信模板标题 HTML 结构不统一）。
+
+---
+
+## Phase I1 — 图片 EXIF 提取 + 基本信息卡
+
+**日期**：2026-05-29
+**分支**：`feat/phase-i1-exif`
+**Commits**：`b32405f`（后端）`176e010`（前端）
+
+### 关键改动
+- `backend/app/services/pipeline_tasks.py` `handle_image_task`（image_bytes 拿到后）用 Pillow 提取：
+  - `getexif()` → Make/Model(设备) / LensModel(镜头) / DateTimeOriginal(时间)
+  - `get_ifd(0x8769)`（ExifIFD）→ FNumber(光圈) / ExposureTime(快门) / ISOSpeedRatings(ISO)；GPSInfo → 经纬度坐标
+  - **IFDRational 转 str**（光圈 `f/1.8`、快门 `1/200`）保证 result `json.dumps` 可序列化（关键坑）
+  - dimensions: width/height/format/size_kb；PNG 等无 EXIF 兜底空 dict 不报错
+- 前端：ImageResult 类型加 `exif`/`dimensions`；ImageResultPage 按设计稿 `image_detail.jsx` 加「基本信息」卡（分辨率/格式/大小）+「EXIF 拍摄信息」卡（设备/镜头/快门/ISO/光圈/时间/地点），无 EXIF 自动隐藏。
+
+### 验证
+- `pytest` 13 passed（JPEG 带 EXIF 验全字段 + PNG 无 EXIF 验空值）；`npx tsc --noEmit` EXIT=0。
+
+### 留给后续的影响
+- 图片 track I：**I1 ✅**；I2 批量任务（落点在 LibraryPage 而非 ImageResultPage，ROADMAP I2.1 描述不准）；I3 风格 DNA 建议缓到 [C] 复刻一起做（ROADMAP 标注重叠）。
