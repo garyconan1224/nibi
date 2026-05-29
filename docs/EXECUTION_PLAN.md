@@ -31,7 +31,7 @@
 - [x] S0.1 删 `/subtitles` demo 兜底（🔴P1）→ 分支 `fix/e2e-p1-subtitles-no-demo`
 - [x] S0.2 `get_audio_result` 的 has_real 认 transcript_segments（🔴P1）→ `fix/e2e-p1-audio-result-has-real`
 - [x] S0.3 visual_only 前端禁 SRT 按钮（🟠P1+）→ `fix/e2e-p1-visual-only-srt-disabled`
-- [ ] S0.4 ResultsOverview React key 警告（🟡P2）→ `fix/e2e-p2-results-overview-key`
+- [x] S0.4 ResultsOverview React key 警告（🟡P2）→ `fix/e2e-p2-results-overview-key`（真凶：frames 的 key={f.idx} 在 idx 未定义时失效，已修复 + AppShell stats 防御 + vite proxy 加 /admin）
 - [ ] S0.5~S0.8 隐藏播放器 / B站412重试 / VLM进度 / URL input（⚪P3，可选）
 
 **P1 · 搭架构 + 整理仓库**

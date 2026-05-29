@@ -1090,3 +1090,27 @@ E2E 测试发现 7 个问题，其中 3 个 P1 级数据串扰：visual_only 路
 - `.venv/bin/python -m pytest tests/backend -q -k "audio_result"`：3 passed
 - `cd frontend && npx tsc --noEmit`：EXIT=0
 - S0.3 按钮禁用属 UI 交互，需用户帮看一眼确认 visual_only 任务按钮灰显
+
+---
+
+## E2E P2: S0.4 ResultsOverview React key 警告修复
+
+**完成日期**：2026-05-29
+**模型 / 工具**：xiaomi mimo 2.5pro
+**分支**：`fix/e2e-p2-results-overview-key`
+**提交**：`9cefd2a` fix(e2e.p2): ResultsOverview 补 unique key + AppShell stats 防御
+
+### 问题
+E2E 报告问题3：ResultsOverview 页面控制台报 "Each child in a list should have a unique key prop · Check the render method of ResultsOverview"。
+
+### 真凶
+`ResultsOverview/index.tsx:441` 的 `frames.slice(0,10).map((f) => <div key={f.idx}>` —— 当 frames 数据中 `idx` 字段未定义时（实际数据为 `[{}, {}, {}]`），`key={undefined}` 导致 React 报警。
+
+### 影响范围
+- **前端 ResultsOverview/index.tsx**：`key={f.idx}` → `key={f.idx ?? frame-idx}`（兜底 index）
+- **前端 AppShell.tsx**：`stats &&` → `stats?.cpu && stats?.memory &&`（防御 stats 结构异常崩溃）
+- **前端 vite.config.ts**：proxy 加 `/admin`（dev 模式下 `/admin/system/stats` 走代理，避免 CORS + HTML 响应导致崩溃）
+
+### 验证
+- Playwright dev console：0 errors, 0 warnings（修复前有 1 error = key 警告）
+- `npx tsc --noEmit`：EXIT=0

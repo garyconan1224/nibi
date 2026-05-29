@@ -227,10 +227,19 @@ rg -n "\.map\(" frontend/src/pages/result/ResultsOverview/index.tsx
 - 前端 dev console 不再报 React key 警告
 - `npx tsc --noEmit` EXIT=0
 
+### 实际执行（2026-05-29）
+
+**真凶**：`ResultsOverview/index.tsx:441` 的 `frames.slice(0,10).map((f) => <div key={f.idx}>` —— 当 frames 数据中 `idx` 字段未定义时，`key={undefined}` 导致 React 报警。
+
+**修复**：
+- `key={f.idx}` → `key={f.idx ?? \`frame-${idx}\`}`（兜底 index）
+- 附带修复：AppShell.tsx `stats &&` → `stats?.cpu && stats?.memory &&`（防御 stats 结构异常）
+- 附带修复：vite.config.ts proxy 加 `/admin`（dev 模式下系统指标走代理）
+
 ### Commit
 
 ```
-fix(e2e.p2): ResultsOverview 列表加 unique key，消除 React 警告
+fix(e2e.p2): ResultsOverview 补 unique key + AppShell stats 防御
 
 Co-Authored-By: xiaomi mimo 2.5pro
 ```
