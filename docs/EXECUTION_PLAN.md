@@ -152,7 +152,7 @@
   - [ ] B-8 学习笔记页内 AI 问答抽屉（已决议本期做）— 计划 [rp1-b8](plans/rp1-b8-mimo-prompt.md)
 - [ ] **RP1-C 视频复刻页增强** — 主帧大视图 + 缩略图轨道 / 批量复刻包导出 / 提示词在线编辑+版本 / 与笔记页联动切换 — 12-18h，P2
   - [ ] C-1 主帧大视图 + 缩略图轨道 — 计划 [rp1-c1](plans/rp1-c1-mimo-prompt.md)
-  - [ ] C-2 复刻↔学习笔记联动切换 — 计划 [rp1-c2](plans/rp1-c2-mimo-prompt.md)
+  - [x] C-2 复刻↔学习笔记联动切换 — 并入 RP1-B+ 方案 B（`rp1b-intent-routing-mimo-prompt.md`）
   - [ ] C-3 帧批量操作 + 导出复刻包 — 计划 [rp1-c3](plans/rp1-c3-mimo-prompt.md)
   - [ ] C-4 提示词在线编辑 + 版本 — 计划 [rp1-c4](plans/rp1-c4-mimo-prompt.md)
   - [ ] C-5 小修（改名/重试/标签）— 计划 [rp1-c5](plans/rp1-c5-mimo-prompt.md)

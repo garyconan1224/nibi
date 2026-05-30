@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Check, Copy, Download, Pause, Play, Settings2, Star } from 'lucide-react'
+import { ArrowLeft, BookOpen, Check, Copy, Download, Film, Pause, Play, Settings2, Star } from 'lucide-react'
 
 import {
   type PromptVersion,
@@ -495,6 +495,23 @@ export default function VideoResultPage() {
           <span className="kw" style={{ fontSize: 10, background: 'var(--accent-green)', color: '#fff', padding: '2px 8px', borderRadius: 6 }}>
             {result.detected_template ? `自动识别：${result.detected_template}` : (result.video_template || '其它')}
           </span>
+          {/* 学习/复刻 toggle */}
+          <div className="vd-mode-toggle">
+            <button
+              className="vd-mode-btn"
+              onClick={() => navigate(`/workspaces/${workspaceId}/ln`)}
+            >
+              <BookOpen size={12} />
+              <span>学习笔记</span>
+            </button>
+            <button
+              className="vd-mode-btn active"
+              data-active="true"
+            >
+              <Film size={12} />
+              <span>复刻</span>
+            </button>
+          </div>
           <div style={{ marginLeft: 'auto' }} />
           <div style={{ position: 'relative' }}>
             <button className="btn-ghost" style={{ height: 28, padding: '0 10px', fontSize: 12 }} onClick={() => setExportOpen(!exportOpen)} title="导出字幕">
@@ -681,6 +698,23 @@ export default function VideoResultPage() {
               DEMO
             </span>
           )}
+          {/* 学习/复刻 toggle */}
+          <div className="vd-mode-toggle">
+            <button
+              className="vd-mode-btn"
+              onClick={() => navigate(`/workspaces/${workspaceId}/ln`)}
+            >
+              <BookOpen size={12} />
+              <span>学习笔记</span>
+            </button>
+            <button
+              className="vd-mode-btn active"
+              data-active="true"
+            >
+              <Film size={12} />
+              <span>复刻</span>
+            </button>
+          </div>
           <div style={{ marginLeft: 'auto' }} />
           <div style={{ position: 'relative' }}>
             <button className="btn-ghost" style={{ height: 28, padding: '0 10px', fontSize: 12, opacity: isVisualOnly ? 0.5 : 1 }} onClick={() => !isVisualOnly && setExportOpen(!exportOpen)} title={isVisualOnly ? "仅画面分析模式无字幕数据" : "导出字幕"} disabled={isVisualOnly}>

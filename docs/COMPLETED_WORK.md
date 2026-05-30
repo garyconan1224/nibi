@@ -4,7 +4,7 @@
 >
 > **维护规则**：每完成一个子任务，在本文件**追加**一段（不删旧记录），格式见下方"记录模板"。
 >
-> Last updated: 2026-05-30（RP1-B B-5 截图插光标 + 字幕引用进笔记）
+> Last updated: 2026-05-31（RP1-B+ 方案 B — 按 intent 分流入口 + 学习/复刻顶栏 toggle）
 
 ---
 
@@ -1645,3 +1645,47 @@ T2.2 核实发现：link_preview.py 只返回 og 元数据（title/description/i
 
 ### Commit
 - `6ca4166` feat(rp1-b): B-6 TOC 当前章节高亮 + 时间戳锚点 chip
+
+---
+
+## RP1-B+ 方案 B — 按 intent 分流入口 + 学习/复刻顶栏 toggle
+
+**完成日期**：2026-05-31
+**模型 / 工具**：mimo 2.5pro
+**计划文档**：`docs/plans/rp1b-intent-routing-mimo-prompt.md`
+**合并说明**：整合并取代原 C-2 toggle 计划（`rp1-c2-mimo-prompt.md`）
+
+### 问题
+所有视频 item「打开」都跳 `video_detail`（复刻提示词布局），不看 intent。`intent=learning` + `summary_path=av_combined` 的视频也掉进复刻页，而它本该看的 md 总结（图文分镜）没有入口。
+
+### 影响范围
+- **frontend/src/types/workspace.ts**：`PreflightConfig` 接口添加 `intent?: string` 字段（与后端对齐）
+- **frontend/src/pages/WorkspacePage/TaskboardPage/MaterialCard.tsx**：新增 `resolveItemRoute()` helper；`handleClick` 按 intent 分流（learning → `/ln`，其它 → `video_detail`）
+- **frontend/src/pages/WorkspacePage/TaskboardPage/FavoritesTab.tsx**：同上，新增 `resolveItemRoute()` + `handleClick` 按 intent 分流
+- **frontend/src/pages/FavoritesPage/FavoritesPage.tsx**：`resultRouteFor()` 按 intent 分流
+- **frontend/src/pages/result/ResultsOverview/index.tsx**：新增 `resolveDetailRoute()` helper；3 处跳转改为按 intent 分流
+- **frontend/src/pages/results/LearningNotesPage/index.tsx**：顶栏 `ln-nav` 添加 `[学习笔记 | 复刻]` toggle，复刻按钮跳 `video_detail`
+- **frontend/src/pages/results/LearningNotesPage/learning-notes.css**：新增 `.ln-mode-toggle` / `.ln-mode-btn` 样式
+- **frontend/src/pages/result/VideoResultPage.tsx**：两处 `vd-nav`（字幕模式 + 普通模式）添加 toggle，学习笔记按钮跳 `/ln`
+- **frontend/src/pages/result/result.css**：新增 `.vd-mode-toggle` / `.vd-mode-btn` 样式
+
+### 设计决策
+- intent 取自 `item.preflight.intent`（后端 PreflightConfig 已有此字段，前端类型补上）
+- toggle 样式参考设计稿 `storyboard.jsx` 的 sb-tabs（segmented 控件），当前页 `data-active="true"`
+- 两页互切：/ln 的 `videoItem.item_id` 用于构建 video_detail 路由；video_detail 直接跳 `/workspaces/${ws}/ln`
+- 不在 video_detail 重复实现 md 总结视图（方案 B 核心原则）
+- 旧 `/result` 静态重定向保留不动（新入口不再走它，仅兼容旧 URL）
+
+### 验证
+- `pnpm tsc --noEmit`：EXIT=0
+- `pnpm build`：EXIT=0
+- Playwright 自动化测试：6 项全通过
+  - learning 视频(484d8bb6…)「打开」→ 进 `/ln` ✅
+  - `/ln` 顶栏 toggle 可见 ✅
+  - 点「复刻」→ 切到 `video_detail` ✅
+  - `video_detail` 顶栏 toggle 可见 ✅
+  - 点「学习笔记」→ 切回 `/ln` ✅
+- 截图归档：`rp1b-intent-{taskboard,after-click,ln-default,toggle-to-vd,vd-toggle}.png`
+
+### Commit
+- `39e9839` feat(rp1-b+): 按 intent 分流入口 + 学习/复刻顶栏 toggle（方案B/整合C-2）

@@ -10,6 +10,19 @@ const RESULT_ROUTE: Record<ItemType, string> = {
   text: 'text_result',
 }
 
+/** 根据 item 类型和 intent 决定跳转路径 */
+function resolveItemRoute(workspaceId: string, item: WorkspaceItem): string {
+  if (item.type === 'video') {
+    const intent = item.preflight?.intent
+    if (intent === 'learning') {
+      return `/workspaces/${workspaceId}/ln`
+    }
+    return `/workspaces/${workspaceId}/items/${item.item_id}/video_detail`
+  }
+  const suffix = RESULT_ROUTE[item.type]
+  return `/workspaces/${workspaceId}/items/${item.item_id}/${suffix}`
+}
+
 interface FavoritesTabProps {
   /** 当前 workspace 的 favorites（item_id 列表） */
   favoriteIds: string[]
@@ -36,8 +49,7 @@ export function FavoritesTab({ favoriteIds, items, workspaceId }: FavoritesTabPr
   }
 
   const handleClick = (item: WorkspaceItem) => {
-    const suffix = RESULT_ROUTE[item.type]
-    navigate(`/workspaces/${workspaceId}/items/${item.item_id}/${suffix}`)
+    navigate(resolveItemRoute(workspaceId, item))
   }
 
   return (

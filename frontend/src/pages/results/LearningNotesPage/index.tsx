@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Star } from 'lucide-react'
-import { getWorkspace, getLnMarkdown, getItemResult, patchLnMarkdown } from '@/services/workspaces'
+import { ArrowLeft, Star, Download, BookOpen, Film } from 'lucide-react'
+import { getWorkspace, getLnMarkdown, getItemResult, patchLnMarkdown, exportNotes } from '@/services/workspaces'
 import type { VideoResultTranscriptLine } from '@/services/workspaces'
 import type { WorkspaceRecord, WorkspaceItem } from '@/types/workspace'
 import LNVideoPanel, { type LNVideoPanelHandle } from './LNVideoPanel'
@@ -36,6 +36,23 @@ export default function LearningNotesPage() {
     setView(v)
     localStorage.setItem('ln-view', v)
   }, [])
+
+  // B-7: 导出菜单
+  const [exportOpen, setExportOpen] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const exportRef = useRef<HTMLDivElement>(null)
+
+  // 点击外部关闭导出菜单
+  useEffect(() => {
+    if (!exportOpen) return
+    const handler = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [exportOpen])
 
   // B-4: 自动保存
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -118,6 +135,23 @@ export default function LearningNotesPage() {
     return { videoSrc: '', externalUrl: videoResult?.source_url || url }
   }, [pageState])
 
+  // B-7: 导出处理
+  const handleExport = useCallback(async (format: 'pdf' | 'docx' | 'obsidian' | 'print') => {
+    setExportOpen(false)
+    if (format === 'print') {
+      window.print()
+      return
+    }
+    setExporting(true)
+    try {
+      await exportNotes(workspaceId, format)
+    } catch {
+      alert('导出失败，请稍后重试')
+    } finally {
+      setExporting(false)
+    }
+  }, [workspaceId])
+
   const handleTimeUpdate = useCallback((time: number) => {
     setCurrentTime(time)
   }, [])
@@ -138,6 +172,73 @@ export default function LearningNotesPage() {
           {saveState === 'saved' && `已保存 ${lastSavedAt}`}
           {saveState === 'error' && '保存失败，重试中…'}
         </span>
+        {/* 学习/复刻 toggle */}
+        {pageState.kind === 'ready' && (
+          <div className="ln-mode-toggle">
+            <button
+              className="ln-mode-btn active"
+              data-active="true"
+            >
+              <BookOpen size={12} />
+              <span>学习笔记</span>
+            </button>
+            <button
+              className="ln-mode-btn"
+              onClick={() => navigate(`/workspaces/${workspaceId}/items/${pageState.videoItem.item_id}/video_detail`)}
+            >
+              <Film size={12} />
+              <span>复刻</span>
+            </button>
+          </div>
+        )}
+        {/* B-7: 导出菜单 */}
+        <div ref={exportRef} style={{ position: 'relative', marginLeft: 8 }}>
+          <button
+            className="btn-ghost"
+            style={{ height: 28, padding: '0 10px', fontSize: 12 }}
+            onClick={() => setExportOpen(!exportOpen)}
+            disabled={exporting}
+            title="导出笔记"
+          >
+            <Download size={13} /> {exporting ? '导出中…' : '导出 ▾'}
+          </button>
+          {exportOpen && (
+            <div
+              className="ln-export-menu"
+              style={{
+                position: 'absolute',
+                right: 0,
+                top: 36,
+                zIndex: 50,
+                background: 'var(--bg-elev)',
+                border: '1px solid var(--line)',
+                borderRadius: 8,
+                padding: '4px 0',
+                minWidth: 160,
+                boxShadow: '0 4px 16px rgba(0,0,0,.12)',
+              }}
+            >
+              {(['obsidian', 'pdf', 'docx'] as const).map((fmt) => (
+                <button
+                  key={fmt}
+                  className="btn-ghost"
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 14px', fontSize: 12, borderRadius: 0 }}
+                  onClick={() => handleExport(fmt)}
+                >
+                  {fmt === 'obsidian' ? 'Obsidian (.zip)' : fmt === 'pdf' ? 'PDF' : 'Word (.docx)'}
+                </button>
+              ))}
+              <div style={{ height: 1, background: 'var(--line)', margin: '4px 0' }} />
+              <button
+                className="btn-ghost"
+                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 14px', fontSize: 12, borderRadius: 0 }}
+                onClick={() => handleExport('print')}
+              >
+                打印当前页
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Loading / Error */}

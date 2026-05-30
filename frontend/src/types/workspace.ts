@@ -16,6 +16,8 @@ export interface PreflightConfig {
   models: { vision?: string; text?: string; video?: string }
   /** 任务勾选项 + 子参数；结构按 item.type 不同 */
   tasks: Record<string, unknown>
+  /** 素材意图：learning（学习消费）/ replica（复刻生产）/ 空 */
+  intent?: string
 }
 
 /** 工作空间内单个素材 */

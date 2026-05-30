@@ -33,6 +33,20 @@ const DETAIL_ROUTE: Record<ItemType, string> = {
   text: 'text_detail',
 }
 
+/** 根据 item 类型和 intent 决定详情页路由 */
+function resolveDetailRoute(workspaceId: string, item: WorkspaceItem): string {
+  // video 类型：learning intent 跳 /ln，其它跳 video_detail
+  if (item.type === 'video') {
+    const intent = item.preflight?.intent
+    if (intent === 'learning') {
+      return `/workspaces/${workspaceId}/ln`
+    }
+    return `/workspaces/${workspaceId}/items/${item.item_id}/video_detail`
+  }
+  // 非 video 类型：走原路由
+  return `/workspaces/${workspaceId}/items/${item.item_id}/${DETAIL_ROUTE[item.type]}`
+}
+
 type ItemResult = VideoResult | AudioResult | ImageResult | TextResult
 
 type PageState =
@@ -499,7 +513,7 @@ export default function ResultsOverview() {
                 <button
                   className="btn-ghost"
                   style={{ fontSize: 11, height: 24, padding: '0 8px' }}
-                  onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/${DETAIL_ROUTE[itemType]}`)}
+                  onClick={() => pageState.kind === 'ready' && navigate(resolveDetailRoute(workspaceId, pageState.item))}
                 >
                   查看全部
                 </button>
@@ -538,7 +552,7 @@ export default function ResultsOverview() {
           {/* 打开详情 — 大按钮 */}
           <button
             className="ov-detail-btn"
-            onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/${DETAIL_ROUTE[itemType]}`)}
+            onClick={() => pageState.kind === 'ready' && navigate(resolveDetailRoute(workspaceId, pageState.item))}
           >
             打开详情 <ArrowRight size={14} />
           </button>
@@ -558,7 +572,7 @@ export default function ResultsOverview() {
           <div className="ov-side-actions">
             <button
               className="ov-side-action"
-              onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/${DETAIL_ROUTE[itemType]}`)}
+              onClick={() => pageState.kind === 'ready' && navigate(resolveDetailRoute(workspaceId, pageState.item))}
             >
               <BookOpen size={14} />
               <span>{ITEM_TYPE_TEXT[itemType]}详情</span>

@@ -48,8 +48,15 @@ function collectFavorites(workspaces: WorkspaceRecord[]): FavoriteEntry[] {
 
 function resultRouteFor(entry: FavoriteEntry): string {
   const { workspace, item } = entry
+  // video 类型：learning intent 跳 /ln，其它跳 video_detail
+  if (item.type === 'video') {
+    const intent = item.preflight?.intent
+    if (intent === 'learning') {
+      return `/workspaces/${workspace.workspace_id}/ln`
+    }
+    return `/workspaces/${workspace.workspace_id}/items/${item.item_id}/video_detail`
+  }
   const map: Record<string, string> = {
-    video: 'result',
     audio: 'audio_result',
     image: 'image_result',
     text: 'text_result',

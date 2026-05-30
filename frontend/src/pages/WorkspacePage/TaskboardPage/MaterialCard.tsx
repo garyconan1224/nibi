@@ -53,6 +53,21 @@ const RESULT_ROUTE: Record<ItemType, string> = {
   text: 'text_result',
 }
 
+/** 根据 item 类型和 intent 决定跳转路径 */
+function resolveItemRoute(workspaceId: string, item: WorkspaceItem): string {
+  // video 类型：learning intent 跳 /ln，其它跳 video_detail
+  if (item.type === 'video') {
+    const intent = item.preflight?.intent
+    if (intent === 'learning') {
+      return `/workspaces/${workspaceId}/ln`
+    }
+    return `/workspaces/${workspaceId}/items/${item.item_id}/video_detail`
+  }
+  // 非 video 类型：走原路由
+  const suffix = RESULT_ROUTE[item.type]
+  return `/workspaces/${workspaceId}/items/${item.item_id}/${suffix}`
+}
+
 interface MaterialCardProps {
   item: WorkspaceItem
   workspaceId: string
@@ -79,8 +94,7 @@ export function MaterialCard({ item, workspaceId, progress }: MaterialCardProps)
   const framePaths: string[] = (item.results?.frame_paths as string[]) ?? []
 
   const handleClick = () => {
-    const suffix = RESULT_ROUTE[item.type]
-    navigate(`/workspaces/${workspaceId}/items/${item.item_id}/${suffix}`)
+    navigate(resolveItemRoute(workspaceId, item))
   }
 
   return (

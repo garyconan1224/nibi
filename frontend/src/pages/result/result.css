@@ -41,6 +41,43 @@
   flex-shrink: 0;
 }
 
+/* ── 学习/复刻 toggle ──────────────────────────── */
+.vm-video-result-scope .vd-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-sunken);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.vm-video-result-scope .vd-mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vm-video-result-scope .vd-mode-btn:hover {
+  color: var(--ink-2);
+  background: var(--bg-elev);
+}
+
+.vm-video-result-scope .vd-mode-btn[data-active="true"] {
+  color: var(--ink);
+  background: var(--bg-elev);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
 /* ─── Video player ─── */
 .vm-video-result-scope .vd-player-wrap {
   padding: 14px 20px 10px;
