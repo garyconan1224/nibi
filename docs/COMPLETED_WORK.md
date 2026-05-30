@@ -1481,3 +1481,25 @@ T2.2 核实发现：link_preview.py 只返回 og 元数据（title/description/i
 
 ### Commit
 - `2a75744` feat(rp1-a): 四迭 UI 整修 — 空 tab 隐藏 / 总结 UI 重设计 / Overview 重构 / 音频时间轴重做 + bug 修
+
+---
+
+## RP1-B B-1 学习笔记页双栏 + 视频播放器（2026-05-30）
+
+**目标**：接通视频源 + ln.md 路径 + 设计稿样式对齐
+
+### 改动
+- **backend/app/routes/workspaces.py**：`get_item_result` 端点添加 video URL 本地解析（仿 audio 模式），优先返回 `/static/workspaces/{ws}/videos/{file}` 路径
+- **backend/app/routes/export.py**：新增 `GET /{workspace_id}/ln` 端点，读取 `ln.md` 文件
+- **frontend/src/services/workspaces.ts**：新增 `getLnMarkdown` 函数
+- **frontend/src/pages/results/LearningNotesPage/index.tsx**：改用 `getLnMarkdown` 替代 `getAVSynthesisMarkdown`
+- **frontend/src/pages/results/LearningNotesPage/learning-notes.css**：重写为 nibi 设计 token（--bg-elev, --ink, --line, --accent-2 等），字体用 --display/--sans/--mono
+
+### 验证
+- `pnpm build`：EXIT=0
+- `npx tsc --noEmit`：EXIT=0
+- 后端 video URL 解析逻辑已实现（需实际视频任务验证）
+- ln.md 端点已添加（需实际 ln.md 文件验证）
+
+### Commit
+- pending feat(rp1-b): B-1 学习笔记页接通视频源 + ln.md 路径 + 设计稿样式对齐

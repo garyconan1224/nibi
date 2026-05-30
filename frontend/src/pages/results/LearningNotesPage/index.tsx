@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Star } from 'lucide-react'
-import { getWorkspace } from '@/services/workspaces'
-import { getAVSynthesisMarkdown } from '@/services/workspaces'
+import { getWorkspace, getLnMarkdown } from '@/services/workspaces'
 import type { WorkspaceRecord, WorkspaceItem } from '@/types/workspace'
 import LNVideoPanel from './LNVideoPanel'
 import LNNotesPanel from './LNNotesPanel'
@@ -25,7 +24,7 @@ export default function LearningNotesPage() {
       try {
         const [ws, md] = await Promise.all([
           getWorkspace(workspaceId),
-          getAVSynthesisMarkdown(workspaceId).catch(() => ''),
+          getLnMarkdown(workspaceId).catch(() => ''),
         ])
         if (cancelled) return
 

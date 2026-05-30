@@ -5,6 +5,9 @@
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  background: var(--bg);
+  color: var(--ink-2);
+  font-family: var(--sans);
 }
 
 /* ── Nav bar ─────────────────────────────────── */
@@ -12,9 +15,9 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 16px;
-  border-bottom: 1px solid hsl(var(--border));
-  background: hsl(var(--card));
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-elev);
   flex-shrink: 0;
 }
 
@@ -23,9 +26,9 @@
   align-items: center;
   gap: 4px;
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
-  color: hsl(var(--muted-foreground));
+  color: var(--ink-3);
   background: none;
   border: none;
   cursor: pointer;
@@ -33,13 +36,15 @@
 }
 
 .vm-ln-scope .ln-nav .ln-back:hover {
-  background: hsl(var(--accent-pink));
+  background: var(--line);
 }
 
 .vm-ln-scope .ln-nav .ln-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: hsl(var(--foreground));
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--ink);
+  letter-spacing: -0.02em;
 }
 
 .vm-ln-scope .ln-nav .ln-badge {
@@ -47,10 +52,13 @@
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  border-radius: 9999px;
+  border-radius: 99px;
+  font-family: var(--mono);
   font-size: 11px;
-  background: hsl(var(--primary) / 0.1);
-  color: hsl(var(--primary));
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--accent-2);
+  color: #fff;
 }
 
 /* ── Status ──────────────────────────────────── */
@@ -60,17 +68,19 @@
   justify-content: center;
   flex: 1;
   font-size: 14px;
-  color: hsl(var(--muted-foreground));
+  color: var(--ink-3);
 }
 
 .vm-ln-scope .ln-status.ln-error {
-  color: hsl(var(--destructive));
+  color: var(--accent);
 }
 
 /* ── Body (dual-column) ──────────────────────── */
 .vm-ln-scope .ln-body {
   display: flex;
   flex: 1;
+  gap: 16px;
+  padding: 16px;
   overflow: hidden;
 }
 
@@ -79,9 +89,10 @@
   width: 50%;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid hsl(var(--border));
-  background: hsl(var(--card));
+  border-radius: var(--radius-sm);
+  background: var(--bg-elev);
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 .vm-ln-scope .ln-video-wrapper {
@@ -104,8 +115,8 @@
   padding: 8px 12px;
   font-size: 13px;
   font-weight: 500;
-  color: hsl(var(--foreground));
-  border-top: 1px solid hsl(var(--border));
+  color: var(--ink);
+  border-top: 1px solid var(--line);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -115,8 +126,9 @@
   display: flex;
   gap: 16px;
   padding: 4px 12px 8px;
+  font-family: var(--mono);
   font-size: 11px;
-  color: hsl(var(--muted-foreground));
+  color: var(--ink-4);
 }
 
 .vm-ln-scope .ln-video-placeholder {
@@ -126,13 +138,13 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  color: hsl(var(--muted-foreground));
+  color: var(--ink-3);
   font-size: 14px;
 }
 
 .vm-ln-scope .ln-video-hint {
   font-size: 12px;
-  opacity: 0.7;
+  color: var(--ink-4);
 }
 
 /* ── Notes Panel (right 50%) ─────────────────── */
@@ -140,7 +152,10 @@
   width: 50%;
   display: flex;
   flex-direction: column;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elev);
   overflow-y: auto;
+  box-shadow: var(--shadow-sm);
 }
 
 .vm-ln-scope .ln-notes-empty {
@@ -150,27 +165,30 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  color: hsl(var(--muted-foreground));
+  color: var(--ink-3);
   font-size: 14px;
+  padding: 20px;
+  text-align: center;
 }
 
 .vm-ln-scope .ln-notes-hint {
   font-size: 12px;
-  opacity: 0.7;
+  color: var(--ink-4);
 }
 
 /* ── TOC ─────────────────────────────────────── */
 .vm-ln-scope .ln-toc {
   padding: 12px 16px;
-  border-bottom: 1px solid hsl(var(--border));
-  background: hsl(var(--card));
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-elev);
   flex-shrink: 0;
 }
 
 .vm-ln-scope .ln-toc-title {
-  font-size: 12px;
+  font-family: var(--mono);
+  font-size: 11px;
   font-weight: 600;
-  color: hsl(var(--muted-foreground));
+  color: var(--ink-3);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 8px;
@@ -188,13 +206,13 @@
 }
 
 .vm-ln-scope .ln-toc-item a {
-  color: hsl(var(--foreground));
+  color: var(--ink-2);
   text-decoration: none;
   transition: color 0.15s;
 }
 
 .vm-ln-scope .ln-toc-item a:hover {
-  color: hsl(var(--primary));
+  color: var(--accent-2);
 }
 
 .vm-ln-scope .ln-toc-h3 {
@@ -203,24 +221,29 @@
 
 /* ── Markdown content ────────────────────────── */
 .vm-ln-scope .ln-notes-content {
-  padding: 16px 24px 32px;
+  padding: 20px;
   font-size: 14px;
   line-height: 1.7;
-  color: hsl(var(--foreground));
+  color: var(--ink-2);
 }
 
 .vm-ln-scope .ln-notes-content h1,
 .vm-ln-scope .ln-notes-content h2,
 .vm-ln-scope .ln-notes-content h3 {
   scroll-margin-top: 16px;
+  color: var(--ink);
 }
 
 .vm-ln-scope .ln-notes-content h2 {
-  font-size: 18px;
-  font-weight: 700;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   margin: 24px 0 12px;
   padding-bottom: 6px;
-  border-bottom: 1px solid hsl(var(--border));
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-3);
 }
 
 .vm-ln-scope .ln-notes-content h3 {
@@ -244,26 +267,28 @@
 }
 
 .vm-ln-scope .ln-notes-content blockquote {
-  border-left: 3px solid hsl(var(--primary) / 0.4);
+  border-left: 3px solid var(--accent-2);
   padding: 4px 12px;
   margin: 12px 0;
-  color: hsl(var(--muted-foreground));
-  background: hsl(var(--accent-pink));
-  border-radius: 0 4px 4px 0;
+  color: var(--ink-3);
+  background: var(--bg-sunken);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 
 .vm-ln-scope .ln-notes-content code {
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
+  font-family: var(--mono);
   font-size: 13px;
-  background: hsl(var(--muted));
+  background: var(--bg-sunken);
+  color: var(--ink-2);
 }
 
 .vm-ln-scope .ln-notes-content pre {
   padding: 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   overflow-x: auto;
-  background: hsl(var(--muted));
+  background: var(--bg-sunken);
   margin: 12px 0;
 }
 
@@ -274,7 +299,7 @@
 
 .vm-ln-scope .ln-notes-content img {
   max-width: 100%;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   margin: 8px 0;
 }
 
@@ -288,11 +313,12 @@
 .vm-ln-scope .ln-notes-content th,
 .vm-ln-scope .ln-notes-content td {
   padding: 8px 12px;
-  border: 1px solid hsl(var(--border));
+  border: 1px solid var(--line);
   text-align: left;
 }
 
 .vm-ln-scope .ln-notes-content th {
-  background: hsl(var(--muted));
+  background: var(--bg-sunken);
   font-weight: 600;
+  color: var(--ink);
 }

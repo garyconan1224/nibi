@@ -567,6 +567,27 @@ def export_av_synthesis_md(workspace_id: str):
     )
 
 
+# ── 学习笔记 (ln.md) ──────────────────────────────────
+
+
+@router.get("/{workspace_id}/ln")
+def get_ln_markdown(workspace_id: str):
+    """返回学习笔记 markdown 原文（供 LearningNotesPage 渲染）。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+
+    md_path = get_workspace_root(workspace_id) / "ln.md"
+    if not md_path.exists():
+        raise HTTPException(status_code=404, detail="学习笔记尚未生成")
+
+    content = md_path.read_text(encoding="utf-8")
+    return StreamingResponse(
+        io.BytesIO(content.encode("utf-8")),
+        media_type="text/markdown; charset=utf-8",
+    )
+
+
 # ── R20: 笔记多格式导出 ────────────────────────────────
 
 

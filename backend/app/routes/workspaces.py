@@ -1748,12 +1748,27 @@ def get_item_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
         payload = v_results
         payload.setdefault("source", "item_results")
         duration = float(payload.get("duration_sec") or 0)
+
+        # 解析 video URL：优先本地 /static 路径，兜底源 URL（仿 audio 模式）
+        _video_url = ""
+        _source_url = item.source_value if item.source == "url" else ""
+        # 尝试从 workspace/videos/ 目录找本地视频文件
+        _videos_dir = _ROOT_DIR / "data" / "workspaces" / workspace_id / "videos"
+        if _videos_dir.is_dir():
+            _video_files = sorted(_videos_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
+            if _video_files:
+                _rel = _video_files[0].relative_to(_ROOT_DIR / "data").as_posix()
+                _video_url = f"/static/{_rel}"
+        # 优先本地 URL；没有则用源 URL
+        _final_video_url = _video_url or _source_url
+
         payload.setdefault(
             "video",
             {
                 "item_id": item.item_id,
                 "title": item.name,
-                "url": item.source_value if item.source == "url" else "",
+                "url": _final_video_url,
+                "source_url": _source_url,
                 "duration_sec": duration,
                 "duration_str": "",
             },
