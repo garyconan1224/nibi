@@ -40,6 +40,14 @@ const TEMPLATE_OPTIONS: { value: string; label: string }[] = [
   { value: 'shownotes', label: '播客 shownotes' },
 ]
 
+/** 4 个常用模板（segmented control 展示） */
+const QUICK_TEMPLATES = [
+  { value: 'concise', label: '精简' },
+  { value: 'detailed', label: '详细' },
+  { value: 'xhs', label: '小红书' },
+  { value: 'longform', label: '公众号' },
+]
+
 const TEMPLATE_LABEL_MAP = Object.fromEntries(
   TEMPLATE_OPTIONS.map((o) => [o.value, o.label]),
 )
@@ -75,6 +83,55 @@ function groupByTemplate(items: ItemSummary[]): TemplateGroup[] {
 interface SummariesTabProps {
   workspaceId: string
   itemId: string
+}
+
+/* ── localStorage 缓存 ────────────────────────────────────────── */
+
+const CACHE_PREFIX = 'nibi_summary_cache_'
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 小时
+
+function getCacheKey(workspaceId: string, itemId: string, template: string): string {
+  return `${CACHE_PREFIX}${workspaceId}_${itemId}_${template}`
+}
+
+interface CachedSummary {
+  summary_id: string
+  content_md: string
+  template: string
+  version: number
+  cached_at: number
+}
+
+function getCachedSummary(workspaceId: string, itemId: string, template: string): CachedSummary | null {
+  try {
+    const key = getCacheKey(workspaceId, itemId, template)
+    const raw = localStorage.getItem(key)
+    if (!raw) return null
+    const cached = JSON.parse(raw) as CachedSummary
+    if (Date.now() - cached.cached_at > CACHE_TTL_MS) {
+      localStorage.removeItem(key)
+      return null
+    }
+    return cached
+  } catch {
+    return null
+  }
+}
+
+function setCachedSummary(workspaceId: string, itemId: string, summary: ItemSummary): void {
+  try {
+    const key = getCacheKey(workspaceId, itemId, summary.template)
+    const cached: CachedSummary = {
+      summary_id: summary.summary_id,
+      content_md: summary.content_md,
+      template: summary.template,
+      version: summary.version,
+      cached_at: Date.now(),
+    }
+    localStorage.setItem(key, JSON.stringify(cached))
+  } catch {
+    // localStorage 满或不可用时静默失败
+  }
 }
 
 /* ── 主组件 ──────────────────────────────────────────────────── */
@@ -118,6 +175,19 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
   /* ── 创建 ────────────────────────────────────────────────── */
 
   const handleCreate = useCallback(async () => {
+    // 检查 localStorage 缓存
+    const cached = getCachedSummary(workspaceId, itemId, newTemplate)
+    if (cached && !newBackground) {
+      // 从缓存中找到对应的 summary
+      const cachedSummary = summaries.find(s => s.summary_id === cached.summary_id)
+      if (cachedSummary) {
+        toast.success(`使用缓存的 ${templateLabel(newTemplate)}`)
+        setShowNew(false)
+        setSelected(cachedSummary)
+        return
+      }
+    }
+
     setCreating(true)
     try {
       const s = await createSummary(
@@ -126,6 +196,8 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
         newTemplate,
         newBackground,
       )
+      // 写入缓存
+      setCachedSummary(workspaceId, itemId, s)
       toast.success(`${templateLabel(s.template)} v${s.version} 生成完成`)
       setShowNew(false)
       setNewBackground('')
@@ -137,7 +209,7 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
     } finally {
       setCreating(false)
     }
-  }, [workspaceId, itemId, newTemplate, newBackground, refresh])
+  }, [workspaceId, itemId, newTemplate, newBackground, refresh, summaries])
 
   /* ── 删除 ────────────────────────────────────────────────── */
 
@@ -236,18 +308,37 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
         {/* 新建面板 */}
         {showNew && (
           <div className="sm-new-panel">
-            <label style={{ fontSize: 12, marginBottom: 4 }}>模板</label>
-            <select
-              value={newTemplate}
-              onChange={(e) => setNewTemplate(e.target.value)}
-              className="sm-select"
-            >
-              {TEMPLATE_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
+            <label style={{ fontSize: 12, marginBottom: 6 }}>选择模板</label>
+            {/* segmented control：4 个常用模板 */}
+            <div className="sm-segmented">
+              {QUICK_TEMPLATES.map((t) => (
+                <button
+                  key={t.value}
+                  className={`sm-segment ${newTemplate === t.value ? 'active' : ''}`}
+                  onClick={() => setNewTemplate(t.value)}
+                  type="button"
+                >
+                  {t.label}
+                </button>
               ))}
-            </select>
+            </div>
+            {/* 更多模板下拉 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+              <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>更多：</span>
+              <select
+                value={QUICK_TEMPLATES.some(t => t.value === newTemplate) ? '' : newTemplate}
+                onChange={(e) => e.target.value && setNewTemplate(e.target.value)}
+                className="sm-select"
+                style={{ flex: 1 }}
+              >
+                <option value="" disabled>选择其他模板</option>
+                {TEMPLATE_OPTIONS.filter(o => !QUICK_TEMPLATES.some(t => t.value === o.value)).map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <label style={{ fontSize: 12, marginTop: 8, marginBottom: 4 }}>
               总结用背景（可选）
             </label>

@@ -53,6 +53,44 @@
   background: var(--bg-sunken);
 }
 
+/* segmented control（4 个常用模板） */
+.sm-segmented {
+  display: flex;
+  gap: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  background: var(--bg);
+}
+
+.sm-segment {
+  flex: 1;
+  padding: 6px 0;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-right: 1px solid var(--line);
+}
+
+.sm-segment:last-child {
+  border-right: none;
+}
+
+.sm-segment:hover {
+  background: var(--bg-elev);
+  color: var(--ink);
+}
+
+.sm-segment.active {
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+}
+
 .sm-select {
   padding: 6px 8px;
   border-radius: 4px;
