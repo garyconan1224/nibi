@@ -2,36 +2,6 @@ import React, { useRef, useMemo, useEffect, useState, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeRaw from 'rehype-raw'
-import DOMPurify from 'dompurify'
-import TurndownService from 'turndown'
-// @ts-expect-error turndown-plugin-gfm 没有类型声明
-import { gfm as turndownGfm } from 'turndown-plugin-gfm'
-
-const turndown = new TurndownService({
-  headingStyle: 'atx',
-  codeBlockStyle: 'fenced',
-  bulletListMarker: '-',
-  emDelimiter: '_',
-})
-turndown.use(turndownGfm)
-
-const SAFE_TAGS = [
-  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-  'p', 'br', 'strong', 'em', 'del', 'code', 'pre', 'blockquote',
-  'ul', 'ol', 'li',
-  'table', 'thead', 'tbody', 'tr', 'th', 'td',
-  'a', 'img',
-  'input',
-]
-const SAFE_ATTRS = ['href', 'src', 'alt', 'title', 'type', 'checked', 'disabled']
-
-function sanitize(html: string): string {
-  return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: SAFE_TAGS,
-    ALLOWED_ATTR: SAFE_ATTRS,
-    KEEP_CONTENT: true,
-  })
-}
 
 // remarkGfm 类型与 react-markdown 不完全兼容
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -55,12 +25,10 @@ function slugify(text: string): string {
 
 interface Props {
   markdown: string
-  onMarkdownChange: (md: string) => void
   onSeek?: (sec: number) => void
 }
 
-export default function HtmlView({ markdown, onMarkdownChange, onSeek }: Props) {
-  const editableRef = useRef<HTMLDivElement>(null)
+export default function HtmlView({ markdown, onSeek }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [activeId, setActiveId] = useState('')
 
@@ -118,21 +86,6 @@ export default function HtmlView({ markdown, onMarkdownChange, onSeek }: Props) 
     [onSeek],
   )
 
-  function onPaste(e: React.ClipboardEvent) {
-    e.preventDefault()
-    const html = e.clipboardData.getData('text/html')
-    const text = e.clipboardData.getData('text/plain')
-    const insert = html ? sanitize(html) : text.replace(/</g, '&lt;')
-    document.execCommand('insertHTML', false, insert)
-  }
-
-  function onBlur() {
-    if (!editableRef.current) return
-    const html = sanitize(editableRef.current.innerHTML)
-    const md = turndown.turndown(html)
-    onMarkdownChange(md)
-  }
-
   if (!markdown) {
     return (
       <div className="ln-html-view">
@@ -164,16 +117,9 @@ export default function HtmlView({ markdown, onMarkdownChange, onSeek }: Props) 
         </div>
       )}
 
-      {/* Editable HTML content */}
+      {/* 美化只读预览 */}
       <div ref={scrollRef} className="ln-html-scroll">
-        <div
-          ref={editableRef}
-          contentEditable
-          suppressContentEditableWarning
-          onPaste={onPaste}
-          onBlur={onBlur}
-          className="ln-html-view"
-        >
+        <div className="ln-html-view">
           <ReactMarkdown
             remarkPlugins={remarkPlugins}
             rehypePlugins={[rehypeRaw]}

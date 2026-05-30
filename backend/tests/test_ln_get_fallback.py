@@ -1,8 +1,7 @@
-"""GET /workspaces/{id}/ln — 学习笔记读取测试（含 analyze 产物降级）。"""
+"""GET /workspaces/{id}/ln — 学习笔记读取测试（含 summary 降级）。"""
 
 from __future__ import annotations
 
-import json
 import pathlib
 
 import pytest
@@ -12,12 +11,9 @@ from backend.app.models.workspace import WorkspaceItem, WorkspaceRecord
 from backend.app.services.workspace_store import WorkspaceStore
 
 
-def _make_test_store(tmp_dir: str, *, with_json_outputs: bool = False) -> WorkspaceStore:
+def _make_test_store(tmp_dir: str) -> WorkspaceStore:
     """创建含一个 workspace + video item 的临时 store。"""
     store = WorkspaceStore(root=pathlib.Path(tmp_dir))
-    results = {}
-    if with_json_outputs:
-        results["json_outputs"] = [str(pathlib.Path(tmp_dir) / "videos" / "test_video_视觉数据.json")]
     item = WorkspaceItem.from_dict({
         "item_id": "item-1",
         "type": "video",
@@ -25,7 +21,7 @@ def _make_test_store(tmp_dir: str, *, with_json_outputs: bool = False) -> Worksp
         "source_value": "/tmp/test.mp4",
         "name": "测试视频",
         "status": "done",
-        "results": results,
+        "results": {},
         "related_task_ids": [],
     })
     rec = WorkspaceRecord(workspace_id="ws-1", name="测试工作空间")
@@ -35,22 +31,14 @@ def _make_test_store(tmp_dir: str, *, with_json_outputs: bool = False) -> Worksp
 
 
 @pytest.fixture()
-def _setup_with_analyze_report(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path):
-    """创建 analyze 产物目录 + 图文分镜.md。"""
+def _setup_with_summary(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path):
+    """video item.results 含 summary（学习总结 md）。"""
     import backend.app.routes.export as export_module
-    import backend.app.routes.workspaces as ws_module
 
-    # 创建 analyze 产物目录结构
-    report_dir = tmp_path / "videos" / "test_video_分析报告"
-    report_dir.mkdir(parents=True)
-    note_path = report_dir / "test_video_图文分镜.md"
-    note_path.write_text("# 视频拆解：《测试视频》\n\n## 全局视觉总结\n\n测试内容。", encoding="utf-8")
-
-    # 创建视觉数据.json（空的，够用即可）
-    json_path = tmp_path / "videos" / "test_video_视觉数据.json"
-    json_path.write_text(json.dumps({"frames": []}), encoding="utf-8")
-
-    store = _make_test_store(str(tmp_path), with_json_outputs=True)
+    store = _make_test_store(str(tmp_path))
+    # 给 item 注入 summary
+    item = store.get("ws-1").items[0]
+    item.results["summary"] = "### 视频综合总结：GameCheats Manager\n\n#### 核心功能与亮点\n\n测试内容。"
     monkeypatch.setattr(export_module, "_store", store)
 
     ws_root = tmp_path / "ws-1"
@@ -97,12 +85,12 @@ class TestGetLnFallback:
         assert resp.status_code == 200
         assert "用户笔记" in resp.text
 
-    def test_fallback_to_analyze_report(self, _setup_with_analyze_report):
-        """无 ln.md 但有 analyze 产物时，返回图文分镜.md。"""
+    def test_fallback_to_summary(self, _setup_with_summary):
+        """无 ln.md 但有 item.results.summary 时，返回 summary。"""
         resp = client.get("/workspaces/ws-1/ln")
         assert resp.status_code == 200
-        assert "视频拆解" in resp.text
-        assert "测试视频" in resp.text
+        assert "视频综合总结" in resp.text
+        assert "GameCheats Manager" in resp.text
 
     def test_404_when_nothing_exists(self, _setup_empty):
         """既无 ln.md 也无 analyze 产物时返回 404。"""

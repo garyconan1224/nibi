@@ -297,14 +297,22 @@
   scroll-behavior: smooth;
 }
 
-/* ── HTML View (contentEditable) ─────────────── */
+/* ── HTML View（美化只读预览）────────────────── */
 .vm-ln-scope .ln-html-view {
-  padding: 20px;
+  padding: 24px 28px;
   font-size: 14px;
-  line-height: 1.7;
+  line-height: 1.8;
   color: var(--ink-2);
-  outline: none;
-  min-height: 200px;
+}
+
+/* H1 = 封面标题 */
+.vm-ln-scope .ln-html-view h1 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 20px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--accent);
 }
 
 .vm-ln-scope .ln-html-view h1,
@@ -315,15 +323,14 @@
 }
 
 .vm-ln-scope .ln-html-view h2 {
-  font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin: 24px 0 12px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--line);
-  color: var(--ink-3);
+  font-size: 16px;
+  font-weight: 700;
+  margin: 28px 0 12px;
+  padding: 8px 0 8px 12px;
+  border-left: 3px solid var(--accent);
+  color: var(--ink);
+  background: var(--bg-sunken);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 
 .vm-ln-scope .ln-html-view h3 {
@@ -733,10 +740,13 @@
   background: var(--bg-sunken);
 }
 
-/* B-7: 打印样式 — 只保留笔记内容 */
+/* 打印样式 — 只保留 HTML 美化预览正文 */
 @media print {
   .vm-ln-scope .ln-nav,
   .vm-ln-scope .ln-left-col,
+  .vm-ln-scope .ln-toolbar,
+  .vm-ln-scope .ln-toc,
+  .vm-ln-scope .ln-transcript-panel,
   .vm-ln-scope .ln-export-menu {
     display: none !important;
   }
@@ -746,5 +756,17 @@
   .vm-ln-scope .ln-notes-panel {
     width: 100% !important;
     border: none !important;
+    padding: 0 !important;
+  }
+  .vm-ln-scope .ln-html-view {
+    padding: 0 !important;
+  }
+  .vm-ln-scope .ln-html-view h1 {
+    font-size: 24px;
+    border-bottom-color: #333;
+  }
+  .vm-ln-scope .ln-html-view h2 {
+    border-left-color: #333;
+    background: none;
   }
 }

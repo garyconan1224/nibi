@@ -23,7 +23,7 @@ export default function LNNotesPanel({ markdown, onMarkdownChange, view, onSwitc
         >MD 源码</button>
       </div>
       {view === 'html'
-        ? <HtmlView markdown={markdown} onMarkdownChange={onMarkdownChange} onSeek={onSeek} />
+        ? <HtmlView markdown={markdown} onSeek={onSeek} />
         : <MdView markdown={markdown} onMarkdownChange={onMarkdownChange} />}
     </div>
   )

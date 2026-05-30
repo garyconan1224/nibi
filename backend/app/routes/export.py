@@ -28,7 +28,7 @@ from pydantic import BaseModel
 from shared.audio_analyzer import export_srt, export_vtt, export_ass
 from backend.app.models.workspace import ItemType, WorkspaceItem, WorkspaceRecord
 from backend.app.services.video_result_demo import build_demo_video_result
-from backend.app.routes.workspaces import _store, _sync_item_with_tasks, _locate_analyze_report_dir
+from backend.app.routes.workspaces import _store, _sync_item_with_tasks
 from backend.app.routes.pipeline import _runner as _pipeline_runner
 from shared.config import get_workspace_root
 
@@ -577,7 +577,7 @@ def get_ln_markdown(workspace_id: str):
 
     优先级：
     1. {ws}/ln.md（用户编辑覆盖层）
-    2. analyze 产物：{分析报告目录}/{json_stem}_图文分镜.md
+    2. video item.results.summary（pipeline 产出的学习总结 md）
     3. 都没有 → 404
     """
     rec = _store.get(workspace_id)
@@ -593,35 +593,17 @@ def get_ln_markdown(workspace_id: str):
             media_type="text/markdown; charset=utf-8",
         )
 
-    # 优先级 2：从 video item.results 定位 analyze 产物
+    # 优先级 2：从 video item.results.summary 取学习总结
     video_item = next((it for it in rec.items if it.type == "video"), None)
     if video_item is not None:
-        # X.1 bridge: 拉取 task 产物到 item.results
         overlay = _sync_item_with_tasks(video_item)
         results = dict(overlay.get("results", {})) if overlay and overlay.get("results") else dict(video_item.results or {})
-
-        json_outputs = results.get("json_outputs") or []
-        if json_outputs:
-            # 找最近一条 SUCCESS analyze task 的 preferred_basenames
-            preferred_basenames: list = []
-            for tid in reversed(video_item.related_task_ids):
-                task = _pipeline_runner.store.get(tid)
-                if task and task.task_type == "analyze" and task.status == "SUCCESS":
-                    preferred_basenames = list(task.payload.get("video_basenames") or [])
-                    if preferred_basenames:
-                        break
-
-            located = _locate_analyze_report_dir(json_outputs, preferred_basenames)
-            if located:
-                report_dir = located["report_dir"]
-                json_stem = located["json_stem"]
-                note_path = report_dir / f"{json_stem}_图文分镜.md"
-                if note_path.exists():
-                    content = note_path.read_text(encoding="utf-8")
-                    return StreamingResponse(
-                        io.BytesIO(content.encode("utf-8")),
-                        media_type="text/markdown; charset=utf-8",
-                    )
+        summary = results.get("summary")
+        if summary and isinstance(summary, str) and summary.strip():
+            return StreamingResponse(
+                io.BytesIO(summary.encode("utf-8")),
+                media_type="text/markdown; charset=utf-8",
+            )
 
     # 优先级 3：都没有
     raise HTTPException(status_code=404, detail="学习笔记尚未生成")
