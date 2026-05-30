@@ -42,3 +42,6 @@ node_modules/
 output/
 projects/
 runtime.log
+
+# Backend SQLite runtime db（运行时自动创建，不入仓）
+backend/vidmirror.db

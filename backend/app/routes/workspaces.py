@@ -2086,7 +2086,29 @@ def get_audio_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
                 or item.name
             )
         audio_payload.setdefault("item_id", item.item_id)
-        audio_payload.setdefault("url", item.source_value if item.source == "url" else "")
+        # url 字段：优先返回本地音频文件的 /static URL（浏览器可播）；
+        # 找不到再 fallback 到源 URL（如 B 站网页链接，仅用于"打开来源"按钮，不能给 <audio src>）
+        _filename = str(audio_payload.get("filename") or "").strip()
+        _local_url = ""
+        if _filename:
+            _candidates = [
+                _ROOT_DIR / "data" / "workspaces" / workspace_id / "audio" / _filename,
+                _ROOT_DIR / "data" / "workspaces" / "default_project" / "audio" / _filename,
+            ]
+            for _p in _candidates:
+                if _p.exists():
+                    _rel = _p.relative_to(_ROOT_DIR / "data").as_posix()
+                    _local_url = f"/static/{_rel}"
+                    break
+        # 注意：audio_payload 里可能已有 url（pipeline 写入的源 URL），不能用 setdefault
+        # 必须强制覆盖：能播放的本地 URL 优先；同时把源 URL 留到 source_url 字段
+        _existing_url = str(audio_payload.get("url") or "")
+        _source_url = (
+            item.source_value if item.source == "url"
+            else _existing_url  # 兜底：若已有 url 字段就当源 URL 保留
+        )
+        audio_payload["url"] = _local_url or _source_url
+        audio_payload.setdefault("source_url", _source_url)  # 保留源链接给"打开来源"按钮用
         audio_payload.setdefault("duration_sec", results.get("tracks_meta", {}).get("total_sec", 0))
         audio_payload.setdefault("duration_str", "")
         payload["audio"] = audio_payload
