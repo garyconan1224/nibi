@@ -264,7 +264,7 @@
 }
 
 .vm-image-scope .im-picker-item[data-selected='true'] {
-  border: 2px solid var(--accent);
+  border: 2px solid var(--accent-pink);
   background: rgba(255, 77, 126, 0.06);
 }
 
@@ -281,7 +281,7 @@
 
 .vm-image-scope .im-picker-item[data-selected='true'] .im-picker-check {
   border: none;
-  background: var(--accent);
+  background: var(--accent-pink);
 }
 
 .vm-image-scope .im-picker-fmt-name {

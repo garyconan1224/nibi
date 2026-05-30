@@ -312,7 +312,7 @@ export default function AudioResultPage() {
   if (fetchState.kind === 'error' || !result) {
     return (
       <div className="vm-audio-scope" style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-        <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
+        <span style={{ color: 'var(--accent-pink)', fontWeight: 600 }}>
           {fetchState.kind === 'error' ? fetchState.message : '没有可显示的音频结果'}
         </span>
         <button className="btn-ghost" style={{ padding: '6px 12px' }} onClick={() => navigate(-1)}>
@@ -349,7 +349,7 @@ export default function AudioResultPage() {
                     type="checkbox"
                     checked={exportWithSpeaker}
                     onChange={(e) => setExportWithSpeaker(e.target.checked)}
-                    style={{ accentColor: 'var(--accent)' }}
+                    style={{ accentColor: 'var(--accent-pink)' }}
                   />
                   带说话人标注
                 </label>
@@ -630,7 +630,7 @@ export default function AudioResultPage() {
                 {result.audio?.filename && <div>文件名：<span style={{ color: 'var(--ink-2)' }}>{result.audio.filename}</span></div>}
                 {result.audio?.url && (
                   <div style={{ wordBreak: 'break-all' }}>
-                    URL：<a href={result.audio.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', fontSize: 11 }}>{result.audio.url.slice(0, 60)}{result.audio.url.length > 60 ? '…' : ''}</a>
+                    URL：<a href={result.audio.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-pink)', fontSize: 11 }}>{result.audio.url.slice(0, 60)}{result.audio.url.length > 60 ? '…' : ''}</a>
                   </div>
                 )}
               </div>

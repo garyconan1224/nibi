@@ -93,7 +93,7 @@ export function MusicMaterialLibrary({ segments }: MusicMaterialLibraryProps) {
               <span style={{ fontSize: 12, color: 'var(--ink-4)' }}>
                 {formatSec(seg.start ?? 0)} – {formatSec(seg.end ?? 0)}
               </span>
-              <span style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 500 }}>
+              <span style={{ fontSize: 12, color: 'var(--accent-pink)', fontWeight: 500 }}>
                 {seg.bpm || 0} BPM
               </span>
               <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
@@ -138,7 +138,7 @@ export function MusicMaterialLibrary({ segments }: MusicMaterialLibraryProps) {
                 href="https://suno.com/create"
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ fontSize: 11, color: 'var(--accent)', textDecoration: 'none' }}
+                style={{ fontSize: 11, color: 'var(--accent-pink)', textDecoration: 'none' }}
               >
                 复制 → 去 Suno 生成同风格音乐 ↗
               </a>

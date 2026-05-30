@@ -277,7 +277,7 @@ export default function TextResultPage() {
         className="vm-text-scope"
         style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}
       >
-        <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
+        <span style={{ color: 'var(--accent-pink)', fontWeight: 600 }}>
           {fetchState.kind === 'error' ? fetchState.message : '没有可显示的文本结果'}
         </span>
         <button className="btn-ghost" style={{ padding: '6px 12px' }} onClick={() => navigate(-1)}>

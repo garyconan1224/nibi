@@ -360,7 +360,7 @@ export default function ProcessingPage() {
           {/* Failed state — inline indicator */}
           {isFailed && (
             <div className="proc-error">
-              <AlertTriangle size={28} style={{ color: 'var(--accent)' }} />
+              <AlertTriangle size={28} style={{ color: 'var(--accent-pink)' }} />
               <h3>任务失败</h3>
               <p style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>
                 {categorized.friendlyMessage}

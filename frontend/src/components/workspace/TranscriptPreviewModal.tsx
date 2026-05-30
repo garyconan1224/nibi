@@ -129,7 +129,7 @@ export function TranscriptPreviewModal({ open, sourceUrl, onClose }: TranscriptP
           )}
 
           {error && (
-            <div style={{ padding: 20, textAlign: 'center', color: 'var(--accent)', fontSize: 13 }}>
+            <div style={{ padding: 20, textAlign: 'center', color: 'var(--accent-pink)', fontSize: 13 }}>
               {error}
             </div>
           )}

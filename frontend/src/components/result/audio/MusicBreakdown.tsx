@@ -129,7 +129,7 @@ export function MusicBreakdown({ segments, onSeek, workspaceId, itemId }: MusicB
           >
             {/* 头部：时刻 + 基本信息 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent-pink)' }}>
                 {formatSec(startSec)} – {formatSec(endSec)}
               </span>
               <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
@@ -164,7 +164,7 @@ export function MusicBreakdown({ segments, onSeek, workspaceId, itemId }: MusicB
                     border: '1px solid var(--line)',
                     borderRadius: 4,
                     cursor: isLoading ? 'wait' : 'pointer',
-                    color: 'var(--accent)',
+                    color: 'var(--accent-pink)',
                   }}
                 >
                   {isLoading ? '分析中…' : '点击生成'}

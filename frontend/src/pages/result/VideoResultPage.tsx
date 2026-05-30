@@ -466,7 +466,7 @@ export default function VideoResultPage() {
         className="vm-video-result-scope"
         style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}
       >
-        <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
+        <span style={{ color: 'var(--accent-pink)', fontWeight: 600 }}>
           {fetchState.kind === 'error' ? fetchState.message : '没有可显示的视频结果'}
         </span>
         <button className="btn-ghost" style={{ padding: '6px 12px' }} onClick={() => navigate(-1)}>
@@ -652,7 +652,7 @@ export default function VideoResultPage() {
         className="vm-video-result-scope"
         style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}
       >
-        <span style={{ color: 'var(--accent)', fontWeight: 600 }}>没有可显示的视频结果</span>
+        <span style={{ color: 'var(--accent-pink)', fontWeight: 600 }}>没有可显示的视频结果</span>
         <button className="btn-ghost" style={{ padding: '6px 12px' }} onClick={() => navigate(-1)}>
           <ArrowLeft size={14} /> 返回
         </button>
@@ -946,7 +946,7 @@ function FormatPicker({ allFormats, selection, onToggle, onCancel, onSave }: For
                   gap: 10,
                   padding: '8px 10px',
                   borderRadius: 8,
-                  border: `1px solid ${checked ? 'var(--accent)' : 'var(--line)'}`,
+                  border: `1px solid ${checked ? 'var(--accent-pink)' : 'var(--line)'}`,
                   cursor: 'pointer',
                   background: checked ? 'rgba(255,77,126,0.08)' : 'transparent',
                 }}
@@ -960,7 +960,7 @@ function FormatPicker({ allFormats, selection, onToggle, onCancel, onSave }: For
                   <div style={{ fontSize: 13, fontWeight: 600 }}>
                     {f.name}
                     {index !== null && (
-                      <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--accent)' }}>
+                      <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--accent-pink)' }}>
                         #{index}
                       </span>
                     )}

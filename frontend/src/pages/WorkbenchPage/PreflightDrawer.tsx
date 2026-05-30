@@ -646,7 +646,7 @@ function PFTaskCard({ group, state, setState, locks, disabledReasons }: {
       background: cardBg,
       opacity: disabled ? 0.55 : 1,
       transition: 'background 140ms ease, border-color 140ms ease, opacity 140ms ease',
-      borderColor: locked ? 'var(--accent)' : on ? 'var(--line-strong)' : 'var(--line)',
+      borderColor: locked ? 'var(--accent-pink)' : on ? 'var(--line-strong)' : 'var(--line)',
     }}>
       <label style={{
         display: 'flex', alignItems: 'flex-start', gap: 12,
@@ -654,8 +654,8 @@ function PFTaskCard({ group, state, setState, locks, disabledReasons }: {
       }}>
         <div style={{
           width: 22, height: 22, borderRadius: 7,
-          border: `2px solid ${on ? (locked ? 'var(--accent)' : 'var(--ink)') : 'var(--line-strong)'}`,
-          background: on ? (locked ? 'var(--accent)' : 'var(--ink)') : 'transparent',
+          border: `2px solid ${on ? (locked ? 'var(--accent-pink)' : 'var(--ink)') : 'var(--line-strong)'}`,
+          background: on ? (locked ? 'var(--accent-pink)' : 'var(--ink)') : 'transparent',
           display: 'grid', placeItems: 'center',
           flexShrink: 0, marginTop: 2,
           transition: 'all 140ms ease',
@@ -679,7 +679,7 @@ function PFTaskCard({ group, state, setState, locks, disabledReasons }: {
             {locked && (
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 7px', borderRadius: 99,
-                background: 'rgba(255,77,126,0.12)', color: 'var(--accent)',
+                background: 'rgba(255,77,126,0.12)', color: 'var(--accent-pink)',
                 fontSize: 10, fontFamily: 'var(--mono)', letterSpacing: '0.04em', fontWeight: 600,
               }}>
                 <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -702,7 +702,7 @@ function PFTaskCard({ group, state, setState, locks, disabledReasons }: {
             <div className="mono" style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 3, letterSpacing: '0.04em' }}>{group.sub}</div>
           )}
           {(lockedReason || disabledReason) && (
-            <div style={{ fontSize: 11, color: locked ? 'var(--accent)' : 'var(--ink-3)', marginTop: 5, lineHeight: 1.4 }}>
+            <div style={{ fontSize: 11, color: locked ? 'var(--accent-pink)' : 'var(--ink-3)', marginTop: 5, lineHeight: 1.4 }}>
               {lockedReason || disabledReason}
             </div>
           )}
@@ -781,7 +781,7 @@ function PFTaskCard({ group, state, setState, locks, disabledReasons }: {
                     )}
                   </div>
                   {childLocked && (
-                    <div style={{ fontSize: 10, color: 'var(--accent)', marginTop: 4 }}>{locks[childLockKey]}</div>
+                    <div style={{ fontSize: 10, color: 'var(--accent-pink)', marginTop: 4 }}>{locks[childLockKey]}</div>
                   )}
                 </div>
               )

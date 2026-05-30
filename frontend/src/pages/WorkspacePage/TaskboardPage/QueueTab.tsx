@@ -14,7 +14,7 @@ function statusRank(status: string): number {
 const STATE_DOT: Record<string, string> = {
   running: 'var(--ink)',
   queued: 'var(--ink-4)',
-  error: 'var(--accent)',
+  error: 'var(--accent-pink)',
 }
 
 /**
@@ -142,7 +142,7 @@ export function QueueTab({ workspaceId }: QueueTabProps) {
               <div className="qp-bar">
                 <span style={{ width: `${pct}%` }} />
               </div>
-              <div className="mono qp-pct" style={{ width: 50, textAlign: 'right', color: isFailed ? 'var(--accent)' : isRunning ? 'var(--ink)' : 'var(--ink-4)' }}>
+              <div className="mono qp-pct" style={{ width: 50, textAlign: 'right', color: isFailed ? 'var(--accent-pink)' : isRunning ? 'var(--ink)' : 'var(--ink-4)' }}>
                 {isRunning ? `${pct}%` : isQueued ? '—' : isFailed ? '失败' : '完成'}
               </div>
               <div className="qp-acts">

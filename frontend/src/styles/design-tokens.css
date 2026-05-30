@@ -20,9 +20,10 @@
   --line:        rgba(0, 0, 0, 0.08);
   --line-strong: rgba(0, 0, 0, 0.18);
 
-  /* Accent — semantic aliases per system_design_v1.1.md §1.3 */
-  --accent:       #FF4D7E;  /* coral — input/output, entry buttons */
-  --accent-pink:  #FF4D7E;  /* alias: input/output layer */
+  /* Accent — semantic aliases per system_design_v1.1.md §1.3
+     注意：不再定义 --accent（避免与 shadcn 的 --accent 悬停色冲突）。
+     设计稿品牌粉色统一用 --accent-pink，紫 / 蓝 / 暖色用对应别名。 */
+  --accent-pink:  #FF4D7E;  /* coral — input/output layer, brand primary */
   --accent-2:     #B84CFF;  /* purple — AI analysis layer */
   --accent-purple:#B84CFF;  /* alias */
   --accent-3:     #3C77FB;  /* blue — structured layer */

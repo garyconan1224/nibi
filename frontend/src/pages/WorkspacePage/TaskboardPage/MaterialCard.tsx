@@ -34,7 +34,7 @@ const STATUS_DOT: Record<string, string> = {
   done: 'var(--accent-green)',
   processing: 'var(--ink)',
   pending: 'var(--ink-4)',
-  failed: 'var(--accent)',
+  failed: 'var(--accent-pink)',
 }
 
 /** 后端 status → 设计稿中文 */

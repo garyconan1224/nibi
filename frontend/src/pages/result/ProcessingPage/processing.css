@@ -336,7 +336,7 @@
 }
 
 .vm-processing-scope .step-row .body .logs .ln.err {
-  color: var(--accent);
+  color: var(--accent-pink);
 }
 
 .vm-processing-scope .step-row .progress {
@@ -371,7 +371,7 @@
 
 .vm-processing-scope .step-row .progress .bar .fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--accent-2), var(--accent-3));
+  background: linear-gradient(90deg, var(--accent-pink), var(--accent-2), var(--accent-3));
   transition: width 400ms ease;
 }
 
@@ -443,7 +443,7 @@
 .vm-processing-scope .proc-error .error-log {
   font-family: var(--mono);
   font-size: 11px;
-  color: var(--accent);
+  color: var(--accent-pink);
   background: var(--bg-sunken);
   border-radius: 8px;
   padding: 12px 16px;

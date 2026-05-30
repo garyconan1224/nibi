@@ -52,7 +52,7 @@
   border-radius: 16px;
   overflow: hidden;
   cursor: pointer;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  background: linear-gradient(135deg, var(--accent-pink), var(--accent-2));
   aspect-ratio: 16/9;
   max-height: 260px;
 }
@@ -117,7 +117,7 @@
 
 .vm-video-result-scope .vd-player .vd-progress .vd-progress-fill {
   height: 100%;
-  background: var(--accent);
+  background: var(--accent-pink);
   transition: width 200ms linear;
 }
 
@@ -414,7 +414,7 @@
 
 .vm-video-result-scope .vd-insert-frame-btn:hover {
   opacity: 1;
-  border-color: var(--accent);
+  border-color: var(--accent-pink);
 }
 
 .vm-video-result-scope .vd-inline-frame {
@@ -447,5 +447,5 @@
 }
 
 .vm-video-result-scope .vd-inline-frame-del:hover {
-  color: var(--accent);
+  color: var(--accent-pink);
 }

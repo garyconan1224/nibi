@@ -330,8 +330,8 @@ export default function LibraryPage() {
                     style={{
                       fontSize: 12,
                       height: 32,
-                      color: selectedSet.size > 0 ? 'var(--accent)' : 'var(--ink-4)',
-                      borderColor: selectedSet.size > 0 ? 'var(--accent)' : 'var(--line)',
+                      color: selectedSet.size > 0 ? 'var(--accent-pink)' : 'var(--ink-4)',
+                      borderColor: selectedSet.size > 0 ? 'var(--accent-pink)' : 'var(--line)',
                       opacity: deleting || selectedSet.size === 0 ? 0.5 : 1,
                     }}
                     onClick={handleBatchDelete}
@@ -396,7 +396,7 @@ export default function LibraryPage() {
       )}
 
       {error && (
-        <div className="empty-state" style={{ color: 'var(--accent)' }}>
+        <div className="empty-state" style={{ color: 'var(--accent-pink)' }}>
           <div className="empty-state-title">{error}</div>
           <button className="btn" style={{ marginTop: 8, fontSize: 12 }} onClick={load}>
             重试

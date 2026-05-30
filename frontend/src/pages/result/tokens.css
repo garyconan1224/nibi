@@ -79,7 +79,7 @@
   min-width: 38px;
 }
 .vm-video-result-scope .tr-line[data-active='true'] .ts {
-  color: var(--accent);
+  color: var(--accent-pink);
 }
 .vm-video-result-scope .tr-line .txt {
   flex: 1;

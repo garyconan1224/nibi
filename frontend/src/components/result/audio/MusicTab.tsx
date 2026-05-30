@@ -68,10 +68,10 @@ export function MusicTab({ segments, onSeek, workspaceId, itemId }: MusicTabProp
               padding: '8px 16px',
               fontSize: 13,
               fontWeight: sub === tab.id ? 600 : 400,
-              color: sub === tab.id ? 'var(--accent)' : 'var(--ink-3)',
+              color: sub === tab.id ? 'var(--accent-pink)' : 'var(--ink-3)',
               background: 'transparent',
               border: 'none',
-              borderBottom: sub === tab.id ? '2px solid var(--accent)' : '2px solid transparent',
+              borderBottom: sub === tab.id ? '2px solid var(--accent-pink)' : '2px solid transparent',
               cursor: 'pointer',
               transition: 'all 0.15s ease',
             }}

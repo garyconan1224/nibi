@@ -10,9 +10,9 @@ const TYPE_TONE: Record<string, { c: string; l: string }> = {
 
 const WS_STATE: Record<string, { l: string; c: string }> = {
   done: { l: '已完成', c: 'var(--accent-green)' },
-  running: { l: '处理中', c: 'var(--accent)' },
+  running: { l: '处理中', c: 'var(--accent-pink)' },
   queued: { l: '等待中', c: 'var(--ink-4)' },
-  error: { l: '有错误', c: 'var(--accent)' },
+  error: { l: '有错误', c: 'var(--accent-pink)' },
 }
 
 function dominantType(cnt: Record<string, number>): string {

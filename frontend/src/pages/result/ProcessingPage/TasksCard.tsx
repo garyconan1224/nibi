@@ -23,7 +23,7 @@ function audioThumbnailFromResult(result: Record<string, unknown>, audio?: Recor
 
 function dotColor(status: string): string {
   if (status === 'SUCCESS') return 'var(--accent-green)'
-  if (status === 'FAILED') return 'var(--accent)'
+  if (status === 'FAILED') return 'var(--accent-pink)'
   if (status === 'PENDING') return 'var(--ink-4)'
   return 'var(--ink)'
 }
@@ -90,7 +90,7 @@ export default function TasksCard({ currentTaskId }: TasksCardProps) {
               borderRadius: 10,
               background: isActive ? 'var(--bg-sunken)' : 'transparent',
               borderLeft: isActive
-                ? '2px solid var(--accent)'
+                ? '2px solid var(--accent-pink)'
                 : '2px solid transparent',
               borderBottom: '1px solid var(--line)',
               cursor: 'pointer',
@@ -170,10 +170,10 @@ export default function TasksCard({ currentTaskId }: TasksCardProps) {
                     className="mono"
                     style={{
                       fontSize: 9,
-                      color: 'var(--accent)',
+                      color: 'var(--accent-pink)',
                       flexShrink: 0,
                       padding: '1px 5px',
-                      border: '1px solid var(--accent)',
+                      border: '1px solid var(--accent-pink)',
                       borderRadius: 4,
                     }}
                   >
@@ -229,7 +229,7 @@ export default function TasksCard({ currentTaskId }: TasksCardProps) {
                     width: `${(t.progress ?? 0) * 100}%`,
                     background:
                       t.status === 'FAILED'
-                        ? 'var(--accent)'
+                        ? 'var(--accent-pink)'
                         : t.status === 'SUCCESS'
                           ? 'var(--accent-green)'
                           : 'var(--ink)',

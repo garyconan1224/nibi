@@ -132,7 +132,7 @@
 }
 
 .ex-delete-btn:hover {
-  background: var(--accent) !important;
+  background: var(--accent-pink) !important;
 }
 
 /* ── Duration badge ── */
@@ -339,5 +339,5 @@
 }
 
 .ws-delete-btn:hover {
-  background: var(--accent) !important;
+  background: var(--accent-pink) !important;
 }

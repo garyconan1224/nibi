@@ -128,7 +128,7 @@ export function CompareTab({ workspace, onSelectItem }: CompareTabProps) {
       )}
 
       {sync.kind === 'need-fetch' && async.phase === 'error' && (
-        <div className="tb-placeholder" style={{ minHeight: 200, color: 'var(--accent)' }}>
+        <div className="tb-placeholder" style={{ minHeight: 200, color: 'var(--accent-pink)' }}>
           {async.message}
         </div>
       )}
@@ -199,7 +199,7 @@ function ImageCompareView({
                 <td>
                   <div style={{ fontWeight: 600, fontSize: 13 }}>{img.name}</div>
                   {img.is_current && (
-                    <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 600 }}>
+                    <span style={{ fontSize: 10, color: 'var(--accent-pink)', fontWeight: 600 }}>
                       当前
                     </span>
                   )}
@@ -295,7 +295,7 @@ function TextCompareView({
                 <td>
                   <div style={{ fontWeight: 600, fontSize: 13 }}>{txt.name}</div>
                   {txt.is_current && (
-                    <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 600 }}>
+                    <span style={{ fontSize: 10, color: 'var(--accent-pink)', fontWeight: 600 }}>
                       当前
                     </span>
                   )}

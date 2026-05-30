@@ -242,7 +242,7 @@ export default function ResultsOverview() {
   if (pageState.kind === 'error') {
     return (
       <div className="vm-overview-scope" style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-        <span style={{ color: 'var(--accent)', fontWeight: 600 }}>{pageState.message}</span>
+        <span style={{ color: 'var(--accent-pink)', fontWeight: 600 }}>{pageState.message}</span>
         <button className="btn-ghost" style={{ padding: '6px 12px' }} onClick={() => navigate(-1)}>
           <ArrowLeft size={14} /> 返回
         </button>
@@ -265,7 +265,7 @@ export default function ResultsOverview() {
         </div>
         <div className="ov-main" style={{ alignItems: 'center', justifyContent: 'center' }}>
           <div className="ov-card" style={{ maxWidth: 480, textAlign: 'center', borderColor: 'rgba(255, 77, 126, 0.2)' }}>
-            <AlertTriangle size={32} style={{ color: 'var(--accent)', marginBottom: 12 }} />
+            <AlertTriangle size={32} style={{ color: 'var(--accent-pink)', marginBottom: 12 }} />
             <h2 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 8px' }}>处理失败</h2>
             <p style={{ fontSize: 13, color: 'var(--ink-3)', margin: '0 0 16px', lineHeight: 1.6 }}>
               该素材的任务处理过程中出现错误，无法生成结果。
@@ -277,7 +277,7 @@ export default function ResultsOverview() {
               marginBottom: 20,
               fontSize: 12,
               fontFamily: 'var(--mono)',
-              color: 'var(--accent)',
+              color: 'var(--accent-pink)',
               textAlign: 'left',
               wordBreak: 'break-all',
             }}>
@@ -295,7 +295,7 @@ export default function ResultsOverview() {
                 className="btn-ghost"
                 style={{
                   padding: '8px 16px',
-                  background: 'var(--accent)',
+                  background: 'var(--accent-pink)',
                   color: '#fff',
                   borderRadius: 8,
                   border: 'none',
@@ -356,10 +356,10 @@ export default function ResultsOverview() {
           className="ov-status-chip"
           style={{
             background: item.status === 'done' ? 'rgba(34, 211, 154, 0.12)' : item.status === 'failed' ? 'rgba(255, 77, 126, 0.12)' : 'var(--bg-sunken)',
-            color: item.status === 'done' ? 'var(--accent-green)' : item.status === 'failed' ? 'var(--accent)' : 'var(--ink-3)',
+            color: item.status === 'done' ? 'var(--accent-green)' : item.status === 'failed' ? 'var(--accent-pink)' : 'var(--ink-3)',
           }}
         >
-          <span className="dot" style={{ background: item.status === 'done' ? 'var(--accent-green)' : item.status === 'failed' ? 'var(--accent)' : 'var(--ink-4)' }} />
+          <span className="dot" style={{ background: item.status === 'done' ? 'var(--accent-green)' : item.status === 'failed' ? 'var(--accent-pink)' : 'var(--ink-4)' }} />
           {item.status === 'done' ? '完成' : item.status === 'processing' ? '处理中' : item.status === 'failed' ? '失败' : item.status}
         </span>
         {result.source === 'demo_fixture' && (

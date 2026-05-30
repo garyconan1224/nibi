@@ -160,7 +160,7 @@
   font-weight: 600;
 }
 .mat-type[data-tone='pink'] {
-  background: var(--accent);
+  background: var(--accent-pink);
 }
 .mat-type[data-tone='purple'] {
   background: var(--accent-2);
@@ -182,7 +182,7 @@
 }
 .mat-prog > div {
   height: 100%;
-  background: var(--accent);
+  background: var(--accent-pink);
   transition: width 400ms;
 }
 .mat-body {
@@ -291,7 +291,7 @@
   background: var(--accent-warm);
 }
 .qp-dot[data-state='error'] {
-  background: var(--accent);
+  background: var(--accent-pink);
 }
 .qp-bar {
   height: 4px;
@@ -306,7 +306,7 @@
   transition: width 0.3s;
 }
 .qp-row[data-state='error'] .qp-bar span {
-  background: var(--accent);
+  background: var(--accent-pink);
 }
 .qp-row[data-state='queued'] .qp-bar span {
   background: var(--accent-warm);
@@ -453,7 +453,7 @@
 .tag-bar > span {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  background: linear-gradient(90deg, var(--accent-pink), var(--accent-2));
 }
 
 /* ─── Segment control (tag filter) ─── */

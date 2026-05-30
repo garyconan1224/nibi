@@ -112,7 +112,7 @@
 }
 .vm-text-scope .tx-kp-item[data-clickable='true']:hover {
   background: rgba(99, 102, 241, 0.06);
-  border-color: var(--accent);
+  border-color: var(--accent-pink);
 }
 
 .vm-text-scope .tx-kp-num {
@@ -157,7 +157,7 @@
 .vm-text-scope .tx-kp-pos {
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--accent);
+  color: var(--accent-pink);
   background: rgba(99, 102, 241, 0.08);
   padding: 1px 6px;
   border-radius: 4px;
@@ -188,7 +188,7 @@
 .vm-text-scope .tx-gq-text {
   margin: 0;
   padding: 10px 14px;
-  border-left: 3px solid var(--accent);
+  border-left: 3px solid var(--accent-pink);
   background: var(--bg-sunken);
   border-radius: 0 10px 10px 0;
   font-size: 13px;
@@ -200,7 +200,7 @@
 .vm-text-scope .tx-gq-pos {
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--accent);
+  color: var(--accent-pink);
   background: rgba(99, 102, 241, 0.08);
   padding: 1px 6px;
   border-radius: 4px;
@@ -310,7 +310,7 @@
 }
 
 .vm-text-scope .tx-align-result {
-  border-left: 2px solid var(--accent);
+  border-left: 2px solid var(--accent-pink);
 }
 
 .vm-text-scope .tx-align-missing {
@@ -337,8 +337,8 @@
 }
 
 .vm-text-scope .tx-align-copy:hover {
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--accent-pink);
+  border-color: var(--accent-pink);
 }
 
 /* ─── Meta info ─── */
@@ -436,7 +436,7 @@
 }
 
 .vm-text-scope .tx-compare-status[data-error='true'] {
-  color: var(--accent);
+  color: var(--accent-pink);
 }
 
 .vm-text-scope .tx-compare-table {

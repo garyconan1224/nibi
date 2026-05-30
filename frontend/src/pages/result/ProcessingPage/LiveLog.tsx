@@ -39,7 +39,7 @@ export function LiveLog({ logs }: LiveLogProps) {
           const time = l.ts ? new Date(l.ts).toLocaleTimeString('zh-CN', { hour12: false }) : ''
           const levelColor =
             l.level === 'error'
-              ? 'var(--accent)'
+              ? 'var(--accent-pink)'
               : l.level === 'warning'
                 ? 'var(--accent-warm)'
                 : 'var(--ink-3)'

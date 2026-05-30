@@ -79,7 +79,7 @@ const timeOf = (value: string | undefined): number => {
 const dotColor = (s: DisplayState): string =>
   s === 'running' ? 'var(--accent-green)'
     : s === 'queued' ? 'var(--ink-4)'
-    : 'var(--accent)'
+    : 'var(--accent-pink)'
 
 /* ── component ── */
 
@@ -272,7 +272,7 @@ export function FloatingTaskQueue() {
               {running > 0 && <>● {running} 处理</>}
               {queued > 0 && <>{running > 0 ? ' · ' : ''}○ {queued} 等待</>}
               {errored > 0 && (
-                <>{(running || queued) ? ' · ' : ''}<span style={{ color: 'var(--accent)' }}>✗ {errored} 失败</span></>
+                <>{(running || queued) ? ' · ' : ''}<span style={{ color: 'var(--accent-pink)' }}>✗ {errored} 失败</span></>
               )}
             </span>
           </div>
@@ -326,7 +326,7 @@ export function FloatingTaskQueue() {
                   style={{
                     height: '100%',
                     width: `${avgPct}%`,
-                    background: 'linear-gradient(90deg, var(--accent), var(--accent-2), var(--accent-green))',
+                    background: 'linear-gradient(90deg, var(--accent-pink), var(--accent-2), var(--accent-green))',
                     transition: 'width 400ms ease',
                   }}
                 />
@@ -345,7 +345,7 @@ export function FloatingTaskQueue() {
                   onClick={() => handleSelectTask(r)}
                   style={{
                     padding: '10px 14px',
-                    borderLeft: isActive ? '2px solid var(--accent)' : '2px solid transparent',
+                    borderLeft: isActive ? '2px solid var(--accent-pink)' : '2px solid transparent',
                     background: isActive ? 'var(--bg-sunken)' : 'transparent',
                     borderBottom: '1px solid var(--line)',
                     cursor: 'pointer',
@@ -372,7 +372,7 @@ export function FloatingTaskQueue() {
                       style={{
                         flex: 1, minWidth: 0, fontSize: 12.5, fontWeight: 600,
                         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                        color: r.state === 'error' ? 'var(--accent)' : 'var(--ink)',
+                        color: r.state === 'error' ? 'var(--accent-pink)' : 'var(--ink)',
                       }}
                     >
                       {r.title}
@@ -381,8 +381,8 @@ export function FloatingTaskQueue() {
                       <span
                         className="mono"
                         style={{
-                          fontSize: 9, color: 'var(--accent)', flexShrink: 0,
-                          padding: '1px 5px', border: '1px solid var(--accent)', borderRadius: 4,
+                          fontSize: 9, color: 'var(--accent-pink)', flexShrink: 0,
+                          padding: '1px 5px', border: '1px solid var(--accent-pink)', borderRadius: 4,
                         }}
                       >
                         查看中

@@ -234,7 +234,7 @@
   transition: border-color 120ms, box-shadow 120ms;
 }
 .vm-overview-scope .ov-action-card:hover {
-  border-color: var(--accent);
+  border-color: var(--accent-pink);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 .vm-overview-scope .ov-action-card .ov-action-icon {

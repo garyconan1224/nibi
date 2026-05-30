@@ -82,12 +82,12 @@
 }
 
 .fpm-card:hover {
-  border-color: var(--accent);
+  border-color: var(--accent-pink);
 }
 
 .fpm-card.selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+  border-color: var(--accent-pink);
+  box-shadow: 0 0 0 1px var(--accent-pink);
 }
 
 .fpm-card-img-wrap {
@@ -156,7 +156,7 @@
 
 .fpm-btn-confirm {
   border: none;
-  background: var(--accent);
+  background: var(--accent-pink);
   color: #fff;
 }
 

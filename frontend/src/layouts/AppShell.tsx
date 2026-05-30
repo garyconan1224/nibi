@@ -165,7 +165,7 @@ export function AppShell({ children }: AppShellProps) {
           >
             <span
               className="inline-block size-1.5 rounded-full"
-              style={{ background: online ? 'var(--accent-green)' : 'var(--accent)' }}
+              style={{ background: online ? 'var(--accent-green)' : 'var(--accent-pink)' }}
             />
             后端 {BACKEND_ADDR} · {online ? 'online' : 'offline'}
           </span>

@@ -168,7 +168,7 @@ export function ListView({ items, selectMode, selectedSet, selectionKey, onToggl
                       transition: 'color 120ms',
                     }}
                     onMouseEnter={(e) => {
-                      ;(e.currentTarget as HTMLElement).style.color = 'var(--accent)'
+                      ;(e.currentTarget as HTMLElement).style.color = 'var(--accent-pink)'
                     }}
                     onMouseLeave={(e) => {
                       ;(e.currentTarget as HTMLElement).style.color = 'var(--ink-4)'

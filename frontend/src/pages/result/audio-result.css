@@ -17,7 +17,7 @@
 }
 
 .vm-audio-scope .ad-waveform .ad-bar.passed {
-  background: var(--accent);
+  background: var(--accent-pink);
   opacity: 1;
 }
 
@@ -81,7 +81,7 @@
 .vm-audio-scope .ad-tab[data-active='true'] {
   background: var(--bg);
   color: var(--ink);
-  border-bottom-color: var(--accent);
+  border-bottom-color: var(--accent-pink);
 }
 
 .vm-audio-scope .ad-tab[data-disabled='true'] {
@@ -303,7 +303,7 @@
   font-size: 13px;
   font-weight: 500;
   padding: 2px 8px;
-  border: 1px solid var(--accent);
+  border: 1px solid var(--accent-pink);
   border-radius: 6px;
   background: var(--bg);
   color: var(--ink);
@@ -341,8 +341,8 @@
 }
 
 .vm-audio-scope .ad-speaker-chip:hover {
-  border-color: var(--chip-color, var(--accent));
-  box-shadow: 0 0 0 1px var(--chip-color, var(--accent));
+  border-color: var(--chip-color, var(--accent-pink));
+  box-shadow: 0 0 0 1px var(--chip-color, var(--accent-pink));
 }
 
 .vm-audio-scope .ad-speaker-chip-dot {
@@ -356,13 +356,13 @@
 .vm-audio-scope .ad-speaker-chip-input {
   padding: 4px 10px;
   border-radius: 99px;
-  border: 1px solid var(--accent);
+  border: 1px solid var(--accent-pink);
   background: var(--bg-card);
   font-size: 12px;
   font-weight: 500;
   color: var(--ink-1);
   outline: none;
   width: 100px;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-pink) 20%, transparent);
 }
 
