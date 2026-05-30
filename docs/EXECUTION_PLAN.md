@@ -146,7 +146,7 @@
   - [x] B-2 字幕轨跟随 + 点击 seek → `73733b5`（2026-05-30）
   - [x] B-3 HTML/MD 视图切换 + 双向同步 → `cdb5a37`（2026-05-30）
   - [x] B-4 在线编辑 + 自动保存（PATCH /ln）→ `07ae2b6`（2026-05-30）
-  - [ ] B-5 截图插光标 + 字幕引用进笔记 — 计划 [rp1-b5](plans/rp1-b5-mimo-prompt.md)
+  - [x] B-5 截图插光标 + 字幕引用进笔记 → `6a6cc16`（2026-05-30）
   - [ ] B-6 TOC 当前章节高亮 + 时间戳锚点 chip — 计划 [rp1-b6](plans/rp1-b6-mimo-prompt.md)
   - [ ] B-7 导出菜单 — 计划 [rp1-b7](plans/rp1-b7-mimo-prompt.md)
   - [ ] B-8 学习笔记页内 AI 问答抽屉（已决议本期做）— 计划 [rp1-b8](plans/rp1-b8-mimo-prompt.md)

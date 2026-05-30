@@ -4,7 +4,7 @@
 >
 > **维护规则**：每完成一个子任务，在本文件**追加**一段（不删旧记录），格式见下方"记录模板"。
 >
-> Last updated: 2026-05-30（RP1-A 主题修复 + 页面整合完成）
+> Last updated: 2026-05-30（RP1-B B-5 截图插光标 + 字幕引用进笔记）
 
 ---
 
@@ -1579,3 +1579,34 @@ T2.2 核实发现：link_preview.py 只返回 og 元数据（title/description/i
 
 ### Commit
 - `07ae2b6` feat(rp1-b): B-4 学习笔记在线编辑 + 自动保存
+
+---
+
+## RP1-B B-5 截图插光标 + 字幕引用进笔记（2026-05-30）
+
+**目标**：视频暂停 → 截当前帧 → 上传 → 插入 MD 编辑器光标位置；收纳 B-2 推迟的字幕引用按钮
+
+### 改动
+- **frontend/src/store/lnEditorStore.ts**（新建）：zustand store — `cmView: EditorView | null` + `setCmView` + `insertAtCursor(text): boolean`（dispatch insert 到 selection.main.head，无 view 返回 false）
+- **frontend/src/pages/results/LearningNotesPage/MdView.tsx**：EditorView 创建后调 `useLnEditorStore.getState().setCmView(view)`，卸载时清空
+- **backend/app/routes/export.py**：新增 `POST /{workspace_id}/ln/screenshots` — 接 multipart file + ts，存 `ws_root/ln-screenshots/shot-{ts:06d}-{HHmmss}.png`，返回 `{ url, filename }`（URL 对齐 /static 挂载）
+- **frontend/src/services/lnScreenshots.ts**（新建）：`uploadLnScreenshot(ws, blob, ts)` — multipart POST
+- **frontend/src/pages/results/LearningNotesPage/LNVideoPanel.tsx**：加"📷 截图插入"按钮 — canvas 抓帧 → toBlob → 上传 → `insertAtCursor(\`![截图@${tsStr}](${url})\n\`)`；6 项错误处理（readyState / getContext / toBlob / 上传 / 无编辑器 / 跨域）
+- **frontend/src/pages/results/LearningNotesPage/LNTranscriptPanel.tsx**：每行加"引用"按钮（Quote icon）— `stopPropagation` 避免触发行级 seek → `insertAtCursor('> [' + t_str + '] ' + text + '\n')`；hover 时才显示
+- **frontend/src/pages/results/LearningNotesPage/index.tsx**：传 `workspaceId` 给 LNVideoPanel
+- **frontend/src/pages/results/LearningNotesPage/learning-notes.css**：新增 `.ln-video-toolbar` / `.ln-shot-btn` / `.ln-tr-quote` 样式
+
+### 设计决策
+- 跨组件通信用 zustand（项目已有 7 个 store），不做 ref forwarding（4 层 prop drilling）
+- HTML 视图下截图 → toast 提示"请先切到 MD 视图"（方案 B，不做自动切换）
+- 截图目录 `data/workspaces/{ws}/ln-screenshots/`，URL 拼法对齐 B-1 视频 URL 本地化
+- 引用按钮 hover 才显示（opacity 0→1），不干扰字幕行的点击 seek
+- 插入后 B-4 的 debounce PATCH 自动触发保存，无需额外处理
+
+### 验证
+- `pnpm build`：EXIT=0
+- `pnpm tsc --noEmit`：EXIT=0
+- `pytest backend/tests -q -k "ln"`：5 passed
+
+### Commit
+- `6a6cc16` feat(rp1-b): B-5 截图插光标 + 字幕引用进笔记
