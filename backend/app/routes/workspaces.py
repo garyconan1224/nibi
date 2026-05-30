@@ -1565,6 +1565,50 @@ def _parse_ts_to_sec(ts: str) -> float:
     return 0.0
 
 
+def _locate_analyze_report_dir(
+    json_outputs: list,
+    preferred_basenames: Optional[List[str]] = None,
+) -> Optional[Dict[str, Any]]:
+    """从 json_outputs 定位「分析报告」目录。
+
+    返回 {"report_dir": Path, "json_stem": str, "target_path": Path} 或 None。
+    """
+    from pathlib import Path as _Path
+
+    candidates = list(json_outputs)
+    if preferred_basenames:
+        def _norm(s: str) -> str:
+            return s.replace("-", "_").replace(".", "_")
+        stems = [_norm(_Path(b).stem) for b in preferred_basenames if b]
+        matched = [p for p in candidates if any(stem and stem in _norm(p) for stem in stems)]
+        if matched:
+            candidates = matched
+
+    target_path = None
+    for p in candidates:
+        if _Path(p).exists():
+            target_path = p
+            break
+    if not target_path:
+        return None
+
+    json_stem = _Path(target_path).stem.replace("_视觉数据", "")
+    parent_dir = _Path(target_path).parent
+
+    for candidate_dir in [
+        parent_dir / f"{json_stem}_分析报告",
+        parent_dir.parent / "videos" / f"{json_stem}_分析报告",
+    ]:
+        if candidate_dir.is_dir():
+            return {"report_dir": candidate_dir, "json_stem": json_stem, "target_path": target_path}
+
+    # 有些旧产物：分析报告目录就是 parent_dir 本身（frames 在同级）
+    if (parent_dir / "frames").is_dir():
+        return {"report_dir": parent_dir, "json_stem": json_stem, "target_path": target_path}
+
+    return None
+
+
 def _materialize_video_results_from_analyze(
     results: Dict[str, Any],
     preferred_basenames: Optional[List[str]] = None,
@@ -1598,22 +1642,13 @@ def _materialize_video_results_from_analyze(
     import json as _json
     from pathlib import Path as _Path
 
-    candidates = list(json_outputs)
-    if preferred_basenames:
-        def _norm(s: str) -> str:
-            return s.replace("-", "_").replace(".", "_")
-        stems = [_norm(_Path(b).stem) for b in preferred_basenames if b]
-        matched = [p for p in candidates if any(stem and stem in _norm(p) for stem in stems)]
-        if matched:
-            candidates = matched
-
-    target_path = None
-    for p in candidates:
-        if _Path(p).exists():
-            target_path = p
-            break
-    if not target_path:
+    located = _locate_analyze_report_dir(json_outputs, preferred_basenames)
+    if not located:
         return results
+    target_path = located["target_path"]
+    json_stem = located["json_stem"]
+    report_dir = located["report_dir"]
+
     try:
         with open(target_path, "r", encoding="utf-8") as f:
             visual = _json.load(f)
@@ -1621,20 +1656,8 @@ def _materialize_video_results_from_analyze(
         return results
     raw_frames = visual.get("frames") or []
 
-    # 从 json 文件名推导 basename（去掉 _视觉数据.json 后缀）
-    json_stem = _Path(target_path).stem.replace("_视觉数据", "")
-    # 在多个可能的位置查找 frames 目录
-    parent_dir = _Path(target_path).parent
     data_root = _ROOT_DIR / "data"
-    frames_dir = None
-    for candidate_dir in [
-        parent_dir / "frames",                          # 同级 frames/
-        parent_dir / f"{json_stem}_分析报告" / "frames",  # videos/{name}_分析报告/frames/
-        parent_dir.parent / "videos" / f"{json_stem}_分析报告" / "frames",  # json_data → videos/
-    ]:
-        if candidate_dir.is_dir():
-            frames_dir = candidate_dir
-            break
+    frames_dir = report_dir / "frames" if (report_dir / "frames").is_dir() else None
 
     frames = []
     for idx, fr in enumerate(raw_frames):
@@ -1759,6 +1782,24 @@ def get_item_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
             if _video_files:
                 _rel = _video_files[0].relative_to(_ROOT_DIR / "data").as_posix()
                 _video_url = f"/static/{_rel}"
+        # 降级：去 analyze 产物目录找 mp4（default_project/videos/）
+        if not _video_url:
+            _json_outputs = v_results.get("json_outputs") or []
+            if _json_outputs:
+                _located = _locate_analyze_report_dir(_json_outputs, preferred_basenames)
+                if _located:
+                    _report_parent = _located["report_dir"].parent
+                    _json_stem = _located["json_stem"]
+                    # 提取 BVid 用于匹配 mp4 文件名
+                    import re as _re
+                    _bvid_match = _re.search(r'(BV[A-Za-z0-9]+)', _json_stem)
+                    if _bvid_match:
+                        _bvid = _bvid_match.group(1)
+                        for _mp4 in _report_parent.glob("*.mp4"):
+                            if _bvid in _mp4.name:
+                                _rel = _mp4.relative_to(_ROOT_DIR / "data").as_posix()
+                                _video_url = f"/static/{_rel}"
+                                break
         # 优先本地 URL；没有则用源 URL
         _final_video_url = _video_url or _source_url
 
