@@ -395,6 +395,7 @@ export interface AudioTranscriptSegment {
   t_sec: number
   t_str: string
   text: string
+  edited_text?: string
   start?: number
   end?: number
   speaker?: string
@@ -479,6 +480,20 @@ export async function updateSpeakerMap(
   await http.patch(`${BASE}/${workspaceId}/items/${itemId}/speaker_map`, {
     speaker_map: speakerMap,
   })
+}
+
+/** PATCH /workspaces/{id}/items/{itemId}/transcript/segments/{idx} — 编辑单段转录文本 */
+export async function updateTranscriptSegment(
+  workspaceId: string,
+  itemId: string,
+  segmentIdx: number,
+  editedText: string,
+): Promise<{ segment_idx: number; edited_text: string | null }> {
+  const res = await http.patch(
+    `${BASE}/${workspaceId}/items/${itemId}/transcript/segments/${segmentIdx}`,
+    { edited_text: editedText },
+  )
+  return res.data
 }
 
 // ── Phase 2C.2: 文本结果页 + 提示词版本栈 ──────────────────
@@ -611,9 +626,10 @@ export async function downloadSubtitles(
   workspaceId: string,
   itemId: string,
   format: 'srt' | 'vtt' | 'ass' = 'srt',
+  withSpeaker = false,
 ): Promise<void> {
   const res = await http.get(`${BASE}/${workspaceId}/items/${itemId}/subtitles`, {
-    params: { format },
+    params: { format, with_speaker: withSpeaker },
     responseType: 'blob',
   })
   const disposition = res.headers['content-disposition'] as string | undefined

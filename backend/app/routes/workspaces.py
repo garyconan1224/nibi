@@ -2332,6 +2332,36 @@ def update_speaker_map(
     return {"speaker_map": req.speaker_map}
 
 
+class TranscriptSegmentEditRequest(BaseModel):
+    """转录段编辑请求体。"""
+
+    edited_text: str = Field(..., description="编辑后的文本，空字符串表示恢复原文")
+
+
+@router.patch("/{workspace_id}/items/{item_id}/transcript/segments/{segment_idx}")
+def update_transcript_segment(
+    workspace_id: str,
+    item_id: str,
+    segment_idx: int,
+    req: TranscriptSegmentEditRequest,
+) -> Dict[str, Any]:
+    """编辑单段转录文本（A-1：字幕在线编辑）。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+    results = dict(item.results or {})
+    segs = list(results.get("transcript_segments") or [])
+    if segment_idx < 0 or segment_idx >= len(segs):
+        raise HTTPException(status_code=400, detail=f"segment_idx {segment_idx} out of range (0-{len(segs) - 1})")
+    seg = dict(segs[segment_idx])
+    seg["edited_text"] = req.edited_text if req.edited_text.strip() else None
+    segs[segment_idx] = seg
+    results["transcript_segments"] = segs
+    _store.update_item(workspace_id, item_id, results=results)
+    return {"segment_idx": segment_idx, "edited_text": seg["edited_text"]}
+
+
 # ── 总结 CRUD ──────────────────────────────────────────────────
 
 
@@ -2495,3 +2525,55 @@ def save_inline_frames(
     frames = [InlineFrame.from_dict(f) for f in req.inline_frames]
     saved = _store.save_inline_frames(workspace_id, item_id, frames)
     return {"status": "saved", "count": len(saved)}
+
+
+# ── 音乐教学拆解（A-4） ──────────────────────────────────────────
+
+class MusicTeachingRequest(BaseModel):
+    bpm: float = Field(..., description="BPM")
+    key: str = Field(..., description="调性")
+    music_prompt: str = Field("", description="音乐提示词")
+
+
+@router.post("/{workspace_id}/items/{item_id}/music-teaching/{seg_idx}")
+async def music_teaching(
+    workspace_id: str,
+    item_id: str,
+    seg_idx: int,
+    req: MusicTeachingRequest,
+) -> Dict[str, str]:
+    """为指定音乐段生成「为什么动人」的教学解释。"""
+    from fastapi.concurrency import run_in_threadpool
+    from backend.app.services.music_teaching_prompts import (
+        MusicTeachingRequest as TeachingReq,
+        generate_teaching_explanation,
+    )
+
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+
+    # 验证 seg_idx 有效性
+    results = item.results or {}
+    music_segments = results.get("music_segments") or []
+    if seg_idx < 0 or seg_idx >= len(music_segments):
+        raise HTTPException(status_code=400, detail=f"无效的段索引: {seg_idx}")
+
+    teaching_req = TeachingReq(
+        bpm=req.bpm,
+        key=req.key,
+        music_prompt=req.music_prompt,
+    )
+
+    # 复用 chat_runner
+    from backend.app.services import chat_runner
+
+    try:
+        explanation = await run_in_threadpool(
+            lambda: generate_teaching_explanation(teaching_req, chat_runner)
+        )
+    except Exception as err:
+        raise HTTPException(status_code=502, detail=f"LLM 调用失败: {err}") from err
+
+    return {"explanation": explanation}

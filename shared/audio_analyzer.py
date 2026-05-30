@@ -305,7 +305,7 @@ def export_srt(
             end = float(seg.get("end") or start)
         except (TypeError, ValueError):
             continue
-        text = str(seg.get("text") or "").strip()
+        text = str(seg.get("edited_text") or seg.get("text") or "").strip()
         if not text:
             continue
         speaker = None
@@ -327,7 +327,7 @@ def export_txt(
 ) -> str:
     lines: List[str] = []
     for seg in segments:
-        text = str(seg.get("text") or "").strip()
+        text = str(seg.get("edited_text") or seg.get("text") or "").strip()
         if not text:
             continue
         if with_speaker and seg.get("speaker"):
@@ -349,7 +349,7 @@ def export_vtt(
             end = float(seg.get("end") or start)
         except (TypeError, ValueError):
             continue
-        text = str(seg.get("text") or "").strip()
+        text = str(seg.get("edited_text") or seg.get("text") or "").strip()
         if not text:
             continue
         speaker = None
@@ -378,7 +378,7 @@ def export_ass(
             end = float(seg.get("end") or start)
         except (TypeError, ValueError):
             continue
-        text = str(seg.get("text") or "").strip()
+        text = str(seg.get("edited_text") or seg.get("text") or "").strip()
         if not text:
             continue
         speaker = None

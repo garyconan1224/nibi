@@ -12,16 +12,17 @@ import { ArrowLeft, Download, FileText, Mic, Music, Pause, Pencil, Play, Wand2 }
 import { toast } from 'sonner'
 import {
   type AudioResult,
-  type MusicSegmentData,
   downloadSubtitles,
   getAudioItemResult,
   updateSpeakerMap,
+  updateTranscriptSegment,
 } from '@/services/workspaces'
 
 import './tokens.css'
 import './audio-result.css'
 import { ItemTagsPanel } from '@/components/workspace/ItemTagsPanel'
 import { SummariesTab } from '@/components/SummariesTab'
+import { MusicTab } from '@/components/result/audio/MusicTab'
 
 /** deterministic 波形高度（从 seed 生成伪随机序列） */
 function generateWaveform(length: number, height: number): number[] {
@@ -67,41 +68,6 @@ function Waveform({ progress, height = 48, bars = 100, onClick }: WaveformProps)
   )
 }
 
-function formatList(value: unknown): string {
-  return Array.isArray(value) ? value.map((v) => String(v)).filter(Boolean).join(', ') : ''
-}
-
-function formatMusicAnalysis(result: AudioResult): string {
-  if (typeof result.music_analysis === 'string' && result.music_analysis.trim()) {
-    return result.music_analysis
-  }
-  if (typeof result.music === 'string') return result.music
-  if (!result.music || typeof result.music !== 'object') return ''
-
-  const music = result.music
-  const lines: string[] = ['### 音乐分析']
-  const fields: Array<[string, unknown]> = [
-    ['时长', music.duration],
-    ['BPM', music.bpm],
-    ['调性', music.key],
-    ['能量均值', music.energy_mean],
-    ['频谱中心', music.spectral_centroid_mean],
-  ]
-  for (const [label, value] of fields) {
-    if (value !== undefined && value !== null && value !== '') {
-      lines.push(`- ${label}: ${String(value)}`)
-    }
-  }
-  if (typeof music.music_prompt === 'string' && music.music_prompt.trim()) {
-    lines.push('', '### 生成提示词', music.music_prompt)
-  }
-  const references = formatList(music.similar_references)
-  if (references) lines.push('', `相似参考: ${references}`)
-  const scenarios = formatList(music.scenarios)
-  if (scenarios) lines.push(`适用场景: ${scenarios}`)
-  return lines.join('\n')
-}
-
 const SPEAKER_COLORS = [
   'hsl(210, 65%, 55%)',
   'hsl(340, 60%, 55%)',
@@ -134,14 +100,17 @@ export default function AudioResultPage() {
   const [playing, setPlaying] = useState(false)
   const [activeTab, setActiveTab] = useState<'transcript' | 'music' | 'summary' | 'vocal' | 'music_transcribe' | 'prompts'>('transcript')
   const [exportOpen, setExportOpen] = useState(false)
+  const [exportWithSpeaker, setExportWithSpeaker] = useState(false)
   const [speakerMap, setSpeakerMap] = useState<Record<string, string>>({})
   const [editingSpeaker, setEditingSpeaker] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
+  const [editingSegmentIdx, setEditingSegmentIdx] = useState<number | null>(null)
+  const [segmentEditText, setSegmentEditText] = useState('')
 
   const handleExportSubtitles = async (format: 'srt' | 'vtt' | 'ass') => {
     setExportOpen(false)
     try {
-      await downloadSubtitles(workspaceId, itemId, format)
+      await downloadSubtitles(workspaceId, itemId, format, exportWithSpeaker)
     } catch (err: unknown) {
       toast.error('字幕导出失败：' + (err instanceof Error ? err.message : '未知错误'))
     }
@@ -189,6 +158,7 @@ export default function AudioResultPage() {
         t_sec: seg.start ?? seg.t_sec ?? 0,
         t_str: formatSec(seg.start ?? seg.t_sec ?? 0),
         text: seg.text || '',
+        edited_text: seg.edited_text ?? undefined,
         start: seg.start,
         end: seg.end,
         speaker: seg.speaker,
@@ -218,10 +188,6 @@ export default function AudioResultPage() {
 
   const totalSec = result?.tracks_meta?.total_sec ?? result?.audio?.duration_sec ?? 0
   const progress = totalSec > 0 ? Math.min(1, currentSec / totalSec) : 0
-  const musicAnalysisText = useMemo(
-    () => (result ? formatMusicAnalysis(result) : ''),
-    [result],
-  )
 
   const handleTimeUpdate = useCallback(() => {
     if (audioRef.current) setCurrentSec(audioRef.current.currentTime)
@@ -263,6 +229,55 @@ export default function AudioResultPage() {
       toast.error('保存失败，请重试')
     }
   }, [speakerMap, workspaceId, itemId])
+
+  const handleSegmentEditSave = useCallback(async (idx: number) => {
+    const trimmed = segmentEditText.trim()
+    const original = transcriptSegments[idx]?.text || ''
+    if (trimmed === original || (trimmed === '' && !transcriptSegments[idx]?.edited_text)) {
+      setEditingSegmentIdx(null)
+      return
+    }
+    try {
+      await updateTranscriptSegment(workspaceId, itemId, idx, trimmed)
+      // Update local state
+      const segs = [...transcriptSegments]
+      segs[idx] = { ...segs[idx], edited_text: trimmed || undefined }
+      setFetchState((prev) => {
+        if (prev.kind !== 'ready') return prev
+        const results = { ...prev.data }
+        const ts = [...(results.transcript_segments || [])]
+        ts[idx] = { ...ts[idx], edited_text: trimmed || null }
+        results.transcript_segments = ts
+        return { kind: 'ready', data: results }
+      })
+      toast.success('字幕已保存')
+    } catch {
+      toast.error('保存失败，请重试')
+    }
+    setEditingSegmentIdx(null)
+  }, [segmentEditText, transcriptSegments, workspaceId, itemId])
+
+  const handleSegmentEditCancel = useCallback(() => {
+    setEditingSegmentIdx(null)
+    setSegmentEditText('')
+  }, [])
+
+  const handleSegmentRestore = useCallback(async (idx: number) => {
+    try {
+      await updateTranscriptSegment(workspaceId, itemId, idx, '')
+      setFetchState((prev) => {
+        if (prev.kind !== 'ready') return prev
+        const results = { ...prev.data }
+        const ts = [...(results.transcript_segments || [])]
+        ts[idx] = { ...ts[idx], edited_text: null }
+        results.transcript_segments = ts
+        return { kind: 'ready', data: results }
+      })
+      toast.success('已恢复原文')
+    } catch {
+      toast.error('恢复失败，请重试')
+    }
+  }, [workspaceId, itemId])
 
   const activeLineIdx = useMemo(() => {
     if (!transcriptSegments.length) return -1
@@ -326,7 +341,19 @@ export default function AudioResultPage() {
             <Download size={13} /> 字幕
           </button>
           {exportOpen && (
-            <div className="vd-dropdown-menu" style={{ position: 'absolute', right: 0, top: 36, zIndex: 50, background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 8, padding: '4px 0', minWidth: 140, boxShadow: '0 4px 16px rgba(0,0,0,.12)' }}>
+            <div className="vd-dropdown-menu" style={{ position: 'absolute', right: 0, top: 36, zIndex: 50, background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 8, padding: '4px 0', minWidth: 160, boxShadow: '0 4px 16px rgba(0,0,0,.12)' }}>
+              {/* 带说话人标注开关 */}
+              {hasSpeakers && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer', borderBottom: '1px solid var(--line)' }}>
+                  <input
+                    type="checkbox"
+                    checked={exportWithSpeaker}
+                    onChange={(e) => setExportWithSpeaker(e.target.checked)}
+                    style={{ accentColor: 'var(--accent)' }}
+                  />
+                  带说话人标注
+                </label>
+              )}
               {(['srt', 'vtt', 'ass'] as const).map((fmt) => (
                 <button
                   key={fmt}
@@ -417,36 +444,113 @@ export default function AudioResultPage() {
       <div className="ad-content" data-tab={activeTab}>
         {activeTab === 'transcript' && (
           <>
+            {/* Speaker chip bar — A-2: click chip to rename */}
+            {hasSpeakers && (
+              <div className="ad-speaker-chips">
+                {Array.from(speakerStats.entries()).map(([spkId]) => {
+                  const displayName = speakerDisplayName(spkId, speakerMap)
+                  const isEditing = editingSpeaker === spkId
+                  return isEditing ? (
+                    <input
+                      key={spkId}
+                      className="ad-speaker-chip-input"
+                      autoFocus
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSpeakerRename(spkId, editValue)
+                        if (e.key === 'Escape') setEditingSpeaker(null)
+                      }}
+                      onBlur={() => handleSpeakerRename(spkId, editValue)}
+                      placeholder={displayName}
+                    />
+                  ) : (
+                    <button
+                      key={spkId}
+                      className="ad-speaker-chip"
+                      style={{ '--chip-color': speakerColor(spkId) } as React.CSSProperties}
+                      onClick={() => { setEditingSpeaker(spkId); setEditValue(speakerMap[spkId] || '') }}
+                      title="点击重命名"
+                    >
+                      <span className="ad-speaker-chip-dot" />
+                      {displayName}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
             <div className="ad-transcript-scroll">
               {transcriptSegments.length === 0 ? (
-                <span className="mono" style={{ fontSize: 12, color: 'var(--ink-4)' }}>暂无转写数据</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, color: 'var(--ink-4)' }}>
+                  <FileText size={32} style={{ opacity: 0.3 }} />
+                  <span style={{ fontSize: 13 }}>等待真实数据</span>
+                  <span style={{ fontSize: 11 }}>转录结果将在分析完成后显示</span>
+                </div>
               ) : (
-                transcriptSegments.map((line, idx) => (
-                  <button
-                    key={idx}
-                    className="ad-tr-row"
-                    data-active={idx === activeLineIdx}
-                    onClick={() => handleSeek(line.t_sec)}
-                  >
-                    <span className="ad-tr-time">{line.t_str}</span>
+                transcriptSegments.map((line, idx) => {
+                  const displayText = line.edited_text ?? line.text
+                  const isEdited = line.edited_text != null
+                  const isEditing = editingSegmentIdx === idx
+                  return (
                     <div
-                      className="ad-tr-avatar"
-                      style={{ background: line.speaker ? speakerColor(line.speaker) : 'var(--ink-3)' }}
+                      key={idx}
+                      className="ad-tr-row"
+                      data-active={idx === activeLineIdx}
+                      data-edited={isEdited || undefined}
+                      onClick={() => !isEditing && handleSeek(line.t_sec)}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation()
+                        setEditingSegmentIdx(idx)
+                        setSegmentEditText(displayText)
+                      }}
                     >
-                      {line.speaker
-                        ? speakerDisplayName(line.speaker, speakerMap).charAt(0)
-                        : String(idx + 1).slice(-1)}
+                      <span className="ad-tr-time">{line.t_str}</span>
+                      <div
+                        className="ad-tr-avatar"
+                        style={{ background: line.speaker ? speakerColor(line.speaker) : 'var(--ink-3)' }}
+                      >
+                        {line.speaker
+                          ? speakerDisplayName(line.speaker, speakerMap).charAt(0)
+                          : String(idx + 1).slice(-1)}
+                      </div>
+                      <span className="ad-tr-text">
+                        {line.speaker && hasSpeakers && (
+                          <span className="ad-speaker-label" style={{ color: speakerColor(line.speaker), fontWeight: 600, fontSize: 11, marginRight: 6 }}>
+                            {speakerDisplayName(line.speaker, speakerMap)}
+                          </span>
+                        )}
+                        {isEditing ? (
+                          <input
+                            className="ad-tr-edit-input"
+                            autoFocus
+                            value={segmentEditText}
+                            onChange={(e) => setSegmentEditText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSegmentEditSave(idx)
+                              if (e.key === 'Escape') handleSegmentEditCancel()
+                            }}
+                            onBlur={() => handleSegmentEditSave(idx)}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <>
+                            {displayText}
+                            {isEdited && (
+                              <button
+                                className="btn-ghost ad-tr-restore"
+                                style={{ padding: '1px 4px', marginLeft: 6, fontSize: 10, opacity: 0.6 }}
+                                onClick={(e) => { e.stopPropagation(); handleSegmentRestore(idx) }}
+                                title="恢复原文"
+                              >
+                                恢复
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </span>
                     </div>
-                    <span className="ad-tr-text">
-                      {line.speaker && hasSpeakers && (
-                        <span className="ad-speaker-label" style={{ color: speakerColor(line.speaker), fontWeight: 600, fontSize: 11, marginRight: 6 }}>
-                          {speakerDisplayName(line.speaker, speakerMap)}
-                        </span>
-                      )}
-                      {line.text}
-                    </span>
-                  </button>
-                ))
+                  )
+                })
               )}
             </div>
 
@@ -516,6 +620,21 @@ export default function AudioResultPage() {
                   提示：勾选「说话人音色区分」后可自动识别说话人
                 </div>
               )}
+
+              {/* 音频元信息卡（A-5） */}
+              <hr style={{ border: 'none', borderTop: '1px solid var(--line)', margin: '16px 0' }} />
+              <div className="eyebrow" style={{ marginBottom: 10 }}>音频信息</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 2 }}>
+                <div>时长：<strong style={{ color: 'var(--ink-2)' }}>{result.audio?.duration_str || formatSec(totalSec)}</strong></div>
+                <div>来源：<span style={{ color: 'var(--ink-2)' }}>{result.audio?.url ? '外部链接' : '本地文件'}</span></div>
+                {result.audio?.filename && <div>文件名：<span style={{ color: 'var(--ink-2)' }}>{result.audio.filename}</span></div>}
+                {result.audio?.url && (
+                  <div style={{ wordBreak: 'break-all' }}>
+                    URL：<a href={result.audio.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)', fontSize: 11 }}>{result.audio.url.slice(0, 60)}{result.audio.url.length > 60 ? '…' : ''}</a>
+                  </div>
+                )}
+              </div>
+
               {result.summary && (
                 <div style={{ marginTop: 20 }}>
                   <div className="eyebrow" style={{ marginBottom: 8 }}>摘要预览</div>
@@ -554,74 +673,12 @@ export default function AudioResultPage() {
 
         {activeTab === 'music' && (
           <div className="ad-summary-scroll">
-            {result.music_segments && result.music_segments.length > 0 ? (
-              <>
-                <div className="eyebrow" style={{ marginBottom: 12 }}>
-                  多段音乐分析（{result.music_segments.length} 段）
-                </div>
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                  gap: 12,
-                }}>
-                  {result.music_segments.map((seg: MusicSegmentData, i: number) => (
-                    <div key={i} className="music-segment-card" style={{
-                      border: '1px solid var(--line)',
-                      borderRadius: 10,
-                      padding: 14,
-                      background: 'var(--bg-elev)',
-                    }}>
-                      <div className="mono" style={{ fontSize: 11, color: 'var(--ink-4)', marginBottom: 8 }}>
-                        片段 {i + 1} · {formatSec(seg.start)} – {formatSec(seg.end)}
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12 }}>
-                        <div style={{ color: 'var(--ink-4)' }}>风格</div><div>{seg.genre || '—'}</div>
-                        <div style={{ color: 'var(--ink-4)' }}>情绪</div><div>{seg.mood || '—'}</div>
-                        <div style={{ color: 'var(--ink-4)' }}>BPM</div><div>{seg.bpm || '—'}</div>
-                        <div style={{ color: 'var(--ink-4)' }}>乐器</div><div>{(seg.instruments || []).join('、') || '—'}</div>
-                        <div style={{ color: 'var(--ink-4)' }}>调性</div><div>{seg.key || '—'}</div>
-                        <div style={{ color: 'var(--ink-4)' }}>氛围</div><div>{seg.atmosphere || '—'}</div>
-                      </div>
-                      {seg.music_prompt && (
-                        <details style={{ marginTop: 10, fontSize: 12 }}>
-                          <summary style={{ cursor: 'pointer', color: 'var(--ink-3)' }}>生成提示词</summary>
-                          <p style={{ marginTop: 4, lineHeight: 1.6 }}>{seg.music_prompt}</p>
-                        </details>
-                      )}
-                      {seg.similar_references?.length > 0 && (
-                        <div style={{ marginTop: 8, fontSize: 11, color: 'var(--ink-4)' }}>
-                          参考: {seg.similar_references.join(' / ')}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                {/* 整体分析折叠区 */}
-                {musicAnalysisText && (
-                  <details style={{ marginTop: 16 }}>
-                    <summary style={{ cursor: 'pointer', fontSize: 13, color: 'var(--ink-3)' }}>整体分析</summary>
-                    <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.7, color: 'var(--ink-2)' }}>
-                      <ReactMarkdown remarkPlugins={remarkPlugins}>
-                        {musicAnalysisText}
-                      </ReactMarkdown>
-                    </div>
-                  </details>
-                )}
-              </>
-            ) : musicAnalysisText ? (
-              <>
-                <div className="eyebrow" style={{ marginBottom: 8 }}>音乐分析</div>
-                <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--ink-2)' }}>
-                  <ReactMarkdown remarkPlugins={remarkPlugins}>
-                    {musicAnalysisText}
-                  </ReactMarkdown>
-                </div>
-              </>
-            ) : (
-              <span className="mono" style={{ fontSize: 12, color: 'var(--ink-4)' }}>
-                未勾选「音乐分析」或暂无数据
-              </span>
-            )}
+            <MusicTab
+              segments={result.music_segments || []}
+              onSeek={handleSeek}
+              workspaceId={workspaceId}
+              itemId={itemId}
+            />
           </div>
         )}
 

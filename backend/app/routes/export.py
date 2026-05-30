@@ -123,7 +123,7 @@ def _build_transcript_txt(transcript: Any) -> str:
     lines: list[str] = []
     for entry in transcript:
         t_sec = entry.get("t_sec", 0)
-        text = entry.get("text", "")
+        text = entry.get("edited_text") or entry.get("text") or ""
         m, s = divmod(int(t_sec), 60)
         lines.append(f"[{m:02d}:{s:02d}] {text}")
     return "\n".join(lines)
@@ -134,7 +134,7 @@ def _build_srt(transcript: List[Dict[str, Any]]) -> str:
     lines: list[str] = []
     for i, entry in enumerate(transcript, start=1):
         t_sec = entry.get("t_sec", 0)
-        text = entry.get("text", "")
+        text = entry.get("edited_text") or entry.get("text") or ""
         # SRT 时间格式: HH:MM:SS,mmm --> HH:MM:SS,mmm
         h = t_sec // 3600
         m = (t_sec % 3600) // 60
@@ -428,10 +428,12 @@ def _normalize_segments(raw: Any) -> list[dict[str, Any]]:
         if not isinstance(seg, dict):
             continue
         start = float(seg.get("start") if "start" in seg else seg.get("t_sec", 0))
-        text = str(seg.get("text") or "").strip()
+        text = str(seg.get("edited_text") or seg.get("text") or "").strip()
         if not text:
             continue
         entry: dict[str, Any] = {"start": start, "text": text}
+        if seg.get("edited_text"):
+            entry["edited_text"] = seg["edited_text"]
         # whisper 格式自带 end，先用上
         if "end" in seg:
             entry["end"] = float(seg["end"])
