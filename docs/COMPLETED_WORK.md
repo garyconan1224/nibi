@@ -1503,3 +1503,25 @@ T2.2 核实发现：link_preview.py 只返回 og 元数据（title/description/i
 
 ### Commit
 - pending feat(rp1-b): B-1 学习笔记页接通视频源 + ln.md 路径 + 设计稿样式对齐
+
+---
+
+## RP1-B B-2 学习笔记页字幕轨跟随 + 点击 seek（2026-05-30）
+
+**目标**：移植视频复刻页的字幕轨到学习笔记页，实现高亮跟随 + 自动滚动 + 点击 seek
+
+### 改动
+- **frontend/src/pages/results/LearningNotesPage/LNVideoPanel.tsx**：改用 forwardRef + useImperativeHandle，对外暴露 seekTo(sec) 方法（带 0~duration 的 clamp）
+- **frontend/src/pages/results/LearningNotesPage/LNTranscriptPanel.tsx**（新建）：字幕轨组件，实现 activeTranscriptIdx 算法（最后一个 t_sec ≤ 当前秒）、字幕行渲染、点击 seek、自动滚动到中央（scrollIntoView block:'center'）
+- **frontend/src/pages/results/LearningNotesPage/index.tsx**：新增 getItemResult 请求取 transcript（失败兜底空数组）、新建 videoPanelRef、左栏渲染 LNTranscriptPanel
+- **frontend/src/pages/results/LearningNotesPage/learning-notes.css**：新增 .ln-transcript-panel / .ln-tr-row / .ln-tr-row[data-active] / .ln-tr-time / .ln-tr-text 样式，全部用 nibi token
+
+### 验证
+- `pnpm build`：EXIT=0
+- `npx tsc --noEmit`：EXIT=0
+- Playwright 截图 4 张：rp1b-b2-{light,dark}-{playing,clicked}.png
+- 字幕轨已显示（00:10, 00:30, 01:00 三行）
+- 点击字幕行事件已触发（视频源为外部 bilibili 链接无法直接播放验证 seek）
+
+### Commit
+- pending feat(rp1-b): B-2 学习笔记页字幕轨跟随 + 点击 seek

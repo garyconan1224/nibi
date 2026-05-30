@@ -1,22 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Star } from 'lucide-react'
-import { getWorkspace, getLnMarkdown } from '@/services/workspaces'
+import { getWorkspace, getLnMarkdown, getItemResult } from '@/services/workspaces'
+import type { VideoResultTranscriptLine } from '@/services/workspaces'
 import type { WorkspaceRecord, WorkspaceItem } from '@/types/workspace'
-import LNVideoPanel from './LNVideoPanel'
+import LNVideoPanel, { type LNVideoPanelHandle } from './LNVideoPanel'
 import LNNotesPanel from './LNNotesPanel'
+import LNTranscriptPanel from './LNTranscriptPanel'
 import './learning-notes.css'
 
 type PageState =
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
-  | { kind: 'ready'; workspace: WorkspaceRecord; videoItem: WorkspaceItem; markdown: string }
+  | { kind: 'ready'; workspace: WorkspaceRecord; videoItem: WorkspaceItem; markdown: string; transcript: VideoResultTranscriptLine[] }
 
 export default function LearningNotesPage() {
   const { workspaceId = '' } = useParams<{ workspaceId: string }>()
   const navigate = useNavigate()
   const [pageState, setPageState] = useState<PageState>({ kind: 'loading' })
   const [currentTime, setCurrentTime] = useState(0)
+  const videoPanelRef = useRef<LNVideoPanelHandle>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -33,7 +36,18 @@ export default function LearningNotesPage() {
           setPageState({ kind: 'error', message: '该工作空间没有视频素材' })
           return
         }
-        setPageState({ kind: 'ready', workspace: ws, videoItem, markdown: md })
+
+        // 取 transcript（第三个请求，失败时兜底空数组）
+        let transcript: VideoResultTranscriptLine[] = []
+        try {
+          const result = await getItemResult(workspaceId, videoItem.item_id)
+          transcript = result.transcript || []
+        } catch {
+          transcript = []
+        }
+        if (cancelled) return
+
+        setPageState({ kind: 'ready', workspace: ws, videoItem, markdown: md, transcript })
       } catch (err: unknown) {
         if (cancelled) return
         const message = err instanceof Error ? err.message : '加载失败'
@@ -87,11 +101,19 @@ export default function LearningNotesPage() {
       {/* Main body: dual-column */}
       {pageState.kind === 'ready' && (
         <div className="ln-body">
-          <LNVideoPanel
-            src={videoSrc}
-            title={pageState.videoItem.name}
-            onTimeUpdate={handleTimeUpdate}
-          />
+          <div className="ln-left-col">
+            <LNVideoPanel
+              ref={videoPanelRef}
+              src={videoSrc}
+              title={pageState.videoItem.name}
+              onTimeUpdate={handleTimeUpdate}
+            />
+            <LNTranscriptPanel
+              transcript={pageState.transcript}
+              currentTime={currentTime}
+              onSeek={(sec) => videoPanelRef.current?.seekTo(sec)}
+            />
+          </div>
           <LNNotesPanel
             markdown={pageState.markdown}
             currentTime={currentTime}

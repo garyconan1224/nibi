@@ -322,3 +322,66 @@
   font-weight: 600;
   color: var(--ink);
 }
+
+/* ── 字幕轨 ── */
+
+.vm-ln-scope .ln-left-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+}
+
+.vm-ln-scope .ln-transcript-panel {
+  background: var(--bg-elev);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  border-top: 1px solid var(--line);
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.vm-ln-scope .ln-tr-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--ink-4);
+  font-size: 13px;
+}
+
+.vm-ln-scope .ln-tr-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 10px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s;
+}
+
+.vm-ln-scope .ln-tr-row:hover {
+  background: var(--line);
+}
+
+.vm-ln-scope .ln-tr-row[data-active="true"] {
+  background: var(--bg-sunken);
+  border-left: 2px solid var(--accent-pink);
+}
+
+.vm-ln-scope .ln-tr-time {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-4);
+  min-width: 48px;
+}
+
+.vm-ln-scope .ln-tr-text {
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
+.vm-ln-scope .ln-tr-row[data-active="true"] .ln-tr-text {
+  color: var(--ink);
+  font-weight: 500;
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react'
 
 interface LNVideoPanelProps {
   src: string
@@ -6,8 +6,22 @@ interface LNVideoPanelProps {
   onTimeUpdate?: (currentTime: number) => void
 }
 
-export default function LNVideoPanel({ src, title, onTimeUpdate }: LNVideoPanelProps) {
-  const videoRef = useRef<HTMLVideoElement>(null)
+export interface LNVideoPanelHandle {
+  seekTo: (sec: number) => void
+}
+
+const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
+  ({ src, title, onTimeUpdate }, ref) => {
+    const videoRef = useRef<HTMLVideoElement>(null)
+
+    useImperativeHandle(ref, () => ({
+      seekTo(sec: number) {
+        const v = videoRef.current
+        if (!v) return
+        const clamped = Math.max(0, Math.min(v.duration || 0, sec))
+        v.currentTime = clamped
+      },
+    }))
 
   // 键盘快捷键：Space 暂停/播放，← → 快退/快进 5s
   useEffect(() => {
@@ -68,4 +82,6 @@ export default function LNVideoPanel({ src, title, onTimeUpdate }: LNVideoPanelP
       </div>
     </div>
   )
-}
+})
+
+export default LNVideoPanel
