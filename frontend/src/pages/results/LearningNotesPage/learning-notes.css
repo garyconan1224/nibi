@@ -176,6 +176,186 @@
   color: var(--ink-4);
 }
 
+/* ── Toolbar (HTML / MD 源码 segmented control) ─ */
+.vm-ln-scope .ln-toolbar {
+  display: flex;
+  gap: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-elev);
+  flex-shrink: 0;
+}
+
+.vm-ln-scope .ln-toolbar button {
+  flex: 1;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-family: var(--mono);
+  font-weight: 500;
+  color: var(--ink-3);
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.vm-ln-scope .ln-toolbar button:first-child {
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  border-right: none;
+}
+
+.vm-ln-scope .ln-toolbar button:last-child {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.vm-ln-scope .ln-toolbar button[data-active="true"] {
+  background: var(--accent-pink);
+  color: var(--bg);
+  border-color: var(--accent-pink);
+}
+
+/* ── HTML View (contentEditable) ─────────────── */
+.vm-ln-scope .ln-html-view {
+  padding: 20px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--ink-2);
+  outline: none;
+  min-height: 200px;
+}
+
+.vm-ln-scope .ln-html-view h1,
+.vm-ln-scope .ln-html-view h2,
+.vm-ln-scope .ln-html-view h3 {
+  scroll-margin-top: 16px;
+  color: var(--ink);
+}
+
+.vm-ln-scope .ln-html-view h2 {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 24px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-3);
+}
+
+.vm-ln-scope .ln-html-view h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 20px 0 8px;
+}
+
+.vm-ln-scope .ln-html-view p {
+  margin: 0 0 12px;
+}
+
+.vm-ln-scope .ln-html-view ul,
+.vm-ln-scope .ln-html-view ol {
+  margin: 0 0 12px;
+  padding-left: 24px;
+}
+
+.vm-ln-scope .ln-html-view li {
+  margin: 4px 0;
+}
+
+.vm-ln-scope .ln-html-view blockquote {
+  border-left: 3px solid var(--accent-2);
+  padding: 4px 12px;
+  margin: 12px 0;
+  color: var(--ink-3);
+  background: var(--bg-sunken);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.vm-ln-scope .ln-html-view code {
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-family: var(--mono);
+  font-size: 13px;
+  background: var(--bg-sunken);
+  color: var(--ink-2);
+}
+
+.vm-ln-scope .ln-html-view pre {
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  background: var(--bg-sunken);
+  margin: 12px 0;
+}
+
+.vm-ln-scope .ln-html-view pre code {
+  padding: 0;
+  background: none;
+}
+
+.vm-ln-scope .ln-html-view img {
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+  margin: 8px 0;
+}
+
+.vm-ln-scope .ln-html-view table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 13px;
+}
+
+.vm-ln-scope .ln-html-view th,
+.vm-ln-scope .ln-html-view td {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  text-align: left;
+}
+
+.vm-ln-scope .ln-html-view th {
+  background: var(--bg-sunken);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* ── MD View (CodeMirror) ────────────────────── */
+.vm-ln-scope .ln-md-view {
+  flex: 1;
+  min-height: 300px;
+  font-size: 14px;
+}
+
+.vm-ln-scope .ln-md-view .cm-editor {
+  height: 100%;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.vm-ln-scope .ln-md-view .cm-editor .cm-scroller {
+  font-family: var(--mono);
+}
+
+.vm-ln-scope .ln-md-view .cm-editor.cm-focused {
+  outline: none;
+}
+
+.vm-ln-scope .ln-md-view .cm-editor .cm-gutters {
+  background: var(--bg-sunken);
+  border-right: 1px solid var(--line);
+  color: var(--ink-4);
+}
+
+.vm-ln-scope .ln-md-view .cm-editor .cm-activeLineGutter {
+  background: var(--line);
+}
+
+.vm-ln-scope .ln-md-view .cm-editor .cm-activeLine {
+  background: var(--bg-sunken);
+}
+
 /* ── TOC ─────────────────────────────────────── */
 .vm-ln-scope .ln-toc {
   padding: 12px 16px;

@@ -1525,3 +1525,28 @@ T2.2 核实发现：link_preview.py 只返回 og 元数据（title/description/i
 
 ### Commit
 - `73733b5` feat(rp1-b): B-2 学习笔记页字幕轨跟随 + 点击 seek
+
+## RP1-B B-3 学习笔记页 HTML/MD 视图切换 + 双向同步（2026-05-30）
+
+**目标**：右栏笔记面板从只读 markdown 升级为 HTML 视图 / MD 源码视图可切换 + 双向同步
+
+### 改动
+- **frontend/src/pages/results/LearningNotesPage/HtmlView.tsx**（新建）：react-markdown 渲染 + contentEditable 包装 + DOMPurify 净化粘贴 + blur 时 turndown 转回 markdown；含 TOC h2/h3 提取（从旧 LNNotesPanel 迁移，B-6 复用）
+- **frontend/src/pages/results/LearningNotesPage/MdView.tsx**（新建）：CodeMirror 6 核心 API（EditorState/EditorView + lang-markdown + history），内容变更即时回写 markdown
+- **frontend/src/pages/results/LearningNotesPage/LNNotesPanel.tsx**：整个重写为 toolbar（HTML / MD 源码 segmented control）+ 根据 view 分发 HtmlView 或 MdView
+- **frontend/src/pages/results/LearningNotesPage/index.tsx**：增量改 — markdown 提为独立 useState + view state（localStorage 'ln-view'）+ switchView（切走前 blur flush）+ 换 LNNotesPanel props；左栏 LNVideoPanel + LNTranscriptPanel 原样保留
+- **frontend/src/pages/results/LearningNotesPage/learning-notes.css**：新增 .ln-toolbar / .ln-html-view / .ln-md-view 样式，全部 nibi token，light + dark 可读
+
+### 依赖
+- codemirror @codemirror/lang-markdown @codemirror/state @codemirror/view @codemirror/commands
+- dompurify @types/dompurify（deprecated stub，dompurify 自带类型）
+- turndown @types/turndown turndown-plugin-gfm
+- remark-gfm 3→4（升级，修复与 react-markdown@10 的兼容性）
+
+### 验证
+- `pnpm build`：EXIT=0
+- `npx tsc --noEmit`：EXIT=0
+- Playwright 截图 4 张：rp1b-b3-{light,dark}-{html,md}.png
+- HTML 视图：TOC、标题、加粗、斜体、行内代码、代码块、checkbox、表格、blockquote、链接全部渲染正确
+- MD 视图：CodeMirror 6 行号 + markdown 源码渲染正确
+- 视图切换内容不丢；localStorage 记住偏好

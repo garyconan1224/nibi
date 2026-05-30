@@ -21,6 +21,22 @@ export default function LearningNotesPage() {
   const [currentTime, setCurrentTime] = useState(0)
   const videoPanelRef = useRef<LNVideoPanelHandle>(null)
 
+  // B-3: 可编辑的 markdown state
+  const [markdown, setMarkdown] = useState('')
+
+  // B-3: 视图偏好（localStorage 持久化）
+  const [view, setView] = useState<'html' | 'md'>(() => {
+    const saved = localStorage.getItem('ln-view')
+    return saved === 'md' ? 'md' : 'html'
+  })
+
+  const switchView = useCallback((v: 'html' | 'md') => {
+    // 切走前 blur 当前活动元素，flush HTML 视图的编辑
+    ;(document.activeElement as HTMLElement | null)?.blur()
+    setView(v)
+    localStorage.setItem('ln-view', v)
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     async function load() {
@@ -48,6 +64,7 @@ export default function LearningNotesPage() {
         if (cancelled) return
 
         setPageState({ kind: 'ready', workspace: ws, videoItem, markdown: md, transcript })
+        setMarkdown(md)
       } catch (err: unknown) {
         if (cancelled) return
         const message = err instanceof Error ? err.message : '加载失败'
@@ -115,8 +132,10 @@ export default function LearningNotesPage() {
             />
           </div>
           <LNNotesPanel
-            markdown={pageState.markdown}
-            currentTime={currentTime}
+            markdown={markdown}
+            onMarkdownChange={setMarkdown}
+            view={view}
+            onSwitchView={switchView}
           />
         </div>
       )}
