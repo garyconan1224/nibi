@@ -1689,3 +1689,41 @@ T2.2 核实发现：link_preview.py 只返回 og 元数据（title/description/i
 
 ### Commit
 - `39e9839` feat(rp1-b+): 按 intent 分流入口 + 学习/复刻顶栏 toggle（方案B/整合C-2）
+
+---
+
+## RP1-B+ 学习笔记页修复（数据源/视频源/md-html-pdf/toggle）
+
+**完成日期**：2026-05-31
+**模型 / 工具**：mimo 2.5pro
+**计划文档**：`docs/plans/rp1b-learning-notes-fix-mimo-prompt.md`
+
+### 问题
+2026-05-31 用户实测 learning 视频的 /ln，发现 3 个问题：
+1. /ln 笔记是「逐帧画面提示词」（图文分镜.md，复刻向）而非学习总结
+2. /ln「暂无可用视频源」（videoSrc 取自 getWorkspace 的 item.results.video.url，没经 /static 适配）
+3. HTML 视图空 / 双向同步多余（contentEditable+turndown 双向，用户要单向 md→html 美化预览）
+
+### 影响范围
+- **backend/app/routes/export.py**：GET /ln 优先级2 从读图文分镜.md 改为读 item.results.summary；删 _locate_analyze_report_dir import
+- **backend/tests/test_ln_get_fallback.py**：图文分镜兜底用例 → summary 兜底
+- **frontend/.../LearningNotesPage/index.tsx**：视频源改用 getItemResult 的 video.url；默认视图改 md；去掉 toggle + 导出菜单，简化为打印按钮
+- **frontend/.../LearningNotesPage/HtmlView.tsx**：去掉 contentEditable/turndown/DOMPurify，改为纯只读美化预览
+- **frontend/.../LearningNotesPage/LNNotesPanel.tsx**：HtmlView 不再接收 onMarkdownChange
+- **frontend/.../LearningNotesPage/learning-notes.css**：美化 H1/H2 样式 + @media print 只留笔记正文
+
+### 设计决策
+- 后端三级降级：ln.md → item.results.summary → 404（删掉图文分镜那一路，它是复刻向）
+- 视频源：getItemResult 返回的 video.url 已经过 /static 适配，直接用
+- HTML = 纯只读美化预览（单向 md→html），md 编辑只在 MdView(CodeMirror)
+- 导出 PDF = window.print() + @media print CSS（隐藏 nav/视频/toolbar，只留美化正文）
+- toggle 去掉：intent 是单值（learning|replica），技术上不支持 "both"，toggle 永远不显示 → 直接移除
+- 默认视图改 md（用户主要编辑 md，html 只是预览）
+
+### 验证
+- pytest 4/4 通过（summary 兜底 + ln.md 优先 + 404 + 不存在 ws）
+- `pnpm tsc --noEmit`：EXIT=0
+- `pnpm build`：EXIT=0
+
+### Commit
+- `c855d71` fix(rp1-b+): 学习笔记接 summary + 视频源修 + md源/html美化预览/pdf + toggle规则
