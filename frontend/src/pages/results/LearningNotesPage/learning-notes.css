@@ -61,6 +61,13 @@
   color: #fff;
 }
 
+.vm-ln-scope .ln-nav .ln-save-status {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-4);
+}
+
 /* ── Status ──────────────────────────────────── */
 .vm-ln-scope .ln-status {
   display: flex;

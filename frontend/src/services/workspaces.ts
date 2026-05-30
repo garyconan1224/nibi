@@ -664,6 +664,18 @@ export async function getLnMarkdown(workspaceId: string): Promise<string> {
   return res.data as unknown as string
 }
 
+/** PATCH /workspaces/{id}/ln — 保存学习笔记 markdown */
+export async function patchLnMarkdown(
+  workspaceId: string,
+  markdown: string,
+): Promise<{ saved_at: string; version: number }> {
+  const res = await http.patch<{ saved_at: string; version: number }>(
+    `${BASE}/${workspaceId}/ln`,
+    { markdown },
+  )
+  return res.data
+}
+
 /** GET /workspaces/{id}/export/av-synthesis.md — 下载综合笔记 .md 文件 */
 export async function downloadAVSynthesisMd(workspaceId: string): Promise<void> {
   const res = await http.get(`${BASE}/${workspaceId}/export/av-synthesis.md`, {

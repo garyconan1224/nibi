@@ -15,7 +15,7 @@ MVP 只导 4 样东西：
 import io
 import json
 import zipfile
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Dict, List
 from urllib.parse import quote
 
@@ -586,6 +586,33 @@ def get_ln_markdown(workspace_id: str):
         io.BytesIO(content.encode("utf-8")),
         media_type="text/markdown; charset=utf-8",
     )
+
+
+class LnPatchRequest(BaseModel):
+    markdown: str
+
+
+@router.patch("/{workspace_id}/ln")
+def patch_ln_markdown(workspace_id: str, body: LnPatchRequest):
+    """保存学习笔记 markdown（覆盖写 + bump version）。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+
+    md_path = get_workspace_root(workspace_id) / "ln.md"
+    md_path.write_text(body.markdown, encoding="utf-8")
+
+    # bump ln_version（存在 video item 的 results 里）
+    video_item = next((it for it in rec.items if it.type == "video"), None)
+    if video_item is not None:
+        results = dict(video_item.results or {})
+        results["ln_version"] = results.get("ln_version", 0) + 1
+        _store.update_item(workspace_id, video_item.item_id, results=results)
+        version = results["ln_version"]
+    else:
+        version = 0
+
+    return {"saved_at": datetime.now().isoformat(), "version": version}
 
 
 # ── R20: 笔记多格式导出 ────────────────────────────────

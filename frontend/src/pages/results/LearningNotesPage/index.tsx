@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Star } from 'lucide-react'
-import { getWorkspace, getLnMarkdown, getItemResult } from '@/services/workspaces'
+import { getWorkspace, getLnMarkdown, getItemResult, patchLnMarkdown } from '@/services/workspaces'
 import type { VideoResultTranscriptLine } from '@/services/workspaces'
 import type { WorkspaceRecord, WorkspaceItem } from '@/types/workspace'
 import LNVideoPanel, { type LNVideoPanelHandle } from './LNVideoPanel'
@@ -36,6 +36,35 @@ export default function LearningNotesPage() {
     setView(v)
     localStorage.setItem('ln-view', v)
   }, [])
+
+  // B-4: 自动保存
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [lastSavedAt, setLastSavedAt] = useState('')
+  const isInitialLoad = useRef(true)
+  const debounceTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  useEffect(() => {
+    // 首次加载不触发保存
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false
+      return
+    }
+    if (pageState.kind !== 'ready') return
+
+    clearTimeout(debounceTimer.current)
+    debounceTimer.current = setTimeout(async () => {
+      setSaveState('saving')
+      try {
+        const { saved_at } = await patchLnMarkdown(workspaceId, markdown)
+        setSaveState('saved')
+        setLastSavedAt(new Date(saved_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }))
+      } catch {
+        setSaveState('error')
+      }
+    }, 1500)
+
+    return () => clearTimeout(debounceTimer.current)
+  }, [markdown, workspaceId, pageState.kind])
 
   useEffect(() => {
     let cancelled = false
@@ -104,6 +133,11 @@ export default function LearningNotesPage() {
         <span className="ln-title">学习笔记</span>
         <span className="ln-badge">
           <Star size={10} /> Learning Notes
+        </span>
+        <span className="ln-save-status">
+          {saveState === 'saving' && '保存中…'}
+          {saveState === 'saved' && `已保存 ${lastSavedAt}`}
+          {saveState === 'error' && '保存失败，重试中…'}
         </span>
       </div>
 
