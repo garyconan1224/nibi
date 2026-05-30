@@ -491,6 +491,20 @@ export default function ResultsOverview() {
           </div>
         )}
 
+        {/* 打开详情入口 */}
+        <button
+          className="ov-action-card"
+          onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/${DETAIL_ROUTE[itemType]}`)}
+        >
+          <div className="ov-action-icon">
+            <BookOpen size={18} />
+          </div>
+          <div className="ov-action-text">
+            <div className="title">打开详情 <ArrowRight size={14} /></div>
+            <div className="desc">查看完整 {ITEM_TYPE_TEXT[itemType]} 分析结果</div>
+          </div>
+        </button>
+
         {/* R19: 综合笔记入口卡片（顶置） */}
         {pageState.kind === 'ready' && Boolean((pageState.item.results as Record<string, unknown>)?.av_synthesis_path) && (
           <div

@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useSystemStats } from '@/hooks/useSystemStats'
 import { FloatingTaskQueue } from '@/components/FloatingTaskQueue'
+import ThemeSwitcher from '@/components/ThemeSwitcher'
 
 interface NavItem {
   id: string
@@ -154,6 +155,7 @@ export function AppShell({ children }: AppShellProps) {
           style={{ borderColor: 'var(--line)', background: 'var(--bg)' }}
         >
           <div className="flex-1" />
+          <ThemeSwitcher />
           {/* 后端状态 chip */}
           <span
             className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs"

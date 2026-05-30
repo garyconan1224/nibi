@@ -8,7 +8,7 @@ import App from './App.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+    <ThemeProvider attribute={['class', 'data-theme']} defaultTheme="system" enableSystem>
       <App />
     </ThemeProvider>
   </StrictMode>,

@@ -4,7 +4,7 @@
 >
 > **维护规则**：每完成一个子任务，在本文件**追加**一段（不删旧记录），格式见下方"记录模板"。
 >
-> Last updated: 2026-05-30（RP1-A 音频结果页打磨完成）
+> Last updated: 2026-05-30（RP1-A 主题修复 + 页面整合完成）
 
 ---
 
@@ -1437,3 +1437,26 @@ T2.2 核实发现：link_preview.py 只返回 og 元数据（title/description/i
 
 ### Commit
 - `ec3b7d0` feat(rp1-a): 二次迭代 UI 对齐设计稿（颜色 / 空态提示）
+
+---
+
+## RP1-A 主题修复 + 页面整合（2026-05-30）
+
+**目标**：修复主题分裂 bug（next-themes class 与 design-tokens.css data-theme 不互通）+ 挂载 ThemeSwitcher + 删两页内容重复
+
+### 改动
+- **main.tsx**：`<ThemeProvider attribute="class">` → `attribute={['class', 'data-theme']}`，统一两套主题系统
+- **AppShell.tsx**：顶栏挂载 `<ThemeSwitcher />`（后端状态 chip 前），import ThemeSwitcher 组件
+- **design-tokens.css**：`[data-theme="dark"]` 块补充 5 个 accent 色（pink/purple/blue/warm/green 提亮 10%）
+- **AudioResultPage.tsx**：删除顶部 `<ItemTagsPanel>` 重复区块 + import；"任务中心" 按钮改"返回总览"并跳 overview 路由
+- **ResultsOverview/index.tsx**：转录预览卡片后新增"打开详情 →"按钮，跳转对应 itemType 的 detail 页
+
+### 验证
+- `class="dark"` + `data-theme="dark"` 同时生效（DevTools 确认）
+- ThemeSwitcher 可见可点击，light→dark→system 循环切换
+- `pnpm build`：EXIT=0
+- `npx tsc --noEmit`：EXIT=0
+- Playwright 截图：dark/light 首页各 1 张（audio_detail/overview 因后端 offline 待补）
+
+### Commit
+- 待 commit

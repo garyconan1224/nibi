@@ -20,7 +20,7 @@ import {
 
 import './tokens.css'
 import './audio-result.css'
-import { ItemTagsPanel } from '@/components/workspace/ItemTagsPanel'
+
 import { SummariesTab } from '@/components/SummariesTab'
 import { MusicTab } from '@/components/result/audio/MusicTab'
 
@@ -329,8 +329,8 @@ export default function AudioResultPage() {
     <div className="vm-audio-scope" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {/* Nav bar */}
       <div className="vd-nav" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 20px', borderBottom: '1px solid var(--line)', flexShrink: 0, background: 'var(--bg-elev)' }}>
-        <button className="btn-ghost" onClick={() => navigate(-1)} style={{ height: 28, padding: '0 10px', fontSize: 12 }}>
-          <ArrowLeft size={13} /> 任务中心
+        <button className="btn-ghost" onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/overview`)} style={{ height: 28, padding: '0 10px', fontSize: 12 }}>
+          <ArrowLeft size={13} /> 返回总览
         </button>
         <span className="vd-sep" />
         <span className="vd-title">{result.audio?.title || result.audio?.filename || '音频'}</span>
@@ -390,11 +390,6 @@ export default function AudioResultPage() {
           </button>
         </div>
       )}
-
-      {/* Tags */}
-      <div style={{ padding: '10px 20px 0', flexShrink: 0 }}>
-        <ItemTagsPanel workspaceId={workspaceId} itemId={itemId} />
-      </div>
 
       {/* Waveform player */}
       <div className="ad-player-area">
