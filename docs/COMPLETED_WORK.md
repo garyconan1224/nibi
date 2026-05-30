@@ -1419,3 +1419,21 @@ T2.2 核实发现：link_preview.py 只返回 og 元数据（title/description/i
 ### 验证
 - `pytest backend/tests/test_export_edited_text.py -v`：7 passed
 - `pnpm build`：EXIT=0
+
+---
+
+## RP1-A 二次迭代 · UI 设计稿对齐（2026-05-30）
+
+**目标**：音频结果页 UI 全面对齐设计稿（颜色 / 字号 / 留白 / 空态提示）
+
+### 改动
+- **MusicReport.tsx**：硬编码 indigo 色板（#6366f1 等 6 色）改为设计稿语义色（accent-pink/purple/blue/warm/green，5 色轮转）
+- **AudioResultPage.tsx**：新增 demo 数据提示条（"当前为示例数据…"），localStorage 记忆 dismiss 状态（key: audio-demo-banner-dismissed）
+- **CSS 字号/留白**：已对齐设计稿（Tab nav 13px/500、段卡片 10px 12px、说话人头像 24px 圆形、时间戳 mono 11px、正文 14px 1.55 行高），无需改动
+
+### 验证
+- `pnpm build`：EXIT=0
+- Playwright 截图 3 张（转录 / 音乐分析 / 总结）：docs/e2e-test/screenshots/rp1a-polish-*.png
+
+### Commit
+- `ec3b7d0` feat(rp1-a): 二次迭代 UI 对齐设计稿（颜色 / 空态提示）

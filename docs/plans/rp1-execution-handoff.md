@@ -433,3 +433,37 @@ Week 5：mimo 跑 C-2 + C-3 + C-4 + C-5（顺序，4 个会话）
 4. 提醒用户开 mimo 会话从 A-1 开始
 
 合计约 2.5h，是一个标准 Opus 会话。
+
+---
+
+## 7. 2026-05-30 中场修订（RP1-B 启动前必读）
+
+RP1-A 二次迭代会话中，mimo **越界做了 RP1-B 的 B-1 半成品**（commit `603e2ea` 含 `frontend/src/pages/results/LearningNotesPage/` 4 文件 + router 注册 `/workspaces/{ws}/ln`），用户 2026-05-30 决议「保留作为 B-1 初版」。
+
+**对下游 B-1/B-2/B-3/B-5 mimo 提示词的影响**：
+
+### 新 B-1 提示词补一段（启动时一并发给 mimo）
+
+> 注意：`frontend/src/pages/results/LearningNotesPage/` 已存在 4 个文件（commit `603e2ea`），是只读 markdown 渲染骨架，**不符合 B-1 完整规格**。你的任务是**在现有文件基础上扩展**：
+> - `LNVideoPanel.tsx` 已有视频 ref + 快捷键，但视频源 prop 没真实接入 → 接 `workspace.video_url` / `results.video_path`
+> - `LNNotesPanel.tsx` 当前只用 react-markdown 只读 → B-1 阶段保持只读 OK（B-3 会重写）
+> - `index.tsx` 已有双栏布局 + 加载状态机 → 检查 `getAVSynthesisMarkdown` 路径是否真的能拿到当前 workspace 的 ln.md
+> - `learning-notes.css` 已有 298 行样式 → 检查是否对齐设计稿 audio_detail.jsx / video_detail.jsx 的样式风格
+> - **重点**：路由 `/workspaces/{ws}/ln` 已注册，访问应该看到双栏但右侧可能空白（demo 没 ln.md）
+
+### B-3 提示词强制要求**完全重写 LNNotesPanel.tsx**
+
+> ⚠️ 现有 `LNNotesPanel.tsx`（84 行，只读 ReactMarkdown）**必须整个删除重写**为 [docs/plans/rp1-b3-html-md-sync.md](rp1-b3-html-md-sync.md) §3.2 / 3.3 / 3.4 的 CodeMirror 6 + contentEditable + turndown + DOMPurify 实现。不要在现有只读版本上「增量加」，会留下技术债。
+> 同时 `index.tsx` 容器要按 §3.1 加 `view: 'html' | 'md'` state + ViewSwitcher。
+
+### B-5 提示词强制要求**扩展 LNVideoPanel.tsx**
+
+> 现有 `LNVideoPanel.tsx`（71 行，原生 video + 快捷键）**保留扩展**为 [docs/plans/rp1-b5-screenshot-flow.md](rp1-b5-screenshot-flow.md) §3.3 的完整版：
+> - 加 `<canvas>` 抓帧 + 截图按钮
+> - 调 `uploadLnScreenshot` API + `lnEditorStore.insertAtCursor`
+> - 加 6 项错误处理
+
+### B-2 提示词不变
+
+字幕跟随逻辑可以直接加到现有 `LNNotesPanel.tsx`（react-markdown 渲染部分），B-3 重写时再合并到 CodeMirror 版本。
+
