@@ -1610,3 +1610,38 @@ T2.2 核实发现：link_preview.py 只返回 og 元数据（title/description/i
 
 ### Commit
 - `6a6cc16` feat(rp1-b): B-5 截图插光标 + 字幕引用进笔记
+
+---
+
+## RP1-B B-6 TOC 当前章节高亮 + 时间戳锚点 chip（2026-05-30）
+
+**目标**：HTML 视图笔记加两个导航增强——TOC 滚动高亮 + 时间戳可点击 chip
+
+### 改动
+- **frontend/src/pages/results/LearningNotesPage/HtmlView.tsx**：
+  - 接收 `onSeek` prop，用 scroll 事件监听器实现 TOC 当前章节高亮（替代 IntersectionObserver，contentEditable 兼容性更好）
+  - 正则 `TS_RE` 解析 `[mm:ss]` / `[mm:ss~mm:ss]` / `[hh:mm:ss]` 为可点击 chip
+  - `processChildren` 递归处理 ReactNode，只在 text 节点替换，代码块内不替换
+  - `parseTs` 导出供测试使用
+- **frontend/src/pages/results/LearningNotesPage/LNNotesPanel.tsx**：接收并转发 `onSeek` 给 HtmlView
+- **frontend/src/pages/results/LearningNotesPage/index.tsx**：传 `onSeek={(sec) => videoPanelRef.current?.seekTo(sec)}` 给 LNNotesPanel
+- **frontend/src/pages/results/LearningNotesPage/learning-notes.css**：
+  - `.ln-html-scroll`：滚动容器（flex:1, overflow-y:auto）
+  - `.ln-toc-item[data-active]`：左侧高亮条 + 文字加粗
+  - `.ln-ts-chip`：inline、mono、accent-pink 文字、小圆角、hover 背景
+- **frontend/src/__tests__/timestamp-chip.test.ts**（新建）：8 个测试用例覆盖 parseTs + TS_RE 正则匹配
+
+### 设计决策
+- 用 scroll 事件监听器替代 IntersectionObserver：contentEditable 内 observer 回调不稳定，scroll + getBoundingClientRect 更可靠
+- 激活区阈值 = 容器高度 30%（靠上的 heading 才算"当前"）
+- 时间戳 chip 只在 HTML 视图渲染，MD 源码视图保持纯文本
+- onSeek 回调取区间起点秒数（如 `[01:30~05:00]` → 90 秒）
+
+### 验证
+- `vitest run timestamp-chip.test.ts`：8 passed
+- `pnpm build`：EXIT=0
+- Playwright 手测：4 个 chip 渲染成功 + TOC 滚动跟随高亮
+- 截图归档：`rp1b-b6-toc-active.png` + `rp1b-b6-ts-chip.png`
+
+### Commit
+- `6ca4166` feat(rp1-b): B-6 TOC 当前章节高亮 + 时间戳锚点 chip
