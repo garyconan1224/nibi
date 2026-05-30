@@ -145,7 +145,17 @@
   - [x] B-1 学习笔记页双栏 + 视频播放器（接通视频源 + ln.md 路径 + 设计稿样式对齐）→ `8a5c57b`（2026-05-30）
   - [x] B-2 字幕轨跟随 + 点击 seek → `73733b5`（2026-05-30）
   - [x] B-3 HTML/MD 视图切换 + 双向同步 → `cdb5a37`（2026-05-30）
+  - [ ] B-4 在线编辑 + 自动保存（PATCH /ln）— 计划 [rp1-b4](plans/rp1-b4-mimo-prompt.md)
+  - [ ] B-5 截图插光标 + 字幕引用进笔记 — 计划 [rp1-b5](plans/rp1-b5-mimo-prompt.md)
+  - [ ] B-6 TOC 当前章节高亮 + 时间戳锚点 chip — 计划 [rp1-b6](plans/rp1-b6-mimo-prompt.md)
+  - [ ] B-7 导出菜单 — 计划 [rp1-b7](plans/rp1-b7-mimo-prompt.md)
+  - [ ] B-8 学习笔记页内 AI 问答抽屉（已决议本期做）— 计划 [rp1-b8](plans/rp1-b8-mimo-prompt.md)
 - [ ] **RP1-C 视频复刻页增强** — 主帧大视图 + 缩略图轨道 / 批量复刻包导出 / 提示词在线编辑+版本 / 与笔记页联动切换 — 12-18h，P2
+  - [ ] C-1 主帧大视图 + 缩略图轨道 — 计划 [rp1-c1](plans/rp1-c1-mimo-prompt.md)
+  - [ ] C-2 复刻↔学习笔记联动切换 — 计划 [rp1-c2](plans/rp1-c2-mimo-prompt.md)
+  - [ ] C-3 帧批量操作 + 导出复刻包 — 计划 [rp1-c3](plans/rp1-c3-mimo-prompt.md)
+  - [ ] C-4 提示词在线编辑 + 版本 — 计划 [rp1-c4](plans/rp1-c4-mimo-prompt.md)
+  - [ ] C-5 小修（改名/重试/标签）— 计划 [rp1-c5](plans/rp1-c5-mimo-prompt.md)
 
 ### 延后阶段（RP1 之后）
 
