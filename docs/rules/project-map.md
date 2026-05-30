@@ -6,25 +6,45 @@
 
 ## 1. 常用命令
 
-### 1.1 一键启动（推荐日常用）
+### 1.1 首次安装（只需一次）
 
 ```bash
 ./start.sh
 ```
 
-脚本会自动检测/安装 brew、Python 3.10+、ffmpeg、Node、pnpm，创建 `.venv`，装依赖，清端口，并行起后端 + 前端，日志写到 `.local/backend.log` 与 `.local/frontend.log`。
+自动检测/安装 brew、Python 3.10+、ffmpeg、Node、pnpm，创建 `.venv`，装依赖，清端口，并行起后端 + 前端。日志写到 `.local/backend.log` 与 `.local/frontend.log`。
 
-### 1.2 单独启动（调试时用）
+### 1.2 日常快速启动 ← AI 测试用这个
 
 ```bash
-# 后端（默认 8000，改端口看 .env 里的 BACKEND_PORT）
-uvicorn backend.app.main:app --reload --port 8000
+./dev.sh      # 跳过安装；自动读 .env 端口、杀旧进程、起前后端、轮询健康检查
+./stop.sh     # 停止所有服务
+```
 
-# 前端（默认 5173，改端口看 .env 里的 VITE_PORT）
+`dev.sh` 内置健康探测（轮询 `/health` + 前端 200），确认就绪后才退出。  
+**端口**从 `.env` 读取（`BACKEND_PORT` 默认 8000，`VITE_PORT` 默认 5173）——**不要在命令里硬编码端口**。
+
+验证服务已就绪（在 `dev.sh` 已确认的前提下也可手动再查）：
+
+```bash
+# 一行读 .env 端口 + 同时探两端
+BPORT=$(grep -E '^BACKEND_PORT=' .env 2>/dev/null | tail -1 | cut -d= -f2 | tr -d '"' | tr -d "'"); BPORT=${BPORT:-8000}
+FPORT=$(grep -E '^VITE_PORT=' .env 2>/dev/null | tail -1 | cut -d= -f2 | tr -d '"' | tr -d "'"); FPORT=${FPORT:-5173}
+curl -s "http://localhost:$BPORT/health"
+curl -so /dev/null -w "%{http_code}" "http://localhost:$FPORT/"
+```
+
+### 1.3 单独启动（调试时用）
+
+```bash
+# 后端（端口看 .env BACKEND_PORT，默认 8000）
+.venv/bin/uvicorn backend.app.main:app --reload --port "${BACKEND_PORT:-8000}"
+
+# 前端（端口看 .env VITE_PORT，默认 5173）
 cd frontend && pnpm dev
 ```
 
-### 1.3 测试 / 检查
+### 1.4 测试 / 检查
 
 ```bash
 # 后端测试（CI 用同样命令）
