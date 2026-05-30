@@ -6,6 +6,8 @@ import { useLnEditorStore } from '@/store/lnEditorStore'
 
 interface LNVideoPanelProps {
   src: string
+  /** 在线平台网页链接（src 为空时降级展示，供用户去原平台观看） */
+  externalUrl?: string
   title: string
   workspaceId?: string
   onTimeUpdate?: (currentTime: number) => void
@@ -22,7 +24,7 @@ function formatTs(sec: number): string {
 }
 
 const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
-  ({ src, title, workspaceId, onTimeUpdate }, ref) => {
+  ({ src, externalUrl, title, workspaceId, onTimeUpdate }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null)
     const [shooting, setShooting] = useState(false)
     const insertAtCursor = useLnEditorStore((s) => s.insertAtCursor)
@@ -125,8 +127,20 @@ const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
       return (
         <div className="ln-video-panel">
           <div className="ln-video-placeholder">
-            <p>暂无可用视频源</p>
-            <p className="ln-video-hint">视频可能尚未下载完成</p>
+            {externalUrl ? (
+              <>
+                <p>该视频为在线链接，暂不支持内嵌播放</p>
+                <a className="ln-video-extlink" href={externalUrl} target="_blank" rel="noreferrer">
+                  ↗ 在原平台打开观看
+                </a>
+                <p className="ln-video-hint">下载到本地后即可在此直接播放</p>
+              </>
+            ) : (
+              <>
+                <p>暂无可用视频源</p>
+                <p className="ln-video-hint">视频可能尚未下载完成</p>
+              </>
+            )}
           </div>
         </div>
       )

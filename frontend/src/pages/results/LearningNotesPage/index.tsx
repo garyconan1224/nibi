@@ -40,22 +40,21 @@ export default function LearningNotesPage() {
   // B-4: 自动保存
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [lastSavedAt, setLastSavedAt] = useState('')
-  const isInitialLoad = useRef(true)
+  // 记录最后一次与服务端一致的内容（含初始加载值），用于判断是否真有编辑
+  const lastSavedMarkdownRef = useRef<string | null>(null)
   const debounceTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   useEffect(() => {
-    // 首次加载不触发保存
-    if (isInitialLoad.current) {
-      isInitialLoad.current = false
-      return
-    }
     if (pageState.kind !== 'ready') return
+    // 内容与服务端一致（含初始加载那次 setMarkdown）时不触发保存，避免"白存"
+    if (markdown === lastSavedMarkdownRef.current) return
 
     clearTimeout(debounceTimer.current)
     debounceTimer.current = setTimeout(async () => {
       setSaveState('saving')
       try {
         const { saved_at } = await patchLnMarkdown(workspaceId, markdown)
+        lastSavedMarkdownRef.current = markdown
         setSaveState('saved')
         setLastSavedAt(new Date(saved_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }))
       } catch {
@@ -94,6 +93,7 @@ export default function LearningNotesPage() {
 
         setPageState({ kind: 'ready', workspace: ws, videoItem, markdown: md, transcript })
         setMarkdown(md)
+        lastSavedMarkdownRef.current = md
       } catch (err: unknown) {
         if (cancelled) return
         const message = err instanceof Error ? err.message : '加载失败'
@@ -104,19 +104,18 @@ export default function LearningNotesPage() {
     return () => { cancelled = true }
   }, [workspaceId])
 
-  const videoSrc = useMemo(() => {
-    if (pageState.kind !== 'ready') return ''
-    const { videoItem } = pageState
-    const results = videoItem.results as Record<string, unknown>
-    const videoResult = results.video as { url?: string } | undefined
-
-    // 优先用 results.video.url（可能是本地 /static/ 路径或外部 URL）
-    if (videoResult?.url) return videoResult.url
-
-    // 兜底：尝试从 workspace 目录构造本地路径
-    // 本地视频文件一般在 data/workspaces/{workspace_id}/videos/ 下
-    // 但需要知道文件名，这里只能返回空
-    return ''
+  // 区分"可内嵌播放的视频文件"与"在线平台网页链接"
+  // 后者（如 B 站 / YouTube 页面）无法用 <video> 播放，降级为外链
+  const { videoSrc, externalUrl } = useMemo(() => {
+    if (pageState.kind !== 'ready') return { videoSrc: '', externalUrl: '' }
+    const results = pageState.videoItem.results as Record<string, unknown>
+    const videoResult = results.video as { url?: string; source_url?: string } | undefined
+    const url = videoResult?.url ?? ''
+    // 仅本地 /static 路径或视频文件扩展名可内嵌播放
+    const isPlayable = url.startsWith('/static') || /\.(mp4|webm|ogg|mov|m4v)(\?|$)/i.test(url)
+    if (isPlayable) return { videoSrc: url, externalUrl: '' }
+    // 平台网页链接 → 不喂给 <video>，保留为外链
+    return { videoSrc: '', externalUrl: videoResult?.source_url || url }
   }, [pageState])
 
   const handleTimeUpdate = useCallback((time: number) => {
@@ -156,6 +155,7 @@ export default function LearningNotesPage() {
             <LNVideoPanel
               ref={videoPanelRef}
               src={videoSrc}
+              externalUrl={externalUrl}
               title={pageState.videoItem.name}
               workspaceId={workspaceId}
               onTimeUpdate={handleTimeUpdate}

@@ -677,3 +677,21 @@
   background: var(--bg-sunken);
   border-color: var(--accent-pink);
 }
+
+/* B-1 修复：在线视频降级外链按钮 */
+.vm-ln-scope .ln-video-extlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 8px 0;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--accent-pink);
+  border: 1px solid var(--accent-pink);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+.vm-ln-scope .ln-video-extlink:hover {
+  background: var(--bg-sunken);
+}
