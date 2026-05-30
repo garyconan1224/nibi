@@ -1553,3 +1553,29 @@ T2.2 核实发现：link_preview.py 只返回 og 元数据（title/description/i
 
 ### Commit
 - `cdb5a37` feat(rp1-b): B-3 学习笔记页 HTML/MD 双向同步
+
+---
+
+## RP1-B B-4 学习笔记在线编辑 + 自动保存（2026-05-30）
+
+**目标**：编辑笔记后自动保存回 ln.md，刷新不丢
+
+### 改动
+- **backend/app/routes/export.py**：新增 `PATCH /{workspace_id}/ln` 端点 — 接收 `{ markdown }` 覆盖写 ln.md + bump `item.results['ln_version']`（整数 +1）+ 返回 `{ saved_at, version }`
+- **frontend/src/services/workspaces.ts**：新增 `patchLnMarkdown(ws, markdown)` 函数
+- **frontend/src/pages/results/LearningNotesPage/index.tsx**：markdown state 变化 → debounce 1500ms → 调 patchLnMarkdown；维护 saveState（idle/saving/saved/error）+ lastSavedAt；isInitialLoad ref 跳过首次加载；顶栏显示保存状态文案
+- **frontend/src/pages/results/LearningNotesPage/learning-notes.css**：新增 `.ln-save-status` 样式（var(--ink-4) + var(--mono) 小字，margin-left:auto 右对齐）
+- **backend/tests/test_ln_patch.py**（新建）：5 个测试 — 创建文件+返回 version / 写入内容正确 / version 递增 / 覆盖写 / 404
+
+### 设计决策
+- last-write-wins，不做并发冲突检测（单机用户）
+- version 存在 video item 的 results JSON 字段里，不触发 DB schema 迁移
+- debounce 用 setTimeout + useRef 自写，不装新依赖
+
+### 验证
+- `pytest backend/tests/`：100 passed
+- `pnpm build`：EXIT=0
+- `pnpm tsc -b`：EXIT=0
+
+### Commit
+- `07ae2b6` feat(rp1-b): B-4 学习笔记在线编辑 + 自动保存

@@ -1,6 +1,8 @@
 ---
 phase: RP1-B · B-4 学习笔记在线编辑 + 自动保存
-status: ready
+status: done
+commits: 07ae2b6
+completed_date: 2026-05-30
 owner: xiaomi-mimo-2.5pro
 parent: docs/plans/result-pages-redesign-v1.md § RP1-B · B-4
 companion: docs/plans/rp1-execution-handoff.md § 3.3 提示词 B-4
