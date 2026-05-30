@@ -1550,3 +1550,6 @@ T2.2 核实发现：link_preview.py 只返回 og 元数据（title/description/i
 - HTML 视图：TOC、标题、加粗、斜体、行内代码、代码块、checkbox、表格、blockquote、链接全部渲染正确
 - MD 视图：CodeMirror 6 行号 + markdown 源码渲染正确
 - 视图切换内容不丢；localStorage 记住偏好
+
+### Commit
+- `cdb5a37` feat(rp1-b): B-3 学习笔记页 HTML/MD 双向同步
