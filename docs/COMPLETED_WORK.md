@@ -1459,4 +1459,25 @@ T2.2 核实发现：link_preview.py 只返回 og 元数据（title/description/i
 - Playwright 截图：dark/light 首页各 1 张（audio_detail/overview 因后端 offline 待补）
 
 ### Commit
-- 待 commit
+- `ba28ada` feat(rp1-a): 主题分裂修复 + 挂 ThemeSwitcher + 删两页内容重复
+
+---
+
+## RP1-A 四迭 UI 整修（2026-05-30）
+
+**目标**：4 个 UI 反馈一次性修 — 空 tab 隐藏 / 总结 UI 重设计 / Overview 重构 / 音频时间轴重做
+
+### 改动
+- **AudioResultPage.tsx**：tab 数组改 useMemo 按数据条件 filter（transcript/summary 始终显示，music/vocal/music_transcribe/prompts 按需）；activeTab fallback 到第一个可见 tab
+- **SummariesTab.tsx + CSS**：空态居中引导卡片（2×2 模板 grid + 更多模板展开）；有总结时 sidebar 列表项显示模板名 + 内容预览；新增"重新生成"按钮；createSummary catch 500 含 "chat model" → toast + "去设置"按钮
+- **ResultsOverview/index.tsx**：2 列网格布局（左主 2/3 + 右辅 1/3）；删 audio 转录预览重复卡片；右辅列 stat 小卡片 + 渐变"打开详情"按钮 + 纵向 action 列表
+- **ResultsOverview/overview.css**：新增 2 列网格 + stat-mini + detail-btn + side-action 样式
+- **extractAudioTimelineLines**：字段映射修复（transcript_segments.start → t_sec/t_str）；音频时间轴新形态（水平 bar + 圆点 + 前 10 段列表）
+
+### 验证
+- `pnpm build`：EXIT=0
+- `npx tsc --noEmit`：EXIT=0
+- Playwright 截图 4 张：overview light/dark + audio tabs filtered + audio summary empty
+
+### Commit
+- `2a75744` feat(rp1-a): 四迭 UI 整修 — 空 tab 隐藏 / 总结 UI 重设计 / Overview 重构 / 音频时间轴重做 + bug 修
