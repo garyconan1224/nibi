@@ -171,6 +171,7 @@ export default function LearningNotesPage() {
             onMarkdownChange={setMarkdown}
             view={view}
             onSwitchView={switchView}
+            onSeek={(sec) => videoPanelRef.current?.seekTo(sec)}
           />
         </div>
       )}

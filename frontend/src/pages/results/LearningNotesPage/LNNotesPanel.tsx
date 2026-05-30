@@ -6,9 +6,10 @@ interface LNNotesPanelProps {
   onMarkdownChange: (md: string) => void
   view: 'html' | 'md'
   onSwitchView: (v: 'html' | 'md') => void
+  onSeek?: (sec: number) => void
 }
 
-export default function LNNotesPanel({ markdown, onMarkdownChange, view, onSwitchView }: LNNotesPanelProps) {
+export default function LNNotesPanel({ markdown, onMarkdownChange, view, onSwitchView, onSeek }: LNNotesPanelProps) {
   return (
     <div className="ln-notes-panel">
       <div className="ln-toolbar">
@@ -22,7 +23,7 @@ export default function LNNotesPanel({ markdown, onMarkdownChange, view, onSwitc
         >MD 源码</button>
       </div>
       {view === 'html'
-        ? <HtmlView markdown={markdown} onMarkdownChange={onMarkdownChange} />
+        ? <HtmlView markdown={markdown} onMarkdownChange={onMarkdownChange} onSeek={onSeek} />
         : <MdView markdown={markdown} onMarkdownChange={onMarkdownChange} />}
     </div>
   )

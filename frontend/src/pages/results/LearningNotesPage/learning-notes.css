@@ -253,6 +253,13 @@
   border-color: var(--accent-pink);
 }
 
+/* ── HTML scroll container ────────────────────── */
+.vm-ln-scope .ln-html-scroll {
+  flex: 1;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
 /* ── HTML View (contentEditable) ─────────────── */
 .vm-ln-scope .ln-html-view {
   padding: 20px;
@@ -436,6 +443,27 @@
 
 .vm-ln-scope .ln-toc-h3 {
   padding-left: 16px;
+}
+
+.vm-ln-scope .ln-toc-item[data-active] {
+  position: relative;
+  color: var(--ink);
+}
+
+.vm-ln-scope .ln-toc-item[data-active]::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 1.5px;
+  background: var(--accent-2);
+}
+
+.vm-ln-scope .ln-toc-item[data-active] a {
+  color: var(--ink);
+  font-weight: 600;
 }
 
 /* ── Markdown content ────────────────────────── */
@@ -627,4 +655,25 @@
 .vm-ln-scope .ln-tr-row[data-active="true"] .ln-tr-text {
   color: var(--ink);
   font-weight: 500;
+}
+
+/* ── Timestamp chip ──────────────────────────── */
+.ln-ts-chip {
+  display: inline;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent-pink);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0 4px;
+  cursor: pointer;
+  line-height: 1.6;
+  vertical-align: baseline;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.ln-ts-chip:hover {
+  background: var(--bg-sunken);
+  border-color: var(--accent-pink);
 }
