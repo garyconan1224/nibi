@@ -1524,4 +1524,4 @@ T2.2 核实发现：link_preview.py 只返回 og 元数据（title/description/i
 - 点击字幕行事件已触发（视频源为外部 bilibili 链接无法直接播放验证 seek）
 
 ### Commit
-- pending feat(rp1-b): B-2 学习笔记页字幕轨跟随 + 点击 seek
+- `73733b5` feat(rp1-b): B-2 学习笔记页字幕轨跟随 + 点击 seek
