@@ -11,14 +11,13 @@ import {
 } from 'recharts'
 import type { MusicSegmentData } from '@/services/workspaces'
 
-// 颜色方案（使用 CSS 变量对应的色值）
+// 颜色方案（对应 design-tokens.css 语义色，5 色轮转）
 const COLORS = [
-  '#6366f1', // accent (indigo)
-  '#818cf8', // accent-soft
-  '#a5b4fc', // lighter
-  '#c7d2fe', // lightest
-  '#e0e7ff', // very light
-  '#eef2ff', // almost white
+  '#FF4D7E', // accent-pink — input/output layer
+  '#B84CFF', // accent-purple — AI analysis layer
+  '#3C77FB', // accent-blue — structured layer
+  '#FFB84C', // accent-warm — storyboard layer
+  '#22D39A', // accent-green — completion state
 ]
 
 interface MusicReportProps {
@@ -85,7 +84,7 @@ export function MusicReport({ segments }: MusicReportProps) {
             <Tooltip
               contentStyle={{ fontSize: 12, background: 'var(--bg-elev)', border: '1px solid var(--line)' }}
             />
-            <Line type="monotone" dataKey="bpm" stroke="#6366f1" strokeWidth={2} dot={{ r: 4 }} />
+            <Line type="monotone" dataKey="bpm" stroke={COLORS[0]} strokeWidth={2} dot={{ r: 4 }} />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -124,7 +123,7 @@ export function MusicReport({ segments }: MusicReportProps) {
             <Tooltip
               contentStyle={{ fontSize: 12, background: 'var(--bg-elev)', border: '1px solid var(--line)' }}
             />
-            <Bar dataKey="duration" fill="#6366f1" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="duration" fill={COLORS[0]} radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -152,7 +151,7 @@ export function MusicReport({ segments }: MusicReportProps) {
             />
             <Scatter
               data={scatterData}
-              fill="#6366f1"
+              fill={COLORS[0]}
             />
           </ScatterChart>
         </ResponsiveContainer>

@@ -106,6 +106,9 @@ export default function AudioResultPage() {
   const [editValue, setEditValue] = useState('')
   const [editingSegmentIdx, setEditingSegmentIdx] = useState<number | null>(null)
   const [segmentEditText, setSegmentEditText] = useState('')
+  const [demoBannerDismissed, setDemoBannerDismissed] = useState(() =>
+    localStorage.getItem('audio-demo-banner-dismissed') === 'true'
+  )
 
   const handleExportSubtitles = async (format: 'srt' | 'vtt' | 'ass') => {
     setExportOpen(false)
@@ -368,6 +371,25 @@ export default function AudioResultPage() {
           )}
         </div>
       </div>
+
+      {/* Demo 提示条 */}
+      {result.source === 'demo_fixture' && !demoBannerDismissed && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '8px 20px', background: 'color-mix(in srgb, var(--accent-warm) 8%, transparent)',
+          borderBottom: '1px solid color-mix(in srgb, var(--accent-warm) 25%, transparent)',
+          fontSize: 12, color: 'var(--ink-2)', flexShrink: 0,
+        }}>
+          <span>当前为示例数据（任务未完成 / 未上传）。完成上传或处理后将自动显示真实结果。</span>
+          <button
+            className="btn-ghost"
+            style={{ padding: '2px 6px', fontSize: 11, flexShrink: 0 }}
+            onClick={() => { setDemoBannerDismissed(true); localStorage.setItem('audio-demo-banner-dismissed', 'true') }}
+          >
+            知道了
+          </button>
+        </div>
+      )}
 
       {/* Tags */}
       <div style={{ padding: '10px 20px 0', flexShrink: 0 }}>
