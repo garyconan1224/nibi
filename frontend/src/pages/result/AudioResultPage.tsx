@@ -98,7 +98,8 @@ export default function AudioResultPage() {
 
   const [currentSec, setCurrentSec] = useState(0)
   const [playing, setPlaying] = useState(false)
-  const [activeTab, setActiveTab] = useState<'transcript' | 'music' | 'summary' | 'vocal' | 'music_transcribe' | 'prompts'>('transcript')
+  type TabId = 'transcript' | 'music' | 'summary' | 'vocal' | 'music_transcribe' | 'prompts'
+  const [activeTab, setActiveTab] = useState<TabId>('transcript')
   const [exportOpen, setExportOpen] = useState(false)
   const [exportWithSpeaker, setExportWithSpeaker] = useState(false)
   const [speakerMap, setSpeakerMap] = useState<Record<string, string>>({})
@@ -136,6 +137,34 @@ export default function AudioResultPage() {
   }, [workspaceId, itemId])
 
   const result = fetchState.kind === 'ready' ? fetchState.data : null
+
+  // 按数据条件过滤可用 tabs
+  const visibleTabs = useMemo(() => {
+    const all: { id: TabId; label: string; icon: typeof FileText }[] = [
+      { id: 'transcript', label: '转录', icon: FileText },
+      { id: 'summary', label: '总结', icon: FileText },
+    ]
+    if (result?.music_segments?.length || result?.music_mode) {
+      all.push({ id: 'music', label: '音乐分析', icon: Music })
+    }
+    if (result?.vocal_url || result?.vocal_path) {
+      all.push({ id: 'vocal', label: '人声分离', icon: Mic })
+    }
+    if (result?.music_transcription) {
+      all.push({ id: 'music_transcribe', label: '音乐转写', icon: Music })
+    }
+    if (result?.prompt_output) {
+      all.push({ id: 'prompts', label: '提示词', icon: Wand2 })
+    }
+    return all
+  }, [result])
+
+  // activeTab fallback: 当前 tab 被过滤掉时切到第一个可见 tab
+  useEffect(() => {
+    if (visibleTabs.length > 0 && !visibleTabs.some((t) => t.id === activeTab)) {
+      setActiveTab(visibleTabs[0].id)
+    }
+  }, [visibleTabs, activeTab])
 
   // A3: music_mode → 默认切到音乐分析 tab
   useEffect(() => {
@@ -435,14 +464,7 @@ export default function AudioResultPage() {
 
       {/* Tab nav */}
       <div className="ad-tabs">
-        {([
-          { id: 'transcript' as const, label: '转录', icon: FileText },
-          { id: 'music' as const, label: '音乐分析', icon: Music },
-          { id: 'summary' as const, label: '总结', icon: FileText },
-          { id: 'vocal' as const, label: '人声分离', icon: Mic },
-          { id: 'music_transcribe' as const, label: '音乐转写', icon: Music },
-          { id: 'prompts' as const, label: '提示词', icon: Wand2 },
-        ]).map((tab) => {
+        {visibleTabs.map((tab) => {
           const Icon = tab.icon
           return (
             <button

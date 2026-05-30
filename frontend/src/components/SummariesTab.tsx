@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { toast } from 'sonner'
@@ -46,6 +47,14 @@ const QUICK_TEMPLATES = [
   { value: 'detailed', label: '详细' },
   { value: 'xhs', label: '小红书' },
   { value: 'longform', label: '公众号' },
+]
+
+/** 4 个常用模板卡片（空态引导 2×2 grid） */
+const QUICK_TEMPLATE_CARDS: { value: string; label: string; desc: string }[] = [
+  { value: 'concise', label: '精简摘要', desc: '几句话概括核心内容' },
+  { value: 'detailed', label: '详细要点', desc: '逐条列出关键信息' },
+  { value: 'xhs', label: '小红书风格', desc: '带 emoji 的种草体笔记' },
+  { value: 'longform', label: '公众号长文', desc: '结构化的深度解读' },
 ]
 
 const TEMPLATE_LABEL_MAP = Object.fromEntries(
@@ -137,6 +146,7 @@ function setCachedSummary(workspaceId: string, itemId: string, summary: ItemSumm
 /* ── 主组件 ──────────────────────────────────────────────────── */
 
 export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
+  const navigate = useNavigate()
   const [summaries, setSummaries] = useState<ItemSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<ItemSummary | null>(null)
@@ -204,8 +214,16 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
       await refresh()
       setSelected(s)
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : '生成失败'
-      toast.error(msg)
+      // 检查 axios 500 错误中的 "chat model" 关键词
+      const axiosData = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      if (axiosData && axiosData.includes('chat model')) {
+        toast.error('请先在设置中配置 LLM 模型', {
+          action: { label: '去设置', onClick: () => navigate('/settings/models') },
+        })
+      } else {
+        const msg = err instanceof Error ? err.message : '生成失败'
+        toast.error(msg)
+      }
     } finally {
       setCreating(false)
     }
@@ -236,6 +254,13 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
       navigator.clipboard.writeText(selected.content_md)
       toast.success('已复制 markdown')
     }
+  }, [selected])
+
+  const handleRegenerate = useCallback(() => {
+    if (!selected) return
+    setNewTemplate(selected.template)
+    setNewBackground(selected.background_for_summary || '')
+    setShowNew(true)
   }, [selected])
 
   /* ── 对比模式 ────────────────────────────────────────────── */
@@ -278,6 +303,89 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
     return <div style={{ padding: 24, color: 'var(--ink-3)' }}>加载中…</div>
   }
 
+  // ── 空态：居中引导卡片 ────────────────────────────────────
+  if (summaries.length === 0 && !showNew) {
+    return (
+      <div className="sm-empty-guide">
+        <h2 className="sm-empty-title">生成一份内容总结</h2>
+        <p className="sm-empty-subtitle">选一个模板，AI 帮你把转录文本整理成可读笔记</p>
+        <div className="sm-template-grid">
+          {QUICK_TEMPLATE_CARDS.map((t) => (
+            <button
+              key={t.value}
+              className="sm-template-card"
+              onClick={() => {
+                setNewTemplate(t.value)
+                setShowNew(true)
+              }}
+            >
+              <span className="sm-template-card-label">{t.label}</span>
+              <span className="sm-template-card-desc">{t.desc}</span>
+            </button>
+          ))}
+        </div>
+        <button
+          className="sm-link-more"
+          onClick={() => {
+            setNewTemplate('concise')
+            setShowNew(true)
+          }}
+        >
+          + 更多模板
+        </button>
+      </div>
+    )
+  }
+
+  // ── 空态 + 新建面板展开 ──────────────────────────────────
+  if (summaries.length === 0 && showNew) {
+    return (
+      <div className="sm-empty-guide">
+        <h2 className="sm-empty-title">生成一份内容总结</h2>
+        <p className="sm-empty-subtitle">选一个模板，AI 帮你把转录文本整理成可读笔记</p>
+        <div className="sm-template-grid">
+          {QUICK_TEMPLATE_CARDS.map((t) => (
+            <button
+              key={t.value}
+              className={`sm-template-card ${newTemplate === t.value ? 'active' : ''}`}
+              onClick={() => setNewTemplate(t.value)}
+            >
+              <span className="sm-template-card-label">{t.label}</span>
+              <span className="sm-template-card-desc">{t.desc}</span>
+            </button>
+          ))}
+        </div>
+        <div className="sm-empty-more-select">
+          <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>更多模板：</span>
+          <select
+            value={QUICK_TEMPLATE_CARDS.some(t => t.value === newTemplate) ? '' : newTemplate}
+            onChange={(e) => e.target.value && setNewTemplate(e.target.value)}
+            className="sm-select"
+          >
+            <option value="" disabled>选择其他模板</option>
+            {TEMPLATE_OPTIONS.filter(o => !QUICK_TEMPLATE_CARDS.some(t => t.value === o.value)).map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+        <textarea
+          value={newBackground}
+          onChange={(e) => setNewBackground(e.target.value)}
+          placeholder="补充背景信息，帮助 LLM 更好理解…（可选）"
+          className="sm-textarea sm-empty-textarea"
+          rows={3}
+        />
+        <div className="sm-empty-actions">
+          <button className="sm-btn-back" onClick={() => setShowNew(false)}>返回</button>
+          <button className="sm-btn-generate" onClick={handleCreate} disabled={creating}>
+            {creating ? '生成中…' : '生成'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── 有总结：sidebar + main ────────────────────────────────
   return (
     <div className="sm-summaries-root">
       {/* 左侧列表 */}
@@ -287,7 +395,7 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
           <div style={{ display: 'flex', gap: 6 }}>
             {selectedIds.size >= 2 && !isCompareMode && (
               <button className="sm-btn-compare" onClick={enterCompare}>
-                ⇄ 进入对比 ({selectedIds.size})
+                ⇄ 对比 ({selectedIds.size})
               </button>
             )}
             {isCompareMode && (
@@ -305,11 +413,9 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
           </div>
         </div>
 
-        {/* 新建面板 */}
+        {/* 新建面板（有总结时的简化版） */}
         {showNew && (
           <div className="sm-new-panel">
-            <label style={{ fontSize: 12, marginBottom: 6 }}>选择模板</label>
-            {/* segmented control：4 个常用模板 */}
             <div className="sm-segmented">
               {QUICK_TEMPLATES.map((t) => (
                 <button
@@ -322,7 +428,6 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
                 </button>
               ))}
             </div>
-            {/* 更多模板下拉 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
               <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>更多：</span>
               <select
@@ -333,38 +438,24 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
               >
                 <option value="" disabled>选择其他模板</option>
                 {TEMPLATE_OPTIONS.filter(o => !QUICK_TEMPLATES.some(t => t.value === o.value)).map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
+                  <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
             </div>
-            <label style={{ fontSize: 12, marginTop: 8, marginBottom: 4 }}>
-              总结用背景（可选）
-            </label>
             <textarea
               value={newBackground}
               onChange={(e) => setNewBackground(e.target.value)}
-              placeholder="补充背景信息，帮助 LLM 更好理解…"
+              placeholder="补充背景信息…（可选）"
               className="sm-textarea"
-              rows={3}
+              rows={2}
             />
-            <button
-              className="sm-btn-generate"
-              onClick={handleCreate}
-              disabled={creating}
-            >
+            <button className="sm-btn-generate" onClick={handleCreate} disabled={creating}>
               {creating ? '生成中…' : '生成'}
             </button>
           </div>
         )}
 
         {/* 分组列表 */}
-        {groups.length === 0 && (
-          <div style={{ padding: 16, color: 'var(--ink-3)', fontSize: 13 }}>
-            暂无总结，点击「+ 新建」生成
-          </div>
-        )}
         {groups.map((g) => (
           <div key={g.template} className="sm-group">
             <div className="sm-group-label">{g.label}</div>
@@ -386,7 +477,13 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
                       : undefined
                   }
                 />
-                <span>v{s.version}</span>
+                <div className="sm-version-info">
+                  <span className="sm-version-label">v{s.version}</span>
+                  <span className="sm-version-preview">
+                    {s.content_md.replace(/[#*_>\-\n]/g, ' ').trim().slice(0, 30)}
+                    {s.content_md.length > 30 ? '…' : ''}
+                  </span>
+                </div>
                 <button
                   className="sm-btn-delete"
                   onClick={(e) => {
@@ -406,7 +503,6 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
       {/* 右侧主显示 */}
       <main className={`sm-main ${isCompareMode ? 'sm-compare' : ''}`}>
         {isCompareMode ? (
-          /* 对比模式：多栏并排 */
           <div className="sm-compare-columns">
             {compareItems.map((s) => (
               <div key={s.summary_id} className="sm-compare-col">
@@ -445,7 +541,6 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
             ))}
           </div>
         ) : selected ? (
-          /* 单栏模式 */
           <>
             <div className="sm-main-header">
               <span className="sm-main-title">
@@ -462,10 +557,9 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
               </ReactMarkdown>
             </div>
             <div className="sm-main-actions">
-              <button onClick={handleCopy}>复制 markdown</button>
-              <button onClick={() => handleDelete(selected.summary_id)}>
-                删除
-              </button>
+              <button onClick={handleCopy}>复制</button>
+              <button onClick={handleRegenerate}>重新生成</button>
+              <button onClick={() => handleDelete(selected.summary_id)}>删除</button>
             </div>
           </>
         ) : (
@@ -478,7 +572,7 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
               color: 'var(--ink-3)',
             }}
           >
-            选择一份总结查看，或点击「+ 新建」生成
+            选择一份总结查看
           </div>
         )}
       </main>

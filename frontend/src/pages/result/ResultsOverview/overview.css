@@ -274,3 +274,183 @@
   height: 5px;
   border-radius: 50%;
 }
+
+/* ── 2 列网格布局 ─────────────────────────────────────── */
+
+.vm-overview-scope .ov-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.vm-overview-scope .ov-col-left {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.vm-overview-scope .ov-col-right {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+}
+
+/* Stat 小卡片 */
+.vm-overview-scope .ov-stat-cards {
+  display: flex;
+  gap: 12px;
+}
+
+.vm-overview-scope .ov-stat-mini {
+  flex: 1;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.vm-overview-scope .ov-stat-mini .label {
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--ink-4);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+
+.vm-overview-scope .ov-stat-mini .value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* 打开详情大按钮 */
+.vm-overview-scope .ov-detail-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent, #FF4D7E), var(--accent-2, #B84CFF));
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 120ms;
+}
+
+.vm-overview-scope .ov-detail-btn:hover {
+  opacity: 0.9;
+}
+
+/* 侧边 action 小列表 */
+.vm-overview-scope .ov-side-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vm-overview-scope .ov-side-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 120ms;
+  text-align: left;
+  width: 100%;
+}
+
+.vm-overview-scope .ov-side-action:hover {
+  background: var(--bg-sunken);
+}
+
+/* ── 音频时间轴（水平 bar + 圆点） ────────────────────── */
+
+.vm-overview-scope .ov-audio-bar-wrap {
+  padding: 8px 0 4px;
+}
+
+.vm-overview-scope .ov-audio-bar {
+  position: relative;
+  height: 6px;
+  background: var(--bg-sunken);
+  border-radius: 3px;
+  margin: 0 0 4px;
+}
+
+.vm-overview-scope .ov-audio-dot {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent, #FF4D7E);
+  opacity: 0.7;
+  cursor: pointer;
+  transition: opacity 120ms, transform 120ms;
+}
+
+.vm-overview-scope .ov-audio-dot:hover {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1.5);
+  z-index: 1;
+}
+
+.vm-overview-scope .ov-audio-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--ink-4);
+}
+
+.vm-overview-scope .ov-audio-seg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
+.vm-overview-scope .ov-audio-seg-item {
+  display: flex;
+  gap: 8px;
+  padding: 4px 0;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 120ms;
+}
+
+.vm-overview-scope .ov-audio-seg-item:hover {
+  background: var(--bg-sunken);
+}
+
+.vm-overview-scope .ov-audio-seg-ts {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent, #FF4D7E);
+  flex-shrink: 0;
+  min-width: 42px;
+}
+
+.vm-overview-scope .ov-audio-seg-text {
+  font-size: 12px;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

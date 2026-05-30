@@ -99,8 +99,20 @@ function extractTranscriptPreview(itemType: ItemType, result: ItemResult): strin
 }
 
 function extractAudioTimelineLines(result: AudioResult): TimelineLine[] {
-  if (Array.isArray(result.transcript)) return result.transcript
-  if (Array.isArray(result.transcript_segments)) return result.transcript_segments
+  if (Array.isArray(result.transcript) && result.transcript.length > 0) {
+    return result.transcript.map((seg) => ({
+      t_sec: seg.t_sec ?? 0,
+      t_str: seg.t_str ?? formatSec(seg.t_sec ?? 0),
+      text: seg.text || '',
+    }))
+  }
+  if (Array.isArray(result.transcript_segments) && result.transcript_segments.length > 0) {
+    return result.transcript_segments.map((seg) => ({
+      t_sec: seg.start ?? seg.t_sec ?? 0,
+      t_str: formatSec(seg.start ?? seg.t_sec ?? 0),
+      text: seg.text || '',
+    }))
+  }
   return []
 }
 
@@ -392,189 +404,183 @@ export default function ResultsOverview() {
         <ItemTagsPanel workspaceId={workspaceId} itemId={itemId} />
       </div>
 
-      {/* Main content */}
-      <div className="ov-main">
-        {/* Summary card */}
-        {summary && (
-          <div className="ov-card">
-            <div className="ov-card-head">
-              <div>
-                <div className="eyebrow">OVERVIEW · {ITEM_TYPE_TEXT[itemType]}</div>
-                <h2 style={{ marginTop: 4 }}>内容摘要</h2>
+      {/* Main content — 2 列网格 */}
+      <div className="ov-main ov-grid">
+        {/* ── 左主列 ──────────────────────────────── */}
+        <div className="ov-col-left">
+          {/* Summary card */}
+          {summary && (
+            <div className="ov-card">
+              <div className="ov-card-head">
+                <div>
+                  <div className="eyebrow">OVERVIEW · {ITEM_TYPE_TEXT[itemType]}</div>
+                  <h2 style={{ marginTop: 4 }}>内容摘要</h2>
+                </div>
               </div>
+              <div className="ov-summary-text">{summary}</div>
             </div>
-            <div className="ov-summary-text">{summary}</div>
-            {/* Stat row */}
-            <div className="ov-stat-row">
-              {duration > 0 && (
-                <div className="ov-stat-cell">
-                  <div className="label">时长</div>
-                  <div className="value">{formatSec(duration)}</div>
-                </div>
-              )}
-              {itemType === 'video' && (
-                <div className="ov-stat-cell">
-                  <div className="label">关键帧</div>
-                  <div className="value">{extractFrameCount(result as VideoResult)}</div>
-                </div>
-              )}
-              {transcriptCount > 0 && (
-                <div className="ov-stat-cell">
-                  <div className="label">{itemType === 'text' ? '字符数' : '转录段落'}</div>
-                  <div className="value">{transcriptCount}</div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+          )}
 
-        {/* Timeline card (video) */}
-        {showTimeline && itemType === 'video' && (result as VideoResult).frames?.length > 0 && (
-          <div className="ov-card">
-            <div className="ov-card-head">
-              <h2>时间轴</h2>
-              <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>
-                前 {Math.min(10, (result as VideoResult).frames.length)} 帧
-              </span>
-            </div>
-            <div className="ov-timeline-strip">
-              {(result as VideoResult).frames.slice(0, 10).map((f, idx) => (
-                <div key={f.idx ?? `frame-${idx}`} className="ov-tl-frame">
-                  <div className="ov-tl-thumb">{f.ts}</div>
-                  <div className="ov-tl-ts">{f.shot_type}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Timeline card (audio) — transcript 前 10 段 */}
-        {showTimeline && itemType === 'audio' && (() => {
-          const lines = extractAudioTimelineLines(result as AudioResult)
-          if (lines.length === 0) return null
-          return (
+          {/* Timeline card (video) — 保持原样 */}
+          {showTimeline && itemType === 'video' && (result as VideoResult).frames?.length > 0 && (
             <div className="ov-card">
               <div className="ov-card-head">
                 <h2>时间轴</h2>
                 <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>
-                  前 {Math.min(10, lines.length)} 段
+                  前 {Math.min(10, (result as VideoResult).frames.length)} 帧
                 </span>
               </div>
               <div className="ov-timeline-strip">
-                {lines.slice(0, 10).map((l, idx) => (
-                  <div key={idx} className="ov-tl-frame">
-                    <div className="ov-tl-thumb">{l.t_str || formatSec(l.t_sec ?? 0)}</div>
-                    <div className="ov-tl-ts">{l.text?.slice(0, 20)}{l.text && l.text.length > 20 ? '…' : ''}</div>
+                {(result as VideoResult).frames.slice(0, 10).map((f, idx) => (
+                  <div key={f.idx ?? `frame-${idx}`} className="ov-tl-frame">
+                    <div className="ov-tl-thumb">{f.ts}</div>
+                    <div className="ov-tl-ts">{f.shot_type}</div>
                   </div>
                 ))}
               </div>
             </div>
-          )
-        })()}
+          )}
 
-        {/* Transcript preview */}
-        {transcriptPreview && (
-          <div className="ov-card">
-            <div className="ov-card-head">
-              <h2>转录预览</h2>
-              <button
-                className="btn-ghost"
-                style={{ fontSize: 11, height: 24, padding: '0 8px' }}
-                onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/${DETAIL_ROUTE[itemType]}`)}
-              >
-                查看全部
-              </button>
-            </div>
-            <div className="ov-transcript-preview">
-              {transcriptPreview}
-            </div>
-          </div>
-        )}
+          {/* Timeline card (audio) — 任务 4 新形态 */}
+          {showTimeline && itemType === 'audio' && (() => {
+            const lines = extractAudioTimelineLines(result as AudioResult)
+            if (lines.length === 0) return null
+            const totalSec = extractDuration('audio', result) || (lines.length > 0 ? (lines[lines.length - 1].t_sec ?? 0) : 0)
+            return (
+              <div className="ov-card">
+                <div className="ov-card-head">
+                  <h2>时间轴</h2>
+                  <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>
+                    时间分布 · 共 {lines.length} 段
+                  </span>
+                </div>
+                {/* 水平 bar */}
+                <div className="ov-audio-bar-wrap">
+                  <div className="ov-audio-bar">
+                    {lines.map((l, idx) => {
+                      const pct = totalSec > 0 ? ((l.t_sec ?? 0) / totalSec) * 100 : 0
+                      return (
+                        <div
+                          key={idx}
+                          className="ov-audio-dot"
+                          style={{ left: `${Math.min(pct, 100)}%` }}
+                          title={`${l.t_str || formatSec(l.t_sec ?? 0)} — ${l.text?.slice(0, 40)}`}
+                        />
+                      )
+                    })}
+                  </div>
+                  <div className="ov-audio-bar-labels">
+                    <span>00:00</span>
+                    <span>{formatSec(totalSec)}</span>
+                  </div>
+                </div>
+                {/* 前 10 段列表 */}
+                <div className="ov-audio-seg-list">
+                  {lines.slice(0, 10).map((l, idx) => (
+                    <div
+                      key={idx}
+                      className="ov-audio-seg-item"
+                      onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/audio_detail`)}
+                    >
+                      <span className="ov-audio-seg-ts">{l.t_str || formatSec(l.t_sec ?? 0)}</span>
+                      <span className="ov-audio-seg-text">{l.text?.slice(0, 50)}{l.text && l.text.length > 50 ? '…' : ''}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
 
-        {/* 打开详情入口 */}
-        <button
-          className="ov-action-card"
-          onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/${DETAIL_ROUTE[itemType]}`)}
-        >
-          <div className="ov-action-icon">
-            <BookOpen size={18} />
-          </div>
-          <div className="ov-action-text">
-            <div className="title">打开详情 <ArrowRight size={14} /></div>
-            <div className="desc">查看完整 {ITEM_TYPE_TEXT[itemType]} 分析结果</div>
-          </div>
-        </button>
-
-        {/* R19: 综合笔记入口卡片（顶置） */}
-        {pageState.kind === 'ready' && Boolean((pageState.item.results as Record<string, unknown>)?.av_synthesis_path) && (
-          <div
-            className="ov-action-card"
-            style={{ border: '1px solid var(--accent, #4f46e5)', background: 'var(--accent-bg, #eef2ff)' }}
-            onClick={() => navigate(`/workspaces/${workspaceId}/av-synthesis`)}
-          >
-            <div className="ov-action-icon" style={{ background: 'var(--accent-bg, #eef2ff)', color: 'var(--accent, #4f46e5)' }}>
-              <Star size={18} />
+          {/* 转录预览 — 仅非 audio 类型保留（audio 用时间轴替代） */}
+          {transcriptPreview && itemType !== 'audio' && (
+            <div className="ov-card">
+              <div className="ov-card-head">
+                <h2>转录预览</h2>
+                <button
+                  className="btn-ghost"
+                  style={{ fontSize: 11, height: 24, padding: '0 8px' }}
+                  onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/${DETAIL_ROUTE[itemType]}`)}
+                >
+                  查看全部
+                </button>
+              </div>
+              <div className="ov-transcript-preview">
+                {transcriptPreview}
+              </div>
             </div>
-            <div className="ov-action-text">
-              <div className="title">综合笔记已就绪</div>
-              <div className="desc">查看图文教学笔记</div>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* Action cards */}
-        <div className="ov-actions">
-          {/* 详情页 */}
-          <div
-            className="ov-action-card"
+        {/* ── 右辅列 ──────────────────────────────── */}
+        <div className="ov-col-right">
+          {/* Stat 卡片 */}
+          <div className="ov-stat-cards">
+            {duration > 0 && (
+              <div className="ov-stat-mini">
+                <div className="label">时长</div>
+                <div className="value">{formatSec(duration)}</div>
+              </div>
+            )}
+            {itemType === 'video' && (
+              <div className="ov-stat-mini">
+                <div className="label">关键帧</div>
+                <div className="value">{extractFrameCount(result as VideoResult)}</div>
+              </div>
+            )}
+            {transcriptCount > 0 && (
+              <div className="ov-stat-mini">
+                <div className="label">{itemType === 'text' ? '字符数' : '转录段落'}</div>
+                <div className="value">{transcriptCount}</div>
+              </div>
+            )}
+          </div>
+
+          {/* 打开详情 — 大按钮 */}
+          <button
+            className="ov-detail-btn"
             onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/${DETAIL_ROUTE[itemType]}`)}
           >
-            <div className="ov-action-icon">
-              <BookOpen size={18} />
-            </div>
-            <div className="ov-action-text">
-              <div className="title">{ITEM_TYPE_TEXT[itemType]}详情</div>
-              <div className="desc">查看完整分析结果</div>
-            </div>
-          </div>
+            打开详情 <ArrowRight size={14} />
+          </button>
 
-          {/* 分镜 */}
-          <div
-            className="ov-action-card"
-            onClick={() => navigate(`/storyboard?workspace=${workspaceId}&item=${itemId}`)}
-          >
-            <div className="ov-action-icon">
-              <Clapperboard size={18} />
-            </div>
-            <div className="ov-action-text">
-              <div className="title">进入分镜</div>
-              <div className="desc">生成分镜脚本</div>
-            </div>
-          </div>
+          {/* R19: 综合笔记入口 */}
+          {pageState.kind === 'ready' && Boolean((pageState.item.results as Record<string, unknown>)?.av_synthesis_path) && (
+            <button
+              className="ov-side-action"
+              onClick={() => navigate(`/workspaces/${workspaceId}/av-synthesis`)}
+            >
+              <Star size={14} />
+              <span>综合笔记已就绪</span>
+            </button>
+          )}
 
-          {/* LLM 对话 */}
-          <div
-            className="ov-action-card"
-            onClick={() => navigate(`/workspaces/${workspaceId}?tab=chat`)}
-          >
-            <div className="ov-action-icon">
-              <MessageSquare size={18} />
-            </div>
-            <div className="ov-action-text">
-              <div className="title">LLM 对话</div>
-              <div className="desc">与 AI 讨论内容</div>
-            </div>
-          </div>
-
-          {/* 导出 */}
-          <div className="ov-action-card" onClick={handleExport}>
-            <div className="ov-action-icon">
-              <Download size={18} />
-            </div>
-            <div className="ov-action-text">
-              <div className="title">导出工作包</div>
-              <div className="desc">下载分析结果</div>
-            </div>
+          {/* Action 小列表 */}
+          <div className="ov-side-actions">
+            <button
+              className="ov-side-action"
+              onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/${DETAIL_ROUTE[itemType]}`)}
+            >
+              <BookOpen size={14} />
+              <span>{ITEM_TYPE_TEXT[itemType]}详情</span>
+            </button>
+            <button
+              className="ov-side-action"
+              onClick={() => navigate(`/storyboard?workspace=${workspaceId}&item=${itemId}`)}
+            >
+              <Clapperboard size={14} />
+              <span>进入分镜</span>
+            </button>
+            <button
+              className="ov-side-action"
+              onClick={() => navigate(`/workspaces/${workspaceId}?tab=chat`)}
+            >
+              <MessageSquare size={14} />
+              <span>LLM 对话</span>
+            </button>
+            <button className="ov-side-action" onClick={handleExport}>
+              <Download size={14} />
+              <span>导出工作包</span>
+            </button>
           </div>
         </div>
       </div>

@@ -402,3 +402,148 @@
     min-width: 240px;
   }
 }
+
+/* ── 空态引导卡片 ─────────────────────────────────────── */
+
+.sm-empty-guide {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  min-height: 400px;
+}
+
+.sm-empty-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 8px;
+}
+
+.sm-empty-subtitle {
+  font-size: 14px;
+  color: var(--ink-3);
+  margin: 0 0 28px;
+  text-align: center;
+}
+
+.sm-template-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  width: 100%;
+  max-width: 440px;
+}
+
+.sm-template-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-elev);
+  cursor: pointer;
+  transition: border-color 120ms, box-shadow 120ms;
+  text-align: left;
+}
+
+.sm-template-card:hover {
+  border-color: var(--accent-pink);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.sm-template-card.active {
+  border-color: var(--accent-pink);
+  background: rgba(255, 77, 126, 0.04);
+}
+
+.sm-template-card-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sm-template-card-desc {
+  font-size: 12px;
+  color: var(--ink-3);
+  line-height: 1.4;
+}
+
+.sm-link-more {
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--accent-pink);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.sm-link-more:hover {
+  text-decoration: underline;
+}
+
+.sm-empty-more-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 440px;
+  margin-top: 12px;
+}
+
+.sm-empty-textarea {
+  width: 100%;
+  max-width: 440px;
+  margin-top: 12px;
+}
+
+.sm-empty-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  width: 100%;
+  max-width: 440px;
+  margin-top: 16px;
+}
+
+.sm-btn-back {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg);
+  color: var(--ink-2);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.sm-btn-back:hover {
+  background: var(--bg-sunken);
+}
+
+/* ── 列表项改进：模板名 + 预览 ────────────────────────── */
+
+.sm-version-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sm-version-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.sm-version-preview {
+  font-size: 11px;
+  color: var(--ink-4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
