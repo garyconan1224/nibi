@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react'
+import { Quote } from 'lucide-react'
+import { toast } from 'sonner'
 import type { VideoResultTranscriptLine } from '@/services/workspaces'
+import { useLnEditorStore } from '@/store/lnEditorStore'
 
 interface LNTranscriptPanelProps {
   transcript: VideoResultTranscriptLine[]
@@ -28,12 +31,24 @@ export default function LNTranscriptPanel({
     [transcript, currentTime],
   )
   const activeRef = useRef<HTMLDivElement>(null)
+  const insertAtCursor = useLnEditorStore((s) => s.insertAtCursor)
 
   useEffect(() => {
     if (activeRef.current) {
       activeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
   }, [activeIdx])
+
+  function handleQuote(line: VideoResultTranscriptLine, e: React.MouseEvent) {
+    e.stopPropagation()
+    const md = `> [${line.t_str}] ${line.text}\n`
+    const inserted = insertAtCursor(md)
+    if (inserted) {
+      toast.success('已引用字幕')
+    } else {
+      toast.error('请先切到 MD 视图')
+    }
+  }
 
   if (transcript.length === 0) {
     return (
@@ -55,6 +70,13 @@ export default function LNTranscriptPanel({
         >
           <span className="ln-tr-time">{line.t_str}</span>
           <span className="ln-tr-text">{line.text}</span>
+          <button
+            className="ln-tr-quote"
+            title="引用到笔记"
+            onClick={(e) => handleQuote(line, e)}
+          >
+            <Quote size={12} />
+          </button>
         </div>
       ))}
     </div>

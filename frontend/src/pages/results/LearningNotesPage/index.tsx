@@ -157,6 +157,7 @@ export default function LearningNotesPage() {
               ref={videoPanelRef}
               src={videoSrc}
               title={pageState.videoItem.name}
+              workspaceId={workspaceId}
               onTimeUpdate={handleTimeUpdate}
             />
             <LNTranscriptPanel

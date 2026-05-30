@@ -3,6 +3,7 @@ import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
+import { useLnEditorStore } from '@/store/lnEditorStore'
 
 interface Props {
   markdown: string
@@ -32,7 +33,8 @@ export default function MdView({ markdown: md, onMarkdownChange }: Props) {
     })
     const view = new EditorView({ state, parent: hostRef.current })
     viewRef.current = view
-    return () => { view.destroy(); viewRef.current = null }
+    useLnEditorStore.getState().setCmView(view)
+    return () => { useLnEditorStore.getState().setCmView(null); view.destroy(); viewRef.current = null }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // 只挂载一次
 

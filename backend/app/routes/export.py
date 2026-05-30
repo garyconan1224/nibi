@@ -21,7 +21,7 @@ from urllib.parse import quote
 
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -613,6 +613,45 @@ def patch_ln_markdown(workspace_id: str, body: LnPatchRequest):
         version = 0
 
     return {"saved_at": datetime.now().isoformat(), "version": version}
+
+
+# ── B-5: 学习笔记截图上传 ──────────────────────────────
+
+
+import re as _re
+
+_SAFE_NAME = _re.compile(r'[^a-zA-Z0-9._-]+')
+
+
+@router.post("/{workspace_id}/ln/screenshots")
+async def upload_ln_screenshot(
+    workspace_id: str,
+    file: UploadFile = File(...),
+    ts: float = Form(0.0),
+):
+    """接收视频截图 blob，存到 ln-screenshots/，返回可访问 URL。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail="workspace not found")
+
+    ws_root = get_workspace_root(workspace_id)
+    dst_dir = ws_root / "ln-screenshots"
+    dst_dir.mkdir(parents=True, exist_ok=True)
+
+    ts_int = int(ts)
+    now = datetime.now().strftime("%H%M%S")
+    safe = f"shot-{ts_int:06d}-{now}.png"
+
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="screenshot too large")
+
+    (dst_dir / safe).write_bytes(content)
+
+    # /static 挂载在 data/，URL 为 /static/workspaces/{ws}/ln-screenshots/xxx.png
+    rel = dst_dir.relative_to(ws_root.parent.parent)
+    url = f"/static/{rel}/{safe}"
+    return {"url": url, "filename": safe}
 
 
 # ── R20: 笔记多格式导出 ────────────────────────────────
