@@ -4,7 +4,7 @@
 >
 > **维护规则**：每完成一个子任务，在本文件**追加**一段（不删旧记录），格式见下方"记录模板"。
 >
-> Last updated: 2026-05-29（补录 S0.5-S0.7 / S4 N7b 骨架 / N8b 映射 / build hotfix；handoff S0-S6 音视频闭环完成）
+> Last updated: 2026-05-30（RP1-A 音频结果页打磨完成）
 
 ---
 
@@ -1368,3 +1368,54 @@ T2.2 核实发现：link_preview.py 只返回 og 元数据（title/description/i
 
 ### 留给后续的影响
 - 图片 track I：**I1 ✅ / I2.1 ✅**；I2.2（如果有）可考虑对已有本地文件跳过 FETCH 直接进 OCR/VLM。
+
+---
+
+## RP1-A 音频结果页打磨
+
+**完成日期**：2026-05-30
+**模型 / 工具**：xiaomi-mimo-2.5pro
+**分支**：main（直接提交）
+**提交**：
+- A-1：`8c3e987` feat(rp1-a): A-1 转录段在线编辑 + 字幕导出 edited_text 优先
+- A-3：`3143a3f` feat(rp1-a): A-3 摘要模板 segmented control + localStorage 缓存
+- A-4：`fbd8e53` feat(rp1-a): A-4 音乐教学拆解图表组件 + recharts 依赖
+
+### 子任务完成情况
+
+**A-1 转录段在线编辑 + 导出 bug 修复**
+- 新增 `PATCH /transcript/segments/{idx}` 端点，支持编辑单段转录文本（`edited_text` 字段）
+- 修复字幕导出 bug：`_build_srt` / `export_srt` / `export_txt` / `export_vtt` / `export_ass` 优先读取 `edited_text`；`_normalize_segments` 保留 `edited_text` 字段
+- 前端双击转录行进入编辑模式，支持保存/恢复原文
+- 导出菜单增加"带说话人标注"开关
+- 新增 7 个 pytest 验证 edited_text 导出逻辑
+
+**A-2 说话人改名**
+- 已有 `speaker_map` 机制（`PATCH /speaker_map` 端点 + 前端 `updateSpeakerMap`），说话人芯片条 + inline 改名 UI 已在 AudioResultPage.tsx 中实现
+- ⚠️ 与规划差异：规划写的是用 `speaker_aliases` 存储，实际复用了已有的 `speaker_map` 字段（功能等价，无需新增字段）
+
+**A-3 总结模板 segmented control**
+- 新建面板改用 4 格 segmented control（精简/详细/小红书/公众号），更多模板通过下拉菜单选择
+- localStorage 缓存已生成摘要（24h TTL），避免重复生成
+- ⚠️ 超出规划：规划只说"加 segmented control 入口"，实际额外做了 localStorage 缓存机制
+
+**A-4 音乐教学拆解**
+- 新增 MusicTab / MusicBreakdown / MusicReport / MusicMaterialLibrary 四个 React 组件
+- 新增 `music_teaching_prompts.py` 服务（LLM 教学解释生成）
+- 音乐教学 API 端点 `POST /music-teaching/{seg_idx}`
+- 添加 recharts 依赖用于图表渲染
+- ⚠️ 超出规划：规划是"音乐分析三 sub-tab（素材库·报告·拆解）"，实际做了完整的图表可视化 + 教学拆解功能
+
+**A-5 小修**
+- 音频元信息卡（时长/来源/文件名/URL）已集成到 AudioResultPage 侧边栏
+- 无独立 commit（包含在 A-1 中）
+
+### 影响范围
+- **后端**：export.py（导出 edited_text 优先）、workspaces.py（transcript PATCH + music-teaching POST）、music_teaching_prompts.py（新文件）
+- **前端**：AudioResultPage.tsx（编辑+芯片+音乐 Tab）、audio-result.css、SummariesTab.tsx + CSS（模板 segmented control）、workspaces.ts（API 函数）、result/audio/ 四组件（新目录）
+- **共享**：shared/audio_analyzer.py（导出函数 edited_text 优先）
+- **测试**：backend/tests/test_export_edited_text.py（7 个用例）
+
+### 验证
+- `pytest backend/tests/test_export_edited_text.py -v`：7 passed
+- `pnpm build`：EXIT=0
