@@ -166,9 +166,9 @@ export default function AudioResultPage() {
     }
     // Fallback to transcript (display format or string)
     const raw = result?.transcript
-    if (Array.isArray(raw)) return raw.map(l => ({ ...l, start: undefined as number | undefined, end: undefined as number | undefined, speaker: undefined as string | undefined }))
+    if (Array.isArray(raw)) return raw.map(l => ({ ...l, edited_text: undefined, start: undefined as number | undefined, end: undefined as number | undefined, speaker: undefined as string | undefined }))
     if (typeof raw === 'string' && raw.length > 0) {
-      return [{ t_sec: 0, t_str: '00:00', text: raw, start: undefined as number | undefined, end: undefined as number | undefined, speaker: undefined as string | undefined }]
+      return [{ t_sec: 0, t_str: '00:00', text: raw, edited_text: undefined, start: undefined as number | undefined, end: undefined as number | undefined, speaker: undefined as string | undefined }]
     }
     return []
   }, [result])
@@ -246,7 +246,7 @@ export default function AudioResultPage() {
         if (prev.kind !== 'ready') return prev
         const results = { ...prev.data }
         const ts = [...(results.transcript_segments || [])]
-        ts[idx] = { ...ts[idx], edited_text: trimmed || null }
+        ts[idx] = { ...ts[idx], edited_text: trimmed || undefined }
         results.transcript_segments = ts
         return { kind: 'ready', data: results }
       })
@@ -269,7 +269,7 @@ export default function AudioResultPage() {
         if (prev.kind !== 'ready') return prev
         const results = { ...prev.data }
         const ts = [...(results.transcript_segments || [])]
-        ts[idx] = { ...ts[idx], edited_text: null }
+        ts[idx] = { ...ts[idx], edited_text: undefined }
         results.transcript_segments = ts
         return { kind: 'ready', data: results }
       })
