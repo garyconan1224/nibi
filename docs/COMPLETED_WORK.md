@@ -1880,3 +1880,34 @@ feat(rp1-c): C-1 复刻页主帧大视图 + 缩略图轨道
 - `.venv/bin/python -m pytest backend/tests -q`：139 passed
 - `pnpm tsc --noEmit`：EXIT=0
 - `pnpm build`：EXIT=0
+
+---
+
+## RP1-C-4 帧提示词在线编辑 + 版本（2026-05-31）
+
+**完成日期**：2026-05-31
+**模型 / 工具**：mimo 2.5pro
+**父任务**：RP1-C
+**Commit**：`8b712ef` feat(rp1-c): C-4 帧提示词在线编辑 + 版本
+
+### 前置调查
+版本是 **item 级**（`prompt_versions: Dict[str, List[PromptVersion]]`，按 item_id 索引），不是 frame 级。现有 `PromptVersionStack` + `addPromptVersion` 接口不需要改。
+
+### 改动
+- **frontend/src/pages/result/VideoResultPage.tsx**：
+  - 新增 `editing` / `editText` / `selectedVersionIdx` 状态
+  - `startEdit`: 预填当前提示词（或选中版本内容）
+  - `saveEdit`: 带帧标记 `[帧 N (ts)]` 调 `handleAddPromptVersion`
+  - `cancelEdit`: 还原
+  - 切帧自动退出编辑态（`useEffect` on `activeFrame`）
+  - 提示词区 UI 改造：标题行 + "✎ 改"按钮 → textarea 编辑态 → 保存/取消
+- **frontend/src/components/result/PromptVersionStack.tsx**：
+  - Props 新增 `selectedIdx?: number | null` / `onSelectVersion?: (idx) => void`
+  - VersionDropdown 新增 `selectedIdx` prop，按钮标签显示选中版本号
+  - 版本预览区显示选中版本内容（非最新）
+  - dropdown 选择时调 `onSelectVersion`
+
+### 验证
+- `pnpm tsc --noEmit`：EXIT=0
+- `pnpm build`：EXIT=0
+- `.venv/bin/python -m pytest backend/tests -q`：139 passed
