@@ -1357,6 +1357,14 @@ def _bridge_to_pipeline_payload(
             params = tasks.get(task_id)
             if isinstance(params, dict):
                 payload[task_id] = params
+        # T3.2: 前端 assoc_dirs[] → pipeline association.directions
+        assoc_task = tasks.get("assoc")
+        if isinstance(assoc_task, dict) and assoc_task.get("on"):
+            dirs = assoc_task.get("assoc_dirs") or assoc_task.get("assoc_dir")
+            if isinstance(dirs, str):
+                dirs = [dirs]
+            if isinstance(dirs, list) and dirs:
+                payload["association"] = {"enabled": True, "directions": dirs}
         return "text", payload
 
     if item.type == ItemType.IMAGE.value:
@@ -1375,6 +1383,14 @@ def _bridge_to_pipeline_payload(
             params = tasks.get(task_id)
             if isinstance(params, dict):
                 payload[task_id] = params
+        # T3.2: 前端 assoc_dirs[] → pipeline assoc.directions
+        assoc_task = tasks.get("assoc")
+        if isinstance(assoc_task, dict):
+            dirs = assoc_task.get("assoc_dirs") or assoc_task.get("assoc_dir")
+            if isinstance(dirs, str):
+                dirs = [dirs]
+            if isinstance(dirs, list):
+                payload["assoc"] = {**assoc_task, "directions": dirs}
         # R21.P3.S1: 透传 preflight 新字段（image_mode / background_for_recognition）
         _preflight = tasks.get("preflight")
         if isinstance(_preflight, dict):

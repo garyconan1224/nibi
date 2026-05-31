@@ -635,6 +635,8 @@ function PFTaskCard({ group, state, setState, locks, disabledReasons }: {
   const disabled = !!disabledReason
   const [tooltip, setTooltip] = useState<string | null>(null)
   const [radioExpanded, setRadioExpanded] = useState<Record<string, boolean>>({})
+  const [tagInput, setTagInput] = useState<Record<string, string>>({})
+  const [tagInputVisible, setTagInputVisible] = useState<Record<string, boolean>>({})
   const cardBg = disabled ? 'var(--bg-sunken)'
     : on ? 'var(--bg-elev)'
     : 'transparent'
@@ -783,6 +785,109 @@ function PFTaskCard({ group, state, setState, locks, disabledReasons }: {
                   {childLocked && (
                     <div style={{ fontSize: 10, color: 'var(--accent-pink)', marginTop: 4 }}>{locks[childLockKey]}</div>
                   )}
+                </div>
+              )
+            }
+            if (c.type === 'tag-list') {
+              const selected = (Array.isArray(state[c.id]) ? state[c.id] : c.default ?? []) as string[]
+              const builtInOpts = (c.options ?? []).map(o => typeof o === 'string' ? o : o.value)
+              const storageKey = `nibi_custom_dirs_${group.id}_${c.id}`
+              const customOpts: string[] = (() => {
+                try { return JSON.parse(localStorage.getItem(storageKey) || '[]') } catch { return [] }
+              })()
+              const allOpts = [...new Set([...builtInOpts, ...customOpts])]
+              const toggleTag = (tag: string) => {
+                const next = selected.includes(tag) ? selected.filter(t => t !== tag) : [...selected, tag]
+                setState({ [c.id]: next.length > 0 ? next : [builtInOpts[0] ?? tag] })
+              }
+              const addCustomTag = () => {
+                const val = (tagInput[c.id] || '').trim()
+                if (!val || allOpts.includes(val)) return
+                const updated = [...customOpts, val]
+                localStorage.setItem(storageKey, JSON.stringify(updated))
+                setState({ [c.id]: [...selected, val] })
+                setTagInput(prev => ({ ...prev, [c.id]: '' }))
+                setTagInputVisible(prev => ({ ...prev, [c.id]: false }))
+              }
+              const removeCustomTag = (tag: string) => {
+                const updated = customOpts.filter(t => t !== tag)
+                localStorage.setItem(storageKey, JSON.stringify(updated))
+                if (selected.includes(tag)) {
+                  const next = selected.filter(t => t !== tag)
+                  setState({ [c.id]: next.length > 0 ? next : [builtInOpts[0] ?? ''] })
+                }
+              }
+              return (
+                <div key={c.id}>
+                  <div style={{ fontSize: 11, color: 'var(--ink-2)', marginBottom: 6, fontWeight: 500 }}>{c.label}</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {allOpts.map(opt => {
+                      const active = selected.includes(opt)
+                      const isCustom = !builtInOpts.includes(opt)
+                      return (
+                        <div key={opt} style={{ position: 'relative', display: 'inline-flex' }}>
+                          <button
+                            onClick={() => toggleTag(opt)}
+                            style={{
+                              height: 28, padding: '0 12px', borderRadius: 8,
+                              border: `1px solid ${active ? 'var(--ink)' : 'var(--line)'}`,
+                              background: active ? 'var(--ink)' : 'var(--bg)',
+                              color: active ? 'var(--bg)' : 'var(--ink)',
+                              fontSize: 11, fontFamily: 'var(--mono)', cursor: 'pointer',
+                            }}>
+                            {opt}
+                          </button>
+                          {isCustom && (
+                            <button
+                              onClick={() => removeCustomTag(opt)}
+                              title="移除自定义方向"
+                              style={{
+                                position: 'absolute', top: -6, right: -6,
+                                width: 16, height: 16, borderRadius: '50%',
+                                background: 'var(--accent-pink, #e74c3c)', color: '#fff',
+                                fontSize: 10, lineHeight: '16px', textAlign: 'center',
+                                border: 'none', cursor: 'pointer', padding: 0,
+                              }}>
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
+                    {tagInputVisible[c.id] ? (
+                      <div style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                        <input
+                          value={tagInput[c.id] || ''}
+                          onChange={e => setTagInput(prev => ({ ...prev, [c.id]: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Enter') addCustomTag(); if (e.key === 'Escape') setTagInputVisible(prev => ({ ...prev, [c.id]: false })) }}
+                          placeholder="自定义方向"
+                          autoFocus
+                          style={{
+                            height: 28, width: 100, padding: '0 8px', borderRadius: 8,
+                            border: '1px solid var(--line)', background: 'var(--bg)',
+                            color: 'var(--ink)', fontSize: 11, outline: 'none',
+                          }}
+                        />
+                        <button onClick={addCustomTag}
+                          style={{
+                            height: 28, padding: '0 8px', borderRadius: 8,
+                            border: '1px solid var(--line)', background: 'var(--ink)',
+                            color: 'var(--bg)', fontSize: 11, cursor: 'pointer',
+                          }}>
+                          +
+                        </button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setTagInputVisible(prev => ({ ...prev, [c.id]: true }))}
+                        style={{
+                          height: 28, padding: '0 8px', borderRadius: 8,
+                          border: '1px dashed var(--line)', background: 'transparent',
+                          color: 'var(--ink-3)', fontSize: 11, cursor: 'pointer',
+                        }}>
+                        + 自定义
+                      </button>
+                    )}
+                  </div>
                 </div>
               )
             }

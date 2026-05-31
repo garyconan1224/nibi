@@ -13,9 +13,9 @@ export interface RadioOption {
 export interface TaskChild {
   id: string
   label: string
-  type: 'radio' | 'check' | 'number' | 'text' | 'textarea'
+  type: 'radio' | 'check' | 'number' | 'text' | 'textarea' | 'tag-list'
   options?: (string | RadioOption)[]
-  default: string | number | boolean
+  default: string | number | boolean | string[]
   unit?: string
   placeholder?: string
   hint?: string
@@ -128,7 +128,7 @@ export const TASK_GROUPS: Record<MediaKind, TaskGroup[]> = {
     },
     { id: 'assoc', label: '内容联想总结', sub: '用途 / 设计 / 竞品 / 情绪', default: false,
       children: [
-        { id: 'assoc_dir', label: '联想方向', type: 'radio', options: ['用途推断', '设计分析', '竞品洞察', '情绪解读'], default: '用途推断' },
+        { id: 'assoc_dirs', label: '联想方向', type: 'tag-list', options: ['用途推断', '设计分析', '竞品洞察', '情绪解读'], default: ['用途推断'] },
       ],
     },
     { id: 'compare', label: '多图对比分析', sub: '仅多张图片时可选', default: false },
@@ -141,7 +141,7 @@ export const TASK_GROUPS: Record<MediaKind, TaskGroup[]> = {
     },
     { id: 'assoc', label: '联想归纳', sub: '深度解读 / 观点 / 趋势 / 行动', default: true,
       children: [
-        { id: 'assoc_dir', label: '方向', type: 'radio', options: ['深度解读', '观点提炼', '趋势判断', '行动建议'], default: '深度解读' },
+        { id: 'assoc_dirs', label: '方向', type: 'tag-list', options: ['深度解读', '观点提炼', '趋势判断', '行动建议'], default: ['深度解读'] },
       ],
     },
     { id: 'rewrite', label: '改写 / 润色', sub: '与原文并排对照', default: false,

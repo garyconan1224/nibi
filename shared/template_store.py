@@ -1,9 +1,10 @@
 """
-视频模板持久化（本地 JSON，不入库）。
+模板持久化（本地 JSON，不入库）。
 
-- 内置 6 类硬编码在 pipeline_tasks._VIDEO_TEMPLATE_PROMPTS
+- 视频内置 6 类硬编码在 pipeline_tasks._VIDEO_TEMPLATE_PROMPTS
+- 文字内置 5 类硬编码在 routes/templates._TEXT_BUILTIN_PROMPTS
 - 用户自定义模板写 .local/video_templates.json
-- _load_video_template_prompts() 合并两者，自定义优先
+- category 字段区分 'video' | 'text'；老模板缺 category 默认 'video'（向后兼容）
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ class VideoTemplate:
     name: str = ""
     prompt: str = ""
     is_builtin: bool = False
+    category: str = "video"  # 'video' | 'text'
     created_at: str = ""
     updated_at: str = ""
 
@@ -39,6 +41,7 @@ class VideoTemplate:
             name=str(data.get("name") or ""),
             prompt=str(data.get("prompt") or ""),
             is_builtin=bool(data.get("is_builtin", False)),
+            category=str(data.get("category") or "video"),
             created_at=str(data.get("created_at") or ""),
             updated_at=str(data.get("updated_at") or ""),
         )
@@ -62,6 +65,11 @@ def load_templates() -> list[VideoTemplate]:
         return []
 
 
+def load_templates_by_category(category: str) -> list[VideoTemplate]:
+    """按 category 过滤用户自定义模板。"""
+    return [t for t in load_templates() if t.category == category]
+
+
 def save_templates(templates: list[VideoTemplate]) -> None:
     """全量覆写模板文件。"""
     _ensure_store_dir()
@@ -71,13 +79,14 @@ def save_templates(templates: list[VideoTemplate]) -> None:
     )
 
 
-def create_template(name: str, prompt: str) -> VideoTemplate:
+def create_template(name: str, prompt: str, category: str = "video") -> VideoTemplate:
     now = datetime.now(timezone.utc).isoformat()
     template = VideoTemplate(
         template_id=uuid.uuid4().hex[:12],
         name=name,
         prompt=prompt,
         is_builtin=False,
+        category=category,
         created_at=now,
         updated_at=now,
     )
@@ -135,6 +144,7 @@ def duplicate_template(template_id: str, source_prompt: str) -> VideoTemplate | 
         name=f"{name}（副本）",
         prompt=source_prompt,
         is_builtin=False,
+        category=source.category,
         created_at=now,
         updated_at=now,
     )

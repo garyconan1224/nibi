@@ -4,8 +4,9 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useTemplateStore } from '@/store/templateStore'
-import type { VideoTemplateItem } from '@/services/templates'
+import type { VideoTemplateItem, TemplateCategory } from '@/services/templates'
 import {
   fetchTemplates,
   createTemplate,
@@ -16,7 +17,19 @@ import {
 
 type ModalMode = 'closed' | 'create' | 'edit'
 
+const CATEGORY_META: Record<TemplateCategory, { label: string; desc: string }> = {
+  video: {
+    label: '视频模板',
+    desc: '自定义视频类型模板，在分析时与内置 6 类一起出现在 Preflight 选择中',
+  },
+  text: {
+    label: '文字模板',
+    desc: '自定义文字分析模板，覆盖摘要/要点/金句/改写/联想等任务',
+  },
+}
+
 export default function VideoTemplatesPage() {
+  const [category, setCategory] = useState<TemplateCategory>('video')
   const [templates, setTemplates] = useState<VideoTemplateItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -28,17 +41,18 @@ export default function VideoTemplatesPage() {
   const [formName, setFormName] = useState('')
   const [formPrompt, setFormPrompt] = useState('')
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (cat?: TemplateCategory) => {
+    const c = cat ?? category
     setLoading(true)
     setError(null)
     try {
-      setTemplates(await fetchTemplates())
+      setTemplates(await fetchTemplates(c))
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载失败')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [category])
 
   useEffect(() => {
     let cancelled = false
@@ -46,7 +60,7 @@ export default function VideoTemplatesPage() {
       setLoading(true)
       setError(null)
       try {
-        const data = await fetchTemplates()
+        const data = await fetchTemplates(category)
         if (!cancelled) setTemplates(data)
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : '加载失败')
@@ -56,7 +70,7 @@ export default function VideoTemplatesPage() {
     }
     void load()
     return () => { cancelled = true }
-  }, [])
+  }, [category])
 
   const openCreate = () => {
     setModalMode('create')
@@ -88,13 +102,13 @@ export default function VideoTemplatesPage() {
     }
     try {
       if (modalMode === 'create') {
-        await createTemplate({ name, prompt })
+        await createTemplate({ name, prompt, category })
         toast.success(`模板「${name}」已创建`)
       } else {
         await updateTemplate(editingId, { name, prompt })
         toast.success(`模板「${name}」已更新`)
       }
-      useTemplateStore.getState().invalidate()
+      useTemplateStore.getState().invalidate(category)
       closeModal()
       await reload()
     } catch (err) {
@@ -107,7 +121,7 @@ export default function VideoTemplatesPage() {
     setBusyId(t.template_id)
     try {
       await deleteTemplate(t.template_id)
-      useTemplateStore.getState().invalidate()
+      useTemplateStore.getState().invalidate(category)
       toast.success(`模板「${t.name}」已删除`)
       await reload()
     } catch (err) {
@@ -123,7 +137,7 @@ export default function VideoTemplatesPage() {
       const copy = await duplicateTemplate(t.template_id, {
         source_prompt: t.prompt,
       })
-      useTemplateStore.getState().invalidate()
+      useTemplateStore.getState().invalidate(category)
       toast.success(`已复制为「${copy.name}」`)
       await reload()
     } catch (err) {
@@ -133,22 +147,30 @@ export default function VideoTemplatesPage() {
     }
   }
 
+  const meta = CATEGORY_META[category]
+
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-        <div>
-          <h2 className="text-lg font-semibold">视频模板</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            自定义视频类型模板，在分析时与内置 6 类一起出现在 Preflight 选择中
-          </p>
+      <Tabs
+        value={category}
+        onValueChange={(v) => setCategory(v as TemplateCategory)}
+        className="flex flex-col h-full"
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <div>
+            <TabsList>
+              <TabsTrigger value="video">视频模板</TabsTrigger>
+              <TabsTrigger value="text">文字模板</TabsTrigger>
+            </TabsList>
+            <p className="text-sm text-muted-foreground mt-2">{meta.desc}</p>
+          </div>
+          <Button size="sm" onClick={openCreate}>
+            <Plus className="size-4" />
+            新建模板
+          </Button>
         </div>
-        <Button size="sm" onClick={openCreate}>
-          <Plus className="size-4" />
-          新建模板
-        </Button>
-      </div>
 
-      <div className="flex-1 overflow-auto p-6">
+        <TabsContent value={category} className="flex-1 overflow-auto p-6 mt-0">
         {loading && (
           <p className="text-sm text-muted-foreground text-center py-12">加载中…</p>
         )}
@@ -240,7 +262,8 @@ export default function VideoTemplatesPage() {
               </div>
             </div>
           ))}
-      </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Create / Edit Modal */}
       {modalMode !== 'closed' && (
@@ -250,7 +273,9 @@ export default function VideoTemplatesPage() {
             <div className="bg-background rounded-lg shadow-xl w-full max-w-lg mx-4 pointer-events-auto">
               <div className="flex items-center justify-between px-5 py-4 border-b border-border">
                 <h3 className="font-semibold">
-                  {modalMode === 'create' ? '新建视频模板' : '编辑视频模板'}
+                  {modalMode === 'create'
+                    ? `新建${CATEGORY_META[category].label.replace('模板', '')}模板`
+                    : `编辑${CATEGORY_META[category].label.replace('模板', '')}模板`}
                 </h3>
                 <Button variant="ghost" size="icon" className="size-7" onClick={closeModal}>
                   <X className="size-4" />
@@ -276,7 +301,9 @@ export default function VideoTemplatesPage() {
                     value={formPrompt}
                     onChange={(e) => setFormPrompt(e.target.value)}
                     placeholder={
-                      '这是一段学术讲座类视频的转写文本。请按以下结构输出总结：\n1. 一句话摘要（30字以内）\n2. 核心论点列表\n3. 关键引用\n4. 研究启示'
+                      category === 'text'
+                        ? '请对以下文本进行分析：\n1. 核心摘要\n2. 关键要点\n3. 金句摘录'
+                        : '这是一段学术讲座类视频的转写文本。请按以下结构输出总结：\n1. 一句话摘要（30字以内）\n2. 核心论点列表\n3. 关键引用\n4. 研究启示'
                     }
                     rows={8}
                     maxLength={5000}

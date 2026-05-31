@@ -30,6 +30,7 @@ from backend.app.routes.search import router as search_router
 from backend.app.routes.system import router as system_router
 from backend.app.routes.transcriber_config import router as transcriber_config_router
 from backend.app.routes.templates import router as templates_router
+from backend.app.routes.templates import legacy_router as templates_legacy_router
 from backend.app.routes.transcript import router as transcript_router
 from backend.app.routes.workspaces import router as workspaces_router
 from backend.app.routes.chat import router as chat_router
@@ -124,6 +125,7 @@ app.include_router(prompt_formats_router)
 app.include_router(rag_router)
 app.include_router(search_router)
 app.include_router(templates_router)
+app.include_router(templates_legacy_router)
 app.include_router(workspaces_router)
 app.include_router(chat_router)
 app.include_router(export_router)

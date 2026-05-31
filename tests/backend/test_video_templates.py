@@ -11,6 +11,7 @@ from pytest import MonkeyPatch
 
 import shared.template_store as template_store_module
 from backend.app.routes.templates import router as templates_router
+from backend.app.routes.templates import legacy_router as templates_legacy_router
 
 
 @pytest.fixture
@@ -23,6 +24,7 @@ def client(tmp_path: Path, monkeypatch: MonkeyPatch) -> TestClient:
 
     app = FastAPI()
     app.include_router(templates_router)
+    app.include_router(templates_legacy_router)
     return TestClient(app)
 
 
