@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, BookOpen, Check, Copy, Download, Film, Pause, Play, Settings2, Star } from 'lucide-react'
+import { ArrowLeft, BookOpen, Check, Copy, Download, Film, Maximize2, Pause, Play, Settings2, Star, X } from 'lucide-react'
 
 import {
   type PromptVersion,
@@ -96,6 +96,7 @@ export default function VideoResultPage() {
   const [promptVersions, setPromptVersions] = useState<PromptVersion[]>([])
   const [exportOpen, setExportOpen] = useState(false)
   const [contentTab, setContentTab] = useState<'content' | 'summary'>('content')
+  const [lightboxOpen, setLightboxOpen] = useState(false)
 
   // 学习模式补图
   const [inlineFrames, setInlineFrames] = useState<InlineFrame[]>([])
@@ -113,6 +114,7 @@ export default function VideoResultPage() {
   }
 
   const videoRef = useRef<HTMLVideoElement>(null)
+  const activeThumbRef = useRef<HTMLButtonElement>(null)
 
   // 拉提示词格式配置；失败容忍（result 页仍可看，只是 tabs 用 fallback）
   useEffect(() => {
@@ -217,6 +219,11 @@ export default function VideoResultPage() {
   }, [frames, currentSec])
 
   const frame: VideoResultFrame | null = frames[activeFrame] ?? null
+
+  // activeFrame 变化时让当前缩略图居中
+  useEffect(() => {
+    activeThumbRef.current?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
+  }, [activeFrame])
 
   // 构造 tabs：active_image_ids 对应 format + JSON 永远附加在末尾
   const tabs = useMemo<TabDescriptor[]>(() => {
@@ -447,11 +454,13 @@ export default function VideoResultPage() {
       } else if (e.key >= '1' && e.key <= '9') {
         const idx = parseInt(e.key, 10) - 1
         if (idx < tabs.length) setPromptStyle(tabs[idx].key)
+      } else if (e.key === 'Escape' && lightboxOpen) {
+        setLightboxOpen(false)
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [togglePlay, jumpFrame, seekTo, currentSec, setRate, handleCopy, handleFavorite, tabs])
+  }, [togglePlay, jumpFrame, seekTo, currentSec, setRate, handleCopy, handleFavorite, tabs, lightboxOpen])
 
   if (fetchState.kind === 'loading') {
     return (
@@ -742,50 +751,79 @@ export default function VideoResultPage() {
           <ItemTagsPanel workspaceId={workspaceId} itemId={itemId} />
         </div>
 
-        {/* 播放器 / visual_only placeholder */}
-        {isVisualOnly ? (
-          <div className="vd-player-wrap" style={{ display: 'grid', placeItems: 'center', minHeight: 240 }}>
-            <div style={{ textAlign: 'center', color: 'var(--ink-3)', fontFamily: 'var(--display)', fontSize: 18, letterSpacing: '-0.01em', lineHeight: 1.6 }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>📽️</div>
-              仅画面分析模式 · 不含视频播放
-            </div>
-          </div>
-        ) : (
-        <div className="vd-player-wrap">
-          <div className="vd-player" onClick={togglePlay}>
-            {hasVideoSource ? (
-              <video ref={videoRef} src={result.video.url} preload="metadata" />
+        {/* ══ 主帧大图 + 缩略图轨道 ══ */}
+        <div className="vd-main-frame-area">
+          {/* 主帧大图 */}
+          <div className="vd-main-frame" onClick={() => frame.image_path && setLightboxOpen(true)}>
+            {frame.image_path ? (
+              <img src={frame.image_path} alt={frame.title} />
             ) : (
-              <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.92)', fontFamily: 'var(--display)', fontSize: 28, letterSpacing: '-0.01em', textAlign: 'center', padding: 24 }}>
+              <div className="vd-main-frame-fallback">
+                <span style={{ fontSize: 32, marginBottom: 8 }}>🖼️</span>
                 {frame.title}
               </div>
             )}
-
-            <div className="vd-overlay">
-              <div className="vd-ov-meta">{frame.ts} · {frame.shot_type}</div>
-              <div className="vd-ov-title">{frame.title}</div>
-              <div className="vd-ov-sub">{frame.subtitle}</div>
+            <div className="vd-main-frame-info">
+              <span className="mono">{frame.ts} · {frame.shot_type}</span>
+              <span className="vd-main-frame-title">{frame.title}</span>
             </div>
-
-            <div className="vd-play-btn">
-              {playing ? <Pause size={18} /> : <Play size={18} />}
-            </div>
-
-            <div className="vd-progress">
-              <div className="vd-progress-fill" style={{ width: `${progress * 100}%` }} />
-            </div>
+            {frame.image_path && (
+              <div className="vd-main-frame-expand">
+                <Maximize2 size={14} />
+              </div>
+            )}
           </div>
 
-          <div className="vd-controls">
-            <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>
-              {formatSec(currentSec)} / {formatSec(totalSec)}
-            </span>
-            <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>
-              快捷键：Space 播放 · ←/→ ±5s · Shift+←/→ 切镜头 · C 复制 · F 收藏 · 1/2/3 切格式
-            </span>
+          {/* 缩略图轨道 */}
+          <div className="vd-thumb-track">
+            {frames.map((f, i) => (
+              <button
+                key={i}
+                ref={i === activeFrame ? activeThumbRef : undefined}
+                className="vd-thumb"
+                data-active={i === activeFrame}
+                onClick={() => seekTo(f.sec ?? parseTsStr(f.ts ?? f.timestamp ?? ''))}
+                title={f.title}
+              >
+                {f.image_path ? (
+                  <img src={f.image_path} alt={f.title} loading="lazy" />
+                ) : (
+                  <div className="vd-thumb-fallback">{f.title?.slice(0, 4)}</div>
+                )}
+              </button>
+            ))}
           </div>
+
+          {/* 视频播放器（缩小，次要位置） */}
+          {isVisualOnly ? (
+            <div className="vd-player-mini-wrap" style={{ display: 'grid', placeItems: 'center', padding: '8px 0' }}>
+              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>仅画面分析模式 · 不含视频播放</span>
+            </div>
+          ) : (
+            <div className="vd-player-mini-wrap">
+              <div className="vd-player-mini" onClick={togglePlay}>
+                {hasVideoSource ? (
+                  <video ref={videoRef} src={result.video.url} preload="metadata" />
+                ) : (
+                  <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.92)', fontFamily: 'var(--display)', fontSize: 14, textAlign: 'center', padding: 12 }}>
+                    {frame.title}
+                  </div>
+                )}
+                <div className="vd-play-btn-mini">
+                  {playing ? <Pause size={14} /> : <Play size={14} />}
+                </div>
+                <div className="vd-progress-mini">
+                  <div className="vd-progress-mini-fill" style={{ width: `${progress * 100}%` }} />
+                </div>
+              </div>
+              <div className="vd-controls-mini">
+                <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>
+                  {formatSec(currentSec)} / {formatSec(totalSec)}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
-        )}
 
         {/* 三轨 */}
         <TripleTrack
@@ -921,6 +959,24 @@ export default function VideoResultPage() {
           onSelect={handleInsertFrame}
           onClose={() => setFramePickerOpen(false)}
         />
+      )}
+
+      {/* 主帧 Lightbox */}
+      {lightboxOpen && frame.image_path && (
+        <div className="vd-lightbox" onClick={() => setLightboxOpen(false)}>
+          <button className="vd-lightbox-close" onClick={() => setLightboxOpen(false)}>
+            <X size={20} />
+          </button>
+          <img
+            className="vd-lightbox-img"
+            src={frame.image_path}
+            alt={frame.title}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div className="vd-lightbox-info">
+            {frame.ts} · {frame.shot_type} · {frame.title}
+          </div>
+        </div>
       )}
     </div>
   )

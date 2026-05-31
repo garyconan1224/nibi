@@ -486,3 +486,266 @@
 .vm-video-result-scope .vd-inline-frame-del:hover {
   color: var(--accent-pink);
 }
+
+/* ═══════ C-1：主帧大图 + 缩略图轨道 + lightbox ═══════ */
+
+.vm-video-result-scope .vd-main-frame-area {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 10px 20px 0;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 主帧大图 */
+.vm-video-result-scope .vd-main-frame {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--bg-sunken);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vm-video-result-scope .vd-main-frame img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.vm-video-result-scope .vd-main-frame-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-3);
+  font-family: var(--display);
+  font-size: 16px;
+  text-align: center;
+  padding: 24px;
+  line-height: 1.5;
+}
+
+.vm-video-result-scope .vd-main-frame-info {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 10px 14px;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.72) 0%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vm-video-result-scope .vd-main-frame-info .mono {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.vm-video-result-scope .vd-main-frame-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.vm-video-result-scope .vd-main-frame-expand {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.85);
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.vm-video-result-scope .vd-main-frame:hover .vd-main-frame-expand {
+  opacity: 1;
+}
+
+/* 缩略图轨道 */
+.vm-video-result-scope .vd-thumb-track {
+  display: flex;
+  gap: 6px;
+  padding: 10px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-shrink: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+.vm-video-result-scope .vd-thumb-track::-webkit-scrollbar {
+  height: 4px;
+}
+
+.vm-video-result-scope .vd-thumb-track::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 2px;
+}
+
+.vm-video-result-scope .vd-thumb {
+  flex-shrink: 0;
+  width: 80px;
+  height: 60px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  background: var(--bg-sunken);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.vm-video-result-scope .vd-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.vm-video-result-scope .vd-thumb-fallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  color: var(--ink-4);
+  font-family: var(--mono);
+}
+
+.vm-video-result-scope .vd-thumb[data-active='true'] {
+  border-color: var(--accent-pink);
+  box-shadow: 0 0 0 1px var(--accent-pink), 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.vm-video-result-scope .vd-thumb:hover:not([data-active='true']) {
+  border-color: var(--line);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* 视频播放器（缩小） */
+.vm-video-result-scope .vd-player-mini-wrap {
+  flex-shrink: 0;
+  padding: 0 0 6px;
+}
+
+.vm-video-result-scope .vd-player-mini {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--accent-pink), var(--accent-2));
+  aspect-ratio: 16/9;
+  max-height: 100px;
+}
+
+.vm-video-result-scope .vd-player-mini video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.vm-video-result-scope .vd-play-btn-mini {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.85);
+  display: grid;
+  place-items: center;
+  color: #000;
+}
+
+.vm-video-result-scope .vd-progress-mini {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.vm-video-result-scope .vd-progress-mini-fill {
+  height: 100%;
+  background: var(--accent-pink);
+  transition: width 200ms linear;
+}
+
+.vm-video-result-scope .vd-controls-mini {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+/* Lightbox */
+.vm-video-result-scope .vd-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.vm-video-result-scope .vd-lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  z-index: 101;
+  transition: background 0.15s;
+}
+
+.vm-video-result-scope .vd-lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.vm-video-result-scope .vd-lightbox-img {
+  max-width: 92vw;
+  max-height: 88vh;
+  object-fit: contain;
+  border-radius: 4px;
+  cursor: default;
+}
+
+.vm-video-result-scope .vd-lightbox-info {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.55);
+  padding: 4px 14px;
+  border-radius: 6px;
+  white-space: nowrap;
+}

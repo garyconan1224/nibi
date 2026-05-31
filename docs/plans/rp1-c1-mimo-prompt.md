@@ -1,6 +1,6 @@
 ---
 phase: RP1-C · C-1 视频复刻页主帧大视图 + 缩略图轨道
-status: ready
+status: done
 owner: xiaomi-mimo-2.5pro
 parent: docs/plans/result-pages-redesign-v1.md § RP1-C · C-1
 companion: docs/plans/rp1-execution-handoff.md § 3.4 提示词 C-1
