@@ -1911,3 +1911,37 @@ feat(rp1-c): C-1 复刻页主帧大视图 + 缩略图轨道
 - `pnpm tsc --noEmit`：EXIT=0
 - `pnpm build`：EXIT=0
 - `.venv/bin/python -m pytest backend/tests -q`：139 passed
+
+---
+
+## RP1-C-5 复刻页小修 — 帧标题改名（2026-05-31）
+
+**完成日期**：2026-05-31
+**模型 / 工具**：mimo 2.5pro
+**父任务**：RP1-C（收尾）
+**Commit**：`7767158` feat(rp1-c): C-5 复刻页小修 — 帧标题改名
+
+### 前置核对
+- **标签展示**：已存在（`Object.values(frame.tags ?? {}).flat()` 渲染为 chip）→ 跳过
+- **重试端点**：后端无 frame 级 status/retry 机制，`VideoResultFrame` 无 status 字段 → 超出小修范围，跳过
+- **帧标题**：只读展示，无编辑功能 → 实现
+
+### 改动
+- **backend/app/routes/workspaces.py**：
+  - 新增 `PATCH /{ws}/items/{item}/frames/{idx}/title` 端点
+  - 标题存入 `item.results.frame_title_overrides`（Dict[str, str]，key=帧索引字符串）
+  - GET result 端点在 `_materialize_video_results_from_analyze` 后合并 overrides
+  - 新增 `FrameTitleRequest` model + 4 个测试
+- **frontend/src/services/workspaces.ts**：
+  - 新增 `updateFrameTitle(ws, item, frameIdx, title)`
+- **frontend/src/pages/result/VideoResultPage.tsx**：
+  - 新增 `titleEditing` / `titleEditValue` / `frameTitles` 状态
+  - `displayTitle` 优先取 `frameTitles[activeFrame]`，兜底 `frame.title`
+  - 右侧面板帧标题点击 → inline input（Enter 保存 / Esc 取消）
+  - 保存后 `frameTitles` 本地更新 + PATCH 持久化
+- **backend/tests/test_frame_title.py**：4 个测试用例
+
+### 验证
+- `.venv/bin/python -m pytest backend/tests -q`：143 passed
+- `pnpm tsc --noEmit`：EXIT=0
+- `pnpm build`：EXIT=0
