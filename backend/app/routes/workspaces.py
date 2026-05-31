@@ -21,12 +21,14 @@ from __future__ import annotations
   DELETE /workspaces/{ws_id}/favorites/{id}    取消收藏
 """
 
+import io
 import json
 import logging
 import re
 import shutil
 import threading
 import uuid
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -38,6 +40,7 @@ from backend.app.models.tasks import TERMINAL_STATUS_VALUES, TaskStatus
 _ROOT_DIR: Path = Path(__file__).resolve().parent.parent.parent.parent
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from backend.app.models.workspace import (
@@ -2326,6 +2329,108 @@ def list_prompt_versions(workspace_id: str, item_id: str) -> List[Dict[str, Any]
     except KeyError as err:
         raise HTTPException(status_code=404, detail=str(err)) from err
     return [pv.to_dict() for pv in versions]
+
+
+# ── C-3 复刻包导出 ─────────────────────────────────────────
+
+
+class ReproduceExportRequest(BaseModel):
+    frame_indices: List[int] = Field(..., min_length=1)
+
+
+@router.post("/{workspace_id}/items/{item_id}/reproduce/export")
+def export_reproduce_package(
+    workspace_id: str, item_id: str, req: ReproduceExportRequest
+) -> StreamingResponse:
+    """打包选中帧为复刻工作包 zip 流式返回。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+
+    # 复用 get_item_result 的数据获取逻辑
+    v_results = dict(item.results or {})
+    v_overlay = _sync_item_with_tasks(item)
+    if v_overlay and v_overlay.get("results"):
+        v_results = dict(v_overlay.get("results", {}))
+
+    preferred_basenames: List[str] = []
+    for tid in reversed(item.related_task_ids):
+        task = _pipeline_runner.store.get(tid)
+        if task is None or task.task_type != "analyze" or task.status != TaskStatus.SUCCESS.value:
+            continue
+        preferred_basenames = list(task.payload.get("video_basenames") or [])
+        if preferred_basenames:
+            break
+    v_results = _materialize_video_results_from_analyze(v_results, preferred_basenames=preferred_basenames)
+    frames = v_results.get("frames", [])
+
+    # 过滤有效帧索引
+    valid = [i for i in req.frame_indices if 0 <= i < len(frames)]
+    if not valid:
+        raise HTTPException(status_code=400, detail="no valid frame indices")
+
+    data_root = _ROOT_DIR / "data"
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        # frames/*.jpg
+        for i in valid:
+            fr = frames[i]
+            img_path = fr.get("image_path") or fr.get("frame_image_path") or ""
+            if img_path.startswith("/static/"):
+                fs_path = data_root / img_path[len("/static/"):]
+            else:
+                fs_path = None
+            if fs_path and fs_path.is_file():
+                zf.writestr(f"frames/{i:03d}.jpg", fs_path.read_bytes())
+
+        # prompts.txt
+        lines = []
+        for i in valid:
+            fr = frames[i]
+            ts = fr.get("ts", "")
+            title = fr.get("title", "")
+            prompt = fr.get("prompt_mj") or fr.get("prompt_video") or ""
+            lines.append(f"--- Frame {i} ({ts}) {title} ---\n{prompt}\n")
+        zf.writestr("prompts.txt", "\n".join(lines))
+
+        # styles.json — 所有选中帧的 tags 汇总
+        styles = {}
+        for i in valid:
+            tags = frames[i].get("tags", {})
+            for dim, vals in tags.items():
+                if isinstance(vals, list):
+                    styles.setdefault(dim, [])
+                    for v in vals:
+                        if v not in styles[dim]:
+                            styles[dim].append(v)
+        zf.writestr("styles.json", json.dumps(styles, ensure_ascii=False, indent=2))
+
+        # manifest.json
+        manifest = {
+            "workspace_id": workspace_id,
+            "item_id": item_id,
+            "video_title": v_results.get("video", {}).get("title", ""),
+            "frame_count": len(valid),
+            "frames": [
+                {
+                    "index": i,
+                    "ts": frames[i].get("ts", ""),
+                    "title": frames[i].get("title", ""),
+                    "shot_type": frames[i].get("shot_type", ""),
+                }
+                for i in valid
+            ],
+        }
+        zf.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+
+    buf.seek(0)
+    filename = f"reproduce_{item_id[:8]}.zip"
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ── Phase 3B.2：单工作空间语义检索 ─────────────────────────

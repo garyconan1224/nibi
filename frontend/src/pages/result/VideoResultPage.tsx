@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, BookOpen, Check, Copy, Download, Film, Maximize2, Pause, Play, Settings2, Star, X } from 'lucide-react'
+import { ArrowLeft, BookOpen, Check, CheckSquare, Copy, Download, Film, Maximize2, MinusSquare, Pause, Play, Settings2, Square, Star, X } from 'lucide-react'
 
 import {
   type PromptVersion,
@@ -9,7 +9,7 @@ import {
   type VideoResultFrame,
   addPromptVersion,
   downloadSubtitles,
-  // downloadExport, -- N11: 导出功能 UI 隐藏
+  exportReproducePackage,
   getItemResult,
   listPromptVersions,
 } from '@/services/workspaces'
@@ -97,6 +97,11 @@ export default function VideoResultPage() {
   const [exportOpen, setExportOpen] = useState(false)
   const [contentTab, setContentTab] = useState<'content' | 'summary'>('content')
   const [lightboxOpen, setLightboxOpen] = useState(false)
+
+  // C-3: 帧多选
+  const [selectedFrames, setSelectedFrames] = useState<Set<number>>(new Set())
+  const lastClickedIdx = useRef<number>(-1)
+  const [exporting, setExporting] = useState(false)
 
   // 学习模式补图
   const [inlineFrames, setInlineFrames] = useState<InlineFrame[]>([])
@@ -362,6 +367,66 @@ export default function VideoResultPage() {
       return { ...prev, [activeFrame]: next }
     })
   }, [frame, activeFrame, workspaceId, itemId])
+
+  // C-3: 帧多选 toggle（支持 Shift 连选）
+  const handleFrameSelect = useCallback(
+    (idx: number, e: React.MouseEvent) => {
+      setSelectedFrames((prev) => {
+        const next = new Set(prev)
+        if (e.shiftKey && lastClickedIdx.current >= 0) {
+          const lo = Math.min(lastClickedIdx.current, idx)
+          const hi = Math.max(lastClickedIdx.current, idx)
+          for (let i = lo; i <= hi; i++) next.add(i)
+        } else {
+          if (next.has(idx)) next.delete(idx)
+          else next.add(idx)
+        }
+        lastClickedIdx.current = idx
+        return next
+      })
+    },
+    [],
+  )
+
+  const selectAllFrames = useCallback(() => {
+    setSelectedFrames(new Set(frames.map((_, i) => i)))
+    lastClickedIdx.current = frames.length - 1
+  }, [frames])
+
+  const clearSelectedFrames = useCallback(() => {
+    setSelectedFrames(new Set())
+    lastClickedIdx.current = -1
+  }, [])
+
+  // C-3: 批量复制选中帧提示词
+  const handleBatchCopy = useCallback(() => {
+    if (!selectedFrames.size) return
+    const lines: string[] = []
+    const sorted = [...selectedFrames].sort((a, b) => a - b)
+    for (const i of sorted) {
+      const f = frames[i]
+      if (!f) continue
+      const prompt = f.prompt_mj || f.prompt_video || ''
+      lines.push(`--- Frame ${i} (${f.ts}) ${f.title} ---\n${prompt}`)
+    }
+    navigator.clipboard?.writeText(lines.join('\n\n')).catch(() => {})
+    toast.success(`已复制 ${sorted.length} 帧提示词`)
+  }, [selectedFrames, frames])
+
+  // C-3: 导出复刻包
+  const handleExportReproduce = useCallback(async () => {
+    if (!selectedFrames.size) return
+    setExporting(true)
+    try {
+      const indices = [...selectedFrames].sort((a, b) => a - b)
+      await exportReproducePackage(workspaceId, itemId, indices)
+      toast.success(`已导出 ${indices.length} 帧复刻包`)
+    } catch (err) {
+      toast.error('导出失败：' + (err instanceof Error ? err.message : '未知'))
+    } finally {
+      setExporting(false)
+    }
+  }, [selectedFrames, workspaceId, itemId])
 
   /* N11: 导出功能 UI 隐藏（代码保留，见 SPEC §8.2）
   const handleExport = useCallback(async () => {
@@ -774,6 +839,29 @@ export default function VideoResultPage() {
             )}
           </div>
 
+          {/* C-3: 帧多选工具栏 */}
+          {selectedFrames.size > 0 && (
+            <div className="vd-select-bar">
+              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                已选 {selectedFrames.size} / {frames.length} 帧
+              </span>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button className="vd-btn-tool" onClick={handleBatchCopy} title="复制选中帧提示词">
+                  <Copy size={12} /> 复制提示词
+                </button>
+                <button className="vd-btn-tool" onClick={handleExportReproduce} disabled={exporting} title="导出复刻包">
+                  <Download size={12} /> {exporting ? '导出中…' : '导出复刻包'}
+                </button>
+                <button className="vd-btn-tool" onClick={selectAllFrames} title="全选">
+                  <CheckSquare size={12} /> 全选
+                </button>
+                <button className="vd-btn-tool" onClick={clearSelectedFrames} title="清空选择">
+                  <MinusSquare size={12} /> 清空
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* 缩略图轨道 */}
           <div className="vd-thumb-track">
             {frames.map((f, i) => (
@@ -782,7 +870,14 @@ export default function VideoResultPage() {
                 ref={i === activeFrame ? activeThumbRef : undefined}
                 className="vd-thumb"
                 data-active={i === activeFrame}
-                onClick={() => seekTo(f.sec ?? parseTsStr(f.ts ?? f.timestamp ?? ''))}
+                data-selected={selectedFrames.has(i)}
+                onClick={(e) => {
+                  if (e.shiftKey || e.metaKey || e.ctrlKey) {
+                    handleFrameSelect(i, e)
+                  } else {
+                    seekTo(f.sec ?? parseTsStr(f.ts ?? f.timestamp ?? ''))
+                  }
+                }}
                 title={f.title}
               >
                 {f.image_path ? (
@@ -790,6 +885,12 @@ export default function VideoResultPage() {
                 ) : (
                   <div className="vd-thumb-fallback">{f.title?.slice(0, 4)}</div>
                 )}
+                <span
+                  className="vd-thumb-check"
+                  onClick={(e) => { e.stopPropagation(); handleFrameSelect(i, e) }}
+                >
+                  {selectedFrames.has(i) ? <CheckSquare size={14} /> : <Square size={14} />}
+                </span>
               </button>
             ))}
           </div>

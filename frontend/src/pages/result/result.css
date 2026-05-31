@@ -636,6 +636,76 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
+/* C-3: 帧多选样式 */
+.vm-video-result-scope .vd-thumb[data-selected='true'] {
+  border-color: var(--accent-warm, #f59e0b);
+  box-shadow: 0 0 0 1px var(--accent-warm, #f59e0b);
+}
+
+.vm-video-result-scope .vd-thumb-check {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 3px;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 2;
+}
+
+.vm-video-result-scope .vd-thumb:hover .vd-thumb-check,
+.vm-video-result-scope .vd-thumb[data-selected='true'] .vd-thumb-check {
+  opacity: 1;
+}
+
+.vm-video-result-scope .vd-thumb[data-selected='true'] .vd-thumb-check {
+  color: var(--accent-warm, #f59e0b);
+}
+
+.vm-video-result-scope .vd-thumb {
+  position: relative;
+}
+
+.vm-video-result-scope .vd-select-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  flex-shrink: 0;
+}
+
+.vm-video-result-scope .vd-btn-tool {
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-family: var(--mono);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.vm-video-result-scope .vd-btn-tool:hover {
+  background: var(--bg-sunken);
+  color: var(--ink-1);
+}
+
+.vm-video-result-scope .vd-btn-tool:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* 视频播放器（缩小） */
 .vm-video-result-scope .vd-player-mini-wrap {
   flex-shrink: 0;
