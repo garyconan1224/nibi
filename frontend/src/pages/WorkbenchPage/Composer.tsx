@@ -18,6 +18,8 @@ import {
 } from '@/services/workspaces'
 import type { SniffResult } from '@/services/workspaces'
 import { AddMaterialModal, type StagedConfig } from '@/components/workspace/AddMaterialModal'
+import { LinkPreviewModal } from '@/components/workspace/LinkPreviewModal'
+import type { LinkPreviewWithContent } from '@/services/linkPreview'
 import { PreflightDrawer } from '@/pages/WorkbenchPage/PreflightDrawer'
 
 const WS_COLORS = [
@@ -42,6 +44,8 @@ export function Composer({ onTaskCreated }: ComposerProps) {
   const [preflightOpen, setPreflightOpen] = useState(false)
   const [preflightStaged, setPreflightStaged] = useState<StagedConfig | undefined>(undefined)
   const [uploading, setUploading] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewData, setPreviewData] = useState<LinkPreviewWithContent | null>(null)
 
   const popRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -121,6 +125,17 @@ export function Composer({ onTaskCreated }: ComposerProps) {
 
   const handleAdd = () => {
     if (!url.trim()) return
+    // text 类型 URL → 先预览确认
+    if (sniffResult?.primary_type === 'text') {
+      setPreviewOpen(true)
+    } else {
+      setUploadOpen(true)
+    }
+  }
+
+  const handlePreviewConfirm = (preview: LinkPreviewWithContent) => {
+    setPreviewData(preview)
+    setPreviewOpen(false)
     setUploadOpen(true)
   }
 
@@ -351,6 +366,14 @@ export function Composer({ onTaskCreated }: ComposerProps) {
           </span>
         </button>
       </div>
+
+      {/* Link preview modal */}
+      <LinkPreviewModal
+        open={previewOpen}
+        url={normalizedUrl || url}
+        onConfirm={handlePreviewConfirm}
+        onCancel={() => setPreviewOpen(false)}
+      />
 
       {/* Upload modal */}
       <AddMaterialModal

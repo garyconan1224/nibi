@@ -6,12 +6,14 @@ export interface LinkPreviewResult {
   title: string | null
   description: string | null
   image_url: string | null
-  source: 'bili' | 'og' | 'fallback'
+  source: 'bili' | 'og' | 'fallback' | 'pdf' | 'text'
 }
 
 export interface LinkPreviewWithContent extends LinkPreviewResult {
   content: string
   word_count: number
+  parser?: string
+  warning?: string
 }
 
 export async function fetchLinkPreview(url: string): Promise<LinkPreviewResult> {

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import tempfile
+from pathlib import Path
 from typing import Optional
 
 import httpx
@@ -22,7 +24,7 @@ except ImportError:
         return None
 
 try:
-    from shared.text_loader import load_url as _load_url, TextLoaderError
+    from shared.text_loader import load_url as _load_url, load_pdf as _load_pdf, TextLoaderError
     _HAS_LOADER = True
 except ImportError:
     _HAS_LOADER = False
@@ -105,7 +107,7 @@ async def link_preview(
     # ── 通用网页：og 抓取 ──
     try:
         async with httpx.AsyncClient(
-            timeout=5,
+            timeout=10,
             follow_redirects=True,
             headers={"User-Agent": _UA},
         ) as client:
@@ -124,6 +126,42 @@ async def link_preview(
             result["word_count"] = 0
         return result
 
+    # ── content-type 分流 ──
+    content_type = resp.headers.get("content-type", "").lower()
+    is_pdf = "application/pdf" in content_type or url.lower().endswith(".pdf")
+    is_text = "text/plain" in content_type or url.lower().endswith(".md")
+
+    # PDF：下载到临时文件 → load_pdf 提取
+    if is_pdf and include_content:
+        extract_result = _extract_pdf_content(resp.content, url)
+        og = {
+            "title": extract_result.get("title"),
+            "description": None,
+            "image_url": None,
+            "source": "pdf",
+        }
+        og["content"] = extract_result["content"]
+        og["word_count"] = extract_result["word_count"]
+        og["parser"] = extract_result["parser"]
+        if extract_result.get("warning"):
+            og["warning"] = extract_result["warning"]
+        return og
+
+    # 纯文本 / Markdown：直接取文本
+    if is_text and include_content:
+        text = resp.text
+        og = {
+            "title": url.split("/")[-1] if "/" in url else url,
+            "description": None,
+            "image_url": None,
+            "source": "text",
+        }
+        og["content"] = text
+        og["word_count"] = len(text)
+        og["parser"] = "plain_text"
+        return og
+
+    # HTML：现有 og + readability
     og = _extract_og(resp.text)
 
     if og["title"] or og["description"]:
@@ -133,21 +171,64 @@ async def link_preview(
 
     # ── 可选：readability 正文提取 ──
     if include_content:
-        content, word_count = _extract_content(url)
-        og["content"] = content
-        og["word_count"] = word_count
+        extract_result = _extract_content(url)
+        og["content"] = extract_result["content"]
+        og["word_count"] = extract_result["word_count"]
+        og["parser"] = extract_result["parser"]
+        if extract_result["warning"]:
+            og["warning"] = extract_result["warning"]
 
     return og
 
 
-def _extract_content(url: str) -> tuple[str, int]:
-    """用 readability 提取正文，失败返回空串。"""
+def _extract_pdf_content(pdf_bytes: bytes, url: str) -> dict:
+    """下载 PDF 到临时文件，用 text_loader.load_pdf 提取文本。"""
+    if not _HAS_LOADER:
+        logger.warning("text_loader 不可用，跳过 PDF 提取")
+        return {"content": "", "word_count": 0, "parser": "none", "warning": "text_loader 不可用"}
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp.write(pdf_bytes)
+            tmp_path = Path(tmp.name)
+        try:
+            doc = _load_pdf(tmp_path)
+            return {
+                "content": doc.content,
+                "word_count": doc.char_count,
+                "parser": doc.meta.get("parser", "pdf") if doc.meta else "pdf",
+                "title": doc.title,
+                "warning": None,
+            }
+        finally:
+            tmp_path.unlink(missing_ok=True)
+    except TextLoaderError as exc:
+        logger.warning("PDF 提取失败: %s", exc)
+        return {"content": "", "word_count": 0, "parser": "pdf_failed", "warning": str(exc)}
+    except Exception as exc:
+        logger.warning("PDF 提取异常: %s", exc)
+        return {"content": "", "word_count": 0, "parser": "pdf_failed", "warning": str(exc)}
+
+
+def _extract_content(url: str) -> dict:
+    """用 text_loader 提取正文，返回 {content, word_count, parser, warning}。"""
     if not _HAS_LOADER:
         logger.warning("text_loader 不可用，跳过正文提取")
-        return "", 0
+        return {"content": "", "word_count": 0, "parser": "none", "warning": None}
     try:
         doc = _load_url(url, timeout=10)
-        return doc.content, doc.char_count
-    except (TextLoaderError, Exception) as exc:
-        logger.warning("readability 正文提取失败: %s", exc)
-        return "", 0
+        parser = doc.meta.get("parser", "readability") if doc.meta else "readability"
+        return {"content": doc.content, "word_count": doc.char_count, "parser": parser, "warning": None}
+    except TextLoaderError as exc:
+        logger.warning("正文提取失败: %s", exc)
+        # 微信公众号反爬失败 → 明确提示
+        if "mp.weixin.qq.com" in url:
+            return {
+                "content": "",
+                "word_count": 0,
+                "parser": "wechat_failed",
+                "warning": "该页面无法解析，请直接粘贴正文",
+            }
+        return {"content": "", "word_count": 0, "parser": "failed", "warning": str(exc)}
+    except Exception as exc:
+        logger.warning("正文提取异常: %s", exc)
+        return {"content": "", "word_count": 0, "parser": "failed", "warning": str(exc)}
