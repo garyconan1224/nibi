@@ -107,10 +107,10 @@ _BUILTIN_TEMPLATE_PROMPTS.update(_VIDEO_TEMPLATE_PROMPTS)
 
 def list_video_templates() -> Dict[str, str]:
     """返回合并后的模板 dict：内置 6 类 + 用户自定义（自定义覆盖同名内置）。"""
-    from shared.template_store import load_templates as _load_user_templates
+    from shared.template_store import load_templates_by_category as _load_by_cat
 
     merged = dict(_BUILTIN_TEMPLATE_PROMPTS)
-    for t in _load_user_templates():
+    for t in _load_by_cat("video"):
         merged[t.name] = t.prompt
     return merged
 

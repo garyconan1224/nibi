@@ -251,3 +251,29 @@ def test_duplicate_rejects_blank_prompt_after_strip(client: TestClient) -> None:
         json={"source_prompt": "   "},
     )
     assert resp.status_code == 422
+
+
+def test_text_custom_template_not_in_list_video_templates(
+    tmp_path: Path, monkeypatch: MonkeyPatch,
+) -> None:
+    """list_video_templates() 只返回 video category，text 自定义模板不应混入。"""
+    store_dir = tmp_path / ".local"
+    store_file = store_dir / "video_templates.json"
+    monkeypatch.setattr(template_store_module, "STORE_DIR", store_dir)
+    monkeypatch.setattr(template_store_module, "STORE_PATH", store_file)
+
+    app = FastAPI()
+    app.include_router(templates_router)
+    app.include_router(templates_legacy_router)
+    c = TestClient(app)
+
+    # 创建一个 text 自定义模板
+    c.post("/templates", json={"name": "文字摘要", "prompt": "summarize", "category": "text"})
+    # 创建一个 video 自定义模板
+    c.post("/templates", json={"name": "视频讲解", "prompt": "explain", "category": "video"})
+
+    from backend.app.services.pipeline_tasks import list_video_templates
+
+    result = list_video_templates()
+    assert "视频讲解" in result, "video custom template should be included"
+    assert "文字摘要" not in result, "text custom template must NOT leak into video list"
