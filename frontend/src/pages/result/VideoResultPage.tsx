@@ -12,6 +12,7 @@ import {
   exportReproducePackage,
   getItemResult,
   listPromptVersions,
+  updateFrameTitle,
 } from '@/services/workspaces'
 import { PromptVersionStack } from '@/components/result/PromptVersionStack'
 import {
@@ -107,6 +108,11 @@ export default function VideoResultPage() {
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState('')
   const [selectedVersionIdx, setSelectedVersionIdx] = useState<number | null>(null)
+
+  // C-5: 帧标题改名
+  const [titleEditing, setTitleEditing] = useState(false)
+  const [titleEditValue, setTitleEditValue] = useState('')
+  const [frameTitles, setFrameTitles] = useState<Record<number, string>>({})
 
   // 学习模式补图
   const [inlineFrames, setInlineFrames] = useState<InlineFrame[]>([])
@@ -482,6 +488,32 @@ export default function VideoResultPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeFrame])
+
+  // C-5: 帧标题改名
+  const displayTitle = frameTitles[activeFrame] ?? frame?.title ?? ''
+
+  const startTitleEdit = useCallback(() => {
+    setTitleEditValue(displayTitle)
+    setTitleEditing(true)
+  }, [displayTitle])
+
+  const saveTitleEdit = useCallback(async () => {
+    const val = titleEditValue.trim()
+    if (!val || !frame) return
+    try {
+      await updateFrameTitle(workspaceId, itemId, activeFrame, val)
+      setFrameTitles((prev) => ({ ...prev, [activeFrame]: val }))
+      toast.success('帧标题已更新')
+    } catch {
+      toast.error('保存失败')
+    }
+    setTitleEditing(false)
+  }, [titleEditValue, activeFrame, frame, workspaceId, itemId])
+
+  const cancelTitleEdit = useCallback(() => {
+    setTitleEditing(false)
+    setTitleEditValue('')
+  }, [])
 
   const openPicker = useCallback(() => {
     if (!formatsCfg) return
@@ -995,7 +1027,31 @@ export default function VideoResultPage() {
         </div>
 
         <div className="vd-frame-info">
-          <div className="vd-fi-title">{frame.title}</div>
+          {titleEditing ? (
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              <input
+                value={titleEditValue}
+                onChange={(e) => setTitleEditValue(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') saveTitleEdit(); if (e.key === 'Escape') cancelTitleEdit() }}
+                autoFocus
+                style={{
+                  flex: 1, height: 28, fontSize: 13, fontFamily: 'var(--display)',
+                  padding: '0 8px', borderRadius: 6, border: '1px solid var(--accent-pink)',
+                  background: 'var(--bg-card, #fff)', color: 'var(--ink-1)', outline: 'none',
+                }}
+              />
+              <button className="vd-btn-tool" onClick={saveTitleEdit} style={{ background: 'var(--accent-pink)', color: '#fff', border: 'none' }}>
+                <Check size={11} />
+              </button>
+              <button className="vd-btn-tool" onClick={cancelTitleEdit}>
+                <X size={11} />
+              </button>
+            </div>
+          ) : (
+            <div className="vd-fi-title" onClick={startTitleEdit} title="点击改名" style={{ cursor: 'pointer' }}>
+              {displayTitle} <Pencil size={11} style={{ opacity: 0.4, verticalAlign: 'middle' }} />
+            </div>
+          )}
           <div className="vd-fi-sub">{frame.subtitle}</div>
           <div className="vd-fi-tags">
             {Object.values(frame.tags ?? {}).flat().slice(0, 6).map((t) => (

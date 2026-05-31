@@ -1796,6 +1796,14 @@ def get_item_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
             break
     v_results = _materialize_video_results_from_analyze(v_results, preferred_basenames=preferred_basenames)
 
+    # C-5: 合并用户帧标题改名 overrides
+    _title_overrides = (item.results or {}).get("frame_title_overrides", {})
+    if _title_overrides and v_results.get("frames"):
+        for _idx_str, _new_title in _title_overrides.items():
+            _idx = int(_idx_str)
+            if 0 <= _idx < len(v_results["frames"]):
+                v_results["frames"][_idx]["title"] = _new_title
+
     # N7b / av_combined：规范化 transcript 为数组（前端 VideoResult.transcript 期望 array）
     if v_results.get("summary_path") in ("subtitle", "av_combined"):
         raw_transcript = v_results.get("transcript")
@@ -2329,6 +2337,36 @@ def list_prompt_versions(workspace_id: str, item_id: str) -> List[Dict[str, Any]
     except KeyError as err:
         raise HTTPException(status_code=404, detail=str(err)) from err
     return [pv.to_dict() for pv in versions]
+
+
+# ── C-5 帧标题改名 ─────────────────────────────────────────
+
+
+class FrameTitleRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+
+
+@router.patch("/{workspace_id}/items/{item_id}/frames/{frame_idx}/title")
+def update_frame_title(
+    workspace_id: str, item_id: str, frame_idx: int, req: FrameTitleRequest
+) -> Dict[str, Any]:
+    """更新指定帧的标题（存入 item.results.frame_title_overrides）。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+
+    results = dict(item.results or {})
+    overrides = dict(results.get("frame_title_overrides", {}))
+    overrides[str(frame_idx)] = req.title
+    results["frame_title_overrides"] = overrides
+
+    try:
+        _store.update_item(workspace_id, item_id, results=results)
+    except KeyError as err:
+        raise HTTPException(status_code=404, detail=str(err)) from err
+
+    return {"ok": True, "frame_idx": frame_idx, "title": req.title}
 
 
 # ── C-3 复刻包导出 ─────────────────────────────────────────

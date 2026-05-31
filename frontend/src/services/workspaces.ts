@@ -648,6 +648,16 @@ export async function exportReproducePackage(
   URL.revokeObjectURL(url)
 }
 
+/** PATCH /workspaces/{id}/items/{itemId}/frames/{idx}/title — 帧标题改名 */
+export async function updateFrameTitle(
+  workspaceId: string,
+  itemId: string,
+  frameIdx: number,
+  title: string,
+): Promise<void> {
+  await http.patch(`${BASE}/${workspaceId}/items/${itemId}/frames/${frameIdx}/title`, { title })
+}
+
 /** GET /workspaces/{id}/items/{itemId}/subtitles?format=srt|vtt|ass — 下载字幕文件 */
 export async function downloadSubtitles(
   workspaceId: string,
