@@ -150,6 +150,8 @@
   - [x] B-6 TOC 当前章节高亮 + 时间戳锚点 chip — 计划 [rp1-b6](plans/rp1-b6-mimo-prompt.md) — `6ca4166`（2026-05-30）
   - [x] B-7 导出菜单（简化为 PDF 打印）→ `c855d71`（2026-05-31）
   - [x] B-8 学习笔记页内 AI 问答抽屉（已决议本期做）— 计划 [rp1-b8](plans/rp1-b8-mimo-prompt.md)
+- [ ] **RP1-C 视频复刻页增强** — 主帧大视图 + 缩略图轨道 / 批量复刻包导出 / 提示词在线编辑+版本 / 与笔记页联动切换 — 12-18h，P2
+  - [x] C-0 数据契约修复（_materialize_video_results_from_analyze 字段映射 + 合并逻辑）— 计划 [rp1-c0](plans/rp1-c0-data-contract-mimo-prompt.md)（2026-05-31）
   - [ ] C-1 主帧大视图 + 缩略图轨道 — 计划 [rp1-c1](plans/rp1-c1-mimo-prompt.md)
   - [x] C-2 复刻↔学习笔记联动切换 — 并入 RP1-B+ 方案 B（`rp1b-intent-routing-mimo-prompt.md`）
   - [ ] C-3 帧批量操作 + 导出复刻包 — 计划 [rp1-c3](plans/rp1-c3-mimo-prompt.md)

@@ -1609,6 +1609,30 @@ def _locate_analyze_report_dir(
     return None
 
 
+def _is_target_frame_format(frames: list) -> bool:
+    """检查 frames 是否已经是目标格式（包含 image_path, sec, ts, prompt_mj 等字段）。
+    只检查第一帧，因为所有帧应该格式一致。
+    """
+    if not frames:
+        return False
+    first = frames[0]
+    # 目标格式必须包含这些字段
+    required_fields = ("image_path", "sec", "ts", "prompt_mj")
+    return all(field in first for field in required_fields)
+
+
+def _convert_absolute_to_static_url(abs_path: str, data_root: Path) -> str:
+    """把绝对路径转成前端可用的 /static/... URL。"""
+    if not abs_path or abs_path.startswith("/static/"):
+        return abs_path
+    try:
+        from pathlib import Path as _Path
+        p = _Path(abs_path).resolve()
+        return "/static/" + str(p.relative_to(data_root)).replace("\\", "/")
+    except (ValueError, OSError):
+        return abs_path
+
+
 def _materialize_video_results_from_analyze(
     results: Dict[str, Any],
     preferred_basenames: Optional[List[str]] = None,
@@ -1625,7 +1649,8 @@ def _materialize_video_results_from_analyze(
     """
     if not isinstance(results, dict):
         return results
-    if results.get("frames"):
+    # C-0 fix: 只有 frames 已具备目标字段（image_path, sec, ts, prompt_mj）才可以提前返回
+    if results.get("frames") and _is_target_frame_format(results["frames"]):
         return results  # 已是目标格式
     # N7b 路径 1：字幕直接总结结果，无需从 JSON 文件物化
     if results.get("summary_path") == "subtitle":
@@ -1659,31 +1684,49 @@ def _materialize_video_results_from_analyze(
     data_root = _ROOT_DIR / "data"
     frames_dir = report_dir / "frames" if (report_dir / "frames").is_dir() else None
 
+    # C-0: 支持合并 raw frames（来自 results.frames）和视觉 JSON frames
+    # raw frames 可能只有 frame_image/frame_image_path，需要与视觉 JSON 按顺序合并
+    existing_raw_frames = results.get("frames") or []
+
     frames = []
     for idx, fr in enumerate(raw_frames):
-        # 优先用 JSON 里自带的路径，否则按命名规则拼
-        img_path = fr.get("frame_image_path") or fr.get("image_path") or ""
-        if not img_path and frames_dir:
-            # 命名规则：{basename}_{HH}_{MM}_{SS}.jpg（idx 秒数转时分秒）
-            h = idx // 3600
-            m = (idx % 3600) // 60
-            s = idx % 60
-            fname = f"{json_stem}_{h:02d}_{m:02d}_{s:02d}.jpg"
-            candidate = (frames_dir / fname).resolve()
-            if candidate.exists():
-                # 转为 URL 路径：/static/projects/{pid}/...
-                try:
-                    img_path = "/static/" + str(candidate.relative_to(data_root)).replace("\\", "/")
-                except ValueError:
-                    img_path = ""
+        # C-0: 优先用 raw frame 的真实图片路径（如果存在且有效）
+        img_path = ""
+        if idx < len(existing_raw_frames):
+            raw_img = existing_raw_frames[idx].get("frame_image_path") or existing_raw_frames[idx].get("frame_image") or ""
+            if raw_img:
+                # 把绝对路径转成 /static/... URL
+                img_path = _convert_absolute_to_static_url(raw_img, data_root)
+        # 如果 raw frame 没有图片路径，尝试从视觉 JSON 获取
+        if not img_path:
+            img_path = fr.get("frame_image_path") or fr.get("image_path") or ""
+        # C-0.1: 先解析 timestamp 为 sec，用于后续拼文件名
         raw_ts = fr.get("timestamp", "")
-        # 统一成数值 sec（前端 VideoResultFrame.sec 期望 number）
         if isinstance(raw_ts, (int, float)):
             sec_val = float(raw_ts)
         elif isinstance(raw_ts, str) and raw_ts.strip():
             sec_val = _parse_ts_to_sec(raw_ts.strip())
         else:
             sec_val = float(idx)  # fallback: 帧序号当秒数
+        # C-0.1 fix: 用 sec_val（来自 timestamp）拼文件名，不用 idx
+        if not img_path and frames_dir:
+            # 命名规则：{basename}_{HH}_{MM}_{SS}.jpg（timestamp 秒数转时分秒）
+            total_sec = int(sec_val)
+            h = total_sec // 3600
+            m = (total_sec % 3600) // 60
+            s = total_sec % 60
+            fname = f"{json_stem}_{h:02d}_{m:02d}_{s:02d}.jpg"
+            candidate = (frames_dir / fname).resolve()
+            if candidate.exists():
+                try:
+                    img_path = "/static/" + str(candidate.relative_to(data_root)).replace("\\", "/")
+                except ValueError:
+                    img_path = ""
+        # C-0 fix: 从 image_prompt_en 映射到 prompt_mj，prompt_sd/prompt_video 兜底
+        image_prompt_en = fr.get("image_prompt_en") or fr.get("prompt_mj") or ""
+        prompt_mj = image_prompt_en
+        prompt_sd = fr.get("prompt_sd") or {"positive": image_prompt_en, "negative": ""}
+        prompt_video = fr.get("prompt_video") or image_prompt_en
         frames.append({
             "idx": idx,
             "sec": sec_val,
@@ -1697,9 +1740,9 @@ def _materialize_video_results_from_analyze(
             "shot_type": fr.get("shot_type", ""),
             "title": fr.get("title", ""),
             "subtitle": fr.get("subtitle", ""),
-            "prompt_mj": fr.get("prompt_mj", ""),
-            "prompt_sd": fr.get("prompt_sd", {"positive": "", "negative": ""}),
-            "prompt_video": fr.get("prompt_video", ""),
+            "prompt_mj": prompt_mj,
+            "prompt_sd": prompt_sd,
+            "prompt_video": prompt_video,
             "tags": fr.get("tags", {}),
         })
     return {

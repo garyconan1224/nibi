@@ -25,7 +25,7 @@ C-1 重构视频复刻页 `frontend/src/pages/result/VideoResultPage.tsx`（1002
 
 ```
 布局目标（规格草图）：
-┌ 主帧大图 ~400×300（frames[activeFrame].url，点击 lightbox 放大）┐
+┌ 主帧大图 ~400×300（frames[activeFrame].image_path，点击 lightbox 放大）┐
 ├ 缩略图轨道（80×60 一张，跟随 activeFrame 高亮，点击切帧+seek）  ┤
 └ 视频播放器（缩小，移到次要位置）                               ┘
 ```
@@ -52,7 +52,7 @@ RP1-C · C-1 视频复刻页主帧大视图 + 缩略图轨道。
 
 【任务 2: 缩略图轨道】
   - 主图下方横向滚动轨道，每帧 80×60 缩略图。
-  - data-active={i === activeFrame} 高亮；点击 → setActiveFrame(i) + seekTo(frame.sec)。
+  - data-active={i === activeFrame} 高亮；点击 → seekTo(frame.sec)（activeFrame 由 currentSec 派生，不新增 setActiveFrame）。
   - activeFrame 变化时 scrollIntoView({inline:'center'}) 让当前缩略图居中。
 
 【任务 3: 视频次要化】

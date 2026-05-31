@@ -1752,3 +1752,63 @@ T2.2 核实发现：link_preview.py 只返回 og 元数据（title/description/i
 - `pnpm tsc --noEmit`：EXIT=0
 - `pnpm build`：EXIT=0
 - Playwright 手测：问「这个视频讲了什么？」→ 流式返回基于笔记+字幕的详细回答
+
+## RP1-C0 视频复刻页数据契约修复（2026-05-31）
+
+**完成日期**：2026-05-31
+**模型 / 工具**：mimo 2.5pro
+**计划文档**：`docs/plans/rp1-c0-data-contract-mimo-prompt.md`
+
+### 问题
+视频复刻页前端契约期望 frames 包含 `image_path`, `sec`, `ts`, `prompt_mj` 等字段。但 `_materialize_video_results_from_analyze` 函数存在两个 bug：
+1. 提前返回逻辑只检查 `results["frames"]` 是否存在，没有检查是否是目标格式
+2. 字段映射缺失：视觉 JSON 字段是 `image_prompt_en`，代码直接读 `prompt_mj`（空值）
+
+### 改动
+- **backend/app/routes/workspaces.py**：
+  - 新增 `_is_target_frame_format(frames)`：检查 frames 是否已具备目标字段（`image_path`, `sec`, `ts`, `prompt_mj`）
+  - 新增 `_convert_absolute_to_static_url(abs_path, data_root)`：把绝对路径转成 `/static/...` URL
+  - 修改 `_materialize_video_results_from_analyze`：只有目标格式才提前返回；支持合并 raw frames 和视觉 JSON frames；修复 `image_prompt_en` → `prompt_mj` 映射；`prompt_sd`/`prompt_video` 用 `image_prompt_en` 兜底
+- **backend/tests/test_video_result_materialize.py**（新增）：19 个测试用例
+- **docs/plans/rp1-c0-data-contract-mimo-prompt.md**（新增）：计划文档
+- **docs/EXECUTION_PLAN.md**：添加 C-0 条目
+
+### 设计决策
+- `_is_target_frame_format` 只检查第一帧，因为所有帧格式一致
+- raw frames 与视觉 JSON 按顺序合并：优先保留 raw frame 的真实图片路径，补充视觉 JSON 的元数据
+- `prompt_sd` 没有源字段时用 `{ positive: image_prompt_en, negative: "" }` 兜底
+- `prompt_video` 没有源字段时用 `image_prompt_en` 兜底
+- `summary_path=subtitle` 路径不受影响（已有的 early return 逻辑）
+
+### 验证
+- pytest 133/133 通过（含 19 个新增测试）
+- `pnpm tsc --noEmit`：EXIT=0
+- `pnpm build`：EXIT=0
+
+### Commit
+待提交
+
+---
+
+## RP1-C0.1 补修：frames_dir 兜底用 timestamp 拼文件名（2026-05-31）
+
+**完成日期**：2026-05-31
+**模型 / 工具**：mimo 2.5pro
+**父任务**：RP1-C0
+
+### 问题
+frames_dir 兜底找图用 idx 秒数拼文件名，但应该用 timestamp/sec。导致 timestamp=00:00:03, idx=2 时找不到 *_00_00_03.jpg。
+
+### 改动
+- **backend/app/routes/workspaces.py**：把 timestamp 解析提前到 frames_dir 兜底逻辑之前；用 `int(sec_val)` 转时分秒拼文件名
+- **backend/tests/test_video_result_materialize.py**：新增 2 个测试（timestamp vs idx、重复 timestamp 复用）
+- **docs/plans/rp1-c1-mimo-prompt.md**：`frame.url` → `frame.image_path`；点击缩略图用 `seekTo(frame.sec)` 不新增 `setActiveFrame`
+- **docs/plans/rp1-c0-data-contract-mimo-prompt.md**：追加 C-0.1 章节
+
+### 验证
+- pytest 135/135 通过（含 21 个 C-0/C-0.1 测试）
+- `pnpm tsc --noEmit`：EXIT=0
+- `pnpm build`：EXIT=0
+
+### Commit
+待提交
