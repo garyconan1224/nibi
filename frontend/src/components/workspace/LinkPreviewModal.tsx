@@ -1,6 +1,6 @@
 /** URL 预览确认模态 — 显示抓取结果，用户确认后再入库 */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { X, ExternalLink, FileText, AlertTriangle } from 'lucide-react'
 import { fetchLinkPreviewWithContent, type LinkPreviewWithContent } from '@/services/linkPreview'
 
@@ -13,40 +13,36 @@ interface LinkPreviewModalProps {
 }
 
 export function LinkPreviewModal({ open, url, onConfirm, onFallback, onCancel }: LinkPreviewModalProps) {
-  const [loading, setLoading] = useState(false)
-  const [preview, setPreview] = useState<LinkPreviewWithContent | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const abortRef = useRef<AbortController | null>(null)
+  const [result, setResult] = useState<{
+    url: string
+    preview: LinkPreviewWithContent | null
+    error: string | null
+  }>({ url: '', preview: null, error: null })
 
   useEffect(() => {
     if (!open || !url) return
     let cancelled = false
-    abortRef.current = new AbortController()
-    setLoading(true)
-    setError(null)
-    setPreview(null)
     fetchLinkPreviewWithContent(url)
       .then((data) => {
         if (cancelled) return
-        setPreview(data)
-        if (data.warning) {
-          setError(data.warning)
-        }
+        setResult({ url, preview: data, error: data.warning ?? null })
       })
       .catch(() => {
-        if (!cancelled) setError('抓取失败，请检查链接是否有效')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) {
+          setResult({ url, preview: null, error: '抓取失败，请检查链接是否有效' })
+        }
       })
     return () => {
       cancelled = true
-      abortRef.current?.abort()
     }
   }, [open, url])
 
   if (!open) return null
 
+  const current = result.url === url ? result : { url, preview: null, error: null }
+  const loading = Boolean(url) && result.url !== url
+  const preview = current.preview
+  const error = current.error
   const contentPreview = preview?.content?.slice(0, 500) || ''
   const hasContent = contentPreview.length > 0
 

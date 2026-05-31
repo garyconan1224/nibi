@@ -19,7 +19,6 @@ import {
 import type { SniffResult } from '@/services/workspaces'
 import { AddMaterialModal, type StagedConfig } from '@/components/workspace/AddMaterialModal'
 import { LinkPreviewModal } from '@/components/workspace/LinkPreviewModal'
-import type { LinkPreviewWithContent } from '@/services/linkPreview'
 import { PreflightDrawer } from '@/pages/WorkbenchPage/PreflightDrawer'
 
 const WS_COLORS = [
@@ -132,7 +131,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
     }
   }
 
-  const handlePreviewConfirm = (_preview: LinkPreviewWithContent) => {
+  const handlePreviewConfirm = () => {
     setPreviewOpen(false)
     setUploadOpen(true)
   }
