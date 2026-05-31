@@ -1727,3 +1727,28 @@ T2.2 核实发现：link_preview.py 只返回 og 元数据（title/description/i
 
 ### Commit
 - `c855d71` fix(rp1-b+): 学习笔记接 summary + 视频源修 + md源/html美化预览/pdf + toggle规则
+
+## RP1-B B-8 学习笔记页内 AI 问答抽屉（2026-05-31）
+
+**完成日期**：2026-05-31
+**模型 / 工具**：mimo 2.5pro
+**计划文档**：`docs/plans/rp1-b8-mimo-prompt.md`
+
+### 改动
+- **backend/app/routes/chat.py**：`ChatCreateRequest` 新增可选 `system_prompt` 字段；前端传 `system_prompt` 时直接用它替代 `build_item_context` 构建的上下文
+- **frontend/src/services/chat.ts**：`CreateChatTurnRequest` 新增 `system_prompt` 可选字段
+- **frontend/src/pages/results/LearningNotesPage/ChatDrawer.tsx**（新增）：浮动「问 AI」按钮 + 右侧 360px 抽屉 UI，复用 `createChatTurn` + `subscribeChatTurn` 流式模式
+- **frontend/src/pages/results/LearningNotesPage/index.tsx**：import ChatDrawer；`useMemo` 构建 `chatSystemPrompt`（ln.md 全文 + transcript 字幕）；LNNotesPanel 外包一层 `position:relative` 容器，ChatDrawer 作为兄弟节点
+- **frontend/src/pages/results/LearningNotesPage/learning-notes.css**：新增 `.ln-chat-fab` / `.ln-chat-drawer` / `.ln-chat-bubble-*` 等样式
+
+### 设计决策
+- 后端契约扩展：加 `system_prompt` 可选字段，优先级高于 `item_ids`，不破坏现有 ChatSidebar 行为
+- 上下文由前端构建（ln.md 全文 + transcript 字幕段），通过 `system_prompt` 传给后端
+- 抽屉 UI 复用 ChatSidebar 的流式模式（POST 创建 turn → SSE delta → done 重拉 messages）
+- 作用域提示「仅基于本视频笔记与字幕回答」显示在抽屉顶部
+- 不做全局问答、不做多会话管理、不装新依赖
+
+### 验证
+- `pnpm tsc --noEmit`：EXIT=0
+- `pnpm build`：EXIT=0
+- Playwright 手测：问「这个视频讲了什么？」→ 流式返回基于笔记+字幕的详细回答

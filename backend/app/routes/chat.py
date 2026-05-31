@@ -34,6 +34,9 @@ class ChatCreateRequest(BaseModel):
     model: Optional[str] = None
     # N6: 选中的上下文素材 id 列表（空 = 兼容旧浮动入口，无 item 上下文）
     item_ids: List[str] = Field(default_factory=list)
+    # B-8: 前端直接提供 system prompt（如 LN 页的 ln.md+transcript 上下文）；
+    # 优先级高于 item_ids 构建的上下文。
+    system_prompt: Optional[str] = None
 
 
 def _require_workspace(workspace_id: str) -> None:
@@ -45,10 +48,20 @@ def _require_workspace(workspace_id: str) -> None:
 def create_chat_turn(workspace_id: str, req: ChatCreateRequest) -> Dict[str, Any]:
     _require_workspace(workspace_id)
 
-    # N6: 根据 item_ids 拼 system prompt（空 list → ctx.system_prompt = ""）
+    # B-8: 前端直接传 system_prompt 时优先使用（LN 上下文注入）
     workspace = _workspaces.get(workspace_id)
     assert workspace is not None  # _require_workspace 已校验
-    ctx = build_item_context(workspace, list(req.item_ids or []))
+
+    if req.system_prompt:
+        final_system_prompt = req.system_prompt
+        truncated = False
+        used_ids: List[str] = []
+    else:
+        # N6: 根据 item_ids 拼 system prompt（空 list → ctx.system_prompt = ""）
+        ctx = build_item_context(workspace, list(req.item_ids or []))
+        final_system_prompt = ctx.system_prompt or None
+        truncated = ctx.truncated
+        used_ids = ctx.used_item_ids
 
     try:
         turn = _runner.start_turn(
@@ -56,7 +69,7 @@ def create_chat_turn(workspace_id: str, req: ChatCreateRequest) -> Dict[str, Any
             chat_id=req.chat_id,
             prompt=req.prompt,
             model=req.model,
-            system_prompt=ctx.system_prompt or None,
+            system_prompt=final_system_prompt,
         )
     except ValueError as err:
         raise HTTPException(status_code=422, detail=str(err)) from err
@@ -65,8 +78,8 @@ def create_chat_turn(workspace_id: str, req: ChatCreateRequest) -> Dict[str, Any
         "chat_id": turn.chat_id,
         "workspace_id": workspace_id,
         "status": turn.status,
-        "context_truncated": ctx.truncated,
-        "used_item_ids": ctx.used_item_ids,
+        "context_truncated": truncated,
+        "used_item_ids": used_ids,
     }
 
 

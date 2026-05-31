@@ -7,6 +7,7 @@ import type { WorkspaceRecord, WorkspaceItem } from '@/types/workspace'
 import LNVideoPanel, { type LNVideoPanelHandle } from './LNVideoPanel'
 import LNNotesPanel from './LNNotesPanel'
 import LNTranscriptPanel from './LNTranscriptPanel'
+import ChatDrawer from './ChatDrawer'
 import './learning-notes.css'
 
 type PageState =
@@ -123,6 +124,24 @@ export default function LearningNotesPage() {
     return () => clearTimeout(debounceTimer.current)
   }, [markdown, workspaceId, pageState.kind])
 
+  // B-8: 构建 AI 问答的 system prompt（ln.md + transcript 上下文）
+  const chatSystemPrompt = useMemo(() => {
+    if (pageState.kind !== 'ready') return ''
+    const parts: string[] = [
+      '你正在协助用户理解一篇学习笔记。回答时基于下方提供的笔记全文和视频字幕，不要编造笔记里没有的信息。',
+      '',
+      '【学习笔记全文】',
+      markdown || '（暂无笔记内容）',
+    ]
+    if (pageState.transcript.length > 0) {
+      parts.push('', '【视频字幕】')
+      for (const line of pageState.transcript) {
+        parts.push(`[${line.t_str}] ${line.text}`)
+      }
+    }
+    parts.push('', '回答指引：基于上述笔记和字幕作答；如果用户问到具体时间点，请引用对应字幕；回答使用中文。')
+    return parts.join('\n')
+  }, [pageState, markdown])
 
   useEffect(() => {
     let cancelled = false
@@ -266,6 +285,7 @@ export default function LearningNotesPage() {
               />
             </div>
           </div>
+          <ChatDrawer workspaceId={workspaceId} systemPrompt={chatSystemPrompt} />
         </>
       )}
     </div>

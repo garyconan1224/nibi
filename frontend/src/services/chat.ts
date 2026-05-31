@@ -30,6 +30,8 @@ export interface CreateChatTurnRequest {
   model?: string
   /** N6: 选中的上下文素材 id 列表；空 = 无 item 上下文（兼容浮动入口） */
   item_ids?: string[]
+  /** B-8: 前端直接提供 system prompt（如 LN 页上下文）；优先级高于 item_ids */
+  system_prompt?: string
 }
 
 export interface CreateChatTurnResponse {

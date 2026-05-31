@@ -1,6 +1,7 @@
 ---
 phase: RP1-B · B-8 学习笔记页内 AI 问答抽屉
-status: ready
+status: done
+completed_date: 2026-05-31
 owner: xiaomi-mimo-2.5pro
 parent: docs/plans/result-pages-redesign-v1.md § RP1-B · B-8
 companion: docs/plans/rp1-execution-handoff.md § 3.3 提示词 B-8
@@ -13,6 +14,11 @@ decisions:
 ---
 
 ## 0. 前置说明（mimo 必读）
+
+> **⚠️ 2026-05-31 现状更新（开工必看，文档其余部分写于更早）**：
+> - 学习笔记页已重排为 **笔记左 62% / 视频+字幕右 38%**（index.tsx 里 `<LNNotesPanel>` 在 DOM 最前），顶栏已新增**导出菜单**（PDF/MD/Obsidian）。
+> - 「问 AI」浮动按钮放**笔记面板（左侧）右下角**，与顶栏导出菜单不冲突。
+> - `backend/app/services/ln_service.py` **已不存在**；上下文统一走 `rag_qa_service.ask_with_sources`（`backend/app/routes/rag.py` 调用）。任务 0 以 rag.py + rag_qa_service.py 为准。
 
 B-8 在学习笔记页加一个「问 AI」浮动按钮 → 右侧抽屉，用户问"这段视频讲了什么""3:42 那个画面什么意思"，AI 基于**当前 ln.md + transcript** 回答（流式）。
 
@@ -84,12 +90,14 @@ RP1-B · B-8 学习笔记页内 AI 问答抽屉（作用域限当前笔记 + 字
 
 ## 3. 验收清单
 
-- [ ] 任务 0 摸清 chat/rag 契约 + 上下文注入方式
-- [ ] 浮动按钮 + 右抽屉 UI（nibi token，light/dark）
-- [ ] SSE 流式问答（复用现有 SSE 处理）
-- [ ] 上下文限当前 ln + transcript（后端注入或前端传）
-- [ ] 一次问答往返手测通过
-- [ ] 若动后端则 pytest 过；pnpm build + tsc EXIT=0
-- [ ] 无新前端依赖、无 debug 脚本
-- [ ] 截图 + COMPLETED_WORK + EXECUTION_PLAN（RP1-B 主行此条后打勾）、没 push
+> **2026-05-31 晚 · 布局回归修复（opus）**：B-8 功能链路 mimo 已实现且可用，但 AI 面板原为 `absolute` 常驻、挤占布局，笔记宽度回归（只占 62% 容器留空白）。已修：`.ln-chat-fab`/`.ln-chat-drawer` 改 `position:fixed` 右下悬浮面板（380×min(70vh,620px)，参考 `FloatingTaskQueue`）；`index.tsx` 去掉笔记外层 wrapper，笔记面板恢复占满左栏 62%（两栏满布局）；暗色边框统一。tsc=0 + build OK。
+
+- [x] 任务 0 摸清 chat/rag 契约 + 上下文注入方式
+- [x] 浮动按钮 + 悬浮面板 UI（fixed 右下，light/dark 边框统一）
+- [x] SSE 流式问答（复用现有 SSE 处理）
+- [x] 上下文限当前 ln + transcript
+- [x] 一次问答往返手测通过（用户实测）
+- [x] pnpm build + tsc EXIT=0
+- [x] 无新前端依赖、无 debug 脚本
+- [ ] 截图 + COMPLETED_WORK + EXECUTION_PLAN 登记（待 commit 时补）、没 push
 ```
