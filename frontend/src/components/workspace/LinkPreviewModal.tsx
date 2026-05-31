@@ -1,6 +1,6 @@
 /** URL 预览确认模态 — 显示抓取结果，用户确认后再入库 */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, ExternalLink, FileText, AlertTriangle } from 'lucide-react'
 import { fetchLinkPreviewWithContent, type LinkPreviewWithContent } from '@/services/linkPreview'
 
@@ -8,28 +8,41 @@ interface LinkPreviewModalProps {
   open: boolean
   url: string
   onConfirm: (preview: LinkPreviewWithContent) => void
+  onFallback: () => void
   onCancel: () => void
 }
 
-export function LinkPreviewModal({ open, url, onConfirm, onCancel }: LinkPreviewModalProps) {
+export function LinkPreviewModal({ open, url, onConfirm, onFallback, onCancel }: LinkPreviewModalProps) {
   const [loading, setLoading] = useState(false)
   const [preview, setPreview] = useState<LinkPreviewWithContent | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     if (!open || !url) return
+    let cancelled = false
+    abortRef.current = new AbortController()
     setLoading(true)
     setError(null)
     setPreview(null)
     fetchLinkPreviewWithContent(url)
       .then((data) => {
+        if (cancelled) return
         setPreview(data)
         if (data.warning) {
           setError(data.warning)
         }
       })
-      .catch(() => setError('抓取失败，请检查链接是否有效'))
-      .finally(() => setLoading(false))
+      .catch(() => {
+        if (!cancelled) setError('抓取失败，请检查链接是否有效')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+      abortRef.current?.abort()
+    }
   }, [open, url])
 
   if (!open) return null
@@ -115,20 +128,30 @@ export function LinkPreviewModal({ open, url, onConfirm, onCancel }: LinkPreview
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t">
+        <div className="flex items-center justify-between px-4 py-3 border-t">
           <button
             onClick={onCancel}
             className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-900"
           >
             取消
           </button>
-          <button
-            onClick={() => preview && onConfirm(preview)}
-            disabled={loading || !preview || !hasContent}
-            className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            确认入库
-          </button>
+          <div className="flex items-center gap-2">
+            {/* 降级：正文为空或抓取失败时仍可链接入库 */}
+            <button
+              onClick={onFallback}
+              disabled={loading}
+              className="px-3 py-1.5 text-xs text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+            >
+              链接直接入库
+            </button>
+            <button
+              onClick={() => preview && onConfirm(preview)}
+              disabled={loading || !preview || !hasContent}
+              className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              确认入库
+            </button>
+          </div>
         </div>
       </div>
     </div>

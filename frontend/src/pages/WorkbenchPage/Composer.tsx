@@ -45,7 +45,6 @@ export function Composer({ onTaskCreated }: ComposerProps) {
   const [preflightStaged, setPreflightStaged] = useState<StagedConfig | undefined>(undefined)
   const [uploading, setUploading] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
-  const [previewData, setPreviewData] = useState<LinkPreviewWithContent | null>(null)
 
   const popRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -133,8 +132,12 @@ export function Composer({ onTaskCreated }: ComposerProps) {
     }
   }
 
-  const handlePreviewConfirm = (preview: LinkPreviewWithContent) => {
-    setPreviewData(preview)
+  const handlePreviewConfirm = (_preview: LinkPreviewWithContent) => {
+    setPreviewOpen(false)
+    setUploadOpen(true)
+  }
+
+  const handlePreviewFallback = () => {
     setPreviewOpen(false)
     setUploadOpen(true)
   }
@@ -372,6 +375,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
         open={previewOpen}
         url={normalizedUrl || url}
         onConfirm={handlePreviewConfirm}
+        onFallback={handlePreviewFallback}
         onCancel={() => setPreviewOpen(false)}
       />
 

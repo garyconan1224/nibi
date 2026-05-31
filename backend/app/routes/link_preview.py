@@ -192,10 +192,11 @@ def _extract_pdf_content(pdf_bytes: bytes, url: str) -> dict:
             tmp_path = Path(tmp.name)
         try:
             doc = _load_pdf(tmp_path)
+            meta = getattr(doc, "meta", None)
             return {
                 "content": doc.content,
                 "word_count": doc.char_count,
-                "parser": doc.meta.get("parser", "pdf") if doc.meta else "pdf",
+                "parser": meta.get("parser", "pdf") if meta else "pdf",
                 "title": doc.title,
                 "warning": None,
             }
@@ -216,7 +217,8 @@ def _extract_content(url: str) -> dict:
         return {"content": "", "word_count": 0, "parser": "none", "warning": None}
     try:
         doc = _load_url(url, timeout=10)
-        parser = doc.meta.get("parser", "readability") if doc.meta else "readability"
+        meta = getattr(doc, "meta", None)
+        parser = meta.get("parser", "readability") if meta else "readability"
         return {"content": doc.content, "word_count": doc.char_count, "parser": parser, "warning": None}
     except TextLoaderError as exc:
         logger.warning("正文提取失败: %s", exc)
