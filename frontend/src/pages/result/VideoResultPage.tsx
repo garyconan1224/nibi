@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, BookOpen, Check, CheckSquare, Copy, Download, Film, Maximize2, MinusSquare, Pause, Play, Settings2, Square, Star, X } from 'lucide-react'
+import { ArrowLeft, BookOpen, Check, CheckSquare, Copy, Download, Film, Maximize2, MinusSquare, Pause, Pencil, Play, Settings2, Square, Star, X } from 'lucide-react'
 
 import {
   type PromptVersion,
@@ -102,6 +102,11 @@ export default function VideoResultPage() {
   const [selectedFrames, setSelectedFrames] = useState<Set<number>>(new Set())
   const lastClickedIdx = useRef<number>(-1)
   const [exporting, setExporting] = useState(false)
+
+  // C-4: 帧提示词 inline editor
+  const [editing, setEditing] = useState(false)
+  const [editText, setEditText] = useState('')
+  const [selectedVersionIdx, setSelectedVersionIdx] = useState<number | null>(null)
 
   // 学习模式补图
   const [inlineFrames, setInlineFrames] = useState<InlineFrame[]>([])
@@ -444,6 +449,39 @@ export default function VideoResultPage() {
     setPromptVersions((prev) => [...prev, pv])
     toast.success(`已保存 v${pv.version}`)
   }, [workspaceId, itemId])
+
+  // C-4: inline editor
+  const startEdit = useCallback(() => {
+    const base = selectedVersionIdx !== null && promptVersions[selectedVersionIdx]
+      ? promptVersions[selectedVersionIdx].content
+      : promptText
+    setEditText(base)
+    setEditing(true)
+  }, [promptText, selectedVersionIdx, promptVersions])
+
+  const cancelEdit = useCallback(() => {
+    setEditing(false)
+    setEditText('')
+  }, [])
+
+  const saveEdit = useCallback(async () => {
+    const text = editText.trim()
+    if (!text) return
+    const label = `[帧 ${activeFrame} (${frame?.ts ?? ''})] `
+    await handleAddPromptVersion(label + text)
+    setEditing(false)
+    setEditText('')
+    setSelectedVersionIdx(null)
+  }, [editText, activeFrame, frame, handleAddPromptVersion])
+
+  // 切帧时退出编辑态
+  useEffect(() => {
+    if (editing) {
+      setEditing(false)
+      setEditText('')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFrame])
 
   const openPicker = useCallback(() => {
     if (!formatsCfg) return
@@ -1007,9 +1045,51 @@ export default function VideoResultPage() {
         ) : (
         <>
         <div className="vd-prompt-area">
-          <div className="vd-prompt-text">{promptText}</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span className="eyebrow">当前提示词</span>
+            {!editing && (
+              <button className="vd-btn-tool" onClick={startEdit} title="编辑提示词">
+                <Pencil size={11} /> 改
+              </button>
+            )}
+          </div>
+          {editing ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <textarea
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                style={{
+                  width: '100%',
+                  minHeight: 100,
+                  resize: 'vertical',
+                  fontFamily: 'var(--mono)',
+                  fontSize: 11,
+                  lineHeight: 1.5,
+                  padding: '8px 10px',
+                  borderRadius: 6,
+                  border: '1px solid var(--line)',
+                  background: 'var(--bg-card, #fff)',
+                  color: 'var(--ink-1)',
+                  outline: 'none',
+                }}
+              />
+              <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                <button className="vd-btn-tool" onClick={cancelEdit}>取消</button>
+                <button className="vd-btn-tool" onClick={saveEdit} style={{ background: 'var(--accent-pink)', color: '#fff', border: 'none' }}>
+                  <Check size={11} /> 保存为新版本
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="vd-prompt-text">{promptText}</div>
+          )}
           <div style={{ marginTop: 14 }}>
-            <PromptVersionStack versions={promptVersions} onAddVersion={handleAddPromptVersion} />
+            <PromptVersionStack
+              versions={promptVersions}
+              onAddVersion={handleAddPromptVersion}
+              selectedIdx={selectedVersionIdx}
+              onSelectVersion={setSelectedVersionIdx}
+            />
           </div>
         </div>
 

@@ -9,9 +9,11 @@ import { VersionDiffView } from './VersionDiffView'
 interface PromptVersionStackProps {
   versions: PromptVersion[]
   onAddVersion: (content: string) => Promise<void>
+  selectedIdx?: number | null
+  onSelectVersion?: (idx: number | null) => void
 }
 
-export function PromptVersionStack({ versions, onAddVersion }: PromptVersionStackProps) {
+export function PromptVersionStack({ versions, onAddVersion, selectedIdx, onSelectVersion }: PromptVersionStackProps) {
   const [adding, setAdding] = useState(false)
   const [diffMode, setDiffMode] = useState(false)
   const [diffLeft, setDiffLeft] = useState<PromptVersion | null>(null)
@@ -89,16 +91,20 @@ export function PromptVersionStack({ versions, onAddVersion }: PromptVersionStac
         versions={versions}
         open={dropdownOpen}
         onToggle={() => setDropdownOpen((v) => !v)}
+        selectedIdx={selectedIdx ?? undefined}
         onSelect={(pv) => {
           setDropdownOpen(false)
           if (diffMode) {
             if (!diffLeft || diffLeft.version === pv.version) setDiffLeft(pv)
             else setDiffRight(pv)
+          } else if (onSelectVersion) {
+            const idx = versions.findIndex((v) => v.version === pv.version)
+            onSelectVersion(idx >= 0 ? idx : null)
           }
         }}
       />
 
-      {/* 最新版本内容预览 */}
+      {/* 版本内容预览（选中版本或最新版本） */}
       {!diffMode && versions.length > 0 && (
         <div
           style={{
@@ -115,7 +121,7 @@ export function PromptVersionStack({ versions, onAddVersion }: PromptVersionStac
             marginBottom: 8,
           }}
         >
-          {versions[versions.length - 1].content}
+          {versions[selectedIdx ?? versions.length - 1].content}
         </div>
       )}
 
@@ -164,14 +170,17 @@ function VersionDropdown({
   versions,
   open,
   onToggle,
+  selectedIdx,
   onSelect,
 }: {
   versions: PromptVersion[]
   open: boolean
   onToggle: () => void
+  selectedIdx?: number
   onSelect: (pv: PromptVersion) => void
 }) {
   if (versions.length === 0) return null
+  const selected = versions[selectedIdx ?? versions.length - 1]
   return (
     <div style={{ position: 'relative', marginBottom: 8 }}>
       <button
@@ -191,7 +200,7 @@ function VersionDropdown({
           justifyContent: 'space-between',
         }}
       >
-        <span>v{versions[versions.length - 1].version}（最新）</span>
+        <span>v{selected.version}{(selectedIdx ?? versions.length - 1) === versions.length - 1 ? '（最新）' : ''}</span>
         <ChevronDown size={12} />
       </button>
       {open && (
