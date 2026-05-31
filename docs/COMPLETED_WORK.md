@@ -249,6 +249,34 @@ R13 只覆盖了 download → analyze 路径（_on_download_success 回调），
 
 ---
 
+## Track T · T1.1 – 文字结果金句/要点 char 级原文定位
+
+**完成日期**：2026-05-31
+**模型 / 工具**：xiaomi mimo 2.5 pro
+**分支**：main
+**Commit**：（待 commit）
+
+### 影响范围
+- 后端：`backend/tests/test_structured_summary_parse.py`（新增）
+- 前端：`frontend/src/pages/result/TextResultPage.tsx`、`frontend/src/pages/result/text-result.css`
+
+### 关键改动
+- 新增 12 个 pytest 覆盖 `_parse_structured_summary` 的金句子串校验、要点 source_excerpt 校验、para_index 计算、边界情况
+- 前端 `scrollToParagraph` → `scrollToCharRange(charStart, charEnd, paraIndex?)`：优先用 char_start/char_end 精确定位，缺失时回退 para_index
+- `renderSummary` 签名改为 `onJump(charStart, charEnd, paraIndex?)`，金句/要点点击直接传 char 范围
+- 段落渲染支持 `<mark class="tx-char-hl">` 内联高亮，3 秒渐隐动画
+
+### 为什么这么做
+- 后端 `_parse_structured_summary` 已有 char 定位逻辑但无测试覆盖，补测试防回归
+- 前端原 `scrollToParagraph(para_index)` 只跳段落，金句/要点高亮是整段，违背 T1.1「禁止近似跳转」
+- 保留 para_index 兜底兼容旧数据（char_start 未填时仍可跳段落）
+
+### 留给后续的影响
+- T1.3 可在此基础上做更丰富的交互（如高亮闪烁、tooltip）
+- 后端 prompt 已要求 LLM 输出精确引文，但 LLM 仍可能输出近似文本——substring 校验会丢弃，这是预期行为
+
+---
+
 ## Phase R – 输入层重构（Composer 瘦身 + AddMaterialModal 4 步合一 + 单 URL 多类型 + PreflightDrawer）
 
 **完成日期**：2026-05-25

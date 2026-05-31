@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { ArrowLeft, Star, ChevronDown, ChevronRight, Layers, Copy, Check } from 'lucide-react'
@@ -22,7 +22,7 @@ import { SummariesTab } from '@/components/SummariesTab'
 
 function renderSummary(
   summary: string | StructuredSummary | null | undefined,
-  scrollToParagraph: (paraIndex: number) => void,
+  onJump: (charStart: number, charEnd: number, paraIndex?: number) => void,
 ) {
   if (!summary) return null
 
@@ -54,8 +54,12 @@ function renderSummary(
               <div
                 key={i}
                 className="tx-kp-item"
-                data-clickable={kp.para_index !== undefined}
-                onClick={kp.para_index !== undefined ? () => scrollToParagraph(kp.para_index!) : undefined}
+                data-clickable={kp.char_start !== undefined || kp.para_index !== undefined}
+                onClick={kp.char_start !== undefined
+                  ? () => onJump(kp.char_start!, kp.char_end!, kp.para_index)
+                  : kp.para_index !== undefined
+                    ? () => onJump(0, 0, kp.para_index)
+                    : undefined}
               >
                 <span className="tx-kp-num">{String(i + 1).padStart(2, '0')}</span>
                 <div className="tx-kp-body">
@@ -84,8 +88,8 @@ function renderSummary(
               <div
                 key={i}
                 className="tx-gq-item"
-                data-clickable={q.para_index !== undefined}
-                onClick={() => scrollToParagraph(q.para_index)}
+                data-clickable={q.char_start !== undefined || q.para_index !== undefined}
+                onClick={() => onJump(q.char_start, q.char_end, q.para_index)}
               >
                 <blockquote className="tx-gq-text">{q.quote_text}</blockquote>
                 {q.para_index !== undefined && (
@@ -191,7 +195,7 @@ export default function TextResultPage() {
     | { kind: 'error'; message: string }
   const [fetchState, setFetchState] = useState<FetchState>({ kind: 'loading' })
   const [favored, setFavored] = useState(false)
-  const [highlightedPara, setHighlightedPara] = useState<number | null>(null)
+  const [highlightedCharRange, setHighlightedCharRange] = useState<[number, number] | null>(null)
 
   // N10: 折叠状态
   const [assocOpen, setAssocOpen] = useState(true)
@@ -244,13 +248,25 @@ export default function TextResultPage() {
     })
   }, [])
 
-  const scrollToParagraph = useCallback((paraIndex: number) => {
-    const el = document.getElementById(`tx-para-${paraIndex}`)
+  const scrollToCharRange = useCallback((charStart: number, charEnd: number, paraIndex?: number) => {
+    const content = fetchState.kind === 'ready' ? fetchState.data.content : ''
+    const paras = content.split(/\n{2,}/)
+    let targetPara = paraIndex ?? 0
+    if (paraIndex === undefined && charStart > 0) {
+      let cum = 0
+      for (let i = 0; i < paras.length; i++) {
+        if (charStart < cum + paras[i].length) { targetPara = i; break }
+        cum += paras[i].length + 2
+      }
+    }
+    const el = document.getElementById(`tx-para-${targetPara}`)
     if (!el) return
     el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    setHighlightedPara(paraIndex)
-    setTimeout(() => setHighlightedPara(null), 2200)
-  }, [])
+    if (charStart > 0 && charEnd > charStart) {
+      setHighlightedCharRange([charStart, charEnd])
+      setTimeout(() => setHighlightedCharRange(null), 3000)
+    }
+  }, [fetchState])
 
   // N10: 多文对比
   const handleCompare = useCallback(async () => {
@@ -313,16 +329,34 @@ export default function TextResultPage() {
         {/* 正文区域 */}
         <div className="tx-content-scroll">
           <div className="tx-content-body">
-            {result.content.split(/\n{2,}/).map((para, i) => (
-              <div
-                key={i}
-                id={`tx-para-${i}`}
-                className="tx-para"
-                data-highlight={highlightedPara === i}
-              >
-                {para}
-              </div>
-            ))}
+            {(() => {
+              const paras = result.content.split(/\n{2,}/)
+              let cum = 0
+              return paras.map((para, i) => {
+                const paraStart = cum
+                cum += para.length + 2
+                let children: React.ReactNode = para
+                if (highlightedCharRange) {
+                  const [hs, he] = highlightedCharRange
+                  const localStart = Math.max(0, hs - paraStart)
+                  const localEnd = Math.min(para.length, he - paraStart)
+                  if (localStart < localEnd && localStart < para.length) {
+                    children = (
+                      <>
+                        {para.slice(0, localStart)}
+                        <mark className="tx-char-hl">{para.slice(localStart, localEnd)}</mark>
+                        {para.slice(localEnd)}
+                      </>
+                    )
+                  }
+                }
+                return (
+                  <div key={i} id={`tx-para-${i}`} className="tx-para">
+                    {children}
+                  </div>
+                )
+              })
+            })()}
           </div>
         </div>
       </div>
@@ -353,7 +387,7 @@ export default function TextResultPage() {
           ) : (
           <>
           {/* 摘要 — T1.1: 支持结构化摘要 */}
-          {renderSummary(result.summary, scrollToParagraph)}
+          {renderSummary(result.summary, scrollToCharRange)}
 
           {/* N10: 联想归纳 */}
           {hasAssociations && (
@@ -513,35 +547,51 @@ function TextCompareContent({ data }: { data: TextCompareResult }) {
 
   return (
     <div>
-      {/* 对比表格 */}
+      {/* LLM 对比总结（与 CompareTab 对齐：表格上方 + sunken 背景） */}
+      {data.llm_summary && (
+        <div
+          style={{
+            padding: '14px 18px',
+            background: 'var(--bg-sunken)',
+            borderRadius: 'var(--radius)',
+            marginBottom: 16,
+            fontSize: 13,
+            lineHeight: 1.7,
+            color: 'var(--ink-2)',
+          }}
+        >
+          <span className="eyebrow" style={{ display: 'block', marginBottom: 6 }}>
+            AI 对比总结
+          </span>
+          {data.llm_summary}
+        </div>
+      )}
+
+      {/* 对比表格（与 CompareTab 对齐：素材/摘要/内容预览/字数） */}
       <table className="tx-compare-table">
         <thead>
           <tr>
             <th>素材</th>
-            <th>字数</th>
             <th>摘要</th>
+            <th>内容预览</th>
+            <th>字数</th>
           </tr>
         </thead>
         <tbody>
           {items.map((t) => (
             <tr key={t.item_id} data-current={t.is_current}>
               <td className="name-cell" data-current={t.is_current}>{t.name}</td>
-              <td>{t.char_count.toLocaleString()}</td>
-              <td className="summary-cell">{typeof t.summary === 'string' ? t.summary : (t.summary?.abstract ?? '')}</td>
+              <td className="summary-cell" style={{ fontSize: 12, maxWidth: 280 }}>
+                {(typeof t.summary === 'string' ? t.summary : t.summary?.abstract) || <span style={{ color: 'var(--ink-4)' }}>—</span>}
+              </td>
+              <td style={{ fontSize: 12, maxWidth: 300 }}>
+                {t.content_preview || <span style={{ color: 'var(--ink-4)' }}>—</span>}
+              </td>
+              <td style={{ fontSize: 12, color: 'var(--ink-3)', textAlign: 'right' }}>{t.char_count.toLocaleString()}</td>
             </tr>
           ))}
         </tbody>
       </table>
-
-      {/* LLM 对比总结 */}
-      {data.llm_summary && (
-        <div style={{ marginTop: 12 }}>
-          <div className="eyebrow" style={{ marginBottom: 6 }}>AI 对比总结</div>
-          <div className="tx-compare-summary">
-            {data.llm_summary}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
