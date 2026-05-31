@@ -16,11 +16,11 @@ export default function LNNotesPanel({ markdown, onMarkdownChange, view, onSwitc
         <button
           data-active={view === 'html'}
           onClick={() => onSwitchView('html')}
-        >HTML</button>
+        >阅读<span className="ln-tab-sub">看效果</span></button>
         <button
           data-active={view === 'md'}
           onClick={() => onSwitchView('md')}
-        >MD 源码</button>
+        >Markdown<span className="ln-tab-sub">可编辑</span></button>
       </div>
       {view === 'html'
         ? <HtmlView markdown={markdown} onSeek={onSeek} />

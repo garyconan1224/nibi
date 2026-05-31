@@ -18,6 +18,14 @@ html, body, #root {
   overflow: hidden;
 }
 
+/* 打印时放开最外层高度/overflow，让长内容（如学习笔记导出 PDF）自然分多页，不被裁到一页 */
+@media print {
+  html, body, #root {
+    height: auto;
+    overflow: visible;
+  }
+}
+
 /* 修改滚动条轨道颜色 */
 ::-webkit-scrollbar {
   width: 8px; /* 控制滚动条的宽度 */

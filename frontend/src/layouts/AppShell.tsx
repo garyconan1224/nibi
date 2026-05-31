@@ -100,11 +100,11 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden">
+    <div className="flex h-screen w-screen overflow-hidden print:block print:h-auto print:overflow-visible">
       {/* ── Sidebar ── */}
       <nav
         aria-label="主导航"
-        className="flex w-[72px] shrink-0 flex-col items-center gap-1.5 border-r border-border bg-background py-4"
+        className="flex w-[72px] shrink-0 flex-col items-center gap-1.5 border-r border-border bg-background py-4 print:hidden"
       >
         {/* Logo slot */}
         <button
@@ -148,10 +148,10 @@ export function AppShell({ children }: AppShellProps) {
       </nav>
 
       {/* ── Main content ── */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden print:overflow-visible print:h-auto">
         {/* ── Top bar ── */}
         <div
-          className="flex items-center gap-3 border-b px-5 py-2.5"
+          className="flex items-center gap-3 border-b px-5 py-2.5 print:hidden"
           style={{ borderColor: 'var(--line)', background: 'var(--bg)' }}
         >
           <div className="flex-1" />

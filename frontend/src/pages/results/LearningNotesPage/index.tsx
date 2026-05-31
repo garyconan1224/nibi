@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Star, Download } from 'lucide-react'
-import { getWorkspace, getLnMarkdown, getItemResult, patchLnMarkdown } from '@/services/workspaces'
+import { ArrowLeft, Star, Download, ChevronDown } from 'lucide-react'
+import { getWorkspace, getLnMarkdown, getItemResult, patchLnMarkdown, exportLnObsidian } from '@/services/workspaces'
 import type { VideoResultTranscriptLine } from '@/services/workspaces'
 import type { WorkspaceRecord, WorkspaceItem } from '@/types/workspace'
 import LNVideoPanel, { type LNVideoPanelHandle } from './LNVideoPanel'
@@ -24,16 +24,76 @@ export default function LearningNotesPage() {
   // B-3: 可编辑的 markdown state
   const [markdown, setMarkdown] = useState('')
 
-  // B-3: 视图偏好（localStorage 持久化，默认 md）
+  // B-3: 视图偏好（localStorage 持久化，默认 html 美化阅读）
   const [view, setView] = useState<'html' | 'md'>(() => {
     const saved = localStorage.getItem('ln-view')
-    return saved === 'html' ? 'html' : 'md'
+    return saved === 'md' ? 'md' : 'html'
   })
 
   const switchView = useCallback((v: 'html' | 'md') => {
     setView(v)
     localStorage.setItem('ln-view', v)
   }, [])
+
+  // 导出菜单状态
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
+
+  // 点击外部关闭导出菜单
+  useEffect(() => {
+    if (!exportMenuOpen) return
+    const handleClick = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setExportMenuOpen(false)
+      }
+    }
+    document.addEventListener('click', handleClick)
+    return () => document.removeEventListener('click', handleClick)
+  }, [exportMenuOpen])
+
+  // 从 markdown 提取 H1 标题作为导出文件名
+  const noteTitle = useMemo(() => {
+    const h1 = markdown.match(/^#\s+(.+)$/m)?.[1]?.trim()
+    if (h1) return h1
+    if (pageState.kind === 'ready') return pageState.videoItem.name || '学习笔记'
+    return '学习笔记'
+  }, [markdown, pageState])
+  const safeExportName = noteTitle.replace(/[/\\:*?"<>|]/g, '_').slice(0, 80)
+
+  // 导出 Markdown（纯前端）
+  const handleExportMarkdown = useCallback(() => {
+    if (pageState.kind !== 'ready') return
+    const blob = new Blob([markdown], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${safeExportName}.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    setExportMenuOpen(false)
+  }, [markdown, pageState, safeExportName])
+
+  // 导出 Obsidian 包（后端 zip，走 axios http client）
+  const handleExportObsidian = useCallback(async () => {
+    if (pageState.kind !== 'ready') return
+    try {
+      const blob = await exportLnObsidian(pageState.workspace.workspace_id)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${safeExportName}-obsidian.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Obsidian 导出失败:', err)
+      alert('Obsidian 包导出失败，请重试')
+    }
+    setExportMenuOpen(false)
+  }, [pageState, safeExportName])
 
   // B-4: 自动保存
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
@@ -62,6 +122,7 @@ export default function LearningNotesPage() {
 
     return () => clearTimeout(debounceTimer.current)
   }, [markdown, workspaceId, pageState.kind])
+
 
   useEffect(() => {
     let cancelled = false
@@ -135,15 +196,39 @@ export default function LearningNotesPage() {
           {saveState === 'saved' && `已保存 ${lastSavedAt}`}
           {saveState === 'error' && '保存失败，重试中…'}
         </span>
-        {/* 导出 PDF（打印美化预览） */}
-        <button
-          className="btn-ghost"
-          style={{ height: 28, padding: '0 10px', fontSize: 12, marginLeft: 8 }}
-          onClick={() => window.print()}
-          title="导出 PDF（打印美化预览）"
-        >
-          <Download size={13} /> 导出 PDF
-        </button>
+        {/* 导出菜单 */}
+        <div className="ln-export-menu-wrapper" ref={exportMenuRef}>
+          <button
+            className="btn-ghost"
+            style={{ height: 28, padding: '0 10px', fontSize: 12, marginLeft: 8 }}
+            onClick={() => setExportMenuOpen(!exportMenuOpen)}
+            title="导出"
+          >
+            <Download size={13} /> 导出 <ChevronDown size={12} />
+          </button>
+          {exportMenuOpen && (
+            <div className="ln-export-menu">
+              <button onClick={() => {
+                const prev = document.title
+                document.title = safeExportName
+                window.addEventListener('afterprint', () => { document.title = prev }, { once: true })
+                window.print()
+                setExportMenuOpen(false)
+              }}>
+                导出 PDF
+              </button>
+              <button onClick={handleExportMarkdown}>
+                导出 Markdown
+              </button>
+              <button onClick={handleExportObsidian}>
+                Obsidian 包
+              </button>
+              <button disabled title="阶段③启用">
+                写入 Obsidian 库
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Loading / Error */}
@@ -156,30 +241,32 @@ export default function LearningNotesPage() {
 
       {/* Main body: dual-column */}
       {pageState.kind === 'ready' && (
-        <div className="ln-body">
-          <div className="ln-left-col">
-            <LNVideoPanel
-              ref={videoPanelRef}
-              src={videoSrc}
-              externalUrl={externalUrl}
-              title={pageState.videoItem.name}
-              workspaceId={workspaceId}
-              onTimeUpdate={handleTimeUpdate}
-            />
-            <LNTranscriptPanel
-              transcript={pageState.transcript}
-              currentTime={currentTime}
+        <>
+          <div className="ln-body">
+            <LNNotesPanel
+              markdown={markdown}
+              onMarkdownChange={setMarkdown}
+              view={view}
+              onSwitchView={switchView}
               onSeek={(sec) => videoPanelRef.current?.seekTo(sec)}
             />
+            <div className="ln-left-col">
+              <LNVideoPanel
+                ref={videoPanelRef}
+                src={videoSrc}
+                externalUrl={externalUrl}
+                title={pageState.videoItem.name}
+                workspaceId={workspaceId}
+                onTimeUpdate={handleTimeUpdate}
+              />
+              <LNTranscriptPanel
+                transcript={pageState.transcript}
+                currentTime={currentTime}
+                onSeek={(sec) => videoPanelRef.current?.seekTo(sec)}
+              />
+            </div>
           </div>
-          <LNNotesPanel
-            markdown={markdown}
-            onMarkdownChange={setMarkdown}
-            view={view}
-            onSwitchView={switchView}
-            onSeek={(sec) => videoPanelRef.current?.seekTo(sec)}
-          />
-        </div>
+        </>
       )}
     </div>
   )

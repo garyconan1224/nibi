@@ -711,3 +711,12 @@ export async function exportNotes(
   a.remove()
   URL.revokeObjectURL(url)
 }
+
+/** GET /workspaces/{id}/ln/export?format=obsidian — 导出 Obsidian zip 包 */
+export async function exportLnObsidian(workspaceId: string): Promise<Blob> {
+  const res = await http.get(`${BASE}/${workspaceId}/ln/export`, {
+    params: { format: 'obsidian' },
+    responseType: 'blob',
+  })
+  return res.data as Blob
+}

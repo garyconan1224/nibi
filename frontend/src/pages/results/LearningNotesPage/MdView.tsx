@@ -22,6 +22,7 @@ export default function MdView({ markdown: md, onMarkdownChange }: Props) {
         lineNumbers(),
         history(),
         markdown(),
+        EditorView.lineWrapping,
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) {

@@ -641,7 +641,7 @@ def patch_ln_markdown(workspace_id: str, body: LnPatchRequest):
 
 import re as _re
 
-_SAFE_NAME = _re.compile(r'[^a-zA-Z0-9._-]+')
+_SAFE_NAME = _re.compile(r'[^\w.\-]+', flags=_re.UNICODE)
 
 
 @router.post("/{workspace_id}/ln/screenshots")
@@ -673,6 +673,112 @@ async def upload_ln_screenshot(
     rel = dst_dir.relative_to(ws_root.parent.parent)
     url = f"/static/{rel}/{safe}"
     return {"url": url, "filename": safe}
+
+
+# ── 学习笔记 Obsidian zip 导出 ────────────────────────────────
+
+import re as _re_ln
+
+
+@router.get("/{workspace_id}/ln/export")
+def export_ln_obsidian(workspace_id: str, format: str = "obsidian"):
+    """导出学习笔记为 Obsidian zip 包。
+
+    format=obsidian: zip 含 {标题}.md (图片语法改写为 ![[attachments/...]] + frontmatter) + attachments/*.png
+    """
+    if format != "obsidian":
+        raise HTTPException(status_code=400, detail=f"不支持的格式: {format!r}，目前仅支持 obsidian")
+
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+
+    ws_root = get_workspace_root(workspace_id)
+
+    # 取 markdown（复用 GET /ln 的优先级逻辑）
+    md_path = ws_root / "ln.md"
+    if md_path.exists():
+        md_content = md_path.read_text(encoding="utf-8")
+    else:
+        video_item = next((it for it in rec.items if it.type == "video"), None)
+        if video_item is not None:
+            overlay = _sync_item_with_tasks(video_item)
+            results = dict(overlay.get("results", {})) if overlay and overlay.get("results") else dict(video_item.results or {})
+            summary = results.get("summary")
+            if summary and isinstance(summary, str) and summary.strip():
+                md_content = summary
+            else:
+                raise HTTPException(status_code=404, detail="学习笔记尚未生成")
+        else:
+            raise HTTPException(status_code=404, detail="学习笔记尚未生成")
+
+    # 获取标题
+    video_item = next((it for it in rec.items if it.type == "video"), None)
+    title = video_item.name if video_item else "学习笔记"
+
+    # 改写图片语法: ![alt](/static/workspaces/{ws}/ln-screenshots/FILE.png) → ![[attachments/FILE.png]]
+    img_pattern = _re_ln.compile(r'!\[([^\]]*)\]\(/static/workspaces/[^/]+/ln-screenshots/([^)]+)\)')
+    referenced_images = set()
+    _ALLOWED_IMG_EXT = {'.png', '.jpg', '.jpeg', '.webp', '.gif'}
+    screenshots_dir = ws_root / "ln-screenshots"
+
+    def _replace_img(match: _re_ln.Match) -> str:
+        raw = match.group(2)
+        # 安全：只取 basename，拒绝路径穿越
+        basename = Path(raw).name
+        if basename != raw:
+            return match.group(0)  # 不改写，原样保留
+        ext = Path(basename).suffix.lower()
+        if ext not in _ALLOWED_IMG_EXT:
+            return match.group(0)
+        # 二次确认在截图目录内
+        img_path = (screenshots_dir / basename).resolve()
+        try:
+            img_path.relative_to(screenshots_dir.resolve())
+        except ValueError:
+            return match.group(0)
+        referenced_images.add(basename)
+        return f'![[attachments/{basename}]]'
+
+    md_content = img_pattern.sub(_replace_img, md_content)
+
+    # 从 md 提取 H1 标题作为 safe_title（比 video_item.name 更友好）
+    h1_match = _re_ln.search(r'^#\s+(.+)$', md_content, _re_ln.MULTILINE)
+    if h1_match:
+        title = h1_match.group(1).strip()
+    elif not title:
+        title = workspace_id
+    safe_title = _SAFE_NAME.sub('_', title).strip('_') or "学习笔记"
+
+    # 添加 frontmatter
+    today = datetime.now().strftime("%Y-%m-%d")
+    source = video_item.source_value if video_item and hasattr(video_item, 'source_value') and video_item.source_value else workspace_id
+    frontmatter = f"""---
+title: {title}
+source: {source}
+created: {today}
+tags: [学习笔记, nibi]
+---
+
+"""
+    md_content = frontmatter + md_content
+
+    # 构建 zip
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(f"{safe_title}.md", md_content)
+
+        # 写入引用的图片
+        for img_name in referenced_images:
+            img_path = screenshots_dir / img_name
+            if img_path.exists():
+                zf.write(img_path, f"attachments/{img_name}")
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(safe_title + '-obsidian.zip')}"},
+    )
 
 
 # ── R20: 笔记多格式导出 ────────────────────────────────

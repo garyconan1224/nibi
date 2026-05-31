@@ -68,6 +68,52 @@
   color: var(--ink-4);
 }
 
+/* ── 导出菜单 ──────────────────────────── */
+.vm-ln-scope .ln-export-menu-wrapper {
+  position: relative;
+}
+
+.vm-ln-scope .ln-export-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  min-width: 160px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  padding: 4px;
+}
+
+.vm-ln-scope .ln-export-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  font-size: 13px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s;
+}
+
+.vm-ln-scope .ln-export-menu button:hover {
+  background: var(--bg-sunken);
+}
+
+.vm-ln-scope .ln-export-menu button:disabled {
+  color: var(--ink-4);
+  cursor: not-allowed;
+}
+
+.vm-ln-scope .ln-export-menu button:disabled:hover {
+  background: none;
+}
+
 /* ── 学习/复刻 toggle ──────────────────────────── */
 .vm-ln-scope .ln-mode-toggle {
   display: flex;
@@ -128,9 +174,9 @@
   overflow: hidden;
 }
 
-/* ── Video Panel (left 50%) ──────────────────── */
+/* ── Video Panel (right 38%) ─────────────────── */
 .vm-ln-scope .ln-video-panel {
-  width: 50%;
+  width: 100%;
   display: flex;
   flex-direction: column;
   border-radius: var(--radius-sm);
@@ -223,9 +269,9 @@
   color: var(--ink-4);
 }
 
-/* ── Notes Panel (right 50%) ─────────────────── */
+/* ── Notes Panel (left 62%) ──────────────────── */
 .vm-ln-scope .ln-notes-panel {
-  width: 50%;
+  width: 62%;
   display: flex;
   flex-direction: column;
   border-radius: var(--radius-sm);
@@ -264,7 +310,11 @@
 
 .vm-ln-scope .ln-toolbar button {
   flex: 1;
-  padding: 5px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 4px 12px;
   font-size: 12px;
   font-family: var(--mono);
   font-weight: 500;
@@ -273,6 +323,12 @@
   border: 1px solid var(--line);
   cursor: pointer;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.vm-ln-scope .ln-toolbar button .ln-tab-sub {
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.65;
 }
 
 .vm-ln-scope .ln-toolbar button:first-child {
@@ -617,6 +673,8 @@
 /* ── 字幕轨 ── */
 
 .vm-ln-scope .ln-left-col {
+  width: 38%;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -627,7 +685,8 @@
   background: var(--bg-elev);
   border-radius: 0 0 var(--radius-sm) var(--radius-sm);
   border-top: 1px solid var(--line);
-  max-height: 300px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 4px;
 }
@@ -747,7 +806,8 @@
   .vm-ln-scope .ln-toolbar,
   .vm-ln-scope .ln-toc,
   .vm-ln-scope .ln-transcript-panel,
-  .vm-ln-scope .ln-export-menu {
+  .vm-ln-scope .ln-export-menu,
+  .vm-ln-scope .ln-export-menu-wrapper {
     display: none !important;
   }
   .vm-ln-scope .ln-body {
@@ -760,6 +820,15 @@
   }
   .vm-ln-scope .ln-html-view {
     padding: 0 !important;
+  }
+  /* 放开高度/overflow 让长笔记自然分多页 */
+  .vm-ln-scope,
+  .vm-ln-scope .ln-body,
+  .vm-ln-scope .ln-notes-panel,
+  .vm-ln-scope .ln-html-scroll {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
   }
   .vm-ln-scope .ln-html-view h1 {
     font-size: 24px;
