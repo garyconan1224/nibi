@@ -1,6 +1,7 @@
 ---
 phase: RP1-C · C-5 视频复刻页小修汇总（改名 / 重试 / 标签）
-status: ready
+status: done
+completed_date: 2026-05-31
 owner: xiaomi-mimo-2.5pro
 parent: docs/plans/result-pages-redesign-v1.md § RP1-C · C-5
 companion: docs/plans/rp1-execution-handoff.md § 3.4 提示词 C-5
@@ -18,6 +19,8 @@ C-5 是复刻页三个小修，**不是一个大功能**。逐项先核对现状
 1. **帧标题改名**：大图旁帧标题（如"霓虹巷子氛围"）inline 可改。
 2. **失败帧「重试」按钮接通后端**：规格说现在是 stub，要接真实重试端点。**先确认重试端点是否存在**（`rg -n "retry|重试|regenerate|reproduce" backend/app/routes/*.py`）；不存在则补最小端点。
 3. **帧标签（SPEC 4.2.5 七维度自动打标）显示在帧卡片底部** —— **疑似已实现**：VideoResultPage 已有 `frame.tags` 的渲染（`Object.values(frame.tags ?? {}).flat()...`，class 类似 `vd-fi-tags`）。**启动先核对是否已展示，已做就跳过此项或只补样式**，别重复造。
+
+> **scope exception**：失败帧「重试」未做（缺 frame status 机制），转 backlog；本期交付 = 帧标题改名 + 标签展示（原已有）。
 
 ---
 

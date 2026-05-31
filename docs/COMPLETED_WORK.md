@@ -1924,6 +1924,8 @@ feat(rp1-c): C-1 复刻页主帧大视图 + 缩略图轨道
 ### 前置核对
 - **标签展示**：已存在（`Object.values(frame.tags ?? {}).flat()` 渲染为 chip）→ 跳过
 - **重试端点**：后端无 frame 级 status/retry 机制，`VideoResultFrame` 无 status 字段 → 超出小修范围，跳过
+
+**C-5 范围说明**：失败帧「重试」因当前无 frame status（失败态）机制未实现 → 转 backlog（见 OUTSTANDING_TASKS）；本次完成 = 帧标题改名 + 标签展示（原已有）。
 - **帧标题**：只读展示，无编辑功能 → 实现
 
 ### 改动

@@ -156,7 +156,7 @@
   - [x] C-2 复刻↔学习笔记联动切换 — 并入 RP1-B+ 方案 B（`rp1b-intent-routing-mimo-prompt.md`）
   - [x] C-3 帧批量操作 + 导出复刻包 — 计划 [rp1-c3](plans/rp1-c3-mimo-prompt.md)（2026-05-31）
   - [x] C-4 提示词在线编辑 + 版本 — 计划 [rp1-c4](plans/rp1-c4-mimo-prompt.md)（2026-05-31）
-  - [x] C-5 小修（改名/重试/标签）— 计划 [rp1-c5](plans/rp1-c5-mimo-prompt.md)（2026-05-31）
+  - [x] C-5 小修（改名 ✓ / 标签 ✓已有 / 重试 ⏸转 backlog：缺 frame status 机制）— 计划 [rp1-c5](plans/rp1-c5-mimo-prompt.md)（2026-05-31）
 
 ### 延后阶段（RP1 之后）
 

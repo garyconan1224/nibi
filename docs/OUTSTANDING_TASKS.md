@@ -59,3 +59,4 @@ Last updated: 2026-05-29（**当前阶段 = R21.P3.S3 followup 待 merge → 音
 - `N1b` 磁盘布局：`data/projects/` → `data/workspaces/` 仍是高影响待做项。
 - `N7b` 路径 3 后端 handler（UI 已就绪，依赖 Gemini / GPT-4o / Qwen-VL API 集成决策）。路径 1 已完成。
 - `N8b` 音频 librosa 分析后端（UI 已就绪，6 维度切分）。
+- [backlog] 复刻页失败帧「重试」接后端 — 前置：需先建 frame status（成功/失败态）机制。来源：RP1-C C-5 scope exception。
