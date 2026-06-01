@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 import subprocess
+import threading
 import time
 import urllib.request
 from pathlib import Path
@@ -1277,11 +1278,22 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         _pool = _Pool(max_workers=2, thread_name_prefix="r22-parallel")
         futures: Dict[str, Future] = {}
 
+        # ── 进度单调递增保护（两轨并行写进度，只前进不后退）─────
+        _progress_lock = threading.Lock()
+        _max_progress = [0.30]  # PROBE 阶段结束时的进度
+
+        def _monotonic_progress(pct: float, msg: str) -> None:
+            """只在新进度大于历史最大值时才更新，避免两轨互相覆盖导致倒退。"""
+            with _progress_lock:
+                if pct > _max_progress[0]:
+                    _max_progress[0] = pct
+                    runner.set_progress(task_id, pct, msg)
+
         # ── transcribe 轨 ──────────────────────────────────────
         if "transcribe" in steps:
             def _run_transcribe() -> str:
                 runner.store.update(task_id, status=TaskStatus.ASR.value)
-                runner.set_progress(task_id, 0.32, "开始转录音频...")
+                _monotonic_progress(0.32, "开始转录音频...")
 
                 tcfg = load_settings().transcriber
                 runner.append_log(
@@ -1292,7 +1304,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
 
                 def _on_progress(ratio: float, msg: str) -> None:
                     mapped = 0.32 + 0.26 * max(0.0, min(1.0, ratio))
-                    runner.set_progress(task_id, mapped, f"[转录] {msg}")
+                    _monotonic_progress(mapped, f"[转录] {msg}")
 
                 def _on_log(msg: str) -> None:
                     runner.append_log(task_id, f"[转录] {msg}")
@@ -1313,7 +1325,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         if "analyze" in steps:
             def _run_analyze() -> str:
                 runner.store.update(task_id, status=TaskStatus.FRAMES.value)
-                runner.set_progress(task_id, 0.58, "开始视觉帧分析...")
+                _monotonic_progress(0.58, "开始视觉帧分析...")
 
                 frame_prompts = payload.get("frame_prompt")
                 if preflight := payload.get("preflight"):
@@ -1349,7 +1361,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                     if snaps:
                         avg = sum(float(s["percent"]) for s in snaps) / max(len(snaps), 1) / 100.0
                         cur_pct = min(0.85, 0.58 + avg * 0.27)
-                        runner.set_progress(task_id, cur_pct, "[截帧] 视觉帧分析中...")
+                        _monotonic_progress(cur_pct, "[截帧] 视觉帧分析中...")
                         if cur_pct - _last_logged_pct >= 0.05 or _last_logged_pct < 0:
                             _last_logged_pct = cur_pct
                             for s in snaps:
@@ -1371,36 +1383,36 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
 
             futures["analyze"] = _pool.submit(_run_analyze)
 
-        # ── 等待两轨完成，收集结果 ─────────────────────────────
-        # 任一轨失败立即报错，不拖死另一轨
-        errors: List[str] = []
-        for future in as_completed(futures.values()):
-            try:
-                result = future.result()
-                # 根据 future 对应的 key 存储结果
-                for key, f in futures.items():
-                    if f is future:
-                        if key == "transcribe":
-                            transcript_text = result
-                        elif key == "analyze":
-                            analysis_text = result
-                        completed_steps.append(key)
-                        _persist_intermediate(runner, task_id, {
-                            key: result,
-                            "completed_steps": completed_steps[:],
-                        })
-                        break
-            except Exception as e:
-                # 找到是哪轨失败
-                for key, f in futures.items():
-                    if f is future:
-                        errors.append(f"{key} 失败: {e}")
-                        break
-
-        if errors:
-            _pool.shutdown(wait=False, cancel_futures=True)
-            raise RuntimeError("并行步骤失败: " + "; ".join(errors))
-        _pool.shutdown(wait=False)
+        # ── 等待两轨完成，一轨失败立即取消另一轨 ────────────────
+        try:
+            for future in as_completed(futures.values()):
+                try:
+                    result = future.result()
+                    for key, f in futures.items():
+                        if f is future:
+                            if key == "transcribe":
+                                transcript_text = result
+                            elif key == "analyze":
+                                analysis_text = result
+                            completed_steps.append(key)
+                            _persist_intermediate(runner, task_id, {
+                                key: result,
+                                "completed_steps": completed_steps[:],
+                            })
+                            break
+                except Exception as e:
+                    # 一轨失败：立即取消另一轨，收集错误信息后 raise
+                    for key, f in futures.items():
+                        if f is future:
+                            err_msg = f"{key} 失败: {e}"
+                            break
+                    # 取消尚未完成的 future
+                    for f in futures.values():
+                        f.cancel()
+                    _pool.shutdown(wait=False, cancel_futures=True)
+                    raise RuntimeError(err_msg) from e
+        finally:
+            _pool.shutdown(wait=False)
 
     # ── 6. note 步骤（汇总 markdown）──────────────────────────
     if "note" in steps:
