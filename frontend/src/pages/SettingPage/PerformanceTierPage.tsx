@@ -28,12 +28,13 @@ export default function PerformanceTierPage() {
   const [selected, setSelected] = useState<PerformanceTier>(performanceTier)
   const [isSaving, setIsSaving] = useState(false)
 
-  // 加载当前档位 + 内存探测
+  // 加载当前档位 + 内存探测；同步 store 避免首次打开"假脏"
   useEffect(() => {
     fetchPerformanceTier()
       .then((res) => {
         setInfo(res)
         setSelected(res.tier)
+        setConfig({ performanceTier: res.tier })
       })
       .catch(() => {})
   }, [])
