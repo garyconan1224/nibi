@@ -63,6 +63,69 @@ class TranscriberConfig:
         )
 
 
+# ── PerformanceConfig 性能档位 ─────────────────────────────────────────────────
+
+PerformanceTier = Literal["low", "medium", "high"]
+
+_TIERS: dict[str, dict[str, Any]] = {
+    "low": {
+        "whisper_model_size": "base",
+        "interval_sec": 8,
+        "max_frames": 30,
+    },
+    "medium": {
+        "whisper_model_size": "medium",
+        "interval_sec": 5,
+        "max_frames": 60,
+    },
+    "high": {
+        "whisper_model_size": "large-v3",
+        "interval_sec": 3,
+        "max_frames": 100,
+    },
+}
+
+
+@dataclass(frozen=True)
+class PerformanceConfig:
+    """性能档位：按内存自动推荐，用户可手动覆盖。
+
+    tier 影响 whisper_model_size（转写）和 interval_sec / max_frames（截帧）。
+    用户在转写/截帧页手动改的值优先于档位默认值——档位仅在首次选择时"填充"。
+    """
+
+    tier: PerformanceTier = "medium"
+
+    @classmethod
+    def from_dict(cls, data: Any) -> "PerformanceConfig":
+        if not isinstance(data, dict):
+            return cls()
+        raw = str(data.get("tier") or "medium").strip()
+        tier: PerformanceTier = raw if raw in ("low", "medium", "high") else "medium"
+        return cls(tier=tier)
+
+    @property
+    def whisper_model_size(self) -> str:
+        return _TIERS[self.tier]["whisper_model_size"]
+
+    @property
+    def interval_sec(self) -> int:
+        return _TIERS[self.tier]["interval_sec"]
+
+    @property
+    def max_frames(self) -> int:
+        return _TIERS[self.tier]["max_frames"]
+
+    @staticmethod
+    def recommend_tier(total_ram_gb: float) -> PerformanceTier:
+        """根据总内存推荐默认档位。"""
+        if total_ram_gb <= 5:
+            return "low"
+        if total_ram_gb <= 12:
+            return "medium"
+        return "high"
+
+
 # ── DownloadConfig 数值字段 clamp 边界（与前端 configStore 约束一致）──────────
 _CONCURRENCY_MIN, _CONCURRENCY_MAX = 1, 8
 _RETRY_MIN, _RETRY_MAX = 0, 10
@@ -306,6 +369,7 @@ class AppSettings:
     transcriber: TranscriberConfig = field(default_factory=TranscriberConfig)
     download: DownloadConfig = field(default_factory=DownloadConfig)
     prompt_formats: PromptFormatsConfig = field(default_factory=PromptFormatsConfig)
+    performance: PerformanceConfig = field(default_factory=PerformanceConfig)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "AppSettings":
@@ -329,6 +393,7 @@ class AppSettings:
             transcriber=TranscriberConfig.from_dict(data.get("transcriber")),
             download=DownloadConfig.from_dict(data.get("download")),
             prompt_formats=PromptFormatsConfig.from_dict(data.get("prompt_formats")),
+            performance=PerformanceConfig.from_dict(data.get("performance")),
         )
 
 

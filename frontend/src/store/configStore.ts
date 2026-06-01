@@ -31,6 +31,9 @@ export type TranscriberType = 'fast-whisper' | 'bcut' | 'kuaishou' | 'groq' | 'm
 /** Whisper 模型大小 */
 export type WhisperModelSize = 'tiny' | 'base' | 'small' | 'medium' | 'large-v3' | 'large-v3-turbo'
 
+/** 性能档位 */
+export type PerformanceTier = 'low' | 'medium' | 'high'
+
 /** 音频转写配置 */
 export interface TranscriberConfig {
   /** 转写引擎类型（fast-whisper/bcut/kuaishou/groq） */
@@ -124,6 +127,8 @@ export interface ConfigState {
   transcriber: TranscriberConfig
   /** 截图配置 */
   screenshotSettings: ScreenshotConfig
+  /** 性能档位 */
+  performanceTier: PerformanceTier
 
   /** 下载策略预设（均衡/优先速度/优先画质/仅提取音频） */
   downloadMode: DownloadMode
@@ -218,6 +223,9 @@ const DEFAULT_CONFIG: Omit<ConfigState, ConfigStateActionKey> = {
     jpegQuality: 85,
     embedInNote: true,
   },
+
+  // 性能档位（默认中配）
+  performanceTier: 'medium',
 
   // 下载偏好（默认均衡；高级字段留空，仅在用户显式填写后生效）
   downloadMode: 'balanced',

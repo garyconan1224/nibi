@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next'
 import ScreenshotPage from './ScreenshotPage'
 import TranscriberPage from './TranscriberPage'
 import PromptFormatPage from './PromptFormatPage'
+import PerformanceTierPage from './PerformanceTierPage'
 
-type TabKey = 'screenshot' | 'transcriber' | 'prompt' | 'defaults'
+type TabKey = 'performance' | 'screenshot' | 'transcriber' | 'prompt' | 'defaults'
 
 /**
  * 分析默认偏好（SPEC §3.5 第 4 页）。
@@ -14,12 +15,18 @@ type TabKey = 'screenshot' | 'transcriber' | 'prompt' | 'defaults'
  */
 export default function AnalysisDefaultsPage() {
   const { t } = useTranslation('settings')
-  const [tab, setTab] = useState<TabKey>('screenshot')
+  const [tab, setTab] = useState<TabKey>('performance')
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* 内部 Tab 切换 */}
       <div className="flex items-center gap-1 border-b border-border bg-background px-6">
+        <TabBtn
+          active={tab === 'performance'}
+          onClick={() => setTab('performance')}
+        >
+          性能档位
+        </TabBtn>
         <TabBtn
           active={tab === 'screenshot'}
           onClick={() => setTab('screenshot')}
@@ -48,6 +55,7 @@ export default function AnalysisDefaultsPage() {
 
       {/* 内容区：只渲染激活的子页面 */}
       <div className="flex-1 overflow-auto">
+        {tab === 'performance' && <PerformanceTierPage />}
         {tab === 'screenshot' && <ScreenshotPage />}
         {tab === 'transcriber' && <TranscriberPage />}
         {tab === 'prompt' && <PromptFormatPage />}

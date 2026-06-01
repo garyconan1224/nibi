@@ -45,6 +45,12 @@ from src.vidmirror.core.providers import ChatRequest
 from src.vidmirror.core.providers.registry import create_default_registry
 
 
+def _tier_capture_params() -> CaptureParams:
+    """返回当前性能档位对应的截帧默认参数。"""
+    perf = load_settings().performance
+    return CaptureParams(mode="interval", interval_sec=perf.interval_sec, max_frames=perf.max_frames, frames_per_shot=3)
+
+
 # ── N7b 路径 1：视频字幕直接总结 ──────────────────────────────
 
 _OUTPUT_FORMAT_PROMPTS: Dict[str, str] = {
@@ -920,7 +926,7 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
         runner.append_log(task_id, "🎬 av_combined: ASR 完成，开始 VLM 帧分析…")
         runner.set_progress(record.task_id, 0.3, "VLM frame analysis starting")
         frame_prompts = payload.get("frame_prompt")
-        capture_params = CaptureParams.from_dict(frame_prompts) if frame_prompts is not None else None
+        capture_params = CaptureParams.from_dict(frame_prompts) if frame_prompts is not None else _tier_capture_params()
         state = run_batch_analysis(
             api_key=api_key,
             video_paths=videos,
@@ -983,7 +989,7 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
     # N7 VLM 路径（含 visual_only 和默认 detailed）
     runner.set_progress(record.task_id, 0.1, f"Found {len(videos)} videos")
     frame_prompts = payload.get("frame_prompt")
-    capture_params = CaptureParams.from_dict(frame_prompts) if frame_prompts is not None else None
+    capture_params = CaptureParams.from_dict(frame_prompts) if frame_prompts is not None else _tier_capture_params()
     if capture_params is not None:
         runner.append_log(
             task_id,
@@ -1340,7 +1346,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 if frame_prompts is not None:
                     capture_params = CaptureParams.from_dict(frame_prompts)
                 else:
-                    capture_params = CaptureParams(mode="interval", interval_sec=2, max_frames=60, frames_per_shot=3)
+                    capture_params = _tier_capture_params()
                 if capture_params is not None:
                     runner.append_log(
                         task_id,

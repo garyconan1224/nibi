@@ -29,6 +29,7 @@ from backend.app.routes.rag import router as rag_router
 from backend.app.routes.search import router as search_router
 from backend.app.routes.system import router as system_router
 from backend.app.routes.transcriber_config import router as transcriber_config_router
+from backend.app.routes.performance_tier import router as performance_tier_router
 from backend.app.routes.templates import router as templates_router
 from backend.app.routes.templates import legacy_router as templates_legacy_router
 from backend.app.routes.transcript import router as transcript_router
@@ -120,6 +121,7 @@ app.include_router(providers_router)
 app.include_router(pipeline_router)
 app.include_router(transcript_router)
 app.include_router(transcriber_config_router)
+app.include_router(performance_tier_router)
 app.include_router(download_config_router)
 app.include_router(prompt_formats_router)
 app.include_router(rag_router)
