@@ -280,7 +280,7 @@
 - [x] **T2.3** 微信公众号适配 — text_loader 检测 mp.weixin.qq.com 域名，xpath 直抽 #js_content 正文，回落 readability — `feat/phase-t2.3-wechat`，`ff71ff3` `37fbb8a`
 - [x] **I1** 图片 EXIF 提取 + 基本信息卡 — handle_image_task 用 Pillow 提 EXIF（设备/镜头/光圈/快门/ISO/时间/GPS，IFDRational 转 str 保证序列化），ImageResultPage 按设计稿加基本信息+EXIF 卡 — `feat/phase-i1-exif`，`b32405f` `176e010`
 - [x] **I2.1** 资料库批量分析（仅图片）— LibraryPage 选择模式工具栏加「批量分析」按钮，循环调 startItemPipeline，仅图片类型，非图片 toast 提示，复用浮动队列/结果页，零后端改动 — `feat/phase-i2-image-batch`，`5a3650b`
-- [ ] **R22**（押后）Pipeline 并行调度：截帧 + 转写同时跑 — `docs/plans/phase-r22-parallel-pipeline.md`，~6-10h，依赖 R21
+- [x] **R22** Pipeline 并行调度：截帧 + 转写同时跑 — `docs/plans/r22-r23-perf-mimo-prompt.md`，`feat(r22): 视频音频转录与截帧并行`
 - [ ] **R23**（押后）设置面板：性能档位（CPU/GPU/内存→并发槽位）— `docs/plans/phase-r23-perf-tier-settings.md`，~4-6h，依赖 R22
 
 ---

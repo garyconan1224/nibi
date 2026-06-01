@@ -226,7 +226,10 @@ class TestScenarioC:
         assert done.status == TaskStatus.SUCCESS.value, done.error
         result: Dict[str, Any] = done.result
         all_steps = result["completed_steps"]
-        assert all_steps == ["download", "transcribe", "analyze", "note"]
+        # R22: transcribe 与 analyze 并行，完成顺序不定
+        assert all_steps[0] == "download"
+        assert set(all_steps[1:3]) == {"transcribe", "analyze"}
+        assert all_steps[3] == "note"
         assert "## 分析内容" in result["analysis"]
         # note 步骤优先使用 analysis_text（而非 transcript）
         assert "## 分析内容" in result["markdown"]

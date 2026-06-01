@@ -1219,30 +1219,38 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     runner.store.update(task_id, status=TaskStatus.PROBE.value)
     runner.set_progress(task_id, 0.30, "探测媒体元数据...")
 
-    # ── 4. transcribe 步骤 ─────────────────────────────────────
-    if "transcribe" in steps:
-        # 预检查 A：本地 ASR 引擎是否就绪（轻量探活，避免先读大文件再崩溃）
-        import sys as _sys
-        from backend.app.services.asr_fast_whisper import (
-            is_fast_whisper_available,
-            get_install_hint,
-            get_last_probe_error,
-            transcribe_file_with_fast_whisper,
-        )
-        if not is_fast_whisper_available():
-            hint = get_install_hint()
-            probe = get_last_probe_error()
-            # 首行写关键上下文：解释器路径 + 错误类型，便于一眼定位是路径还是动态库问题
-            header = f"❌ 本地转录引擎未就绪 | python={_sys.executable}"
-            if probe is not None:
-                err_type, err_msg, err_tb = probe
-                runner.append_log(task_id, f"{header}\n错误类型: {err_type}\n错误信息: {err_msg}\nTraceback:\n{err_tb}\n{hint}")
-            else:
-                runner.append_log(task_id, f"{header}\n{hint}")
-            raise RuntimeError(f"本地转录引擎未安装。{hint}")
+    # ── 4+5. transcribe + analyze 并行步骤 ──────────────────────
+    # R22: 音频转录(ASR)与视频截帧(VLM)本质独立，可并行执行。
+    # 进度区间：transcribe 0.32~0.58, analyze 0.58~0.85，各自独立更新。
+    if "transcribe" in steps or "analyze" in steps:
+        from concurrent.futures import Future, as_completed
 
-        # 预检查 B：本地是否存在可转录的视频文件
-        # 优先用 download 步骤返回的 save_path；若路径失效（多流合并/清理）则回退到目录扫描（按 mtime 取最新）
+        # 预检查：转录引擎（仅 transcribe 步骤需要）
+        if "transcribe" in steps:
+            import sys as _sys
+            from backend.app.services.asr_fast_whisper import (
+                is_fast_whisper_available,
+                get_install_hint,
+                get_last_probe_error,
+                transcribe_file_with_fast_whisper,
+            )
+            if not is_fast_whisper_available():
+                hint = get_install_hint()
+                probe = get_last_probe_error()
+                header = f"❌ 本地转录引擎未就绪 | python={_sys.executable}"
+                if probe is not None:
+                    err_type, err_msg, err_tb = probe
+                    runner.append_log(task_id, f"{header}\n错误类型: {err_type}\n错误信息: {err_msg}\nTraceback:\n{err_tb}\n{hint}")
+                else:
+                    runner.append_log(task_id, f"{header}\n{hint}")
+                raise RuntimeError(f"本地转录引擎未安装。{hint}")
+
+        # 预检查：视频文件（两轨都需要）
+        videos = find_videos(project_video_dir)
+        if not videos:
+            raise ValueError("本地视频文件不存在，请先执行下载步骤")
+
+        # 确定视频文件路径（转录用单文件，analyze 用列表）
         video_file = ""
         if download_save_path and Path(download_save_path).is_file():
             video_file = download_save_path
@@ -1252,133 +1260,147 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                     task_id,
                     f"⚠️  download_save_path 失效: {download_save_path!r}，回退到目录扫描",
                 )
-            videos = find_videos(project_video_dir)
-            if videos:
-                # 按修改时间取最新（find_videos 返回字典序，最新文件未必在首位）
-                videos_sorted = sorted(videos, key=lambda p: p.stat().st_mtime, reverse=True)
-                video_file = str(videos_sorted[0])
+            videos_sorted = sorted(videos, key=lambda p: p.stat().st_mtime, reverse=True)
+            video_file = str(videos_sorted[0])
 
         if not video_file or not Path(video_file).is_file():
             raise ValueError(
                 f"无可用的本地视频文件进行转录 (project_video_dir={project_video_dir})"
             )
 
-        runner.store.update(task_id, status=TaskStatus.ASR.value)
-        runner.set_progress(task_id, 0.32, "开始转录音频...")
-
-        # 从 TranscriberConfig 读取用户偏好（模型尺寸/设备/语言/前置提示词），
-        # 替代早期硬编码 base+cpu+zh；这样用户在设置页切换 medium/large 或指定 cuda 才会真正生效。
-        tcfg = load_settings().transcriber
-        runner.append_log(
-            task_id,
-            f"📄 本地转录 | 文件={Path(video_file).name} "
-            f"model={tcfg.whisper_model_size} device={tcfg.device} language={tcfg.language or 'auto'}",
-        )
-
-        # 进度回调：将转录内部 0~1 的完成度压缩到 pipeline 的 0.32~0.50 区间，与 analyze/note 阶段衔接
-        def _on_progress(ratio: float, msg: str) -> None:
-            mapped = 0.32 + 0.18 * max(0.0, min(1.0, ratio))
-            runner.set_progress(task_id, mapped, msg)
-
-        def _on_log(msg: str) -> None:
-            runner.append_log(task_id, msg)
-
-        try:
-            transcript_text = transcribe_file_with_fast_whisper(
-                video_file,
-                model_name=tcfg.whisper_model_size or "base",
-                device=tcfg.device or "cpu",
-                language=tcfg.language or "",
-                initial_prompt=tcfg.initial_prompt or "",
-                log_callback=_on_log,
-                progress_callback=_on_progress,
-            )
-        except Exception as e:
-            # 保留原异常链（from e），便于前端/日志看到完整 traceback 定位动态库 / ffmpeg / 权限问题
-            raise RuntimeError(f"本地转录失败: {e}") from e
-
-        completed_steps.append("transcribe")
-        _persist_intermediate(runner, task_id, {
-            "transcript": transcript_text,
-            "completed_steps": completed_steps[:],
-        })
-
-    # ── 5. analyze 步骤 ────────────────────────────────────────
-    if "analyze" in steps:
-        if not api_key:
+        # 预检查：analyze 需要 api_key
+        if "analyze" in steps and not api_key:
             raise ValueError("analyze 步骤需要 api_key（payload 或 settings）")
 
-        # 前置检查：需确保本地存在视频文件
-        videos = find_videos(project_video_dir)
-        if not videos:
-            raise ValueError("本地视频文件不存在，请先执行下载步骤")
+        # 并行执行：submit 两轨到独立线程池（不能复用 runner._executor，否则会死锁）
+        from concurrent.futures import ThreadPoolExecutor as _Pool
+        _pool = _Pool(max_workers=2, thread_name_prefix="r22-parallel")
+        futures: Dict[str, Future] = {}
 
-        runner.store.update(task_id, status=TaskStatus.FRAMES.value)
-        runner.set_progress(task_id, 0.50, "开始视觉帧分析...")
+        # ── transcribe 轨 ──────────────────────────────────────
+        if "transcribe" in steps:
+            def _run_transcribe() -> str:
+                runner.store.update(task_id, status=TaskStatus.ASR.value)
+                runner.set_progress(task_id, 0.32, "开始转录音频...")
 
-        # #5: 从 payload 读 frame_prompt 子参数（截帧模式/间隔/最大帧数）
-        frame_prompts = payload.get("frame_prompt")
-        if preflight := payload.get("preflight"):
-            frame_prompts = frame_prompts or (isinstance(preflight, dict) and preflight.get("frame_prompt"))
-        if frame_prompts is not None:
-            capture_params = CaptureParams.from_dict(frame_prompts)
-        else:
-            # 未传时给合理兜底（max_frames=60），避免 fallback 到 video_analyzer 的 10**6
-            capture_params = CaptureParams(mode="interval", interval_sec=2, max_frames=60, frames_per_shot=3)
-        if capture_params is not None:
-            runner.append_log(
-                task_id,
-                f"🎬 note capture_params | mode={capture_params.mode} | "
-                f"interval={capture_params.interval_sec}s | "
-                f"max_frames={capture_params.max_frames} | "
-                f"frames_per_shot={capture_params.frames_per_shot}"
-            )
+                tcfg = load_settings().transcriber
+                runner.append_log(
+                    task_id,
+                    f"📄 本地转录 | 文件={Path(video_file).name} "
+                    f"model={tcfg.whisper_model_size} device={tcfg.device} language={tcfg.language or 'auto'}",
+                )
 
-        state = run_batch_analysis(
-            api_key=api_key,
-            video_paths=videos,
-            vision_model=vision_model,
-            text_model=text_model,
-            auto_sync_json=True,
-            target_json_dir=project_json_dir,
-            capture_params=capture_params,
-        )
+                def _on_progress(ratio: float, msg: str) -> None:
+                    mapped = 0.32 + 0.26 * max(0.0, min(1.0, ratio))
+                    runner.set_progress(task_id, mapped, f"[转录] {msg}")
 
-        _last_logged_pct = -1.0
-        while not state.finished:
-            if runner.is_cancel_requested(task_id):
-                break
-            snaps = state.snapshot()
-            if snaps:
-                avg = sum(float(s["percent"]) for s in snaps) / max(len(snaps), 1) / 100.0
-                cur_pct = min(0.85, 0.50 + avg * 0.35)
-                runner.set_progress(task_id, cur_pct, "视觉帧分析中...")
-                # 每 5% 或首尾打一条帧级日志，避免刷屏
-                if cur_pct - _last_logged_pct >= 0.05 or _last_logged_pct < 0:
-                    _last_logged_pct = cur_pct
-                    for s in snaps:
-                        if s.get("total_frames", 0) > 0:
-                            runner.append_log(
-                                task_id,
-                                f"🎬 截帧进度：{s['analyzed_frames']}/{s['total_frames']} 帧 ({s['percent']:.1f}%)",
-                            )
-            time.sleep(0.2)
+                def _on_log(msg: str) -> None:
+                    runner.append_log(task_id, f"[转录] {msg}")
 
-        # 收集分析产出的 markdown 文件
-        md_parts: List[str] = []
-        for video_path in videos:
-            safe_name = get_safe_name(video_path)
-            output_dir = get_output_dir(video_path)
-            md_file = output_dir / (safe_name + "_图文分镜.md")
-            if md_file.exists():
-                md_parts.append(md_file.read_text(encoding="utf-8"))
-        analysis_text = "\n\n---\n\n".join(md_parts) if md_parts else ""
+                return transcribe_file_with_fast_whisper(
+                    video_file,
+                    model_name=tcfg.whisper_model_size or "base",
+                    device=tcfg.device or "cpu",
+                    language=tcfg.language or "",
+                    initial_prompt=tcfg.initial_prompt or "",
+                    log_callback=_on_log,
+                    progress_callback=_on_progress,
+                )
 
-        completed_steps.append("analyze")
-        _persist_intermediate(runner, task_id, {
-            "analysis": analysis_text,
-            "completed_steps": completed_steps[:],
-        })
+            futures["transcribe"] = _pool.submit(_run_transcribe)
+
+        # ── analyze 轨 ─────────────────────────────────────────
+        if "analyze" in steps:
+            def _run_analyze() -> str:
+                runner.store.update(task_id, status=TaskStatus.FRAMES.value)
+                runner.set_progress(task_id, 0.58, "开始视觉帧分析...")
+
+                frame_prompts = payload.get("frame_prompt")
+                if preflight := payload.get("preflight"):
+                    frame_prompts = frame_prompts or (isinstance(preflight, dict) and preflight.get("frame_prompt"))
+                if frame_prompts is not None:
+                    capture_params = CaptureParams.from_dict(frame_prompts)
+                else:
+                    capture_params = CaptureParams(mode="interval", interval_sec=2, max_frames=60, frames_per_shot=3)
+                if capture_params is not None:
+                    runner.append_log(
+                        task_id,
+                        f"🎬 note capture_params | mode={capture_params.mode} | "
+                        f"interval={capture_params.interval_sec}s | "
+                        f"max_frames={capture_params.max_frames} | "
+                        f"frames_per_shot={capture_params.frames_per_shot}"
+                    )
+
+                state = run_batch_analysis(
+                    api_key=api_key,
+                    video_paths=videos,
+                    vision_model=vision_model,
+                    text_model=text_model,
+                    auto_sync_json=True,
+                    target_json_dir=project_json_dir,
+                    capture_params=capture_params,
+                )
+
+                _last_logged_pct = -1.0
+                while not state.finished:
+                    if runner.is_cancel_requested(task_id):
+                        break
+                    snaps = state.snapshot()
+                    if snaps:
+                        avg = sum(float(s["percent"]) for s in snaps) / max(len(snaps), 1) / 100.0
+                        cur_pct = min(0.85, 0.58 + avg * 0.27)
+                        runner.set_progress(task_id, cur_pct, "[截帧] 视觉帧分析中...")
+                        if cur_pct - _last_logged_pct >= 0.05 or _last_logged_pct < 0:
+                            _last_logged_pct = cur_pct
+                            for s in snaps:
+                                if s.get("total_frames", 0) > 0:
+                                    runner.append_log(
+                                        task_id,
+                                        f"🎬 截帧进度：{s['analyzed_frames']}/{s['total_frames']} 帧 ({s['percent']:.1f}%)",
+                                    )
+                    time.sleep(0.2)
+
+                md_parts: List[str] = []
+                for video_path in videos:
+                    safe_name = get_safe_name(video_path)
+                    output_dir = get_output_dir(video_path)
+                    md_file = output_dir / (safe_name + "_图文分镜.md")
+                    if md_file.exists():
+                        md_parts.append(md_file.read_text(encoding="utf-8"))
+                return "\n\n---\n\n".join(md_parts) if md_parts else ""
+
+            futures["analyze"] = _pool.submit(_run_analyze)
+
+        # ── 等待两轨完成，收集结果 ─────────────────────────────
+        # 任一轨失败立即报错，不拖死另一轨
+        errors: List[str] = []
+        for future in as_completed(futures.values()):
+            try:
+                result = future.result()
+                # 根据 future 对应的 key 存储结果
+                for key, f in futures.items():
+                    if f is future:
+                        if key == "transcribe":
+                            transcript_text = result
+                        elif key == "analyze":
+                            analysis_text = result
+                        completed_steps.append(key)
+                        _persist_intermediate(runner, task_id, {
+                            key: result,
+                            "completed_steps": completed_steps[:],
+                        })
+                        break
+            except Exception as e:
+                # 找到是哪轨失败
+                for key, f in futures.items():
+                    if f is future:
+                        errors.append(f"{key} 失败: {e}")
+                        break
+
+        if errors:
+            _pool.shutdown(wait=False, cancel_futures=True)
+            raise RuntimeError("并行步骤失败: " + "; ".join(errors))
+        _pool.shutdown(wait=False)
 
     # ── 6. note 步骤（汇总 markdown）──────────────────────────
     if "note" in steps:
