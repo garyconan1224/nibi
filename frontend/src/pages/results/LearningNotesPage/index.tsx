@@ -36,6 +36,9 @@ export default function LearningNotesPage() {
     localStorage.setItem('ln-view', v)
   }, [])
 
+  // B-1: 学习笔记空态（/ln 404 时显示友好提示）
+  const [lnNotFound, setLnNotFound] = useState(false)
+
   // 导出菜单状态
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const exportMenuRef = useRef<HTMLDivElement>(null)
@@ -149,7 +152,12 @@ export default function LearningNotesPage() {
       try {
         const [ws, md] = await Promise.all([
           getWorkspace(workspaceId),
-          getLnMarkdown(workspaceId).catch(() => ''),
+          getLnMarkdown(workspaceId).catch((err: unknown) => {
+            // 404 = 尚未生成学习笔记（预期），其他错误也降级为空
+            const status = (err as { response?: { status?: number } })?.response?.status
+            if (status === 404) setLnNotFound(true)
+            return ''
+          }),
         ])
         if (cancelled) return
 
@@ -261,31 +269,43 @@ export default function LearningNotesPage() {
       {/* Main body: dual-column */}
       {pageState.kind === 'ready' && (
         <>
-          <div className="ln-body">
-            <LNNotesPanel
-              markdown={markdown}
-              onMarkdownChange={setMarkdown}
-              view={view}
-              onSwitchView={switchView}
-              onSeek={(sec) => videoPanelRef.current?.seekTo(sec)}
-            />
-            <div className="ln-left-col">
-              <LNVideoPanel
-                ref={videoPanelRef}
-                src={videoSrc}
-                externalUrl={externalUrl}
-                title={pageState.videoItem.name}
-                workspaceId={workspaceId}
-                onTimeUpdate={handleTimeUpdate}
-              />
-              <LNTranscriptPanel
-                transcript={pageState.transcript}
-                currentTime={currentTime}
+          {/* 空态：尚未生成学习笔记 */}
+          {lnNotFound && !markdown ? (
+            <div className="ln-status" style={{ padding: '48px 24px', textAlign: 'center' }}>
+              <p style={{ fontSize: 15, marginBottom: 8 }}>该视频还没有生成学习笔记</p>
+              <p style={{ fontSize: 13, color: 'var(--muted-foreground)' }}>
+                请先完成视频分析，系统会自动生成学习笔记
+              </p>
+            </div>
+          ) : (
+          <>
+            <div className="ln-body">
+              <LNNotesPanel
+                markdown={markdown}
+                onMarkdownChange={setMarkdown}
+                view={view}
+                onSwitchView={switchView}
                 onSeek={(sec) => videoPanelRef.current?.seekTo(sec)}
               />
+              <div className="ln-left-col">
+                <LNVideoPanel
+                  ref={videoPanelRef}
+                  src={videoSrc}
+                  externalUrl={externalUrl}
+                  title={pageState.videoItem.name}
+                  workspaceId={workspaceId}
+                  onTimeUpdate={handleTimeUpdate}
+                />
+                <LNTranscriptPanel
+                  transcript={pageState.transcript}
+                  currentTime={currentTime}
+                  onSeek={(sec) => videoPanelRef.current?.seekTo(sec)}
+                />
+              </div>
             </div>
-          </div>
-          <ChatDrawer workspaceId={workspaceId} systemPrompt={chatSystemPrompt} />
+            <ChatDrawer workspaceId={workspaceId} systemPrompt={chatSystemPrompt} />
+          </>
+          )}
         </>
       )}
     </div>
