@@ -164,4 +164,4 @@ F3 错误体验优化
 
 ---
 
-**End of ROADMAP. F1 Tier A UI 已完成（IP.9，5 个 commit 合入 main）。下一步：F1 Tier B 后端（路径 1/3 + 字幕清洗）或 F2 端到端冒烟测试。**
+**End of ROADMAP.** 2026-06-01 对账修正：F1 Tier A UI（IP.9）+ Tier B 路径1（字幕直接总结 `_run_subtitle_summary`）+ 字幕清洗（F1.6）**均已实现**；路径3（Gemini video_model）骨架就绪（`gemini_client.py` + `_run_video_model_path`），**待装 `google-genai` + 配 `GEMINI_API_KEY` 解阻**（用户 2026-06-01 决定暂跳过）。F2 八模块 Preflight 全过、Bug#1/#2 已修（`0269913`），**待第三轮跑真实完整任务验模块 4-7 结果页**。R 轨性能：R22/R23/R24(并发 `227cc7c`) 已合，R25(多图合并) 待 mimo。下一步候选：真实跑测验证（R24/F1/F2 合并，见 `docs/plans/realrun-verify-mimo-prompt.md`）→ 主线深化 [C] 复刻 / AI 导演 或 [D] 安全 + 开源准备。

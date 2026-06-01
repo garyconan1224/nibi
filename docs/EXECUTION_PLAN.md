@@ -25,7 +25,7 @@
 > - 合并视图（先读）：[`docs/PROJECT_STATUS.md`](PROJECT_STATUS.md)
 > - S0 详细计划：[`docs/plans/phase-e2e-bugfix-2026-05-29.md`](plans/phase-e2e-bugfix-2026-05-29.md)（`status: ready`，可直接执行）
 > - S1-S6 详细计划：[`docs/plans/phase-handoff-mimo-2026-05-29.md`](plans/phase-handoff-mimo-2026-05-29.md)
-> - ⚠️ **对账差异（执行前必看 PROJECT_STATUS §5）**：N8b librosa 6 维**已大部分实现**（勿从零做）/ R20 是在 export.py 上**加格式** / N7b 路径3 仍是 stub（卡 Gemini API）。
+> - ⚠️ **对账差异（执行前必看 PROJECT_STATUS §5）**：N8b librosa 6 维**已大部分实现**（勿从零做）/ R20 是在 export.py 上**加格式** / N7b/F1 路径3 **骨架就绪**（`gemini_client.py`+`_run_video_model_path`），待装 `google-genai`+配 `GEMINI_API_KEY` 解阻（2026-06-01 用户暂跳过）；F1 路径1+字幕清洗(F1.6) 已实现；F2 待第三轮验模块4-7结果页（`docs/plans/realrun-verify-mimo-prompt.md`）。
 
 **P0 · 修复当前问题（S0 E2E bugfix，先做、必修）**
 - [x] S0.1 删 `/subtitles` demo 兜底（🔴P1）→ 分支 `fix/e2e-p1-subtitles-no-demo`
