@@ -279,6 +279,68 @@ class TestScenarioC:
         assert result["markdown"] == "降级转录内容"
 
 
+class TestParallelCancel:
+    """R22 协作取消：一轨失败时另一轨应通过 cancel_event 退出。"""
+
+    def test_transcribe_failure_cancels_analyze(self, tmp_path: Path) -> None:
+        """transcribe 快速失败 → analyze 应在下一帧检查点退出。"""
+        import threading
+
+        fake_video = tmp_path / "videos" / "test.mp4"
+        fake_video.parent.mkdir(parents=True, exist_ok=True)
+        fake_video.touch()
+
+        # 模拟 analyze 慢跑（循环 10 次，每次 0.1s）
+        mock_state = MagicMock()
+        mock_state.finished = False
+        _call_count = {"n": 0}
+        _analyze_exited = threading.Event()
+
+        def _slow_snapshot():
+            _call_count["n"] += 1
+            if _call_count["n"] >= 10:
+                # 10 轮后标记完成（防止无限循环）
+                mock_state.finished = True
+            return [{"percent": _call_count["n"] * 10}]
+
+        mock_state.snapshot = _slow_snapshot
+
+        # transcribe 快速失败
+        def _fail_transcribe(*args, **kwargs):
+            raise RuntimeError("ASR 引擎崩溃")
+
+        with (
+            patch("backend.app.services.pipeline_tasks.run_ytdlp_download",
+                  return_value={"ok": True, "save_path": str(fake_video)}),
+            patch("backend.app.services.pipeline_tasks.get_workspace_videos_dir",
+                  return_value=fake_video.parent),
+            patch("backend.app.services.pipeline_tasks.get_workspace_json_dir",
+                  return_value=tmp_path / "json"),
+            patch("backend.app.services.pipeline_tasks.load_settings",
+                  return_value=_mock_settings("sk-test")),
+            patch("backend.app.services.asr_fast_whisper.is_fast_whisper_available",
+                  return_value=True),
+            patch("backend.app.services.asr_fast_whisper.transcribe_file_with_fast_whisper",
+                  side_effect=_fail_transcribe),
+            patch("backend.app.services.pipeline_tasks.find_videos",
+                  return_value=[fake_video]),
+            patch("backend.app.services.pipeline_tasks.run_batch_analysis",
+                  return_value=mock_state),
+            patch("backend.app.services.pipeline_tasks.get_safe_name",
+                  return_value="test"),
+            patch("backend.app.services.pipeline_tasks.get_output_dir",
+                  return_value=tmp_path / "videos" / "test_分析报告"),
+        ):
+            runner, rec = _make_runner(tmp_path, steps=["download", "transcribe", "analyze"])
+            done = _wait_for_terminal(runner.store, rec.task_id, timeout=10.0)
+
+        # 任务应失败（transcribe 失败）
+        assert done.status == TaskStatus.FAILED.value
+        assert "transcribe 失败" in (done.error or "")
+        # analyze 应该被协作取消（不会跑满 10 轮）
+        assert _call_count["n"] < 10, f"analyze 未被取消，跑了 {_call_count['n']} 轮"
+
+
 def test_audio_task_boolean_false_disables_asr(tmp_path: Path) -> None:
     """IP.9 audio boolean payloads should be honored by the audio pipeline."""
     from backend.app.services.pipeline_tasks import handle_audio_task

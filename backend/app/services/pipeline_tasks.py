@@ -1278,6 +1278,9 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         _pool = _Pool(max_workers=2, thread_name_prefix="r22-parallel")
         futures: Dict[str, Future] = {}
 
+        # ── 协作取消信号（一轨失败时 set，另一轨在循环检查点退出）──
+        _cancel_event = threading.Event()
+
         # ── 进度单调递增保护（两轨并行写进度，只前进不后退）─────
         _progress_lock = threading.Lock()
         _max_progress = [0.30]  # PROBE 阶段结束时的进度
@@ -1290,6 +1293,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                     runner.set_progress(task_id, pct, msg)
 
         # ── transcribe 轨 ──────────────────────────────────────
+        # whisper 是单次长调用，无法中途断；进度回调中做 best-effort 检查。
         if "transcribe" in steps:
             def _run_transcribe() -> str:
                 runner.store.update(task_id, status=TaskStatus.ASR.value)
@@ -1303,6 +1307,8 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 )
 
                 def _on_progress(ratio: float, msg: str) -> None:
+                    if _cancel_event.is_set():
+                        raise RuntimeError("已取消：另一轨失败")
                     mapped = 0.32 + 0.26 * max(0.0, min(1.0, ratio))
                     _monotonic_progress(mapped, f"[转录] {msg}")
 
@@ -1322,6 +1328,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             futures["transcribe"] = _pool.submit(_run_transcribe)
 
         # ── analyze 轨 ─────────────────────────────────────────
+        # 截帧循环每轮检查 cancel_event，秒级响应。
         if "analyze" in steps:
             def _run_analyze() -> str:
                 runner.store.update(task_id, status=TaskStatus.FRAMES.value)
@@ -1355,6 +1362,8 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
 
                 _last_logged_pct = -1.0
                 while not state.finished:
+                    if _cancel_event.is_set():
+                        raise RuntimeError("已取消：另一轨失败")
                     if runner.is_cancel_requested(task_id):
                         break
                     snaps = state.snapshot()
@@ -1383,7 +1392,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
 
             futures["analyze"] = _pool.submit(_run_analyze)
 
-        # ── 等待两轨完成，一轨失败立即取消另一轨 ────────────────
+        # ── 等待两轨完成，一轨失败协作取消另一轨 ────────────────
         try:
             for future in as_completed(futures.values()):
                 try:
@@ -1401,15 +1410,15 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                             })
                             break
                 except Exception as e:
-                    # 一轨失败：立即取消另一轨，收集错误信息后 raise
                     for key, f in futures.items():
                         if f is future:
                             err_msg = f"{key} 失败: {e}"
                             break
-                    # 取消尚未完成的 future
+                    # 协作取消：set event 让另一轨在检查点退出
+                    _cancel_event.set()
+                    # 兜底：取消尚未开始的 future
                     for f in futures.values():
                         f.cancel()
-                    _pool.shutdown(wait=False, cancel_futures=True)
                     raise RuntimeError(err_msg) from e
         finally:
             _pool.shutdown(wait=False)
