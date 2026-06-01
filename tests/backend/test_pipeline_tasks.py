@@ -341,6 +341,157 @@ class TestParallelCancel:
         assert _call_count["n"] < 10, f"analyze 未被取消，跑了 {_call_count['n']} 轮"
 
 
+def test_user_cancel_during_frames_keeps_real_progress_and_writes_no_note(
+    tmp_path: Path,
+) -> None:
+    """复现并锁定取消语义（note 任务）：FRAMES 阶段中途取消后——
+
+    · 终态 CANCELLED；
+    · progress 停在取消时刻的真实值（不被顶到 1.0）；
+    · 不落完整笔记（notes API 读 result["markdown"]，该键应缺失）。
+
+    对应 bug：取消却显示 100%（CANCELLED + progress=1.0）+ 残缺笔记入库。
+    """
+    fake_video = tmp_path / "videos" / "test.mp4"
+    fake_video.parent.mkdir(parents=True, exist_ok=True)
+    fake_video.touch()
+
+    # analyze 永不自然 finished：只能靠用户取消 break，模拟"卡在 FRAMES 轮询"
+    mock_state = MagicMock()
+    mock_state.finished = False
+    mock_state.snapshot.return_value = [
+        {"percent": 50, "total_frames": 10, "analyzed_frames": 5}
+    ]
+
+    with (
+        patch("backend.app.services.pipeline_tasks.run_ytdlp_download",
+              return_value={"ok": True, "save_path": str(fake_video)}),
+        patch("backend.app.services.pipeline_tasks.get_workspace_videos_dir",
+              return_value=fake_video.parent),
+        patch("backend.app.services.pipeline_tasks.get_workspace_json_dir",
+              return_value=tmp_path / "json"),
+        patch("backend.app.services.pipeline_tasks.load_settings",
+              return_value=_mock_settings("sk-test")),
+        patch("backend.app.services.asr_fast_whisper.is_fast_whisper_available",
+              return_value=True),
+        patch("backend.app.services.asr_fast_whisper.transcribe_file_with_fast_whisper",
+              return_value="fake transcript"),
+        patch("backend.app.services.pipeline_tasks.find_videos",
+              return_value=[fake_video]),
+        patch("backend.app.services.pipeline_tasks.run_batch_analysis",
+              return_value=mock_state),
+        patch("backend.app.services.pipeline_tasks.get_safe_name",
+              return_value="test"),
+        patch("backend.app.services.pipeline_tasks.get_output_dir",
+              return_value=tmp_path / "videos" / "test_分析报告"),
+    ):
+        runner, rec = _make_runner(
+            tmp_path, steps=["download", "transcribe", "analyze", "note"]
+        )
+
+        # 等进入 analyze 帧轮询（progress 进入 0.58~0.85 区间）
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
+            cur = runner.store.get(rec.task_id)
+            if cur and cur.progress >= 0.58:
+                break
+            time.sleep(0.02)
+        assert runner.store.get(rec.task_id).progress >= 0.58, (
+            "未进入 FRAMES 轮询就触发取消，测试时序失效"
+        )
+
+        # mid-FRAMES 发起用户取消
+        runner.cancel_task(rec.task_id)
+
+        # 等 handler 真正收尾：green 会落 cancelled 标记；red 会误落 markdown
+        deadline = time.monotonic() + 10.0
+        while time.monotonic() < deadline:
+            r = (runner.store.get(rec.task_id).result) or {}
+            if r.get("cancelled") or r.get("markdown"):
+                break
+            time.sleep(0.05)
+
+    done = runner.store.get(rec.task_id)
+    assert done.status == TaskStatus.CANCELLED.value
+    # 进度不被顶到 100%，且保留取消时刻的真实值
+    assert done.progress < 1.0, f"取消后进度被顶到 {done.progress}（应保留真实进度）"
+    assert done.progress >= 0.58, f"取消后真实进度丢失：{done.progress}"
+    # 不落完整笔记
+    result = done.result or {}
+    assert not result.get("markdown"), "取消后仍写入了完整笔记 markdown"
+    assert result.get("cancelled") is True
+
+
+def _make_analyze_runner(
+    tmp_path: Path, payload: Dict[str, Any]
+) -> tuple[TaskRunner, TaskRecord]:
+    """创建注册 handle_analyze_task 的 runner，提交 analyze 任务。"""
+    from backend.app.services.pipeline_tasks import handle_analyze_task
+
+    store = TaskStore(path=tmp_path / "tasks.json")
+    runner = TaskRunner(store, max_workers=1)
+    runner.register("analyze", handle_analyze_task)
+    rec = runner.create_task("proj-test", "analyze", payload)
+    return runner, rec
+
+
+def test_analyze_user_cancel_during_frames_keeps_real_progress(tmp_path: Path) -> None:
+    """锁定 handle_analyze_task 取消语义：默认 VLM 路径中途取消后——
+
+    · 终态 CANCELLED；
+    · progress 停在取消时刻的真实值（不被顶到 0.95→1.0）。
+    """
+    fake_video = tmp_path / "videos" / "test.mp4"
+    fake_video.parent.mkdir(parents=True, exist_ok=True)
+    fake_video.touch()
+
+    mock_state = MagicMock()
+    mock_state.finished = False
+    mock_state.snapshot.return_value = [
+        {"percent": 50, "total_frames": 10, "analyzed_frames": 5}
+    ]
+    mock_state.live_frames_snapshot.return_value = []
+
+    with (
+        patch("backend.app.services.pipeline_tasks.get_workspace_videos_dir",
+              return_value=fake_video.parent),
+        patch("backend.app.services.pipeline_tasks.get_workspace_json_dir",
+              return_value=tmp_path / "json"),
+        patch("backend.app.services.pipeline_tasks.load_settings",
+              return_value=_mock_settings("sk-test")),
+        patch("backend.app.services.pipeline_tasks.find_videos",
+              return_value=[fake_video]),
+        patch("backend.app.services.pipeline_tasks.run_batch_analysis",
+              return_value=mock_state),
+    ):
+        runner, rec = _make_analyze_runner(tmp_path, {"api_key": "sk-test"})
+
+        # 等进入帧轮询（默认路径循环内 set_progress → 0.5）
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
+            cur = runner.store.get(rec.task_id)
+            if cur and cur.progress >= 0.5:
+                break
+            time.sleep(0.02)
+        assert runner.store.get(rec.task_id).progress >= 0.5, "未进入帧轮询，测试时序失效"
+
+        runner.cancel_task(rec.task_id)
+
+        # 等 handler 收尾：green 落 cancelled；red 落 json_output_dir（finalize）
+        deadline = time.monotonic() + 10.0
+        while time.monotonic() < deadline:
+            r = (runner.store.get(rec.task_id).result) or {}
+            if r.get("cancelled") or r.get("json_output_dir"):
+                break
+            time.sleep(0.05)
+
+    done = runner.store.get(rec.task_id)
+    assert done.status == TaskStatus.CANCELLED.value
+    assert done.progress < 1.0, f"取消后进度被顶到 {done.progress}（应保留真实进度）"
+    assert done.progress >= 0.5, f"取消后真实进度丢失：{done.progress}"
+    assert (done.result or {}).get("cancelled") is True
+
+
 def test_audio_task_boolean_false_disables_asr(tmp_path: Path) -> None:
     """IP.9 audio boolean payloads should be honored by the audio pipeline."""
     from backend.app.services.pipeline_tasks import handle_audio_task

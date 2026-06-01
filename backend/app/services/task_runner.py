@@ -138,7 +138,9 @@ class TaskRunner:
             result = handler(record, self)
             current = self.store.get(task_id)
             if current and current.cancel_requested:
-                self.store.update(task_id, status=TaskStatus.CANCELLED.value, progress=1.0, result=result)
+                # 取消终态保留取消时刻的真实进度：不传 progress 即沿用 store 现值，
+                # 不再硬写 1.0（否则取消任务也会显示 100%）。
+                self.store.update(task_id, status=TaskStatus.CANCELLED.value, result=result)
                 self.store.append_log(task_id, "Task cancelled by request", level="warning")
                 return
             # A3: handler 设了 AWAITING_CONFIRM 后提前返回——不覆盖为 SUCCESS，等用户确认

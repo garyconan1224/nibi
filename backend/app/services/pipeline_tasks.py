@@ -964,6 +964,13 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
                             f"🎬 截帧进度：{s['analyzed_frames']}/{s['total_frames']} 帧 ({s['percent']:.1f}%)"
                         )
             time.sleep(0.2)
+        # 用户取消早退：不跑合并总结/收尾，进度停在取消时刻的真实值，终态 CANCELLED
+        if runner.is_cancel_requested(record.task_id):
+            runner.append_log(task_id, "⛔ 已取消：跳过合并总结与收尾", level="warning")
+            rec = runner.store.get(record.task_id)
+            partial = dict(rec.result) if rec and rec.result else {}
+            partial.update({"summary_path": "av_combined", "cancelled": True})
+            return partial
         runner.set_progress(record.task_id, 0.7, "Generating combined summary")
 
         # 收集帧描述
@@ -1039,6 +1046,13 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
         merged["live_preview"] = {"snapshots": snaps, "recent_frames": tail}
         runner.store.update(record.task_id, result=merged)
         time.sleep(0.2)
+    # 用户取消早退：不跑帧收尾/归档，进度停在取消时刻的真实值，终态 CANCELLED
+    if runner.is_cancel_requested(record.task_id):
+        runner.append_log(task_id, "⛔ 已取消：跳过帧收尾归档", level="warning")
+        rec = runner.store.get(record.task_id)
+        partial = dict(rec.result) if rec and rec.result else {}
+        partial.update({"cancelled": True})
+        return partial
     runner.set_progress(record.task_id, 0.95, "Frame analysis finished")
     json_paths = _find_visual_json_paths_for_videos(project_json_dir, videos)
     basenames = [p.name for p in json_paths]
@@ -1432,6 +1446,12 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                             })
                             break
                 except Exception as e:
+                    # 用户主动取消时，另一轨会在检查点抛 "已取消：另一轨失败"，
+                    # 这不是真失败——跳出等待循环走下方取消早退，避免误判为 FAILED。
+                    # （真失败时 is_cancel_requested 为 False，照常 raise → FAILED。）
+                    if runner.is_cancel_requested(task_id):
+                        _cancel_event.set()
+                        break
                     for key, f in futures.items():
                         if f is future:
                             err_msg = f"{key} 失败: {e}"
@@ -1444,6 +1464,23 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                     raise RuntimeError(err_msg) from e
         finally:
             _pool.shutdown(wait=False)
+
+    # ── 5.5. 用户取消早退 ──────────────────────────────────────
+    # 截帧轮询里检测到取消后只是 break，控制流会走到这里。若确属用户取消：
+    #   · 不再构建/落盘 markdown 笔记（notes API 读 result["markdown"]，缺该键即空笔记）
+    #   · 不再推进 set_progress(0.90/0.95/0.98)，进度停在取消时刻的真实值
+    #   · 终态 CANCELLED 由 task_runner._run 的取消分支统一收口
+    if runner.is_cancel_requested(task_id):
+        runner.append_log(task_id, "⛔ 已取消：跳过笔记汇总（SUM）与归档（STORE）收尾", level="warning")
+        rec = runner.store.get(task_id)
+        partial = dict(rec.result) if rec and rec.result else {}
+        partial.pop("markdown", None)  # 确保不残留"看似完整"的笔记
+        partial.update({
+            "completed_steps": completed_steps,
+            "video_file": download_save_path,
+            "cancelled": True,
+        })
+        return partial
 
     # ── 6. note 步骤（汇总 markdown）──────────────────────────
     if "note" in steps:
