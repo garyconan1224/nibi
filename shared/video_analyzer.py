@@ -19,7 +19,7 @@ import json
 import re
 import shutil
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import CancelledError, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -683,8 +683,15 @@ def _analyze_frame_task(
     product_name: str,
     safe_name: str,
     frames_dir: Path,
-) -> dict[str, Any]:
-    """并发 worker：编码帧 → 调用视觉 API → 保存图片 → 返回 frame_data。"""
+    cancel_event: Optional[threading.Event] = None,
+) -> Optional[dict[str, Any]]:
+    """并发 worker：编码帧 → 调用视觉 API → 保存图片 → 返回 frame_data。
+
+    cancel_event 已置位时直接返回 None（跳过 VLM API 调用），让取消时尚未启动的
+    worker 立刻收口，不再发起新的网络请求。
+    """
+    if cancel_event is not None and cancel_event.is_set():
+        return None
     ts = format_timestamp(sec)
     img_b64 = frame_to_base64(frame_img)
     try:
@@ -762,11 +769,15 @@ def process_video(
     auto_sync_json: bool = True,
     target_json_dir: Path | None = None,
     capture_params: Optional["CaptureParams"] = None,
+    concurrency: int | None = None,
+    cancel_event: Optional[threading.Event] = None,
 ) -> Optional[Path]:
     """
     完整处理单个视频：抽帧分析 → 全局总结 → 三位一体保存（支持断点续传）。
 
     auto_sync_json: True 时将 JSON 同步到目标目录（默认 data/json_data/）。
+    concurrency: VLM 多帧并发数；None 时回退到 config.API_CONCURRENCY。
+    cancel_event: 协作取消信号；置位时停止提交新帧并放弃排队中的帧。
     返回分析报告目录路径，失败返回 None。
     """
     original_title = video_path.stem
@@ -804,9 +815,10 @@ def process_video(
 
     frames = list(existing_frames)
     frame_count = len(analyzed_ts)
-    concurrency = API_CONCURRENCY
+    # 并发数：优先用调用方传入（来自 R23 性能档位），否则回退到 config 常量。
+    worker_count = concurrency if (concurrency and concurrency > 0) else API_CONCURRENCY
 
-    with ThreadPoolExecutor(max_workers=concurrency) as executor:
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
         pending = {}
 
         if capture_params.mode == "scene":
@@ -818,6 +830,9 @@ def process_video(
                 max_frames=capture_params.max_frames,
             )
         for sec, frame_img in frame_iter:
+            # 取消时停止提交新帧（已提交的在下方收集循环里放弃）。
+            if cancel_event is not None and cancel_event.is_set():
+                break
             ts = format_timestamp(sec)
             if ts in analyzed_ts:
                 frame_count += 1
@@ -826,12 +841,20 @@ def process_video(
             future = executor.submit(
                 _analyze_frame_task, sec, frame_img,
                 api_key, vision_model, product_name, safe_name, frames_dir,
+                cancel_event,
             )
             pending[future] = sec
 
         for future in as_completed(pending):
+            # 取消：撤销仍在排队中的帧；已在途的 ≤worker_count 个 HTTP 请求让其自然结束。
+            if cancel_event is not None and cancel_event.is_set():
+                for f in pending:
+                    f.cancel()
+                break
             try:
                 frame_data = future.result()
+            except CancelledError:
+                continue
             except Exception as e:
                 frame_data = {
                     "timestamp": format_timestamp(pending[future]),
@@ -839,6 +862,8 @@ def process_video(
                     "image_prompt_en": "",
                     "frame_image": "",
                 }
+            if frame_data is None:  # worker 在取消信号下跳过了该帧
+                continue
             frames.append(frame_data)
             append_checkpoint(output_dir, frame_data)
             frame_count += 1
@@ -846,6 +871,11 @@ def process_video(
             state.push_live_frame(video_path.name, frame_data, frames_dir)
             if on_frame:
                 on_frame(frame_count, frame_data["timestamp"])
+
+    # 取消：跳过全局总结（省一次文本 API）与落盘，让后台线程尽快退出。
+    if cancel_event is not None and cancel_event.is_set():
+        state.update(video_idx, status="failed", error="已取消")
+        return None
 
     if not frames:
         state.update(video_idx, status="failed", error="未提取到任何帧")
@@ -882,10 +912,15 @@ def run_batch_analysis(
     auto_sync_json: bool = True,
     target_json_dir: Path | None = None,
     capture_params: Optional["CaptureParams"] = None,
+    concurrency: int | None = None,
+    cancel_event: Optional[threading.Event] = None,
 ) -> AnalysisState:
     """
     批量分析视频（在后台线程中运行）。
     返回 AnalysisState 供调用方轮询进度。
+
+    concurrency: VLM 多帧并发数；None 时回退到 config.API_CONCURRENCY。
+    cancel_event: 协作取消信号；置位时停止处理后续视频并让在跑的截帧 worker 收口。
     """
     assign_safe_names(video_paths)
     state = AnalysisState(
@@ -895,6 +930,8 @@ def run_batch_analysis(
     def _run() -> None:
         total = len(video_paths)
         for idx, vp in enumerate(video_paths):
+            if cancel_event is not None and cancel_event.is_set():
+                break
             if progress_cb:
                 progress_cb(idx / max(total, 1), f"处理第 {idx + 1}/{total} 个视频：{vp.name}")
             if is_already_processed(vp, target_json_dir=target_json_dir):
@@ -908,6 +945,8 @@ def run_batch_analysis(
                     auto_sync_json=auto_sync_json,
                     target_json_dir=target_json_dir,
                     capture_params=capture_params,
+                    concurrency=concurrency,
+                    cancel_event=cancel_event,
                 )
             except Exception as e:
                 state.update(idx, status="failed", error=str(e))

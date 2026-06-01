@@ -72,16 +72,19 @@ _TIERS: dict[str, dict[str, Any]] = {
         "whisper_model_size": "base",
         "interval_sec": 8,
         "max_frames": 30,
+        "vlm_concurrency": 3,
     },
     "medium": {
         "whisper_model_size": "medium",
         "interval_sec": 5,
         "max_frames": 60,
+        "vlm_concurrency": 6,
     },
     "high": {
         "whisper_model_size": "large-v3",
         "interval_sec": 3,
         "max_frames": 100,
+        "vlm_concurrency": 8,
     },
 }
 
@@ -115,6 +118,11 @@ class PerformanceConfig:
     @property
     def max_frames(self) -> int:
         return _TIERS[self.tier]["max_frames"]
+
+    @property
+    def vlm_concurrency(self) -> int:
+        """VLM 多帧并发数：随档位提速（low=3 / medium=6 / high=8），上限 8 防 SiliconFlow 限流。"""
+        return _TIERS[self.tier]["vlm_concurrency"]
 
     @staticmethod
     def recommend_tier(total_ram_gb: float) -> PerformanceTier:

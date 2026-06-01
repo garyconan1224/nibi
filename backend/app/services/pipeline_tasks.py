@@ -51,6 +51,11 @@ def _tier_capture_params() -> CaptureParams:
     return CaptureParams(mode="interval", interval_sec=perf.interval_sec, max_frames=perf.max_frames, frames_per_shot=3)
 
 
+def _tier_vlm_concurrency() -> int:
+    """返回当前性能档位对应的 VLM 多帧并发数（low=3 / medium=6 / high=8）。"""
+    return load_settings().performance.vlm_concurrency
+
+
 # ── N7b 路径 1：视频字幕直接总结 ──────────────────────────────
 
 _OUTPUT_FORMAT_PROMPTS: Dict[str, str] = {
@@ -927,6 +932,7 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
         runner.set_progress(record.task_id, 0.3, "VLM frame analysis starting")
         frame_prompts = payload.get("frame_prompt")
         capture_params = CaptureParams.from_dict(frame_prompts) if frame_prompts is not None else _tier_capture_params()
+        _vlm_cancel = threading.Event()
         state = run_batch_analysis(
             api_key=api_key,
             video_paths=videos,
@@ -935,10 +941,13 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
             auto_sync_json=True,
             target_json_dir=project_json_dir,
             capture_params=capture_params,
+            concurrency=_tier_vlm_concurrency(),
+            cancel_event=_vlm_cancel,
         )
         last_reported_pct = -100.0
         while not state.finished:
             if runner.is_cancel_requested(record.task_id):
+                _vlm_cancel.set()  # 取消时让后台截帧 worker 停下
                 break
             snaps = state.snapshot()
             if snaps:
@@ -999,6 +1008,7 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
             f"frames_per_shot={capture_params.frames_per_shot}"
         )
 
+    _vlm_cancel = threading.Event()
     state = run_batch_analysis(
         api_key=api_key,
         video_paths=videos,
@@ -1007,10 +1017,13 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
         auto_sync_json=True,
         target_json_dir=project_json_dir,
         capture_params=capture_params,
+        concurrency=_tier_vlm_concurrency(),
+        cancel_event=_vlm_cancel,
     )
     last_reported_pct = -100.0
     while not state.finished:
         if runner.is_cancel_requested(record.task_id):
+            _vlm_cancel.set()  # 取消时让后台截帧 worker 停下
             break
         snaps = state.snapshot()
         if snaps:
@@ -1364,6 +1377,8 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                     auto_sync_json=True,
                     target_json_dir=project_json_dir,
                     capture_params=capture_params,
+                    concurrency=_tier_vlm_concurrency(),
+                    cancel_event=_cancel_event,
                 )
 
                 _last_logged_pct = -1.0
@@ -1371,6 +1386,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                     if _cancel_event.is_set():
                         raise RuntimeError("已取消：另一轨失败")
                     if runner.is_cancel_requested(task_id):
+                        _cancel_event.set()  # 让后台截帧 worker 一并停下，不再发起新 VLM 调用
                         break
                     snaps = state.snapshot()
                     if snaps:
