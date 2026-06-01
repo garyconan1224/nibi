@@ -1975,3 +1975,33 @@ feat(rp1-c): C-1 复刻页主帧大视图 + 缩略图轨道
 - `.venv/bin/python -m pytest backend/tests -q`：143 passed
 - `pnpm tsc --noEmit`：EXIT=0
 - `pnpm build`：EXIT=0
+
+---
+
+## Phase R24 — VLM 多帧并发提速（并发数随性能档位）
+
+**完成日期**：2026-06-01
+**模型 / 工具**：Opus 4.8（Claude Code）
+**分支**：main（直接提交，沿用本项目 main 工作流）
+**提交**：
+- `227cc7c` perf(video): VLM 多帧并发调用提速
+
+### 问题
+用户反映视频分析慢（106 帧约 1 小时）。原以为是「逐帧串行调 VLM」，但读码确认：截帧 VLM 调用**早已并发**——`shared/video_analyzer.py:process_video` 用 `ThreadPoolExecutor(max_workers=API_CONCURRENCY)`，`API_CONCURRENCY=3` 固定。慢的真因是「Qwen3-VL-32B 单帧 ~100s × 帧数 ÷ 3」。所以真正的杠杆不是「加并发」，而是「把并发数调高」。同时发现 R22 协作取消有缺口：`_cancel_event` 只让 pipeline 轮询循环退出，没传进后台 daemon，取消后截帧 worker 仍把帧全部跑完。
+
+### 影响范围
+- **shared/settings_store.py**：`_TIERS` 增 `vlm_concurrency`（low=3 / medium=6 / high=8）+ `PerformanceConfig.vlm_concurrency` property——并发档与 R23 性能档位联动的真相源。
+- **shared/video_analyzer.py**：`run_batch_analysis` / `process_video` / `_analyze_frame_task` 增 `concurrency` + `cancel_event` 两个可选参数（默认 `None` 回退 `API_CONCURRENCY`，向后兼容旧调用与测试）。
+- **backend/app/services/pipeline_tasks.py**：新增 `_tier_vlm_concurrency()`；3 个 VLM 调用点（av_combined / N7 / R22 并行轨）都传并发档；3 处取消点把事件 `set()` 下沉到 worker。
+- **tests/test_video_analyzer_concurrency.py**：新增 7 个单测。
+
+### 关键改动
+- 并发数从「固定 3」改为「随性能档位 3/6/8」，经 `_tier_vlm_concurrency()` 注入；`process_video` 内 `worker_count = concurrency or API_CONCURRENCY`。
+- `cancel_event` 下沉：`_analyze_frame_task` 顶部检查取消即返回 None（不发起 VLM 调用）；`process_video` 提交循环检查取消停止提交、收集循环取消时 `f.cancel()` 撤销排队帧并跳过全局总结；用户主动取消时 pipeline 三处 `is_cancel_requested` 分支补 `_cancel_event.set()`。
+- 帧顺序由既有 `frames.sort(timestamp)` 保证；进度 `frame_count` 在 `as_completed` 中单调递增；并发上限 8 防 SiliconFlow 429 限流；未引入新依赖（标准库 `concurrent.futures`）。
+- **为什么这么做**：起点已是并发 3，提到 6/8 约 2~2.7×（106 帧 1h → 22~30min）；要进「十几分钟」需进一步「多图合并减少调用次数」→ 已规划 R25（`docs/plans/r25-vlm-batch-mimo-prompt.md`）。
+
+### 验证
+- `.venv/bin/python -m pytest tests/backend/test_pipeline_tasks.py tests/test_video_analyzer_smoke.py tests/test_video_analyzer_concurrency.py tests/backend/test_performance_tier.py -q`：72 passed
+- 确定性基准（sleep 模拟单帧）：并发 3→2.8× / 6→5.5× / 8→7.3×，近线性。
+- 真实视频端到端耗时对比：**待用户跑**（需真实 SiliconFlow key + 视频；非代码层可验证）。
