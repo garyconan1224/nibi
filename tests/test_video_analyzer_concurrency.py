@@ -81,6 +81,12 @@ def _patch_process_video(
     monkeypatch.setattr(va, "get_output_dir", lambda vp: tmp_path)
     monkeypatch.setattr(va, "analyze_video_frame", vlm_fn)
 
+    # mock 批量 API：直接调用逐帧函数模拟批量结果
+    def _batch_vlm(api_key: str, model: str, images_b64: list[str], product: str) -> list[dict[str, Any]]:
+        return [vlm_fn(api_key, model, b64, product) for b64 in images_b64]
+
+    monkeypatch.setattr(va, "analyze_video_frames_batch", _batch_vlm)
+
     def _fake_summary(*a: Any, **k: Any) -> str:
         captured["summary_called"] = True
         return "summary"
@@ -197,3 +203,158 @@ def test_process_video_cancel_before_start_makes_no_vlm_call(
     assert out is None
     assert calls["vlm"] == 0
     assert captured.get("summary_called") is not True
+
+
+# ── 5. batch API 相关测试 ──────────────────────────────────────
+
+
+def test_batch_api_returns_aligned_list(monkeypatch: pytest.MonkeyPatch) -> None:
+    """batch API 返回 N 元素数组 → 得到等长对齐 list。"""
+    import json as _json
+    from shared.sf_client import analyze_video_frames_batch
+    import shared.sf_client as sf_mod
+
+    n = 4
+    mock_response = {
+        "choices": [
+            {
+                "message": {
+                    "content": _json.dumps([
+                        {"index": i + 1, "description_zh": f"desc{i+1}", "image_prompt_en": f"prompt{i+1}"}
+                        for i in range(n)
+                    ])
+                }
+            }
+        ]
+    }
+
+    def _mock_post(api_key, path, payload, timeout=120):
+        return mock_response
+
+    monkeypatch.setattr(sf_mod, "_post_json", _mock_post)
+    result = analyze_video_frames_batch("key", "model", ["b64"] * n, "title")
+    assert len(result) == n
+    for i, item in enumerate(result):
+        assert item["description_zh"] == f"desc{i+1}"
+        assert item["image_prompt_en"] == f"prompt{i+1}"
+
+
+def test_batch_count_mismatch_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    """batch API 返回长度不符 → raise，由调用方回退逐帧。"""
+    import json as _json
+    from shared.sf_client import analyze_video_frames_batch, SiliconFlowError
+    import shared.sf_client as sf_mod
+
+    n = 4
+    # 返回 n-1 个元素
+    mock_response = {
+        "choices": [
+            {
+                "message": {
+                    "content": _json.dumps([
+                        {"index": i + 1, "description_zh": f"desc{i+1}", "image_prompt_en": f"prompt{i+1}"}
+                        for i in range(n - 1)
+                    ])
+                }
+            }
+        ]
+    }
+
+    def _mock_post(api_key, path, payload, timeout=120):
+        return mock_response
+
+    monkeypatch.setattr(sf_mod, "_post_json", _mock_post)
+    with pytest.raises(SiliconFlowError, match="计数不符"):
+        analyze_video_frames_batch("key", "model", ["b64"] * n, "title")
+
+
+def test_batch_worker_fallback_on_count_mismatch(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """batch 计数不符 → _analyze_frames_batch_task 走逐帧回退，最终帧数=N、不丢、有序。"""
+    n = 6
+    batch = [(sec, f"img{sec}") for sec in range(n)]
+
+    # mock analyze_video_frames_batch: 返回少一个元素
+    def _batch_fail(api_key, model, images_b64, product):
+        return [{"description_zh": f"batch{i}", "image_prompt_en": f"bp{i}"} for i in range(len(images_b64) - 1)]
+
+    single_calls: list[int] = []
+
+    def _single(api_key, model, img_b64, product):
+        single_calls.append(1)
+        return {"description_zh": f"single{len(single_calls)}", "image_prompt_en": f"sp{len(single_calls)}"}
+
+    monkeypatch.setattr(va, "frame_to_base64", lambda img: "b64")
+    monkeypatch.setattr(va, "save_frame_to_disk", lambda img, fp: None)
+    monkeypatch.setattr(va, "analyze_video_frames_batch", _batch_fail)
+    monkeypatch.setattr(va, "analyze_video_frame", _single)
+    monkeypatch.setattr(va, "make_frame_filename", lambda sn, ts: f"{ts}.jpg")
+
+    result = va._analyze_frames_batch_task(batch, "key", "model", "prod", "safe", tmp_path, None)
+
+    assert result is not None
+    assert len(result) == n, f"回退后帧数应为 {n}，实际 {len(result)}"
+    assert len(single_calls) == n, f"逐帧回退应调用 {n} 次，实际 {len(single_calls)}"
+    # 顺序检查
+    for i, frame_data in enumerate(result):
+        assert frame_data["timestamp"] == va.format_timestamp(i)
+
+
+def test_batch_worker_cancel_returns_none(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """cancel_event 已置位时，_analyze_frames_batch_task 返回 None。"""
+    batch = [(0, "img0"), (1, "img1")]
+
+    calls = {"batch": 0, "single": 0}
+
+    def _batch(api_key, model, images_b64, product):
+        calls["batch"] += 1
+        return [{"description_zh": "d", "image_prompt_en": "p"}] * len(images_b64)
+
+    def _single(api_key, model, img_b64, product):
+        calls["single"] += 1
+        return {"description_zh": "d", "image_prompt_en": "p"}
+
+    monkeypatch.setattr(va, "frame_to_base64", lambda img: "b64")
+    monkeypatch.setattr(va, "analyze_video_frames_batch", _batch)
+    monkeypatch.setattr(va, "analyze_video_frame", _single)
+
+    ev = threading.Event()
+    ev.set()
+
+    result = va._analyze_frames_batch_task(batch, "key", "model", "prod", "safe", tmp_path, ev)
+
+    assert result is None
+    assert calls["batch"] == 0
+    assert calls["single"] == 0
+
+
+def test_process_video_batch_frames_complete_and_ordered(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """batch 模式下多批并发乱序返回，最终帧全部到齐且按时间戳升序归位。"""
+    n = 20
+
+    def _vlm(api_key, model, img_b64, product):
+        time.sleep(random.uniform(0, 0.01))
+        return {"description_zh": "d", "image_prompt_en": "p"}
+
+    captured = _patch_process_video(monkeypatch, tmp_path, n, _vlm)
+    state = AnalysisState(videos=[VideoProgress(video_name="v.mp4")])
+
+    out = va.process_video(
+        "key", Path("v.mp4"), 0, 1, state,
+        auto_sync_json=False,
+        capture_params=_interval_params(n),
+        concurrency=4,
+        frames_per_call=3,
+    )
+
+    assert out is not None
+    result_frames = captured["frames"]
+    assert len(result_frames) == n, f"帧数应为 {n}，实际 {len(result_frames)}"
+    timestamps = [f["timestamp"] for f in result_frames]
+    assert timestamps == sorted(timestamps), "帧应按时间戳升序排列"
+    assert len(set(timestamps)) == n, "时间戳应无重复"

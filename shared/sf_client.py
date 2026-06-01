@@ -322,6 +322,93 @@ def analyze_video_frame(
     return {"description_zh": raw, "image_prompt_en": ""}
 
 
+def analyze_video_frames_batch(
+    api_key: str,
+    model: str,
+    images_b64: list[str],
+    video_title: str,
+) -> list[dict[str, str]]:
+    """
+    批量分析多帧图片（视频分析专用）。
+    一次请求传入 N 张帧，返回长度=N 的列表，按输入顺序对齐。
+    每个元素: {"description_zh": "...", "image_prompt_en": "..."}
+    若解析失败或长度不符 → raise，由调用方回退逐帧。
+    """
+    import re
+
+    n = len(images_b64)
+    prompt = (
+        f"我按时间顺序给你 {n} 张图片，截取自视频《{video_title}》。"
+        f"请严格输出一个 JSON 数组，长度必须等于 {n}，第 i 个元素对应第 i 张图。\n"
+        "每个元素格式：\n"
+        '{"index": i(从1开始), "description_zh": "...(至少150字)", "image_prompt_en": "..."}\n'
+        "不要 markdown 代码块，直接输出 JSON 数组。\n\n"
+        "description_zh 要求：从 4 个维度展开：1) 核心画面内容 2) 主体动作 3) 场景与环境 4) 镜头与视角，每个维度 2-3 句话。如果是纯黑或纯白无意义过渡帧，直接写「纯色过渡帧」即可。\n"
+        "image_prompt_en 要求：分 4 段写英文提示词：Core Visual Content / Subject Action / Scene and Environment / Camera and Lens Perspective，每段 2-4 句话。如果是纯色过渡帧，则留空。"
+    )
+
+    # 构造 content: text + 每张图
+    content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
+    for b64 in images_b64:
+        content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/jpeg;base64,{b64}"},
+        })
+
+    max_tokens = min(8192, n * 700)
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "user",
+                "content": content,
+            }
+        ],
+        "max_tokens": max_tokens,
+        "temperature": 0.3,
+    }
+    data = _post_json(api_key, "/chat/completions", payload, timeout=180)
+    choices = data.get("choices") or []
+    if not choices:
+        raise SiliconFlowError(f"无 choices 字段: {data}")
+    raw = choices[0].get("message", {}).get("content", "").strip()
+
+    # 去掉可能的 markdown 围栏
+    raw_clean = re.sub(r"```json\s*", "", raw)
+    raw_clean = re.sub(r"```\s*$", "", raw_clean)
+
+    # 提取 JSON 数组
+    match = re.search(r"\[[\s\S]*\]", raw_clean)
+    if not match:
+        raise SiliconFlowError(f"批量帧分析返回中无 JSON 数组: {raw[:200]}")
+
+    try:
+        parsed = json.loads(match.group())
+    except json.JSONDecodeError as e:
+        raise SiliconFlowError(f"批量帧分析 JSON 解析失败: {e}") from e
+
+    if not isinstance(parsed, list):
+        raise SiliconFlowError(f"批量帧分析返回非数组: {type(parsed)}")
+
+    if len(parsed) != n:
+        raise SiliconFlowError(
+            f"批量帧分析计数不符: 期望 {n}，实际 {len(parsed)}"
+        )
+
+    # 按 index 升序对齐（如果有的话），否则按数组序
+    if parsed and isinstance(parsed[0], dict) and "index" in parsed[0]:
+        parsed.sort(key=lambda x: x.get("index", 0))
+
+    # 提取需要的字段，确保按输入序对齐
+    result = []
+    for item in parsed:
+        result.append({
+            "description_zh": item.get("description_zh", ""),
+            "image_prompt_en": item.get("image_prompt_en", ""),
+        })
+    return result
+
+
 def generate_video_summary(
     api_key: str,
     model: str,

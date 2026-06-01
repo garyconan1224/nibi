@@ -207,6 +207,7 @@ FRAME_INTERVAL_SEC: int = 0
 SHORT_VIDEO_THRESHOLD: int = 60
 
 API_CONCURRENCY: int = 3      # 并发 API 请求数（建议 2-5，避免触发速率限制）
+VLM_FRAMES_PER_CALL: int = 4  # 多帧合并进一次 VLM 请求的帧数（保质量/防限流）
 JPEG_QUALITY: int = 85
 MAX_IMAGE_SIDE: int = 1280
 
