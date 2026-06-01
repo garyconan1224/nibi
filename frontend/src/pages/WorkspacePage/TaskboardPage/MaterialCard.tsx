@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileVideo, FileAudio, FileImage, FileText, MoreHorizontal, Film, Subtitles } from 'lucide-react'
+import { FileVideo, FileAudio, FileImage, FileText, MoreHorizontal, Film, Subtitles, Check } from 'lucide-react'
 import type { WorkspaceItem, ItemType } from '@/types/workspace'
 import { TranscriptPreviewModal } from '@/components/workspace/TranscriptPreviewModal'
 import { StoryboardLaunchModal } from './StoryboardLaunchModal'
@@ -73,13 +73,17 @@ interface MaterialCardProps {
   workspaceId: string
   /** 该 item 关联任务的进度（0~1），仅 processing 时有意义 */
   progress?: number
+  /** 多选模式下是否已选中 */
+  selected?: boolean
+  /** 多选模式切换选中 */
+  onSelect?: (itemId: string) => void
 }
 
 /**
  * 单张素材卡片。
  * 设计稿来源：taskboard.jsx MaterialCard + VidMirror.html .mat-* 类。
  */
-export function MaterialCard({ item, workspaceId, progress }: MaterialCardProps) {
+export function MaterialCard({ item, workspaceId, progress, selected, onSelect }: MaterialCardProps) {
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [sbOpen, setSbOpen] = useState(false)
@@ -94,13 +98,23 @@ export function MaterialCard({ item, workspaceId, progress }: MaterialCardProps)
   const framePaths: string[] = (item.results?.frame_paths as string[]) ?? []
 
   const handleClick = () => {
-    navigate(resolveItemRoute(workspaceId, item))
+    if (onSelect) {
+      onSelect(item.item_id)
+    } else {
+      navigate(resolveItemRoute(workspaceId, item))
+    }
   }
 
   return (
     <>
-    <div className="mat-card" data-type={item.type} onClick={handleClick}>
+    <div className="mat-card" data-type={item.type} data-selected={selected ? 'true' : undefined} onClick={handleClick}>
       <div className="mat-thumb">
+        {/* 多选勾选框 */}
+        {onSelect && (
+          <div className="mat-select-chk" data-checked={selected ? 'true' : undefined} onClick={(e) => { e.stopPropagation(); onSelect(item.item_id) }}>
+            {selected && <Check size={12} />}
+          </div>
+        )}
         {/* 缩略图占位：无真实图片时显示类型图标 */}
         <div
           style={{

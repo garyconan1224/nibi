@@ -12,6 +12,8 @@ import { ITEM_TYPE_TEXT } from '@/types/workspace'
 interface CompareTabProps {
   workspace: WorkspaceRecord
   onSelectItem?: (itemId: string) => void
+  /** 前端多选传入的素材 ID 集合；有值时只对比选中素材 */
+  selectedIds?: Set<string>
 }
 
 /** 同步派生的"不需要请求"的状态 */
@@ -52,16 +54,30 @@ function deriveSyncState(items: WorkspaceItem[]): SyncState {
   return { kind: 'need-fetch' }
 }
 
-export function CompareTab({ workspace, onSelectItem }: CompareTabProps) {
-  const sync = useMemo(() => deriveSyncState(workspace.items), [workspace.items])
+export function CompareTab({ workspace, onSelectItem, selectedIds }: CompareTabProps) {
+  // 当有 selectedIds 时只用选中的素材
+  const filteredItems = useMemo(
+    () =>
+      selectedIds && selectedIds.size > 0
+        ? workspace.items.filter((it) => selectedIds.has(it.item_id))
+        : workspace.items,
+    [workspace.items, selectedIds],
+  )
+
+  const sync = useMemo(() => deriveSyncState(filteredItems), [filteredItems])
   const [async, setAsync] = useState<AsyncState>({ phase: 'idle' })
   const abortRef = useRef<AbortController | null>(null)
 
   // 只有 need-fetch 时才发请求
   const anchor = useMemo(() => {
     if (sync.kind !== 'need-fetch') return null
-    return pickAnchor(workspace.items, 'image') ?? pickAnchor(workspace.items, 'text')
-  }, [sync.kind, workspace.items])
+    return pickAnchor(filteredItems, 'image') ?? pickAnchor(filteredItems, 'text')
+  }, [sync.kind, filteredItems])
+
+  const selectedIdList = useMemo(
+    () => (selectedIds && selectedIds.size > 0 ? [...selectedIds] : undefined),
+    [selectedIds],
+  )
 
   useEffect(() => {
     if (!anchor) return
@@ -74,10 +90,10 @@ export function CompareTab({ workspace, onSelectItem }: CompareTabProps) {
 
     const promise =
       anchor.type === 'image'
-        ? getImageCompare(workspace.workspace_id, anchor.item_id).then(
+        ? getImageCompare(workspace.workspace_id, anchor.item_id, selectedIdList).then(
             (d): AsyncState => ({ phase: 'image', data: d }),
           )
-        : getTextCompare(workspace.workspace_id, anchor.item_id).then(
+        : getTextCompare(workspace.workspace_id, anchor.item_id, selectedIdList).then(
             (d): AsyncState => ({ phase: 'text', data: d }),
           )
 
@@ -95,7 +111,7 @@ export function CompareTab({ workspace, onSelectItem }: CompareTabProps) {
       })
 
     return () => ac.abort()
-  }, [anchor, workspace.workspace_id])
+  }, [anchor, workspace.workspace_id, selectedIdList])
 
   return (
     <div className="cmp-tab">

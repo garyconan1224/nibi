@@ -35,6 +35,7 @@ export default function TaskboardPage() {
   const [tab, setTab] = useState<TabId>('materials')
   const [addOpen, setAddOpen] = useState(false)
   const [bgOpen, setBgOpen] = useState(false)
+  const [compareSelectedIds, setCompareSelectedIds] = useState<Set<string>>(new Set())
   const tasks = useTaskStore((s) => s.tasks)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -102,6 +103,8 @@ export default function TaskboardPage() {
             items={workspace.items}
             workspaceId={workspace.workspace_id}
             onAddMaterial={() => setAddOpen(true)}
+            onNavigateToCompare={() => setTab('compare')}
+            onSelectedIdsChange={setCompareSelectedIds}
           />
         )}
         {tab === 'queue' && <QueueTab workspaceId={workspace.workspace_id} />}
@@ -125,7 +128,7 @@ export default function TaskboardPage() {
           <ExportTab items={workspace.items} workspaceId={workspace.workspace_id} />
         )}
         {tab === 'compare' && (
-          <CompareTab workspace={workspace} />
+          <CompareTab workspace={workspace} selectedIds={compareSelectedIds} />
         )}
         {tab === 'style' && (
           <div className="tb-placeholder">Phase [C] 开放</div>

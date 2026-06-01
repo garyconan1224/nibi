@@ -151,6 +151,17 @@ def _build_srt(transcript: List[Dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def _sanitize_zip_prefix(name: str) -> str:
+    """清洗 zip 子目录名，防止 path traversal（如 ../escape）。"""
+    # 只保留文件名部分，去掉任何路径分隔符
+    name = name.replace("\\", "/")
+    parts = [p for p in name.split("/") if p and p != ".."]
+    safe = parts[-1] if parts else "unnamed"
+    # 去掉前导点号（防止隐藏文件）
+    safe = safe.lstrip(".")
+    return safe or "unnamed"
+
+
 def _build_prompts_json_video(frames: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """从视频帧提取提示词数据。"""
     out: list[Dict[str, Any]] = []
@@ -395,6 +406,107 @@ def export_workspace_item(workspace_id: str, item_id: str) -> StreamingResponse:
     today = date.today().isoformat()
     filename = f"复刻工作包_{safe_title}_{today}.zip"
     # RFC5987 编码
+    filename_star = f"UTF-8''{quote(filename)}"
+
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f"attachment; filename*= {filename_star}",
+        },
+    )
+
+
+# ── I2.2 批量导出 ──────────────────────────────────────────
+
+
+class BatchExportRequest(BaseModel):
+    item_ids: List[str]
+
+
+@router.post("/{workspace_id}/items/batch-export")
+def batch_export_items(workspace_id: str, req: BatchExportRequest) -> StreamingResponse:
+    """批量导出多个素材为一个 zip，每个素材一个子目录。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+
+    item_map = {it.item_id: it for it in rec.items}
+    buf = io.BytesIO()
+    exported = 0
+
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for item_id in req.item_ids:
+            item = item_map.get(item_id)
+            if item is None:
+                continue
+
+            # 同步 task 产物
+            overlay = _sync_item_with_tasks(item)
+            if overlay and overlay.get("results") and not item.results:
+                item.results = overlay["results"]
+
+            item_type = item.type
+            prefix = _sanitize_zip_prefix(item.name or item_id[:8])
+
+            if item_type == ItemType.IMAGE.value:
+                data = _get_image_data(item)
+                title = data.get("image", {}).get("title", item.name)
+                prompts_data = _build_prompts_json_image(data)
+                img_url = data.get("image", {}).get("image_url", "")
+                zf.writestr(
+                    f"{prefix}/reference_frames/source_image.txt",
+                    f"原始图片 URL: {img_url}\n标题: {title}\n",
+                )
+                zf.writestr(f"{prefix}/prompts.json", json.dumps(prompts_data, ensure_ascii=False, indent=2))
+            elif item_type == ItemType.VIDEO.value:
+                data = _get_video_data(item)
+                frames = data.get("frames", [])
+                transcript = data.get("transcript", [])
+                title = data.get("video", {}).get("title", item.name)
+                prompts_data = _build_prompts_json_video(data.get("frames", []))
+                srt_content = _build_srt(transcript)
+                if frames:
+                    for f in frames:
+                        ts = f.get("ts", "00-00").replace(":", "-")
+                        shot = f.get("shot_type", "frame")
+                        fname = f"{prefix}/reference_frames/frame_{ts}_{shot}.txt"
+                        content = (
+                            f"镜头: {f.get('title', '')}\n"
+                            f"时间: {f.get('ts', '')}\n"
+                            f"类型: {f.get('shot_type', '')}\n"
+                            f"描述: {f.get('description', '')}\n"
+                            f"\nMidjourney 提示词:\n{f.get('prompt_mj', '')}\n"
+                        )
+                        zf.writestr(fname, content)
+                zf.writestr(f"{prefix}/subtitles.srt", srt_content)
+                zf.writestr(f"{prefix}/prompts.json", json.dumps(prompts_data, ensure_ascii=False, indent=2))
+            elif item_type == ItemType.TEXT.value:
+                data = _get_text_data(item)
+                title = data.get("title", item.name) or item.name
+                prompts_data = _build_prompts_json_text(data)
+                zf.writestr(f"{prefix}/source.md", data.get("content") or data.get("markdown", ""))
+                zf.writestr(f"{prefix}/summary.md", data.get("summary", ""))
+                zf.writestr(f"{prefix}/prompts.json", json.dumps(prompts_data, ensure_ascii=False, indent=2))
+            elif item_type == ItemType.AUDIO.value:
+                data = _get_audio_data(item)
+                transcript = data.get("transcript", [])
+                prompts_data = _build_prompts_json_audio(data)
+                zf.writestr(f"{prefix}/transcript.txt", _build_transcript_txt(transcript))
+                zf.writestr(f"{prefix}/summary.md", data.get("summary", ""))
+                zf.writestr(f"{prefix}/segments.json", json.dumps(data.get("segments", []), ensure_ascii=False, indent=2))
+                zf.writestr(f"{prefix}/prompts.json", json.dumps(prompts_data, ensure_ascii=False, indent=2))
+            else:
+                continue
+
+            exported += 1
+
+    if exported == 0:
+        raise HTTPException(status_code=400, detail="no valid items to export")
+
+    buf.seek(0)
+    today = date.today().isoformat()
+    filename = f"批量导出_{workspace_id[:8]}_{today}.zip"
     filename_star = f"UTF-8''{quote(filename)}"
 
     return StreamingResponse(

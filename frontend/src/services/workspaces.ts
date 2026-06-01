@@ -347,9 +347,11 @@ export interface ImageCompareResult {
 export async function getImageCompare(
   workspaceId: string,
   itemId: string,
+  itemIds?: string[],
 ): Promise<ImageCompareResult> {
+  const params = itemIds?.length ? `?item_ids=${itemIds.join(',')}` : ''
   const res = await http.get<ImageCompareResult>(
-    `${BASE}/${workspaceId}/items/${itemId}/image_compare`,
+    `${BASE}/${workspaceId}/items/${itemId}/image_compare${params}`,
   )
   return res.data
 }
@@ -361,7 +363,7 @@ export interface TextCompareItem {
   name: string
   is_current: boolean
   source_value: string
-  summary: string | { abstract?: string; key_points?: any[]; golden_quotes?: any[] }
+  summary: string | { abstract?: string; key_points?: unknown[]; golden_quotes?: unknown[] }
   content_preview: string
   associations: Record<string, string>
   rewrites: Record<string, string>
@@ -381,9 +383,11 @@ export interface TextCompareResult {
 export async function getTextCompare(
   workspaceId: string,
   itemId: string,
+  itemIds?: string[],
 ): Promise<TextCompareResult> {
+  const params = itemIds?.length ? `?item_ids=${itemIds.join(',')}` : ''
   const res = await http.get<TextCompareResult>(
-    `${BASE}/${workspaceId}/items/${itemId}/text_compare`,
+    `${BASE}/${workspaceId}/items/${itemId}/text_compare${params}`,
   )
   return res.data
 }
@@ -634,6 +638,29 @@ export async function exportReproducePackage(
   )
   const disposition = res.headers['content-disposition'] as string | undefined
   let filename = '复刻工作包.zip'
+  if (disposition) {
+    const match = disposition.match(/filename\*=(?:UTF-8''|")?([^";]+)/i)
+    if (match) filename = decodeURIComponent(match[1])
+  }
+  const url = URL.createObjectURL(res.data as Blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+/** POST /workspaces/{id}/items/batch-export — 批量导出多个素材 */
+export async function batchExportItems(workspaceId: string, itemIds: string[]): Promise<void> {
+  const res = await http.post(
+    `${BASE}/${workspaceId}/items/batch-export`,
+    { item_ids: itemIds },
+    { responseType: 'blob' },
+  )
+  const disposition = res.headers['content-disposition'] as string | undefined
+  let filename = '批量导出.zip'
   if (disposition) {
     const match = disposition.match(/filename\*=(?:UTF-8''|")?([^";]+)/i)
     if (match) filename = decodeURIComponent(match[1])

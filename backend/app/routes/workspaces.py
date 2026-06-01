@@ -1995,12 +1995,18 @@ def get_image_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
 
 
 @router.get("/{workspace_id}/items/{item_id}/image_compare")
-def get_image_compare(workspace_id: str, item_id: str) -> Dict[str, Any]:
+def get_image_compare(
+    workspace_id: str,
+    item_id: str,
+    item_ids: Optional[str] = None,
+) -> Dict[str, Any]:
     """多图对比（N9）。
 
     收集同工作空间内所有已完成分析的图片素材结果，
     与当前图片进行结构化对比（标签 / 描述 / 联想）。
     如果 VLM 可用，还会生成一段总结性对比分析。
+
+    可选查询参数 item_ids（逗号分隔）：只对比指定素材。
     """
     rec = _store.get(workspace_id)
     if rec is None:
@@ -2010,7 +2016,11 @@ def get_image_compare(workspace_id: str, item_id: str) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail="image_compare 仅支持 image 类型素材")
 
     # 收集同 workspace 内所有已完成的 image 素材的结果
-    image_items = [it for it in rec.items if it.type == ItemType.IMAGE.value]
+    allowed_ids = set(item_ids.split(",")) if item_ids else None
+    image_items = [
+        it for it in rec.items
+        if it.type == ItemType.IMAGE.value and (allowed_ids is None or it.item_id in allowed_ids)
+    ]
     collected: List[Dict[str, Any]] = []
     for it in image_items:
         overlay = _sync_item_with_tasks(it)
@@ -2084,12 +2094,18 @@ def get_image_compare(workspace_id: str, item_id: str) -> Dict[str, Any]:
 
 
 @router.get("/{workspace_id}/items/{item_id}/text_compare")
-def get_text_compare(workspace_id: str, item_id: str) -> Dict[str, Any]:
+def get_text_compare(
+    workspace_id: str,
+    item_id: str,
+    item_ids: Optional[str] = None,
+) -> Dict[str, Any]:
     """多文对比（N10）。
 
     收集同工作空间内所有已完成分析的文字素材结果，
     与当前文字进行结构化对比（摘要 / 要点 / 联想归纳）。
     如果 LLM 可用，还会生成一段总结性对比分析。
+
+    可选查询参数 item_ids（逗号分隔）：只对比指定素材。
     """
     rec = _store.get(workspace_id)
     if rec is None:
@@ -2099,7 +2115,11 @@ def get_text_compare(workspace_id: str, item_id: str) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail="text_compare 仅支持 text 类型素材")
 
     # 收集同 workspace 内所有已完成的 text 素材的结果
-    text_items = [it for it in rec.items if it.type == ItemType.TEXT.value]
+    allowed_ids = set(item_ids.split(",")) if item_ids else None
+    text_items = [
+        it for it in rec.items
+        if it.type == ItemType.TEXT.value and (allowed_ids is None or it.item_id in allowed_ids)
+    ]
     collected: List[Dict[str, Any]] = []
     for it in text_items:
         overlay = _sync_item_with_tasks(it)

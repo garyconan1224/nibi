@@ -160,3 +160,86 @@ def test_export_404_workspace_not_found(client: TestClient) -> None:
     resp = client.get("/workspaces/nonexistent/items/anything/export")
     assert resp.status_code == 404
     assert "workspace not found" in resp.json()["detail"]
+
+
+# ── batch-export 测试 ─────────────────────────────────────────
+
+
+def test_batch_export_happy_path_mixed(client: TestClient) -> None:
+    """批量导出：混选图片+视频应返回 200，zip 里每个素材一个子目录。"""
+    ws_id, img_id = _create_workspace_with_item(client, "image")
+    # 在同一个 workspace 里加第二个素材
+    rec = client.post(
+        f"/workspaces/{ws_id}/items",
+        json={"source": "url", "source_value": "https://example.com/test2.mp4", "name": "test-video-2", "type": "video"},
+    ).json()
+    vid_id = rec["items"][-1]["item_id"]
+
+    resp = client.post(
+        f"/workspaces/{ws_id}/items/batch-export",
+        json={"item_ids": [img_id, vid_id]},
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/zip"
+
+    zf = zipfile.ZipFile(io.BytesIO(resp.content))
+    names = set(zf.namelist())
+    # 两个素材各有一个 prompts.json
+    prompt_files = [n for n in names if n.endswith("prompts.json")]
+    assert len(prompt_files) == 2
+
+
+def test_batch_export_image_only(client: TestClient) -> None:
+    """批量导出：仅图片素材应正常出 zip。"""
+    ws_id, item_id = _create_workspace_with_item(client, "image")
+    resp = client.post(
+        f"/workspaces/{ws_id}/items/batch-export",
+        json={"item_ids": [item_id]},
+    )
+    assert resp.status_code == 200
+
+    zf = zipfile.ZipFile(io.BytesIO(resp.content))
+    names = set(zf.namelist())
+    assert any(n.endswith("prompts.json") for n in names)
+
+
+def test_batch_export_404_workspace(client: TestClient) -> None:
+    """批量导出：workspace 不存在应 404。"""
+    resp = client.post(
+        "/workspaces/nonexistent/items/batch-export",
+        json={"item_ids": ["any"]},
+    )
+    assert resp.status_code == 404
+
+
+def test_batch_export_empty_item_ids(client: TestClient) -> None:
+    """批量导出：空 item_ids 应 400。"""
+    ws = client.post("/workspaces", json={"name": "empty-test"}).json()
+    ws_id = ws["workspace_id"]
+    resp = client.post(
+        f"/workspaces/{ws_id}/items/batch-export",
+        json={"item_ids": []},
+    )
+    assert resp.status_code == 400
+
+
+def test_batch_export_path_traversal_sanitized(client: TestClient) -> None:
+    """批量导出：素材名含 ../ 时 zip 内路径应被清洗。"""
+    ws = client.post("/workspaces", json={"name": "traversal-test"}).json()
+    ws_id = ws["workspace_id"]
+    rec = client.post(
+        f"/workspaces/{ws_id}/items",
+        json={"source": "url", "source_value": "https://example.com/test.mp4", "name": "../escape", "type": "image"},
+    ).json()
+    item_id = rec["items"][-1]["item_id"]
+
+    resp = client.post(
+        f"/workspaces/{ws_id}/items/batch-export",
+        json={"item_ids": [item_id]},
+    )
+    assert resp.status_code == 200
+
+    zf = zipfile.ZipFile(io.BytesIO(resp.content))
+    for name in zf.namelist():
+        assert not name.startswith("../"), f"zip path not sanitized: {name}"
+        assert not name.startswith("/"), f"zip path not sanitized: {name}"
