@@ -1,24 +1,25 @@
 # AI Handoff
 
-Last updated: 2026-05-29（**当前阶段 = R21.P3.S3 followup 待 merge；下一步音视频端到端打通**）
+Last updated: 2026-06-02（**主干基本完成；当前在 `main`，工作区干净。下一步看 ROADMAP §2+§11，不急**）
 
 ---
 
-## 🔴 当前状态（2026-05-29）
+## 🟢 当前状态（2026-06-02）
 
-**R14~R21 全系列已合入 main；当前分支 `fix/r21-p3-s3-followup` 的 R21.P3.S3 followup 已 `status: done`，待 merge 进 main。不 push origin。**
+**全部主线工作已合入 `main`，工作区干净，不 push origin。F1（IP.9 流程缺口补齐）阶段的 F3.1 / F3.2 已落地。**
 
-- R10~R13.6：输入层重构 / ProcessingPage 1:1 复刻 / 元数据贯通已全部合入。
-- R14~R16：多类型 dedup UX / early-metadata / ProcessingPage 音频适配 ✅
-- R17：chip 重构，引入 av_synthesis「综合笔记」chip ✅
-- R18 / R18.1：PreflightDrawer Remix 复刻 + 本地 ASR + 失败弹窗 ✅
-- R19 / R19d：av_synthesis 图文笔记 pipeline + Markdown 导出 + export endpoint ✅
-- R21.A1~A6 + B1~B3：2026-05-27 用户 11 条反馈中的 9 条（状态同步 6 bug + 行为收口 3 项）✅
-- R21.P2 / P2.v3：模型选择挪到主界面 + capability 过滤 ✅
-- R21.P3.S1 / S2 / S3：添加素材拆参数 / 多版本总结 SummariesTab / 对比 + 学习视频补图 ✅
-- R21.P3.S3 followup（当前分支）：preflight 顶层 intent 链路修复 + av_combined 结果页补图入口，done 待 merge。
+主干（输入链接 → 任务 → 文字 / 图片 / 音频 / 视频落地 → 结果页 → 浮动任务面板）已端到端打通。最近两步：
 
-**下一步方向（用户 2026-05-29 决议）**：先把音频 + 视频从输入链接 → 任务 → 落地页完整端到端打通，确保音视频闭环到位，再做文字 / 图片深化。
+- **F3.1**（`47d63e4`）：VLM 帧分析停滞检测，疑似限流时提示用户（底层 `sf_client` 已自动重试）✅
+- **F3.2**（`7bea1dd`）：浮动任务面板失败展示复用 `errorCategories` 友好文案 + 原始错误 tooltip ✅
+
+**剩余（都不急，按 ROADMAP §2+§11 决定优先级）**：
+
+1. **[C] 复刻 · AI 导演** —— ⛔ 阻塞：需先补设计稿，未动工。
+2. **[D] 开源准备** —— 未动工。
+3. **F3.1 可选增强**：把「停滞**推断**」升级成「**确知**限流透出」（拿到真实限流信号再提示，而非靠超时推断）；属未来增强，非必须。
+
+**下一步指引**：新会话先跑 `git log --oneline -20` 对账，再打开 `docs/ROADMAP.md` §2（6-track 全景）+ §11（推荐顺序）决定做哪个，**不要只看本文件「下一步」旧段拍脑袋**（下方 5-22 的清单是历史日志，已过期，仅留档）。
 
 ---
 
