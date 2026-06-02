@@ -80,6 +80,35 @@ def _mock_settings(api_key: str = ""):
     )
 
 
+def test_stall_notifier_warns_when_progress_stuck() -> None:
+    """F3.1: 帧进度长时间不推进时，stall notifier 提示一次「可能在等 API（限流）」，
+    已提示不刷屏，进度恢复后重置可再次提示。"""
+    from backend.app.services.pipeline_tasks import _make_stall_notifier
+
+    runner = MagicMock()
+    tick = _make_stall_notifier(runner, "task-x", threshold_sec=0.05)
+
+    tick(0.5)  # 首次：记录基线，不提示
+    runner.append_log.assert_not_called()
+
+    time.sleep(0.06)
+    tick(0.5)  # 进度未变 + 超阈值 → 提示一次
+    assert runner.append_log.called
+    msg = str(runner.append_log.call_args[0][1])
+    assert "限流" in msg or "等待 API" in msg
+
+    runner.append_log.reset_mock()
+    tick(0.5)  # 已提示，不重复刷屏
+    runner.append_log.assert_not_called()
+
+    # 进度恢复推进 → 重置；再次停滞应再次提示
+    tick(0.8)
+    runner.append_log.reset_mock()
+    time.sleep(0.06)
+    tick(0.8)
+    assert runner.append_log.called
+
+
 def test_find_visual_json_paths_for_videos_filters_unrelated_workspace_json(tmp_path: Path) -> None:
     from backend.app.services.pipeline_tasks import _find_visual_json_paths_for_videos
     from shared.video_analyzer import get_safe_name

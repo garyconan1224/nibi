@@ -865,6 +865,29 @@ def _build_combined_summary_prompt(
     return "\n".join(parts)
 
 
+def _make_stall_notifier(runner: TaskRunner, task_id: str, *, threshold_sec: float = 30.0):
+    """VLM 帧分析进度停滞检测（F3.1）：进度连续 threshold_sec 秒不推进时提示一次
+    「可能正在等待 API（限流/排队，sf_client 已自动重试）」，缓解任务卡住却无反馈的体验。
+    进度恢复后重置，可再次提示。返回 tick(cur_pct: 0~1) 回调，在轮询循环里每轮调用。"""
+    st = {"last_pct": -1.0, "last_ts": time.monotonic(), "notified": False}
+
+    def tick(cur_pct: float) -> None:
+        now = time.monotonic()
+        if cur_pct > st["last_pct"] + 1e-4:
+            st["last_pct"] = cur_pct
+            st["last_ts"] = now
+            st["notified"] = False
+        elif not st["notified"] and now - st["last_ts"] >= threshold_sec:
+            runner.append_log(
+                task_id,
+                "⏳ 帧分析进度较慢，可能正在等待 API（限流或排队中，已自动重试），请耐心等待…",
+                level="warning",
+            )
+            st["notified"] = True
+
+    return tick
+
+
 def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     payload = record.payload
     task_id = record.task_id
@@ -945,6 +968,7 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
             cancel_event=_vlm_cancel,
         )
         last_reported_pct = -100.0
+        _stall = _make_stall_notifier(runner, record.task_id)
         while not state.finished:
             if runner.is_cancel_requested(record.task_id):
                 _vlm_cancel.set()  # 取消时让后台截帧 worker 停下
@@ -953,6 +977,7 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
             if snaps:
                 avg = sum(float(s["percent"]) for s in snaps) / max(len(snaps), 1) / 100.0
                 current_pct = avg * 100
+                _stall(avg)
                 if current_pct - last_reported_pct >= 5:
                     runner.set_progress(record.task_id, min(0.65, max(0.3, 0.3 + avg * 0.35)), "Analyzing video frames")
                     last_reported_pct = current_pct
@@ -1028,6 +1053,7 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
         cancel_event=_vlm_cancel,
     )
     last_reported_pct = -100.0
+    _stall = _make_stall_notifier(runner, record.task_id)
     while not state.finished:
         if runner.is_cancel_requested(record.task_id):
             _vlm_cancel.set()  # 取消时让后台截帧 worker 停下
@@ -1036,6 +1062,7 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
         if snaps:
             avg = sum(float(s["percent"]) for s in snaps) / max(len(snaps), 1) / 100.0
             current_pct = avg * 100
+            _stall(avg)
             if current_pct - last_reported_pct >= 5:
                 runner.set_progress(record.task_id, min(0.95, max(0.1, avg)), "Analyzing video frames")
                 last_reported_pct = current_pct
@@ -1396,6 +1423,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 )
 
                 _last_logged_pct = -1.0
+                _stall = _make_stall_notifier(runner, task_id)
                 while not state.finished:
                     if _cancel_event.is_set():
                         raise RuntimeError("已取消：另一轨失败")
@@ -1406,6 +1434,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                     if snaps:
                         avg = sum(float(s["percent"]) for s in snaps) / max(len(snaps), 1) / 100.0
                         cur_pct = min(0.85, 0.58 + avg * 0.27)
+                        _stall(avg)
                         _monotonic_progress(cur_pct, "[截帧] 视觉帧分析中...")
                         if cur_pct - _last_logged_pct >= 0.05 or _last_logged_pct < 0:
                             _last_logged_pct = cur_pct
