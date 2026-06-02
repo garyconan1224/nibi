@@ -180,6 +180,26 @@ describe('FloatingTaskQueue v2', () => {
     expect(cancelButtons.length).toBe(1)
   })
 
+  it('note 任务进度应按真实 task.progress 显示而非 0%', () => {
+    useTaskStore.setState({
+      tasks: [
+        makeTask({
+          task_id: 'note-001',
+          project_id: 'workspace-1',
+          task_type: 'note',
+          payload: { title: 'Note task' },
+          status: 'FRAMES',
+          progress: 0.79,
+        }),
+      ],
+    })
+
+    render(<FloatingTaskQueue />)
+    fireEvent.click(screen.getByRole('button', { name: /任务/ }))
+
+    expect(screen.getAllByText('79%').length).toBeGreaterThanOrEqual(1)
+  })
+
   it('analyze 任务用 source_url 而非 url 时也能正确合并', () => {
     useTaskStore.setState({
       tasks: [

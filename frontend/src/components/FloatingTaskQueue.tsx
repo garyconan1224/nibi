@@ -151,7 +151,7 @@ export function FloatingTaskQueue() {
       } else if (analyzeTask) {
         weightedProgress = analyzeProgress
       } else {
-        weightedProgress = 0
+        weightedProgress = representative.progress ?? 0
       }
 
       return {
