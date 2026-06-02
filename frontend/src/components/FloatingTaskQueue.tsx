@@ -123,17 +123,13 @@ export function FloatingTaskQueue() {
       group.some((t) => !isTaskTerminal(t.status) || t.status === 'FAILED'),
     )
 
-    // 每组取代表 task
-    const statusPriority: Record<string, number> = {
-      RUNNING: 4,
-      PENDING: 3,
-      FAILED: 2,
-      SUCCESS: 1,
-    }
+    // 每组取代表 task：运行态 > PENDING > FAILED > 终态(SUCCESS/CANCELLED)
+    const rankOf = (s: string): number =>
+      s === 'FAILED' ? 2 : s === 'PENDING' ? 3 : isTaskTerminal(s) ? 1 : 4
 
     const representativeTasks = activeGroups.map(([groupKey, group]) => {
       // 按 status 优先级排序，取优先级最高的（运行中的 analyze 会盖过已完成的 download）
-      group.sort((a, b) => (statusPriority[b.status] || 0) - (statusPriority[a.status] || 0))
+      group.sort((a, b) => rankOf(b.status) - rankOf(a.status))
       const representative = group[0]
 
       // 计算进度：根据实际存在的任务类型动态分配权重

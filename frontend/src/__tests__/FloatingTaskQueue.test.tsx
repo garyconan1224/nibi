@@ -200,6 +200,37 @@ describe('FloatingTaskQueue v2', () => {
     expect(screen.getAllByText('79%').length).toBeGreaterThanOrEqual(1)
   })
 
+  it('运行中 analyze 被选为代表 → 标题用 video_title、阶段显示截帧', () => {
+    useTaskStore.setState({
+      tasks: [
+        makeTask({
+          task_id: 'download-003',
+          project_id: 'workspace-1',
+          task_type: 'download',
+          payload: { url: 'https://www.bilibili.com/video/BV1LY5J6pEZD' },
+          status: 'SUCCESS',
+          progress: 1.0,
+        }),
+        makeTask({
+          task_id: 'analyze-003',
+          project_id: 'workspace-1',
+          task_type: 'analyze',
+          payload: { url: 'https://www.bilibili.com/video/BV1LY5J6pEZD', video_title: '夯到爆测试标题' },
+          status: 'FRAMES',
+          progress: 0.35,
+        }),
+      ],
+    })
+
+    render(<FloatingTaskQueue />)
+    fireEvent.click(screen.getByRole('button', { name: /任务/ }))
+
+    // 标题应显示真实 video_title，不是 BV 号
+    expect(screen.getByText('夯到爆测试标题')).toBeTruthy()
+    // 阶段文案应显示「截帧」，不是 'SUCCESS'
+    expect(screen.getByText('截帧')).toBeTruthy()
+  })
+
   it('analyze 任务用 source_url 而非 url 时也能正确合并', () => {
     useTaskStore.setState({
       tasks: [
