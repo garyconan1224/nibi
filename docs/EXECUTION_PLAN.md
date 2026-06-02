@@ -267,7 +267,7 @@
 - [ ] **R18.1** 本地 ASR（fast-whisper + mlx-whisper 兜底）+ 任务失败弹窗 + 模型下载进度 — `docs/plans/archive/phase-r18.1-local-asr-and-failure-popup.md`，owner: xiaomi mimo v2.5-pro，~8h
 - [x] **R19** 综合笔记 av_synthesis pipeline + Markdown 导出（骨架 C，无 OCR）— `326eb12` `fdbf4a7`，owner: xiaomi mimo v2.5-pro
 - [x] **R20** 综合笔记多格式导出：PDF / Word / Obsidian Vault — `feat/phase-r20-notes-export` merge `f0e15f5`
-- [ ] **R21** R19 上线后流程状态同步 bug 修 + 进度/资料库行为收口 — `docs/plans/archive/phase-r21-status-sync-bugfix.md`，owner: xiaomi mimo v2.5-pro，~10h
+- [x] **R21** R19 上线后流程状态同步 bug 修 + 进度/资料库行为收口 — A1-A6 + B1-B3 + P2/P3.S1-S3 + 收尾全完成（2026-06-02 对账补勾，git 已合 `3f3e805`/`6740a3a`）
   - A 类 bug：步骤全 DONE / 任务面板重复 3 行 / SSE↔轮询不同步 / 截帧进度卡 30% / "查看结果" 点不动
   - B 类行为：未完成入口 disabled / 步骤日志补业务细节 / 右上角全局倒计时
   - [x] R21.P2 模型选择 + 截帧模式从细调挪到「添加素材」主界面 — `98e5f9d`
@@ -283,7 +283,7 @@
 - [x] **R22** Pipeline 并行调度：截帧 + 转写同时跑 — `docs/plans/r22-r23-perf-mimo-prompt.md`，`feat(r22): 视频音频转录与截帧并行`
 - [x] **R23** 设置面板：性能档位（内存→whisper 模型 + 截帧密度）— `docs/plans/phase-r23-perf-tier-settings.md`，`0dbd2de feat(r23)` `4c6f586 fix(r23)`（2026-06-01 对账补勾：git 已合，文档曾漏勾）
 - [x] **R24** VLM 多帧并发提速：并发数随性能档位（low=3/medium=6/high=8）+ R22 cancel 下沉到截帧 worker — `227cc7c perf(video): VLM 多帧并发调用提速`
-- [ ] **R25** VLM 多图合并再提速：多帧合并进一次 VLM 请求（多图输入，与 R24 并发叠加，目标进十几分钟）— `docs/plans/r25-vlm-batch-mimo-prompt.md`，owner: xiaomi mimo 2.5pro，~6-9h，依赖 R24
+- [x] **R25** VLM 多图合并再提速：多帧合并进一次 VLM 请求（多图输入，与 R24 并发叠加）— `7a9a1df` `85d7ad1`（2026-06-02 对账补勾，已合）
 
 ---
 
