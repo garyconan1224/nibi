@@ -4,6 +4,7 @@ import { RotateCcw, X } from 'lucide-react'
 import { useTaskStore } from '@/store/taskStore'
 import { usePipelineTasks } from '@/hooks/usePipelineTasks'
 import { PROCESSING_STAGES, isTaskTerminal, type TaskRecord } from '@/types/task'
+import { categorizeError } from '@/lib/errorCategories'
 import './FloatingTaskQueue.css'
 
 /* ── helpers ── */
@@ -18,6 +19,7 @@ interface QueueRow {
   status: string
   progress: number
   stage: string
+  stageFull?: string
   workspaceId: string
   itemId?: string
 }
@@ -31,8 +33,9 @@ function displayState(status: string): DisplayState {
 function getStageLabel(status: string, errorMsg?: string): string {
   if (status === 'FAILED') {
     if (errorMsg) {
-      const short = errorMsg.slice(0, 22)
-      return short.length < errorMsg.length ? short + '…' : short
+      // F3.2: 复用 errorCategories 框架，展示友好分类文案（如「API 配额耗尽或请求限流」），
+      // 而非原始错误截断；完整原文走行内 title tooltip（见 QueueRow.stageFull）。
+      return categorizeError(errorMsg).friendlyMessage
     }
     return '失败'
   }
@@ -173,6 +176,7 @@ export function FloatingTaskQueue() {
           status: t.status,
           progress: state === 'error' ? Math.max(displayProgress, 1) : displayProgress,
           stage: getStageLabel(t.status, t.error || undefined),
+          stageFull: t.error || undefined,
           workspaceId: t.project_id,
           itemId: payload?.item_id as string | undefined,
         }
@@ -401,7 +405,7 @@ export function FloatingTaskQueue() {
                         }}
                       />
                     </div>
-                    <span className="mono" style={{ fontSize: 9.5, color: 'var(--ink-4)' }}>
+                    <span className="mono" title={r.stageFull} style={{ fontSize: 9.5, color: 'var(--ink-4)' }}>
                       {r.stage}
                     </span>
                     {r.state === 'error' && (

@@ -82,6 +82,29 @@ describe('FloatingTaskQueue v2', () => {
     expect(screen.queryByText('Cancelled task')).toBeNull()
   })
 
+  it('F3.2: 失败任务用 errorCategories 友好文案展示（限流），原始错误走 title', () => {
+    useTaskStore.setState({
+      tasks: [
+        makeTask({
+          task_id: 'rate-limited',
+          status: 'FAILED',
+          payload: { title: '限流任务' },
+          error: 'HTTP 429: rate limit exceeded, too many requests',
+        }),
+      ],
+    })
+
+    render(<FloatingTaskQueue />)
+    fireEvent.click(screen.getByRole('button', { name: /任务/ }))
+
+    // 友好分类文案（而非原始 "HTTP 429..." 截断 22 字）
+    expect(screen.getByText('API 配额耗尽或请求限流')).toBeTruthy()
+    // 完整原始错误走 title tooltip（hover 可见）
+    expect(
+      screen.getByTitle('HTTP 429: rate limit exceeded, too many requests'),
+    ).toBeTruthy()
+  })
+
   it('查看全部跳转到现有 /workspaces 入口', () => {
     useTaskStore.setState({
       tasks: [makeTask({ status: 'DOWNLOAD' })],
