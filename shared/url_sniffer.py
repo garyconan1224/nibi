@@ -275,6 +275,17 @@ def sniff_url(url: str) -> SniffResult:
     # ── 策略 1: 已知平台路径模式 ──
     platform, default_type, default_possible = _resolve_platform(hostname)
 
+    # 小红书：图文/视频需解析页面区分（分享链接自带 xsec_token，免 cookie；失败降级 text）
+    if platform == "xiaohongshu":
+        try:
+            from shared.xiaohongshu_share import resolve_xhs_share, parse_xhs_page
+            _, _xhs_html = resolve_xhs_share(raw)
+            _xhs_type = (parse_xhs_page(_xhs_html) or {}).get("type", "normal")
+            _xhs_pt = "video" if _xhs_type == "video" else "text"
+            return SniffResult(primary_type=_xhs_pt, possible_types=[_xhs_pt], platform="xiaohongshu")
+        except Exception:
+            return SniffResult(primary_type="text", possible_types=["text"], platform="xiaohongshu")
+
     if platform:
         path_result = _sniff_by_url_path(url_path, platform)
         if path_result:
