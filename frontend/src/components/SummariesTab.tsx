@@ -39,22 +39,27 @@ const TEMPLATE_OPTIONS: { value: string; label: string }[] = [
   { value: 'lecture', label: '教学笔记' },
   { value: 'interview', label: '访谈整理' },
   { value: 'shownotes', label: '播客 shownotes' },
+  { value: 'oral', label: '口播稿' },
+  { value: 'steps', label: '步骤教程' },
+  { value: 'outline', label: '大纲' },
+  { value: 'qa', label: '问答卡(Anki)' },
+  { value: 'actions', label: '行动清单' },
 ]
 
 /** 4 个常用模板（segmented control 展示） */
 const QUICK_TEMPLATES = [
   { value: 'concise', label: '精简' },
-  { value: 'detailed', label: '详细' },
-  { value: 'xhs', label: '小红书' },
-  { value: 'longform', label: '公众号' },
+  { value: 'lecture', label: '教学' },
+  { value: 'oral', label: '口播' },
+  { value: 'steps', label: '教程' },
 ]
 
 /** 4 个常用模板卡片（空态引导 2×2 grid） */
 const QUICK_TEMPLATE_CARDS: { value: string; label: string; desc: string }[] = [
   { value: 'concise', label: '精简摘要', desc: '几句话概括核心内容' },
-  { value: 'detailed', label: '详细要点', desc: '逐条列出关键信息' },
-  { value: 'xhs', label: '小红书风格', desc: '带 emoji 的种草体笔记' },
-  { value: 'longform', label: '公众号长文', desc: '结构化的深度解读' },
+  { value: 'lecture', label: '教学笔记', desc: '知识点 + 例子 + 重点' },
+  { value: 'oral', label: '口播稿', desc: '可直接念的口语化文案' },
+  { value: 'steps', label: '步骤教程', desc: '有序步骤清单，可照着做' },
 ]
 
 const TEMPLATE_LABEL_MAP = Object.fromEntries(
