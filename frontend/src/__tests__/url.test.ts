@@ -50,4 +50,27 @@ describe('normalizeMediaUrl', () => {
     expect(result).toContain('v=dQw4w9WgXcQ')
     expect(result).toContain('list=PLxxx')
   })
+
+  it('小红书图文分享文案 → 提取纯链接', () => {
+    const shareText =
+      '【小红书】快来查看我的笔记 http://xhslink.com/o/3w7r5xADEqD 复制本条笔记，打开小红书看更多精彩内容！'
+    expect(normalizeMediaUrl(shareText)).toBe('http://xhslink.com/o/3w7r5xADEqD')
+  })
+
+  it('小红书视频分享文案 → 提取纯链接', () => {
+    const shareText =
+      '7 求求你们去试试这个发型好吗 http://xhslink.com/o/c7LCUZRTFn 复制本条笔记，打开小红书看更多精彩内容！'
+    expect(normalizeMediaUrl(shareText)).toBe('http://xhslink.com/o/c7LCUZRTFn')
+  })
+
+  it('通用分享文案（无平台特定规则）→ 提取第一个 URL', () => {
+    const shareText =
+      '快来看看这个视频 https://example.com/watch?v=abc123 很有意思哦'
+    expect(normalizeMediaUrl(shareText)).toBe('https://example.com/watch?v=abc123')
+  })
+
+  it('分享文案含中文标点 → URL 尾部标点被去除', () => {
+    const shareText = '点击链接 https://example.com/page，快来！'
+    expect(normalizeMediaUrl(shareText)).toBe('https://example.com/page')
+  })
 })

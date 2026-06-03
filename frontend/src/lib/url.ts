@@ -3,6 +3,9 @@ const BILIBILI_BV_RE = /^BV[a-zA-Z0-9]+$/;
 /** 抖音短链模式——用于从分享文案中提取纯 URL */
 const DOUYIN_URL_RE = /https?:\/\/(?:v\.douyin\.com|www\.douyin\.com|www\.iesdouyin\.com|dy\.com)\/[^\s]+/i;
 
+/** 通用 URL 提取——从任意分享文案中提取第一个 https?:// 开头的 URL（去除尾部中文标点） */
+const GENERIC_URL_RE = /https?:\/\/[^\s，。！？；：""''（）【】《》]+/;
+
 /** 追踪参数白名单——这些参数不影响视频唯一性，应移除 */
 const TRACKING_PARAMS = new Set([
   "spm_id_from",
@@ -19,11 +22,19 @@ const TRACKING_PARAMS = new Set([
 export function normalizeMediaUrl(raw: string): string {
   let s = raw.trim();
 
-  // ① 从抖音分享文案中提取第一个抖音短链
+  // ① 从分享文案中提取纯 URL
+  // 优先匹配抖音短链，否则通用提取第一个 https?:// 开头的 URL
   // 例："8.92 复制打开抖音，看看【...】... https://v.douyin.com/xxx/ ..."
   const dyMatch = s.match(DOUYIN_URL_RE);
   if (dyMatch) {
     s = dyMatch[0];
+  } else {
+    // 小红书/快手/任意分享文案：提取第一个 URL
+    // 例："【标题】... http://xhslink.com/xxx 复制本条笔记..."
+    const genericMatch = s.match(GENERIC_URL_RE);
+    if (genericMatch) {
+      s = genericMatch[0];
+    }
   }
 
   // ② 纯 BV 号 → 拼完整 B站 URL

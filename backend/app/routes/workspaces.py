@@ -396,6 +396,15 @@ def _ensure_valid_status(s: Optional[str]) -> None:
 
 _BILIBILI_BV_RE = re.compile(r"^BV[a-zA-Z0-9]+$")
 
+# 抖音短链模式——用于从分享文案中提取纯 URL
+_DOUYIN_URL_RE = re.compile(
+    r"https?://(?:v\.douyin\.com|www\.douyin\.com|www\.iesdouyin\.com|dy\.com)/\S+",
+    re.IGNORECASE,
+)
+
+# 通用 URL 提取——从任意分享文案中提取第一个 https?:// 开头的 URL（去除尾部中文标点）
+_GENERIC_URL_RE = re.compile(r"https?://[^\s，。！？；：“”‘’（）【】《》]+")
+
 _TRACKING_PARAMS = frozenset({
     "spm_id_from", "vd_source", "share_source", "share_medium",
     "bbid", "ts", "unique_k", "p", "vd_source_2",
@@ -406,22 +415,32 @@ def _normalize_media_url(raw: str) -> str:
     """规整用户粘入的 URL，确保同一视频的不同变体收敛为同一字符串。
 
     处理：
-    ① 纯 BV 号 → 拼完整 B 站 URL
-    ② 缺 scheme → 补 https://
-    ③ 去掉追踪参数（spm_id_from / vd_source 等）
-    ④ 去掉尾斜杠
+    ① 从分享文案中提取纯 URL（抖音短链优先，否则通用提取）
+    ② 纯 BV 号 → 拼完整 B 站 URL
+    ③ 缺 scheme → 补 https://
+    ④ 去掉追踪参数（spm_id_from / vd_source 等）
+    ⑤ 去掉尾斜杠
     """
     s = raw.strip()
 
-    # ① 纯 BV 号
+    # ① 从分享文案中提取纯 URL
+    dy_match = _DOUYIN_URL_RE.search(s)
+    if dy_match:
+        s = dy_match.group(0)
+    else:
+        generic_match = _GENERIC_URL_RE.search(s)
+        if generic_match:
+            s = generic_match.group(0)
+
+    # ② 纯 BV 号
     if _BILIBILI_BV_RE.match(s):
         s = f"https://www.bilibili.com/video/{s}"
 
-    # ② 缺 scheme（没有任何 :// 的才补 https://）
+    # ③ 缺 scheme（没有任何 :// 的才补 https://）
     if "://" not in s:
         s = f"https://{s}"
 
-    # ③④ 解析并清理
+    # ④⑤ 解析并清理
     try:
         u = urlparse(s)
         if u.query:
@@ -753,7 +772,7 @@ def _is_auto_generated_workspace_name(name: str) -> bool:
 _PLATFORM_HOST_MAP: list[tuple[tuple[str, ...], str]] = [
     (("bilibili.com",), "bilibili"),
     (("youtube.com", "youtu.be"), "youtube"),
-    (("xiaohongshu.com",), "xiaohongshu"),
+    (("xiaohongshu.com", "xhslink.com"), "xiaohongshu"),
     (("douyin.com", "iesdouyin.com"), "douyin"),
     (("kuaishou.com",), "kuaishou"),
     (("mp.weixin.qq.com",), "weixin"),

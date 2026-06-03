@@ -10,7 +10,7 @@ export function platformPrefixFromUrl(url: string): string {
   const map: Array<[RegExp, string]> = [
     [/\bbilibili\.com$/, 'bilibili'],
     [/\b(youtube\.com|youtu\.be)$/, 'youtube'],
-    [/\bxiaohongshu\.com$/, 'xiaohongshu'],
+    [/\b(xiaohongshu\.com|xhslink\.com)$/, 'xiaohongshu'],
     [/\b(douyin\.com|iesdouyin\.com)$/, 'douyin'],
     [/\bkuaishou\.com$/, 'kuaishou'],
     [/\bweixin\.qq\.com$/, 'weixin'],

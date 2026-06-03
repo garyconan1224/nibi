@@ -11,6 +11,7 @@ describe('platformPrefixFromUrl', () => {
   })
   it('returns xiaohongshu / douyin / kuaishou / weixin', () => {
     expect(platformPrefixFromUrl('https://www.xiaohongshu.com/explore/x')).toBe('xiaohongshu')
+    expect(platformPrefixFromUrl('http://xhslink.com/o/xxx')).toBe('xiaohongshu')
     expect(platformPrefixFromUrl('https://www.douyin.com/video/x')).toBe('douyin')
     expect(platformPrefixFromUrl('https://www.kuaishou.com/short-video/x')).toBe('kuaishou')
     expect(platformPrefixFromUrl('https://mp.weixin.qq.com/s/x')).toBe('weixin')
