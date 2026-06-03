@@ -1,4 +1,4 @@
-/** 9 个 Tab 的 id */
+/** 10 个 Tab 的 id */
 export type TabId =
   | 'materials'
   | 'queue'
@@ -6,6 +6,7 @@ export type TabId =
   | 'history'
   | 'tags'
   | 'chat'
+  | 'knowledgeQA'
   | 'export'
   | 'style'
   | 'compare'

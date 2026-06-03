@@ -26,6 +26,8 @@ import { toast } from 'sonner'
 
 interface TaskChatPanelProps {
   workspace: WorkspaceRecord
+  /** 知识库问答模式：自动全选所有素材，UI 措辞对齐"知识库" */
+  autoSelectAll?: boolean
 }
 
 const ITEM_TYPE_ICON: Record<ItemType, typeof FileVideo> = {
@@ -46,11 +48,18 @@ const ITEM_TYPE_ICON: Record<ItemType, typeof FileVideo> = {
  *
  * 旧浮动 ChatSidebar 不动，作为「无上下文」快速入口保留。
  */
-export function TaskChatPanel({ workspace }: TaskChatPanelProps) {
+export function TaskChatPanel({ workspace, autoSelectAll }: TaskChatPanelProps) {
   const items = workspace.items ?? []
   const workspaceId = workspace.workspace_id
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  // 知识库问答模式：自动全选所有素材
+  useEffect(() => {
+    if (autoSelectAll && items.length > 0 && selectedIds.size === 0) {
+      setSelectedIds(new Set(items.map((it) => it.item_id)))
+    }
+  }, [autoSelectAll, items, selectedIds.size])
   const [chatId, setChatId] = useState<string | null>(null)
   const [history, setHistory] = useState<ChatMessage[]>([])
   const [streaming, setStreaming] = useState(false)
@@ -178,7 +187,7 @@ export function TaskChatPanel({ workspace }: TaskChatPanelProps) {
   }
 
   const placeholder = useMemo(() => {
-    if (items.length === 0) return '当前任务还没有素材，先去「素材」标签添加'
+    if (items.length === 0) return '当前工作空间还没有笔记，先去「素材」标签添加'
     if (selectedIds.size === 0) return '请先勾选上方的素材 chip 作为对话上下文'
     return '输入消息… Enter 发送 / Shift+Enter 换行'
   }, [items.length, selectedIds.size])
@@ -189,7 +198,7 @@ export function TaskChatPanel({ workspace }: TaskChatPanelProps) {
       <div className="border-b px-4 py-3">
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="text-xs font-medium text-muted-foreground">
-            上下文素材 · 已选 {selectedIds.size} / {items.length}
+            {autoSelectAll ? '知识库笔记' : '上下文素材'} · 已选 {selectedIds.size} / {items.length}
           </div>
           <div className="flex items-center gap-2">
             {lastTruncated && (
@@ -198,7 +207,7 @@ export function TaskChatPanel({ workspace }: TaskChatPanelProps) {
                 className="border-amber-300 bg-amber-50 text-amber-800"
               >
                 <AlertTriangle size={12} className="mr-1" />
-                上下文已自动精简
+                {autoSelectAll ? '上下文已精简，部分笔记未完整纳入' : '上下文已自动精简'}
               </Badge>
             )}
             <Button
@@ -208,7 +217,7 @@ export function TaskChatPanel({ workspace }: TaskChatPanelProps) {
               disabled={items.length === 0}
             >
               <CheckCheck size={14} className="mr-1" />
-              {allSelected ? '全部取消' : '全任务上下文'}
+              {allSelected ? '全部取消' : autoSelectAll ? '全选笔记' : '全任务上下文'}
             </Button>
             <Button
               size="sm"
@@ -224,7 +233,7 @@ export function TaskChatPanel({ workspace }: TaskChatPanelProps) {
         <div className="flex flex-wrap gap-2">
           {items.length === 0 ? (
             <span className="text-xs text-muted-foreground">
-              当前任务还没有素材
+              {autoSelectAll ? '当前工作空间还没有笔记' : '当前任务还没有素材'}
             </span>
           ) : (
             items.map((it) => {
@@ -258,9 +267,13 @@ export function TaskChatPanel({ workspace }: TaskChatPanelProps) {
         <div ref={scrollRef} className="flex flex-col gap-3">
           {history.length === 0 && !streaming && (
             <p className="mt-12 text-center text-xs text-muted-foreground">
-              勾选上方素材，然后开始提问。
+              {autoSelectAll
+                ? '笔记已自动选为上下文，直接开始提问。'
+                : '勾选上方素材，然后开始提问。'}
               <br />
-              典型问题：「这几个素材色调有什么共同点？」「素材 1 第 0-10 秒的画面怎么优化提示词？」
+              {autoSelectAll
+                ? '试试：「这些笔记的共同主题是什么？」「帮我总结一下关键要点。」'
+                : '典型问题：「这几个素材色调有什么共同点？」「素材 1 第 0-10 秒的画面怎么优化提示词？」'}
             </p>
           )}
           {history.map((m) => (

@@ -9,6 +9,7 @@ import { isTaskTerminal } from '@/types/task'
 import type { WorkspaceRecord } from '@/types/workspace'
 
 import { ChatTab } from './ChatTab'
+import { KnowledgeQATab } from './KnowledgeQATab'
 import { CompareTab } from './CompareTab'
 import { ExportTab } from './ExportTab'
 import { FavoritesTab } from './FavoritesTab'
@@ -124,6 +125,7 @@ export default function TaskboardPage() {
           />
         )}
         {tab === 'chat' && <ChatTab workspace={workspace} />}
+        {tab === 'knowledgeQA' && <KnowledgeQATab workspace={workspace} />}
         {tab === 'export' && (
           <ExportTab items={workspace.items} workspaceId={workspace.workspace_id} />
         )}

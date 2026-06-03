@@ -8,6 +8,7 @@ import {
   ArrowLeftRight,
   Archive,
   MessageCircle,
+  BookOpen,
 } from 'lucide-react'
 import type { TabDef, TabId } from './types'
 
@@ -19,6 +20,7 @@ const TAB_DEFS: TabDef[] = [
   { id: 'history', label: '版本', en: 'Versions', icon: Clock, count: null },
   { id: 'tags', label: '标签库', en: 'Tag Library', icon: Tag, count: null },
   { id: 'chat', label: 'AI 对话', en: 'Task Chat', icon: MessageCircle, count: null },
+  { id: 'knowledgeQA', label: '知识库', en: 'KB QA', icon: BookOpen, count: null },
   { id: 'export', label: '导出', en: 'Export', icon: Archive, count: null },
   { id: 'style', label: '风格报告', en: 'Style Report', icon: Sparkles, count: null, disabled: true, disabledHint: 'Phase [C]' },
   { id: 'compare', label: '对比', en: 'Compare', icon: ArrowLeftRight, count: null },
