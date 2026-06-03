@@ -61,3 +61,4 @@ Last updated: 2026-05-29（**当前阶段 = R21.P3.S3 followup 待 merge → 音
 - `N8b` 音频 librosa 分析后端（UI 已就绪，6 维度切分）。
 - [backlog] 复刻页失败帧「重试」接后端 — 前置：需先建 frame status（成功/失败态）机制。来源：RP1-C C-5 scope exception。
 - [backlog] `dev.sh` frontend.pid 路径/cwd bug（约 53-54 行）— 启动时 cwd 错乱，影响 `./dev.sh` 体验。来源：Track K M1 验证（2026-06-03）发现，未阻塞 M1。
+- [backlog] 笔记 PDF/Word 导出 — `av_synthesis` 的 pdf/docx builder 绑死 `ParsedNotes`（关键帧画廊/章节）不能复用，需写轻量 `build_simple_pdf/docx(markdown, title)`（方案 A）。来源：Track K M5（2026-06-03）；md/Obsidian 已覆盖主需求故本期跳过。
