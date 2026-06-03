@@ -75,6 +75,11 @@ def _is_douyin_url(url: str) -> bool:
     return any(d in u for d in ("douyin.com", "iesdouyin.com", "v.douyin", "dy.com"))
 
 
+def _is_xiaohongshu_url(url: str) -> bool:
+    u = (url or "").lower()
+    return any(d in u for d in ("xiaohongshu.com", "xhslink.com", "xhslink.cn"))
+
+
 def is_platform_url(url: str) -> bool:
     """检测 URL 是否属于已知需要 yt-dlp 处理的视频平台。"""
     if not url:
@@ -387,6 +392,31 @@ def run_ytdlp_download(
         except Exception as e:
             if log:
                 log(f"⚠️ 抖音移动端路径异常: {e}，回落 yt-dlp…")
+
+    # ── 小红书 no-cookie 优先路径 ──
+    if _is_xiaohongshu_url(url):
+        if log:
+            log("📕 检测到小红书链接，尝试无 cookie 路径…")
+        try:
+            from shared.xiaohongshu_share import run_xiaohongshu_download
+
+            xhs_result = run_xiaohongshu_download(
+                url_or_text=url,
+                output_dir=output_dir,
+                log=log,
+                progress_callback=progress_callback,
+                speed_callback=speed_callback,
+            )
+            if xhs_result.get("ok"):
+                return xhs_result
+            if log:
+                log(f"⚠️ 小红书路径失败: {xhs_result.get('error', '未知')}，回落 yt-dlp…")
+        except ImportError as e:
+            if log:
+                log(f"⚠️ 无法导入 xiaohongshu_share 模块: {e}，回落 yt-dlp…")
+        except Exception as e:
+            if log:
+                log(f"⚠️ 小红书路径异常: {e}，回落 yt-dlp…")
 
     dirs = cookie_base_dirs_list if cookie_base_dirs_list is not None else cookie_base_dirs()
     task_state: dict[str, Any] = {

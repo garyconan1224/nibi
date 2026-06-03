@@ -29,6 +29,16 @@ try:
 except ImportError:
     _HAS_LOADER = False
 
+try:
+    from shared.xiaohongshu_share import (
+        is_xiaohongshu_url_or_text as _is_xhs_url,
+        resolve_xhs_share,
+        parse_xhs_page,
+    )
+    _HAS_XHS = True
+except ImportError:
+    _HAS_XHS = False
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/link-preview", tags=["link-preview"])
@@ -103,6 +113,31 @@ async def link_preview(
         except Exception as exc:
             logger.warning("B 站预览失败，降级到 og: %s", exc)
             # 降级到通用 og（B 站页面也有 og 标签）
+
+    # ── 小红书：__INITIAL_STATE__ 专用解析（如果可用）──
+    if _HAS_XHS and _is_xhs_url(url):
+        try:
+            _final_url, html = resolve_xhs_share(url)
+            note = parse_xhs_page(html)
+            image_list = note.get("imageList") or []
+            image_url = ""
+            if image_list:
+                image_url = image_list[0].get("urlDefault") or image_list[0].get("url") or ""
+                if image_url.startswith("//"):
+                    image_url = "https:" + image_url
+            result = {
+                "title": note.get("title") or None,
+                "description": note.get("desc") or None,
+                "image_url": image_url or None,
+                "source": "xhs",
+            }
+            if include_content:
+                result["content"] = note.get("desc") or ""
+                result["word_count"] = len(note.get("desc") or "")
+            return result
+        except Exception as exc:
+            logger.warning("小红书预览失败，降级到 og: %s", exc)
+            # 降级到通用 og
 
     # ── 通用网页：og 抓取 ──
     try:
