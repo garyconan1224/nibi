@@ -642,15 +642,16 @@ export default function VideoResultPage() {
           {/* 学习/复刻 toggle */}
           <div className="vd-mode-toggle">
             <button
-              className="vd-mode-btn"
+              className={`vd-mode-btn${isLearning ? ' active' : ''}`}
+              data-active={isLearning}
               onClick={() => navigate(`/workspaces/${workspaceId}/ln`)}
             >
               <BookOpen size={12} />
               <span>学习笔记</span>
             </button>
             <button
-              className="vd-mode-btn active"
-              data-active="true"
+              className={`vd-mode-btn${!isLearning ? ' active' : ''}`}
+              data-active={!isLearning}
             >
               <Film size={12} />
               <span>复刻</span>
@@ -845,15 +846,16 @@ export default function VideoResultPage() {
           {/* 学习/复刻 toggle */}
           <div className="vd-mode-toggle">
             <button
-              className="vd-mode-btn"
+              className={`vd-mode-btn${isLearning ? ' active' : ''}`}
+              data-active={isLearning}
               onClick={() => navigate(`/workspaces/${workspaceId}/ln`)}
             >
               <BookOpen size={12} />
               <span>学习笔记</span>
             </button>
             <button
-              className="vd-mode-btn active"
-              data-active="true"
+              className={`vd-mode-btn${!isLearning ? ' active' : ''}`}
+              data-active={!isLearning}
             >
               <Film size={12} />
               <span>复刻</span>
