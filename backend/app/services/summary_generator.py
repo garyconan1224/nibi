@@ -21,6 +21,13 @@ def build_prompt(
     """
     tpl = get_template(template_id)
     transcript = (item.results or {}).get("transcript", "")
+    # video/audio 的 transcript 是 list[{t_sec, t_str, text}]，拼成纯文本
+    if isinstance(transcript, list):
+        transcript = " ".join(
+            seg.get("text", "") for seg in transcript if isinstance(seg, dict)
+        )
+    if not transcript.strip():
+        transcript = (item.results or {}).get("content", "")
     if not transcript.strip():
         transcript = (item.results or {}).get("summary", "")
 
@@ -41,7 +48,7 @@ def _call_llm(system_prompt: str, user_prompt: str) -> Tuple[str, str]:
     profile = registry.resolve_default_profile(settings, "chat")
     provider = registry.build(profile)
     chat_model = str(
-        getattr(profile.default_models, "chat", None) or ""
+        profile.default_models.get("chat") or ""
     ).strip()
     if not chat_model:
         raise RuntimeError("未配置 chat model")

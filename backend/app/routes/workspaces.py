@@ -2705,6 +2705,19 @@ async def create_summary(
         raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
     item = _find_item(rec, item_id)
 
+    # item.results 缺少实质内容时，从 task store 回填（与 _sync_item_with_tasks 同逻辑）
+    has_content = item.results and (
+        "content" in item.results or "transcript" in item.results
+    )
+    if not has_content and item.related_task_ids:
+        for tid in reversed(item.related_task_ids):
+            task = _pipeline_runner.store.get(tid)
+            if task and task.result and (
+                "content" in task.result or "transcript" in task.result
+            ):
+                item.results = dict(task.result)
+                break
+
     next_ver = _store.next_version_for_template(workspace_id, item_id, req.template)
 
     def _do_generate() -> ItemSummary:
