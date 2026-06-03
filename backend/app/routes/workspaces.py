@@ -567,6 +567,11 @@ def _cover_thumbnail(rec: WorkspaceRecord) -> Optional[str]:
         r = item.results or {}
         if r.get("cover_thumbnail"):
             return str(r["cover_thumbnail"])
+        # item.results 未同步时，从 task store 回填 cover_thumbnail（与 create_summary 同思路）
+        for _tid in reversed(item.related_task_ids or []):
+            _t = _pipeline_runner.store.get(_tid)
+            if _t and _t.result and _t.result.get("cover_thumbnail"):
+                return str(_t.result["cover_thumbnail"])
         if item.type != "video":
             continue
         frames = r.get("frames") or []
