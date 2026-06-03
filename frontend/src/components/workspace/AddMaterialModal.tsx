@@ -251,7 +251,7 @@ export function AddMaterialModal({
   const [backgroundForRecognition, setBackgroundForRecognition] = useState('')
 
   // ── 视频用途模式 + 图片采集模式 ──
-  const [videoIntent, setVideoIntent] = useState<'learning' | 'replica'>('replica')
+  const [videoIntent, setVideoIntent] = useState<'learning' | 'replica'>('learning')
   const [imageMode, setImageMode] = useState<'replica_prompt' | 'ocr'>('replica_prompt')
 
   // ── 链接预填来源 hint ──
@@ -326,7 +326,7 @@ export function AddMaterialModal({
         ...(initialStaged.features ?? {}),
       })
       setAnalysisScope(scope ?? 'av_combined')
-      setVideoIntent(initialStaged.videoIntent ?? 'replica')
+      setVideoIntent(initialStaged.videoIntent ?? 'learning')
       setImageMode(initialStaged.imageMode ?? 'replica_prompt')
     } else {
       const scope = showScopeCards ? 'av_combined' : undefined
@@ -334,7 +334,7 @@ export function AddMaterialModal({
       setSelectedTypes(resetTypes)
       setFeatures(buildDefaults(resetTypes, scope))
       setAnalysisScope(scope ?? 'av_combined')
-      setVideoIntent('replica')
+      setVideoIntent('learning')
       setImageMode('replica_prompt')
     }
     setBackgroundForRecognition('')
