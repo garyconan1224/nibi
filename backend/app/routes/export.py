@@ -710,7 +710,7 @@ def get_ln_markdown(workspace_id: str):
     if video_item is not None:
         overlay = _sync_item_with_tasks(video_item)
         results = dict(overlay.get("results", {})) if overlay and overlay.get("results") else dict(video_item.results or {})
-        summary = results.get("summary")
+        summary = results.get("summary") or results.get("markdown")
         if summary and isinstance(summary, str) and summary.strip():
             return StreamingResponse(
                 io.BytesIO(summary.encode("utf-8")),
