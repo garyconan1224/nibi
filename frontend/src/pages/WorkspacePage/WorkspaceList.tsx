@@ -204,7 +204,7 @@ export default function WorkspaceList() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>新建工作空间</DialogTitle>
+            <DialogTitle>新建知识库</DialogTitle>
             <DialogDescription>
               先取个名字，例如「参考素材 - 某创作者风格」。后续可在详情页添加素材和配置。
             </DialogDescription>
@@ -248,7 +248,7 @@ export default function WorkspaceList() {
           <AlertDialogHeader>
             <AlertDialogTitle>确认删除？</AlertDialogTitle>
             <AlertDialogDescription>
-              将永久删除工作空间「{deleteTarget?.name}」及其内所有素材的引用。此操作不可撤销。
+              将永久删除知识库「{deleteTarget?.name}」及其内所有素材的引用。此操作不可撤销。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

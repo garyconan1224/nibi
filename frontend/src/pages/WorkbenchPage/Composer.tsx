@@ -148,7 +148,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
     setUploading(true)
     try {
       const ws = await autoCreateWorkspace({ hint_text: file.name })
-      toast.info(`已自动创建工作空间「${ws.name}」`)
+      toast.info(`已自动创建知识库「${ws.name}」`)
       const updated = await uploadWorkspaceItem(ws.workspace_id, file, {
         name: file.name,
       })
@@ -305,7 +305,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
                     fontFamily: 'var(--mono)',
                   }}
                 >
-                  无匹配工作空间
+                  无匹配知识库
                 </div>
               )}
               {filteredWs.map((ws) => {
@@ -345,7 +345,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
                 onClick={handleNewWorkspace}
               >
                 <Plus size={11} />
-                新建工作空间{wsQuery ? ` "${wsQuery}"` : ''}
+                新建知识库{wsQuery ? ` "${wsQuery}"` : ''}
               </button>
               <button className="pp-done" onClick={() => setWsOpen(false)}>
                 完成
