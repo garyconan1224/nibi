@@ -123,12 +123,8 @@ export function Composer({ onTaskCreated }: ComposerProps) {
 
   const handleAdd = () => {
     if (!url.trim()) return
-    // text 类型 URL → 先预览确认
-    if (sniffResult?.primary_type === 'text') {
-      setPreviewOpen(true)
-    } else {
-      setUploadOpen(true)
-    }
+    // text 类型直接进添加素材弹窗（跳过预览，减少步骤）
+    setUploadOpen(true)
   }
 
   const handlePreviewConfirm = () => {
