@@ -893,6 +893,132 @@ tags: [学习笔记, nibi]
     )
 
 
+# ── 文章笔记 md / Obsidian 导出 ────────────────────────────────
+
+
+def _assemble_text_note_md(data: Dict[str, Any]) -> str:
+    """从 text 结果组装笔记 markdown（标题 + 结构化摘要 + 正文）。"""
+    parts: list[str] = []
+    title = data.get("title", "文章笔记")
+    parts.append(f"# {title}\n")
+
+    source = data.get("source_url") or data.get("source") or ""
+    source_type = data.get("source_type", "")
+    char_count = data.get("char_count", 0)
+    meta_line = " ｜ ".join(filter(None, [
+        f"来源：{source}" if source else None,
+        f"类型：{source_type}" if source_type else None,
+        f"{char_count} 字符" if char_count else None,
+    ]))
+    if meta_line:
+        parts.append(f"> {meta_line}\n")
+
+    summary = data.get("summary")
+    if isinstance(summary, dict):
+        abstract = summary.get("abstract", "")
+        key_points = summary.get("key_points", [])
+        golden_quotes = summary.get("golden_quotes", [])
+        if abstract:
+            parts.append(f"## 摘要\n\n{abstract}\n")
+        if key_points:
+            parts.append("## 要点\n")
+            for i, kp in enumerate(key_points, 1):
+                text = kp.get("text", "") if isinstance(kp, dict) else str(kp)
+                parts.append(f"{i}. {text}")
+                excerpt = kp.get("source_excerpt", "") if isinstance(kp, dict) else ""
+                if excerpt:
+                    parts.append(f"   > 原文：{excerpt}")
+            parts.append("")
+        if golden_quotes:
+            parts.append("## 金句\n")
+            for q in golden_quotes:
+                qt = q.get("quote_text", "") if isinstance(q, dict) else str(q)
+                parts.append(f"> {qt}\n")
+    elif summary and isinstance(summary, str) and summary.strip():
+        parts.append(f"## 摘要\n\n{summary.strip()}\n")
+
+    associations = data.get("associations") or {}
+    if associations:
+        parts.append("## 联想归纳\n")
+        for direction, analysis in associations.items():
+            parts.append(f"### {direction}\n\n{analysis}\n")
+
+    rewrites = data.get("rewrites") or {}
+    if rewrites:
+        parts.append("## 改写/润色\n")
+        for style, text in rewrites.items():
+            body = text.get("full_text", text) if isinstance(text, dict) else str(text)
+            parts.append(f"### {style}\n\n{body}\n")
+
+    translations = data.get("translations") or {}
+    if translations:
+        parts.append("## 翻译\n")
+        for lang, text in translations.items():
+            body = text.get("full_text", text) if isinstance(text, dict) else str(text)
+            parts.append(f"### {lang}\n\n{body}\n")
+
+    content = data.get("content", "")
+    if content:
+        parts.append(f"## 正文\n\n{content}\n")
+
+    return "\n".join(parts)
+
+
+@router.get("/{workspace_id}/items/{item_id}/text/export")
+def export_text_note(workspace_id: str, item_id: str, format: str = "md"):
+    """导出文章笔记：md（纯 markdown）或 obsidian（zip 包）。"""
+    if format not in ("md", "obsidian"):
+        raise HTTPException(status_code=400, detail=f"不支持的格式: {format!r}，可选 md/obsidian")
+
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+
+    # 同步 task 产物
+    overlay = _sync_item_with_tasks(item)
+    if overlay and overlay.get("results") and not item.results:
+        item.results = overlay["results"]
+
+    data = _get_text_data(item)
+    if data.get("source") == "demo_hint":
+        raise HTTPException(status_code=404, detail="文章笔记尚未生成")
+
+    md_content = _assemble_text_note_md(data)
+    title = data.get("title", "文章笔记") or "文章笔记"
+    safe_title = _SAFE_NAME.sub("_", title).strip("_")[:80] or "文章笔记"
+
+    if format == "md":
+        return StreamingResponse(
+            io.BytesIO(md_content.encode("utf-8")),
+            media_type="text/markdown; charset=utf-8",
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(safe_title + '.md')}"},
+        )
+
+    # obsidian: frontmatter + zip
+    today = datetime.now().strftime("%Y-%m-%d")
+    source_url = data.get("source_url") or data.get("source") or ""
+    frontmatter = f"""---
+title: {title}
+source: {source_url}
+created: {today}
+tags: [文章笔记, nibi]
+---
+
+"""
+    full_md = frontmatter + md_content
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(f"{safe_title}.md", full_md)
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(safe_title + '-obsidian.zip')}"},
+    )
+
+
 # ── R20: 笔记多格式导出 ────────────────────────────────
 
 

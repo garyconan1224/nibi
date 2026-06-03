@@ -503,3 +503,40 @@
   color: var(--ink-2);
   white-space: pre-wrap;
 }
+
+/* ── M5: 导出菜单 ──────────────────────────── */
+.vm-text-scope .tx-export-menu-wrapper {
+  position: relative;
+}
+
+.vm-text-scope .tx-export-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  min-width: 160px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  padding: 4px;
+}
+
+.vm-text-scope .tx-export-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  font-size: 13px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s;
+}
+
+.vm-text-scope .tx-export-menu button:hover {
+  background: var(--bg-sunken);
+}

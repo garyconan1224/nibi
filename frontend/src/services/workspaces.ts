@@ -784,3 +784,24 @@ export async function exportLnObsidian(workspaceId: string): Promise<Blob> {
   })
   return res.data as Blob
 }
+
+/** GET /workspaces/{id}/items/{itemId}/text/export — 导出文章笔记 md 或 obsidian */
+export async function exportTextNote(
+  workspaceId: string,
+  itemId: string,
+  format: 'md' | 'obsidian',
+): Promise<void> {
+  const extMap = { md: 'md', obsidian: 'zip' }
+  const res = await http.get(
+    `${BASE}/${workspaceId}/items/${itemId}/text/export`,
+    { params: { format }, responseType: 'blob' },
+  )
+  const url = URL.createObjectURL(res.data as Blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `文章笔记.${extMap[format]}`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}

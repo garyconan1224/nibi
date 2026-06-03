@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Star, ChevronDown, ChevronRight, Layers, Copy, Check } from 'lucide-react'
+import { ArrowLeft, Star, ChevronDown, ChevronRight, Layers, Copy, Check, Download } from 'lucide-react'
 
 import {
   type TextResult,
@@ -12,6 +12,7 @@ import {
   addPromptVersion,
   getTextItemResult,
   getTextCompare,
+  exportTextNote,
 } from '@/services/workspaces'
 import { PromptVersionStack } from '@/components/result/PromptVersionStack'
 
@@ -211,6 +212,20 @@ export default function TextResultPage() {
     | { kind: 'error'; message: string }
   >({ kind: 'closed' })
 
+  // M5: 导出菜单
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!exportMenuOpen) return
+    const handleClick = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setExportMenuOpen(false)
+      }
+    }
+    document.addEventListener('click', handleClick)
+    return () => document.removeEventListener('click', handleClick)
+  }, [exportMenuOpen])
+
   useEffect(() => {
     let cancelled = false
     getTextItemResult(workspaceId, itemId)
@@ -280,6 +295,27 @@ export default function TextResultPage() {
     }
   }, [workspaceId, itemId])
 
+  // M5: 导出文章笔记
+  const handleExportMarkdown = useCallback(async () => {
+    try {
+      await exportTextNote(workspaceId, itemId, 'md')
+    } catch (err) {
+      console.error('Markdown 导出失败:', err)
+      toast.error('Markdown 导出失败，请重试')
+    }
+    setExportMenuOpen(false)
+  }, [workspaceId, itemId])
+
+  const handleExportObsidian = useCallback(async () => {
+    try {
+      await exportTextNote(workspaceId, itemId, 'obsidian')
+    } catch (err) {
+      console.error('Obsidian 导出失败:', err)
+      toast.error('Obsidian 包导出失败，请重试')
+    }
+    setExportMenuOpen(false)
+  }, [workspaceId, itemId])
+
   if (fetchState.kind === 'loading') {
     return (
       <div className="vm-text-scope" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
@@ -319,6 +355,24 @@ export default function TextResultPage() {
           <span className="vd-sep" />
           <span className="vd-title">{result.title}</span>
           <span className="kw mono" style={{ fontSize: 10, flexShrink: 0 }}>TEXT</span>
+          <div style={{ flex: 1 }} />
+          {/* M5: 导出菜单 */}
+          <div className="tx-export-menu-wrapper" ref={exportMenuRef}>
+            <button
+              className="btn-ghost"
+              style={{ height: 28, padding: '0 10px', fontSize: 12 }}
+              onClick={() => setExportMenuOpen(!exportMenuOpen)}
+              title="导出"
+            >
+              <Download size={13} /> 导出 <ChevronDown size={12} />
+            </button>
+            {exportMenuOpen && (
+              <div className="tx-export-menu">
+                <button onClick={handleExportMarkdown}>导出 Markdown</button>
+                <button onClick={handleExportObsidian}>Obsidian 包</button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* 标签展示 */}
