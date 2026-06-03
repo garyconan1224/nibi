@@ -41,6 +41,7 @@ from shared.video_analyzer import (
     run_batch_analysis,
 )
 from shared.video_download_ytdlp import fetch_ytdlp_metadata, is_platform_url, run_ytdlp_download
+from shared.xiaohongshu_share import is_xiaohongshu_url_or_text, run_xiaohongshu_download
 from src.vidmirror.core.providers import ChatRequest
 from src.vidmirror.core.providers.registry import create_default_registry
 
@@ -1899,10 +1900,39 @@ def handle_text_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     # ── 2. PARSE + EXTRACT（loader 内部一次完成；分两个进度点对外展示）─
     runner.store.update(task_id, status=TaskStatus.PARSE.value)
     runner.set_progress(task_id, 0.30, "解析文档...")
-    try:
-        doc: TextDocument = load_auto(source, source_type)
-    except TextLoaderError as err:
-        raise RuntimeError(str(err)) from err
+    if is_xiaohongshu_url_or_text(source):
+        # 小红书走免 cookie 适配器：分享链接自带 xsec_token → 取图集 + 正文 → text 笔记
+        runner.set_progress(task_id, 0.35, "小红书笔记解析中...")
+        _xhs_out = get_workspace_root(record.project_id) / "image"
+        _xhs_out.mkdir(parents=True, exist_ok=True)
+        _xhs = run_xiaohongshu_download(url_or_text=source, output_dir=str(_xhs_out), log=log)
+        if not _xhs.get("ok"):
+            raise RuntimeError(f"小红书解析失败: {_xhs.get('error') or '未知错误'}")
+        _nm = _xhs.get("note_meta") or {}
+        _note_dir = _xhs.get("save_path") or ""
+        _imgs = sorted(
+            str(_p) for _p in Path(_note_dir).glob("*")
+            if _p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")
+        ) if _note_dir and Path(_note_dir).is_dir() else []
+        _desc = str(_nm.get("desc") or "")
+        doc = TextDocument(
+            title=str(_nm.get("title") or "小红书笔记"),
+            content=_desc,
+            source_type="url",
+            source=source,
+            char_count=len(_desc),
+            meta={
+                "platform": "xiaohongshu",
+                "note_type": _nm.get("type", "normal"),
+                "images": _imgs,
+                "cover_thumbnail": _imgs[0] if _imgs else "",
+            },
+        )
+    else:
+        try:
+            doc = load_auto(source, source_type)
+        except TextLoaderError as err:
+            raise RuntimeError(str(err)) from err
 
     runner.store.update(task_id, status=TaskStatus.EXTRACT.value)
     runner.set_progress(task_id, 0.55, f"正文提取完成（{doc.char_count} 字符）")
@@ -2073,6 +2103,8 @@ def handle_text_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         "source_type": doc.source_type,
         "source": doc.source,
         "meta": doc.meta,
+        "cover_thumbnail": (doc.meta or {}).get("cover_thumbnail", ""),
+        "images": (doc.meta or {}).get("images", []),
         "markdown_path": str(md_path.resolve()),
         "json_path": str(json_path.resolve()),
     }

@@ -564,11 +564,11 @@ def _cover_thumbnail(rec: WorkspaceRecord) -> Optional[str]:
       item.results.frames[0].frame_image
     """
     for item in rec.items:
-        if item.type != "video":
-            continue
         r = item.results or {}
         if r.get("cover_thumbnail"):
             return str(r["cover_thumbnail"])
+        if item.type != "video":
+            continue
         frames = r.get("frames") or []
         if frames and isinstance(frames[0], dict):
             f0 = frames[0]

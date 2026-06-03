@@ -29,8 +29,8 @@ _PLATFORM_DOMAIN_MAP: dict[str, tuple[str, str, list[str]]] = {
     "youtu.be": ("youtube", "video", ["video"]),
     "douyin.com": ("douyin", "video", ["video"]),
     "kuaishou.com": ("kuaishou", "video", ["video"]),
-    "xiaohongshu.com": ("xiaohongshu", "image", ["image", "text", "video"]),
-    "xhslink.com": ("xiaohongshu", "image", ["image", "text", "video"]),
+    "xiaohongshu.com": ("xiaohongshu", "text", ["text"]),
+    "xhslink.com": ("xiaohongshu", "text", ["text"]),
     "weixin.qq.com": ("weixin", "text", ["text"]),
 }
 
@@ -48,11 +48,6 @@ _PLATFORM_PATH_RULES: dict[str, list[tuple[re.Pattern, str, list[str]]]] = {
         (re.compile(r"/watch", re.IGNORECASE), "video", ["video"]),
         (re.compile(r"/shorts/", re.IGNORECASE), "video", ["video"]),
         (re.compile(r"/playlist", re.IGNORECASE), "video", ["video"]),
-    ],
-    "xiaohongshu": [
-        (re.compile(r"/discovery/item/", re.IGNORECASE), "image", ["image", "text"]),
-        (re.compile(r"/explore/", re.IGNORECASE), "image", ["image", "text"]),
-        (re.compile(r"/user/profile/", re.IGNORECASE), "text", ["text"]),
     ],
     "weixin": [
         (re.compile(r"/s/", re.IGNORECASE), "text", ["text"]),
