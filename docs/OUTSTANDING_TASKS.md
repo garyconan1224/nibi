@@ -63,3 +63,4 @@ Last updated: 2026-05-29（**当前阶段 = R21.P3.S3 followup 待 merge → 音
 - [backlog] `dev.sh` frontend.pid 路径/cwd bug（约 53-54 行）— 启动时 cwd 错乱，影响 `./dev.sh` 体验。来源：Track K M1 验证（2026-06-03）发现，未阻塞 M1。
 - [backlog] 笔记 PDF/Word 导出 — `av_synthesis` 的 pdf/docx builder 绑死 `ParsedNotes`（关键帧画廊/章节）不能复用，需写轻量 `build_simple_pdf/docx(markdown, title)`（方案 A）。来源：Track K M5（2026-06-03）；md/Obsidian 已覆盖主需求故本期跳过。
 - [backlog] 快手视频下载 — yt-dlp 无快手提取器，需自写 `kuaishou_share` 模块（仿抖音 `douyin_mobile_share` 的分享页解析）。来源：Track K M6（2026-06-03）；YouTube/抖音/小红书已通，快手单列。
+- [backlog] item.name / project_id 与 task.result 同步债 — pipeline 完成后 `item.name` 仍为 URL 尾部（应取 `result.title`）；产物 `project_id` 仍硬编码 `default_project`（应为 `workspace_id`，N1b 归属债）。属 item↔task 同步问题；封面已用「绝对路径 + 从 task store 回填」绕过，不阻塞。来源：Track K M6 小红书重构（2026-06-04）。
