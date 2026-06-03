@@ -134,14 +134,14 @@ export default function WorkspaceList() {
       {/* 顶部：标题 + 新建 */}
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">工作空间</h1>
+          <h1 className="text-2xl font-semibold">知识库</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            每个工作空间可装多种素材（视频 / 音频 / 图片 / 文字），共享同一个 LLM 上下文。
+            每个知识库可装多种素材（笔记 / 视频 / 音频 / 图片），共享同一个 LLM 上下文。
           </p>
         </div>
         <Button onClick={() => setCreateOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          新建工作空间
+          新建知识库
         </Button>
       </header>
 
@@ -167,19 +167,19 @@ export default function WorkspaceList() {
       ) : items.length === 0 ? (
         <EmptyState
           illustration={<FolderOpen className="size-6" />}
-          title="还没有工作空间"
-          description="新建一个工作空间，开始添加视频/音频/图片/文字素材并分析。"
+          title="还没有知识库"
+          description="新建一个知识库，开始添加笔记/视频/音频/图片素材并分析。"
           action={
             <Button onClick={() => setCreateOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
-              新建工作空间
+              新建知识库
             </Button>
           }
         />
       ) : filteredItems.length === 0 ? (
         <EmptyState
           illustration={<FolderOpen className="size-6" />}
-          title="没有匹配的工作空间"
+          title="没有匹配的知识库"
           description="当前筛选条件下没有素材命中。试着清除一些维度或调整自定义关键词。"
           action={
             <Button variant="outline" onClick={() => setFilter({ dimensions: {}, customQuery: '' })}>
@@ -210,7 +210,7 @@ export default function WorkspaceList() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2">
-            <Label htmlFor="ws-name">工作空间名称</Label>
+            <Label htmlFor="ws-name">知识库名称</Label>
             <Input
               id="ws-name"
               autoFocus
@@ -286,7 +286,7 @@ function WorkspaceCard({ workspace, onOpen, onDelete }: WorkspaceCardProps) {
         <button
           type="button"
           className="ml-2 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-          aria-label="删除工作空间"
+          aria-label="删除知识库"
           onClick={(e) => {
             e.stopPropagation()
             onDelete()

@@ -219,7 +219,7 @@ export default function TextResultPage() {
       })
       .catch((err: unknown) => {
         if (cancelled) return
-        const message = err instanceof Error ? err.message : '加载文本结果失败'
+        const message = err instanceof Error ? err.message : '加载笔记失败'
         setFetchState({ kind: 'error', message })
       })
     return () => { cancelled = true }
@@ -283,7 +283,7 @@ export default function TextResultPage() {
   if (fetchState.kind === 'loading') {
     return (
       <div className="vm-text-scope" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
-        <span className="mono" style={{ color: 'var(--ink-3)' }}>加载文本结果…</span>
+        <span className="mono" style={{ color: 'var(--ink-3)' }}>加载笔记…</span>
       </div>
     )
   }
@@ -294,7 +294,7 @@ export default function TextResultPage() {
         style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}
       >
         <span style={{ color: 'var(--accent-pink)', fontWeight: 600 }}>
-          {fetchState.kind === 'error' ? fetchState.message : '没有可显示的文本结果'}
+          {fetchState.kind === 'error' ? fetchState.message : '没有可显示的笔记'}
         </span>
         <button className="btn-ghost" style={{ padding: '6px 12px' }} onClick={() => navigate(-1)}>
           <ArrowLeft size={14} /> 返回

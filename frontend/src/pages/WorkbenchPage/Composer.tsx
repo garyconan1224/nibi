@@ -52,7 +52,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
   // Fetch workspaces on mount
   useEffect(() => {
     listWorkspaces().then(setWorkspaces).catch(() => {
-      toast.error('加载工作空间列表失败，请检查后端是否已启动')
+      toast.error('加载知识库列表失败，请检查后端是否已启动')
     })
   }, [])
 
@@ -86,15 +86,15 @@ export function Composer({ onTaskCreated }: ComposerProps) {
     setWorkspaceSel((s) => s.filter((x) => x !== id)), [])
 
   const handleNewWorkspace = useCallback(async () => {
-    const name = wsQuery.trim() || '新工作空间'
+    const name = wsQuery.trim() || '新知识库'
     try {
       const created = await createWorkspace({ name })
       setWorkspaces((prev) => [...prev, created])
       setWorkspaceSel((s) => [...s, created.workspace_id])
       setWsQuery('')
-      toast.success(`工作空间「${name}」已创建`)
+      toast.success(`知识库「${name}」已创建`)
     } catch {
-      toast.error('创建工作空间失败')
+      toast.error('创建知识库失败')
     }
   }, [wsQuery])
 
@@ -179,7 +179,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
     setUploadOpen(false)
     setUrl('')
     listWorkspaces().then(setWorkspaces).catch(() => {
-      toast.error('刷新工作空间列表失败')
+      toast.error('刷新知识库列表失败')
     })
     onTaskCreated?.()
   }
@@ -237,9 +237,9 @@ export function Composer({ onTaskCreated }: ComposerProps) {
 
       {/* Workspace assignment row */}
       <div className="composer-projects">
-        <span className="pp-label">归入工作空间</span>
+        <span className="pp-label">归入知识库</span>
 
-        {workspaceSel.length === 0 && <span className="pp-none">未选空间 · 提交时自动创建</span>}
+        {workspaceSel.length === 0 && <span className="pp-none">未选知识库 · 提交时自动创建</span>}
 
         {workspaceSel.map((id) => {
           const ws = wsById[id]
@@ -258,7 +258,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
 
         <button className="pp-add" onClick={() => setWsOpen((o) => !o)}>
           <Layers size={11} />
-          {workspaceSel.length ? '继续添加' : '选择工作空间'}
+          {workspaceSel.length ? '继续添加' : '选择知识库'}
         </button>
 
         <span
@@ -268,9 +268,9 @@ export function Composer({ onTaskCreated }: ComposerProps) {
             color: 'var(--ink-4)',
             fontFamily: 'var(--mono)',
           }}
-          title="一个内容可同时归入多个工作空间"
+          title="一个内容可同时归入多个知识库"
         >
-          可多选 · 一个内容可归入多个空间
+          可多选 · 一个内容可归入多个知识库
         </span>
 
         {wsOpen && (
@@ -279,7 +279,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
               <Search size={14} />
               <input
                 autoFocus
-                placeholder="搜索工作空间..."
+                placeholder="搜索知识库..."
                 value={wsQuery}
                 onChange={(e) => setWsQuery(e.target.value)}
               />
