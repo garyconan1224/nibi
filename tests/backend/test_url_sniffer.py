@@ -53,7 +53,8 @@ class TestSniffUrlKnownPlatforms:
         resp = client.post(SNIFF_URL, json={"url": "https://www.xiaohongshu.com/discovery/item/abc"})
         assert resp.status_code == 200
         data = resp.json()
-        assert data["primary_type"] == "image"
+        # M6 起小红书收敛为 text（图文笔记），下载后 PROBE 阶段再细分 image_text
+        assert data["primary_type"] == "text"
         assert data["platform"] == "xiaohongshu"
 
     def test_douyin_url(self):

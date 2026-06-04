@@ -1300,18 +1300,14 @@ class TestM7ProbeDownload:
         mock_ytdlp.assert_not_called()
 
     def test_bilibili_opus_skips_video_ytdlp(self, tmp_path: Path) -> None:
-        """B站 /opus/ 图文动态不走视频 yt-dlp，走文本网页抽取。"""
+        """B站 /opus/ 图文动态不走视频 yt-dlp，走 opus 专用适配器。"""
         from backend.app.services.pipeline_tasks import _download_note_source
 
-        mock_doc = MagicMock()
-        mock_doc.content = "B站图文动态正文"
-        mock_doc.title = "我的动态"
-        mock_doc.source = "https://www.bilibili.com/opus/12345"
-        mock_doc.char_count = 80
-        mock_doc.meta = {}
-
         with (
-            patch("backend.app.services.pipeline_tasks.load_url", return_value=mock_doc),
+            patch("backend.app.downloaders.bilibili_opus.fetch_bilibili_opus", return_value={
+                "ok": True, "title": "我的动态", "content": "B站图文动态正文",
+                "images": [], "meta": {},
+            }),
             patch("backend.app.services.pipeline_tasks.is_platform_url", return_value=True),
             patch("backend.app.services.pipeline_tasks.is_xiaohongshu_url_or_text", return_value=False),
             patch("backend.app.services.pipeline_tasks.run_ytdlp_download") as mock_ytdlp,
@@ -1414,8 +1410,8 @@ class TestM7ProbeDownload:
         assert "analyze" not in probe["steps"]
         assert "note" in probe["steps"]
 
-    def test_probe_image_text_removes_transcribe(self) -> None:
-        """PROBE 识别为 image_text 时，移除 transcribe 但保留 analyze。"""
+    def test_probe_image_text_removes_transcribe_and_analyze(self) -> None:
+        """PROBE 识别为 image_text 时，移除 transcribe 和 analyze（图片走独立分析流程）。"""
         from backend.app.services.pipeline_tasks import _probe_note_source
 
         dl_result = {
@@ -1431,7 +1427,7 @@ class TestM7ProbeDownload:
 
         assert probe["note_kind"] == "image_text"
         assert "transcribe" not in probe["steps"]
-        assert "analyze" in probe["steps"]
+        assert "analyze" not in probe["steps"]
 
     def test_background_for_recognition_in_result(self, tmp_path: Path) -> None:
         """background_for_recognition 出现在 PROBE 结果中。"""
@@ -1493,3 +1489,105 @@ class TestM7ProbeDownload:
         assert result["ok"] is True
         assert result["kind_hint"] == "video"
         assert result["video_file"] == str(fake_video)
+
+    def test_extract_opus_id_from_url(self) -> None:
+        """_extract_opus_id 从 B站 opus URL 正确提取数字 ID。"""
+        from backend.app.downloaders.bilibili_opus import _extract_opus_id
+
+        assert _extract_opus_id("https://www.bilibili.com/opus/1203642237996498944") == "1203642237996498944"
+        assert _extract_opus_id("https://m.bilibili.com/opus/999") == "999"
+        assert _extract_opus_id("https://www.bilibili.com/video/BV1xx") is None
+
+
+class TestAnalyzeImageFile:
+    """analyze_image_file 的 mock 单测。"""
+
+    def test_ocr_and_vlm_both_succeed(self, tmp_path: Path) -> None:
+        from backend.app.services.pipeline_tasks import analyze_image_file
+
+        img = tmp_path / "photo.jpg"
+        img.write_bytes(b"\xff\xd8" + b"\x00" * 100)  # fake JPEG
+
+        with (
+            patch("shared.ocr_service.extract_text", return_value="图中文字"),
+            patch("backend.app.services.pipeline_tasks.create_default_registry") as mock_reg,
+        ):
+            mock_provider = MagicMock()
+            mock_provider.chat.return_value = "这是一张美丽的风景照片，蓝天白云下有一座小桥。"
+            mock_reg.return_value.resolve_default_profile.return_value = MagicMock()
+            mock_reg.return_value.build.return_value = mock_provider
+
+            result = analyze_image_file(str(img), "gpt-4o", "test-key")
+
+        assert "风景照片" in result["description"]
+        assert result["ocr_text"] == "图中文字"
+
+    def test_no_api_key_skips_vlm(self, tmp_path: Path) -> None:
+        from backend.app.services.pipeline_tasks import analyze_image_file
+
+        img = tmp_path / "photo.jpg"
+        img.write_bytes(b"\xff\xd8" + b"\x00" * 100)
+
+        with patch("shared.ocr_service.extract_text", return_value="OCR结果"):
+            result = analyze_image_file(str(img), "gpt-4o", "")
+
+        assert result["description"] == ""
+        assert result["ocr_text"] == "OCR结果"
+
+    def test_no_vision_model_skips_vlm(self, tmp_path: Path) -> None:
+        from backend.app.services.pipeline_tasks import analyze_image_file
+
+        img = tmp_path / "photo.jpg"
+        img.write_bytes(b"\xff\xd8" + b"\x00" * 100)
+
+        with patch("shared.ocr_service.extract_text", return_value="OCR结果"):
+            result = analyze_image_file(str(img), "", "test-key")
+
+        assert result["description"] == ""
+        assert result["ocr_text"] == "OCR结果"
+
+    def test_ocr_failure_still_runs_vlm(self, tmp_path: Path) -> None:
+        from backend.app.services.pipeline_tasks import analyze_image_file
+
+        img = tmp_path / "photo.png"
+        img.write_bytes(b"\x89PNG" + b"\x00" * 100)
+
+        with (
+            patch("shared.ocr_service.extract_text", side_effect=RuntimeError("OCR 崩了")),
+            patch("backend.app.services.pipeline_tasks.create_default_registry") as mock_reg,
+        ):
+            mock_provider = MagicMock()
+            mock_provider.chat.return_value = "一张产品图"
+            mock_reg.return_value.resolve_default_profile.return_value = MagicMock()
+            mock_reg.return_value.build.return_value = mock_provider
+
+            result = analyze_image_file(str(img), "gpt-4o", "test-key")
+
+        assert result["description"] == "一张产品图"
+        assert result["ocr_text"] == ""  # OCR 失败不影响
+
+    def test_vlm_failure_still_returns_ocr(self, tmp_path: Path) -> None:
+        from backend.app.services.pipeline_tasks import analyze_image_file
+
+        img = tmp_path / "photo.jpg"
+        img.write_bytes(b"\xff\xd8" + b"\x00" * 100)
+
+        with (
+            patch("shared.ocr_service.extract_text", return_value="文字内容"),
+            patch("backend.app.services.pipeline_tasks.create_default_registry") as mock_reg,
+        ):
+            mock_provider = MagicMock()
+            mock_provider.chat.side_effect = RuntimeError("API 超时")
+            mock_reg.return_value.resolve_default_profile.return_value = MagicMock()
+            mock_reg.return_value.build.return_value = mock_provider
+
+            result = analyze_image_file(str(img), "gpt-4o", "test-key")
+
+        assert result["description"] == ""
+        assert result["ocr_text"] == "文字内容"
+
+    def test_missing_file_returns_empty(self, tmp_path: Path) -> None:
+        from backend.app.services.pipeline_tasks import analyze_image_file
+
+        result = analyze_image_file(str(tmp_path / "不存在.jpg"), "gpt-4o", "test-key")
+        assert result == {"description": "", "ocr_text": ""}
