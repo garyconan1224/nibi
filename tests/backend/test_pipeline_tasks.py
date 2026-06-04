@@ -678,7 +678,7 @@ class TestPhase1FStageTransitions:
     def test_probe_and_store_phases_emit_log_messages(self, tmp_path: Path) -> None:
         """download-only 场景下，任务日志应包含 PROBE 与 STORE 阶段的进度消息。
 
-        PROBE 进度消息："探测媒体元数据..."
+        PROBE 进度消息："探测内容类型..."
         STORE 进度消息："归档任务结果..."
         """
         fake_video = tmp_path / "videos" / "test.mp4"
@@ -701,7 +701,7 @@ class TestPhase1FStageTransitions:
         assert done.status == TaskStatus.SUCCESS.value, done.error
         # TaskLogEntry 是 dataclass，含 ts/level/message 属性
         log_messages = " | ".join(entry.message for entry in (done.log or []))
-        assert "探测媒体元数据" in log_messages, (
+        assert "探测内容类型" in log_messages, (
             f"PROBE 阶段消息缺失，日志：{log_messages}"
         )
         assert "归档任务结果" in log_messages, (
@@ -1259,3 +1259,237 @@ class TestImageTask:
         assert result["dimensions"]["format"] == "PNG"
         # PNG 无 EXIF
         assert result.get("exif") in ({}, None)
+
+
+# ── M7: PROBE 内容识别 + download 调度 ────────────────────────────────────
+
+
+class TestM7ProbeDownload:
+    """M7-3: 测试 _download_note_source 调度和 _probe_note_source 识别。"""
+
+    def test_text_url_skips_ytdlp(self, tmp_path: Path) -> None:
+        """普通网页 URL 不调用 run_ytdlp_download，走 text/note 路径。"""
+        from backend.app.services.pipeline_tasks import _download_note_source
+
+        mock_doc = MagicMock()
+        mock_doc.content = "网页正文内容"
+        mock_doc.title = "测试文章"
+        mock_doc.source = "https://example.com/article"
+        mock_doc.char_count = 100
+        mock_doc.meta = {}
+
+        with (
+            patch("backend.app.services.pipeline_tasks.load_url", return_value=mock_doc),
+            patch("backend.app.services.pipeline_tasks.is_platform_url", return_value=False),
+            patch("backend.app.services.pipeline_tasks.is_xiaohongshu_url_or_text", return_value=False),
+            patch("backend.app.services.pipeline_tasks.run_ytdlp_download") as mock_ytdlp,
+        ):
+            result = _download_note_source(
+                url="https://sspai.com/post/12345",
+                payload={},
+                record=MagicMock(project_id="test"),
+                runner=MagicMock(),
+                task_id="t1",
+                project_video_dir=tmp_path,
+                dl_kwargs={},
+            )
+
+        assert result["ok"] is True
+        assert result["kind_hint"] == "text"
+        assert "网页正文内容" in result["content"]
+        mock_ytdlp.assert_not_called()
+
+    def test_bilibili_opus_skips_video_ytdlp(self, tmp_path: Path) -> None:
+        """B站 /opus/ 图文动态不走视频 yt-dlp，走文本网页抽取。"""
+        from backend.app.services.pipeline_tasks import _download_note_source
+
+        mock_doc = MagicMock()
+        mock_doc.content = "B站图文动态正文"
+        mock_doc.title = "我的动态"
+        mock_doc.source = "https://www.bilibili.com/opus/12345"
+        mock_doc.char_count = 80
+        mock_doc.meta = {}
+
+        with (
+            patch("backend.app.services.pipeline_tasks.load_url", return_value=mock_doc),
+            patch("backend.app.services.pipeline_tasks.is_platform_url", return_value=True),
+            patch("backend.app.services.pipeline_tasks.is_xiaohongshu_url_or_text", return_value=False),
+            patch("backend.app.services.pipeline_tasks.run_ytdlp_download") as mock_ytdlp,
+        ):
+            result = _download_note_source(
+                url="https://www.bilibili.com/opus/12345",
+                payload={},
+                record=MagicMock(project_id="test"),
+                runner=MagicMock(),
+                task_id="t1",
+                project_video_dir=tmp_path,
+                dl_kwargs={},
+            )
+
+        assert result["ok"] is True
+        assert result["kind_hint"] == "text"
+        mock_ytdlp.assert_not_called()
+
+    def test_xiaohongshu_uses_xhs_adapter(self, tmp_path: Path) -> None:
+        """小红书调用 run_xiaohongshu_download，保留 images 和正文。"""
+        from backend.app.services.pipeline_tasks import _download_note_source
+
+        img_dir = tmp_path / "xhs_images"
+        img_dir.mkdir()
+        (img_dir / "1.jpg").touch()
+        (img_dir / "2.jpg").touch()
+
+        with (
+            patch("backend.app.services.pipeline_tasks.is_xiaohongshu_url_or_text", return_value=True),
+            patch("backend.app.services.pipeline_tasks.run_xiaohongshu_download", return_value={
+                "ok": True,
+                "save_path": str(img_dir),
+                "note_meta": {"title": "小红书图文", "desc": "图文描述", "type": "normal"},
+            }),
+            patch("backend.app.services.pipeline_tasks.get_workspace_root", return_value=tmp_path),
+        ):
+            result = _download_note_source(
+                url="https://www.xiaohongshu.com/explore/abc123",
+                payload={},
+                record=MagicMock(project_id="test"),
+                runner=MagicMock(),
+                task_id="t1",
+                project_video_dir=tmp_path,
+                dl_kwargs={},
+            )
+
+        assert result["ok"] is True
+        assert result["kind_hint"] == "image_text"
+        assert "图文描述" in result["content"]
+        assert len(result["images"]) == 2
+
+    def test_video_url_uses_ytdlp(self, tmp_path: Path) -> None:
+        """明确视频平台 URL 仍调用 run_ytdlp_download。"""
+        from backend.app.services.pipeline_tasks import _download_note_source
+
+        fake_video = tmp_path / "test.mp4"
+        fake_video.touch()
+
+        with (
+            patch("backend.app.services.pipeline_tasks.is_xiaohongshu_url_or_text", return_value=False),
+            patch("backend.app.services.pipeline_tasks.is_platform_url", return_value=True),
+            patch("backend.app.services.pipeline_tasks.run_ytdlp_download", return_value={
+                "ok": True,
+                "save_path": str(fake_video),
+                "title": "测试视频",
+            }),
+            patch("backend.app.services.pipeline_tasks._apply_ytdlp_metadata_to_task"),
+        ):
+            result = _download_note_source(
+                url="https://www.youtube.com/watch?v=test",
+                payload={},
+                record=MagicMock(project_id="test"),
+                runner=MagicMock(),
+                task_id="t1",
+                project_video_dir=tmp_path,
+                dl_kwargs={},
+            )
+
+        assert result["ok"] is True
+        assert result["kind_hint"] == "video"
+        assert result["video_file"] == str(fake_video)
+
+    def test_probe_text_removes_transcribe_analyze(self) -> None:
+        """PROBE 识别为 text 时，移除 transcribe 和 analyze 步骤。"""
+        from backend.app.services.pipeline_tasks import _probe_note_source
+
+        dl_result = {
+            "ok": True,
+            "kind_hint": "text",
+            "content": "正文",
+            "title": "标题",
+            "images": [],
+            "video_file": "",
+            "metadata": {},
+        }
+        probe = _probe_note_source(dl_result, {"steps": ["download", "transcribe", "analyze", "note"]})
+
+        assert probe["note_kind"] == "text"
+        assert "transcribe" not in probe["steps"]
+        assert "analyze" not in probe["steps"]
+        assert "note" in probe["steps"]
+
+    def test_probe_image_text_removes_transcribe(self) -> None:
+        """PROBE 识别为 image_text 时，移除 transcribe 但保留 analyze。"""
+        from backend.app.services.pipeline_tasks import _probe_note_source
+
+        dl_result = {
+            "ok": True,
+            "kind_hint": "image_text",
+            "content": "图文描述",
+            "title": "小红书笔记",
+            "images": ["a.jpg"],
+            "video_file": "",
+            "metadata": {},
+        }
+        probe = _probe_note_source(dl_result, {"steps": ["download", "transcribe", "analyze", "note"]})
+
+        assert probe["note_kind"] == "image_text"
+        assert "transcribe" not in probe["steps"]
+        assert "analyze" in probe["steps"]
+
+    def test_background_for_recognition_in_result(self, tmp_path: Path) -> None:
+        """background_for_recognition 出现在 PROBE 结果中。"""
+        from backend.app.services.pipeline_tasks import _probe_note_source
+
+        dl_result = {
+            "ok": True,
+            "kind_hint": "text",
+            "content": "正文",
+            "title": "标题",
+            "images": [],
+            "video_file": "",
+            "metadata": {"description": "来自平台的描述"},
+        }
+        payload = {
+            "steps": ["download", "note"],
+            "background_for_recognition": "用户提供的背景信息",
+        }
+        probe = _probe_note_source(dl_result, payload)
+
+        assert "用户提供的背景信息" in probe["background_context"]
+        assert "来自平台的描述" in probe["background_context"]
+
+    def test_unknown_url_falls_back_to_text_then_ytdlp(self, tmp_path: Path) -> None:
+        """未知 URL 先尝试文本网页抽取，内容不足回落 yt-dlp。"""
+        from backend.app.services.pipeline_tasks import _download_note_source
+
+        mock_doc = MagicMock()
+        mock_doc.content = "短"  # 过短
+        mock_doc.title = "标题"
+        mock_doc.source = "https://unknown.com/page"
+        mock_doc.char_count = 5  # < 50
+        mock_doc.meta = {}
+
+        fake_video = tmp_path / "test.mp4"
+        fake_video.touch()
+
+        with (
+            patch("backend.app.services.pipeline_tasks.is_xiaohongshu_url_or_text", return_value=False),
+            patch("backend.app.services.pipeline_tasks.is_platform_url", return_value=False),
+            patch("backend.app.services.pipeline_tasks.load_url", return_value=mock_doc),
+            patch("backend.app.services.pipeline_tasks.run_ytdlp_download", return_value={
+                "ok": True,
+                "save_path": str(fake_video),
+                "title": "下载的视频",
+            }),
+            patch("backend.app.services.pipeline_tasks._apply_ytdlp_metadata_to_task"),
+        ):
+            result = _download_note_source(
+                url="https://unknown.com/page",
+                payload={},
+                record=MagicMock(project_id="test"),
+                runner=MagicMock(),
+                task_id="t1",
+                project_video_dir=tmp_path,
+                dl_kwargs={},
+            )
+
+        assert result["ok"] is True
+        assert result["kind_hint"] == "video"
+        assert result["video_file"] == str(fake_video)

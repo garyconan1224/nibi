@@ -23,7 +23,7 @@ from shared.config import (
 )
 from shared.settings_store import load_settings
 from shared.storyboard_generator import run_storyboard_generation
-from shared.text_loader import TextDocument, TextLoaderError, load_auto
+from shared.text_loader import TextDocument, TextLoaderError, load_auto, load_url
 from shared.audio_analyzer import (
     analyze_music,
     assign_speakers_to_segments,
@@ -1191,6 +1191,242 @@ def _persist_intermediate(runner: TaskRunner, task_id: str, result_patch: Dict[s
     runner.store.update(task_id, result=merged)
 
 
+# ── note task 下载/识别/步骤调度 helpers ────────────────────
+
+def _classify_note_url(url: str) -> str:
+    """根据 URL 形态给出下载器提示（非最终类型，仅用于选择下载器）。
+
+    返回: "xiaohongshu" | "text_page" | "video_audio" | "unknown"
+    """
+    lower = url.lower()
+    if is_xiaohongshu_url_or_text(url):
+        return "xiaohongshu"
+    # B站图文动态 /opus/ 路径
+    if "bilibili.com" in lower and "/opus/" in lower:
+        return "text_page"
+    # 常见文本网页平台（公众号、少数派、MBA智库等）——这些平台 yt-dlp 无法处理
+    if any(d in lower for d in ("mp.weixin.qq.com", "sspai.com", "mbalib.com", "zhihu.com", "juejin.cn")):
+        return "text_page"
+    # 明确的视频/音频平台
+    if is_platform_url(url):
+        return "video_audio"
+    return "unknown"
+
+
+def _download_note_source(
+    *,
+    url: str,
+    payload: dict,
+    record: TaskRecord,
+    runner: TaskRunner,
+    task_id: str,
+    project_video_dir: Path,
+    dl_kwargs: dict,
+) -> dict:
+    """根据 URL 类型选择下载器，返回统一结构。
+
+    返回:
+        {
+            "ok": bool,
+            "kind_hint": "text" | "image_text" | "video" | "audio",
+            "source_path": str,       # 本地文件/目录
+            "content": str,           # 文本内容（text 类型）
+            "title": str,
+            "images": list[str],      # 图片路径列表
+            "video_file": str,        # 视频文件路径
+            "metadata": dict,
+            "error": str,
+        }
+    """
+    log = lambda m: runner.append_log(task_id, m)
+    url_hint = _classify_note_url(url)
+
+    # ── 小红书 ──
+    if url_hint == "xiaohongshu":
+        log("📕 小红书笔记 → 走小红书适配器")
+        _xhs_out = get_workspace_root(record.project_id) / "image"
+        _xhs_out.mkdir(parents=True, exist_ok=True)
+        _xhs = run_xiaohongshu_download(
+            url_or_text=url, output_dir=str(_xhs_out), log=log,
+            progress_callback=lambda p, msg: runner.set_progress(task_id, 0.02 + p * 0.28, msg),
+        )
+        if not _xhs.get("ok"):
+            return {"ok": False, "kind_hint": "image_text", "error": _xhs.get("error") or "小红书解析失败"}
+        _nm = _xhs.get("note_meta") or {}
+        _note_dir = _xhs.get("save_path") or ""
+        _imgs = sorted(
+            str(_p) for _p in Path(_note_dir).glob("*")
+            if _p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")
+        ) if _note_dir and Path(_note_dir).is_dir() else []
+        _desc = str(_nm.get("desc") or "")
+        return {
+            "ok": True,
+            "kind_hint": "image_text",
+            "source_path": _note_dir,
+            "content": _desc,
+            "title": str(_nm.get("title") or "小红书笔记"),
+            "images": _imgs,
+            "video_file": "",
+            "metadata": _nm,
+        }
+
+    # ── 文本网页（B站 opus / 公众号 / 少数派 / MBA智库等）──
+    if url_hint == "text_page":
+        log(f"📄 文本网页 → load_url 抽取正文 ({url[:60]})")
+        try:
+            doc = load_url(url)
+        except TextLoaderError as err:
+            return {"ok": False, "kind_hint": "text", "error": str(err)}
+        return {
+            "ok": True,
+            "kind_hint": "text",
+            "source_path": doc.source,
+            "content": doc.content,
+            "title": doc.title,
+            "images": [],
+            "video_file": "",
+            "metadata": doc.meta,
+        }
+
+    # ── 明确视频/音频平台 ──
+    if url_hint == "video_audio":
+        log("🎬 视频/音频平台 → yt-dlp 下载")
+        out = run_ytdlp_download(
+            url=url,
+            output_dir=str(project_video_dir),
+            log=log,
+            progress_callback=lambda p, msg: runner.set_progress(task_id, 0.02 + p * 0.28, msg),
+            speed_callback=lambda s: runner.set_download_speed(task_id, s),
+            info_callback=lambda meta: _apply_ytdlp_metadata_to_task(record, runner, meta),
+            **dl_kwargs,
+        )
+        if not out.get("ok"):
+            return {"ok": False, "kind_hint": "video", "error": (out.get("error_full") or out.get("error") or "download failed")}
+        _apply_ytdlp_metadata_to_task(record, runner, out)
+        save_path = str(out.get("save_path") or "")
+        ext = Path(save_path).suffix.lower()
+        kind = "audio" if ext in {".mp3", ".wav", ".aac", ".flac", ".ogg", ".m4a", ".opus", ".wma"} else "video"
+        return {
+            "ok": True,
+            "kind_hint": kind,
+            "source_path": save_path,
+            "content": "",
+            "title": str(out.get("title") or ""),
+            "images": [],
+            "video_file": save_path,
+            "metadata": out,
+        }
+
+    # ── unknown: 先尝试文本网页抽取，失败回落 yt-dlp ──
+    log(f"❓ URL 类型不确定 → 先尝试文本网页抽取 ({url[:60]})")
+    try:
+        doc = load_url(url)
+        if doc.char_count > 50:  # 有实质内容
+            log(f"   ✓ 网页正文 {doc.char_count} 字符，走 text 路径")
+            return {
+                "ok": True,
+                "kind_hint": "text",
+                "source_path": doc.source,
+                "content": doc.content,
+                "title": doc.title,
+                "images": [],
+                "video_file": "",
+                "metadata": doc.meta,
+            }
+        log("   ⚠️ 网页正文过短，回落 yt-dlp")
+    except TextLoaderError as err:
+        log(f"   ⚠️ 网页抽取失败({err})，回落 yt-dlp")
+
+    # 回落 yt-dlp
+    out = run_ytdlp_download(
+        url=url,
+        output_dir=str(project_video_dir),
+        log=log,
+        progress_callback=lambda p, msg: runner.set_progress(task_id, 0.02 + p * 0.28, msg),
+        speed_callback=lambda s: runner.set_download_speed(task_id, s),
+        info_callback=lambda meta: _apply_ytdlp_metadata_to_task(record, runner, meta),
+        **dl_kwargs,
+    )
+    if not out.get("ok"):
+        return {"ok": False, "kind_hint": "video", "error": (out.get("error_full") or out.get("error") or "download failed")}
+    _apply_ytdlp_metadata_to_task(record, runner, out)
+    save_path = str(out.get("save_path") or "")
+    return {
+        "ok": True,
+        "kind_hint": "video",
+        "source_path": save_path,
+        "content": "",
+        "title": str(out.get("title") or ""),
+        "images": [],
+        "video_file": save_path,
+        "metadata": out,
+    }
+
+
+def _probe_note_source(download_result: dict, payload: dict) -> dict:
+    """PROBE 阶段：根据下载结果确定内容类型，重算后续步骤。
+
+    返回:
+        {
+            "note_kind": "text" | "image_text" | "video" | "audio",
+            "source_title": str,
+            "source_text": str,
+            "images": list[str],
+            "video_file": str,
+            "background_context": str,
+            "steps": list[str],
+        }
+    """
+    kind = download_result.get("kind_hint", "video")
+    title = download_result.get("title", "")
+    content = download_result.get("content", "")
+    images = download_result.get("images", [])
+    video_file = download_result.get("video_file", "")
+
+    # 合并 background_for_recognition
+    bg_parts = []
+    if payload.get("background_for_recognition"):
+        bg_parts.append(str(payload["background_for_recognition"]))
+    if download_result.get("metadata"):
+        meta = download_result["metadata"]
+        if isinstance(meta, dict):
+            for key in ("description", "desc", "summary"):
+                if meta.get(key):
+                    bg_parts.append(str(meta[key]))
+                    break
+    background_context = "\n".join(bg_parts)
+
+    # 根据内容类型裁剪步骤
+    requested = payload.get("steps") or ["download", "transcribe", "analyze", "note"]
+    steps = _steps_for_note_kind(kind, requested)
+
+    return {
+        "note_kind": kind,
+        "source_title": title,
+        "source_text": content,
+        "images": images,
+        "video_file": video_file,
+        "background_context": background_context,
+        "steps": steps,
+    }
+
+
+def _steps_for_note_kind(kind: str, requested_steps: list[str]) -> list[str]:
+    """根据内容类型裁剪后续步骤。"""
+    steps = list(requested_steps)
+    if kind == "text":
+        # 纯文本：不需要转写和截帧
+        steps = [s for s in steps if s not in ("transcribe", "analyze")]
+    elif kind == "image_text":
+        # 图文：不需要转写，保留图片信息（analyze 可选，但至少不能失败）
+        steps = [s for s in steps if s != "transcribe"]
+    elif kind == "audio":
+        # 音频：需要转写，不需要截帧分析
+        steps = [s for s in steps if s != "analyze"]
+    # video: 保留全部步骤
+    return steps
+
+
 def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     """复合笔记任务：按 payload.steps 动态编排执行步骤。
 
@@ -1242,44 +1478,66 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     analysis_text = ""
     markdown = ""
     download_save_path = ""
+    # PROBE 结果（download 后由内容识别填充）
+    note_kind = "video"  # 默认；PROBE 后可能变为 text / image_text / audio
+    source_text_from_download = ""
+    images_from_download: List[str] = []
+    background_context = ""
 
-    # ── 3. download 步骤 ───────────────────────────────────────
+    # ── 3. download 步骤（M7: 按 URL 类型选择下载器）──────────
     if "download" in steps:
         runner.store.update(task_id, status=TaskStatus.DOWNLOAD.value)
-        runner.set_progress(task_id, 0.02, "开始下载视频...")
+        runner.set_progress(task_id, 0.02, "开始下载...")
 
         dl_kwargs = _resolve_download_kwargs(payload)
-        out = run_ytdlp_download(
+        dl_result = _download_note_source(
             url=url,
-            output_dir=str(project_video_dir),
-            log=lambda m: runner.append_log(task_id, m),
-            progress_callback=lambda p, msg: runner.set_progress(task_id, 0.02 + p * 0.28, msg),
-            # note 流水线下载阶段同样上报实时速度
-            speed_callback=lambda s: runner.set_download_speed(task_id, s),
-            # R15 下载中就把视频标题/封面回写到 task.result，前端立即可见
-            info_callback=lambda meta: _apply_ytdlp_metadata_to_task(record, runner, meta),
-            **dl_kwargs,
+            payload=payload,
+            record=record,
+            runner=runner,
+            task_id=task_id,
+            project_video_dir=project_video_dir,
+            dl_kwargs=dl_kwargs,
         )
-        if not out.get("ok"):
-            err = (out.get("error_full") or out.get("error") or "download failed").strip()
+        if not dl_result.get("ok"):
+            err = (dl_result.get("error") or "download failed").strip()
             raise RuntimeError(f"下载失败: {err}")
 
-        # R13.6.3 把 yt-dlp 元数据回写到 task.result（note task 也走这条路径）
-        _apply_ytdlp_metadata_to_task(record, runner, out)
+        download_save_path = str(dl_result.get("video_file") or dl_result.get("source_path") or "")
+        source_text_from_download = str(dl_result.get("content") or "")
+        images_from_download = list(dl_result.get("images") or [])
 
-        download_save_path = str(out.get("save_path") or "")
         completed_steps.append("download")
         _persist_intermediate(runner, task_id, {
             "completed_steps": completed_steps[:],
             "video_file": download_save_path,
+            "source_path": str(dl_result.get("source_path") or ""),
         })
 
-    # ── 3.5. PROBE 阶段（pipeline 框架级，对齐 v1.1 §11）─────────
-    # 探测：标记任务进入探测期。位置：download 之后、各处理步骤之前。
-    # 当前仅做轻量级状态推进 + 进度条占位；未来可接入 ffprobe 媒体嗅探、
-    # 字幕轨检测、媒体合法性校验等。
+    # ── 3.5. PROBE 阶段（M7: 内容识别 + 步骤裁剪）─────────────
     runner.store.update(task_id, status=TaskStatus.PROBE.value)
-    runner.set_progress(task_id, 0.30, "探测媒体元数据...")
+    runner.set_progress(task_id, 0.30, "探测内容类型...")
+
+    if "download" in steps:
+        probe = _probe_note_source(dl_result, payload)
+        note_kind = probe["note_kind"]
+        source_text_from_download = probe["source_text"] or source_text_from_download
+        images_from_download = probe["images"] or images_from_download
+        background_context = probe["background_context"]
+        steps = probe["steps"]
+
+        runner.append_log(
+            task_id,
+            f"🔍 PROBE | note_kind={note_kind} | steps={steps} | "
+            f"text_len={len(source_text_from_download)} | images={len(images_from_download)}"
+        )
+        _persist_intermediate(runner, task_id, {
+            "note_kind": note_kind,
+            "source_title": probe["source_title"],
+            "background_for_recognition": background_context,
+            "source_description": source_text_from_download[:500] if source_text_from_download else "",
+            "background_context": background_context,
+        })
 
     # ── 4+5. transcribe + analyze 并行步骤 ──────────────────────
     # R22: 音频转录(ASR)与视频截帧(VLM)本质独立，可并行执行。
@@ -1517,8 +1775,8 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         runner.store.update(task_id, status=TaskStatus.SUM.value)
         runner.set_progress(task_id, 0.90, "整理笔记内容...")
 
-        # 数据源优先级：analyze 产出 > transcribe 文本 > 空字符串
-        source_text = analysis_text or transcript_text or ""
+        # 数据源优先级：analyze 产出 > transcribe 文本 > 下载阶段抽取的文本 > 空字符串
+        source_text = analysis_text or transcript_text or source_text_from_download or ""
         if source_text:
             markdown = source_text
         else:
@@ -1541,7 +1799,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
 
     json_paths = sorted(project_json_dir.glob("*_视觉数据.json"))
 
-    return {
+    result: Dict[str, Any] = {
         "transcript":            transcript_text,
         "analysis":              analysis_text,
         "markdown":              markdown,
@@ -1551,6 +1809,14 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         "json_output_basenames": [p.name for p in json_paths],
         "json_output_dir":       str(project_json_dir.resolve()),
     }
+    # M7: 附加 PROBE 识别结果
+    if note_kind != "video":
+        result["note_kind"] = note_kind
+    if images_from_download:
+        result["images"] = images_from_download
+    if background_context:
+        result["background_for_recognition"] = background_context
+    return result
 
 
 def _text_llm_call(
