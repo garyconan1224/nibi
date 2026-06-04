@@ -22,8 +22,10 @@ from backend.app.services.task_store import TaskStore
 from shared.text_loader import (
     TextDocument,
     TextLoaderError,
+    load_auto,
     load_docx,
     load_pdf,
+    load_plain_text,
     load_url,
 )
 
@@ -77,6 +79,45 @@ def test_load_docx_roundtrip(tmp_path: Path) -> None:
     assert out.source_type == "docx"
     assert out.title == "我的文档"
     assert "第一段" in out.content and "第二段" in out.content
+
+
+def test_load_plain_text_txt_roundtrip(tmp_path: Path) -> None:
+    src = tmp_path / "notes.txt"
+    src.write_text("Hello world\n\n第二段内容。", encoding="utf-8")
+    out = load_plain_text(src)
+    assert out.source_type == "text"
+    assert out.title == "notes"
+    assert "Hello world" in out.content
+    assert "第二段内容" in out.content
+    assert out.meta["parser"] == "plain_text"
+    assert out.meta["extension"] == ".txt"
+
+
+def test_load_plain_text_markdown_roundtrip(tmp_path: Path) -> None:
+    src = tmp_path / "readme.md"
+    src.write_text("# 标题\n\n正文内容。", encoding="utf-8")
+    out = load_plain_text(src)
+    assert out.source_type == "text"
+    assert out.title == "readme"
+    assert "# 标题" in out.content
+    assert out.meta["parser"] == "plain_text"
+    assert out.meta["extension"] == ".md"
+
+
+def test_load_auto_plain_text_by_extension(tmp_path: Path) -> None:
+    src = tmp_path / "doc.txt"
+    src.write_text("纯文本内容", encoding="utf-8")
+    out = load_auto(str(src))
+    assert out.source_type == "text"
+    assert "纯文本内容" in out.content
+
+
+def test_load_auto_plain_text_by_source_type(tmp_path: Path) -> None:
+    src = tmp_path / "data"
+    src.write_text("无扩展名文件", encoding="utf-8")
+    out = load_auto(str(src), source_type="text")
+    assert out.source_type == "text"
+    assert "无扩展名文件" in out.content
     assert out.char_count > 0
 
 

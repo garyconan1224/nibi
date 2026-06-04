@@ -19,7 +19,7 @@ from typing import Any, Dict, Literal, Union
 
 import httpx
 
-SourceType = Literal["pdf", "docx", "url"]
+SourceType = Literal["pdf", "docx", "url", "text"]
 
 # 默认 UA：用常见桌面浏览器，避免被站点直接 403；不绕过 robots / 不伪造来源
 _DEFAULT_UA = (
@@ -327,6 +327,30 @@ def load_url(url: str, *, timeout: float = _DEFAULT_TIMEOUT_S) -> TextDocument:
     )
 
 
+# ── 纯文本 ──────────────────────────────────────────────
+
+
+def load_plain_text(path: Union[str, Path]) -> TextDocument:
+    """加载 .txt / .md / .markdown 纯文本文件。"""
+    p = Path(path)
+    if not p.exists():
+        raise TextLoaderError(f"文本文件不存在: {p}")
+    try:
+        content = p.read_text(encoding="utf-8-sig")
+    except UnicodeDecodeError:
+        content = p.read_text(encoding="utf-8", errors="replace")
+    content = _normalize(content)
+    ext = p.suffix.lower()
+    return TextDocument(
+        title=p.stem,
+        content=content,
+        source_type="text",
+        source=str(p),
+        char_count=len(content),
+        meta={"parser": "plain_text", "extension": ext},
+    )
+
+
 # ── 自动分派 ──────────────────────────────────────────────
 
 
@@ -342,6 +366,8 @@ def load_auto(source: str, source_type: str | None = None) -> TextDocument:
         return load_pdf(source)
     if explicit == "docx":
         return load_docx(source)
+    if explicit in {"text", "txt", "md", "markdown"}:
+        return load_plain_text(source)
 
     s = (source or "").strip()
     if s.lower().startswith(("http://", "https://")):
@@ -352,6 +378,8 @@ def load_auto(source: str, source_type: str | None = None) -> TextDocument:
         return load_pdf(s)
     if ext == ".docx":
         return load_docx(s)
+    if ext in {".txt", ".md", ".markdown"}:
+        return load_plain_text(s)
     raise TextLoaderError(
-        f"无法判断文本来源类型，请显式提供 source_type=pdf|docx|url（source={s!r}）"
+        f"无法判断文本来源类型，请显式提供 source_type=pdf|docx|url|text（source={s!r}）"
     )
