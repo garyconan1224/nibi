@@ -11,7 +11,7 @@ import threading
 import time
 import urllib.request
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from backend.app.models.tasks import TaskRecord, TaskStatus
 from backend.app.services.task_runner import TaskRunner
@@ -1431,6 +1431,83 @@ def _probe_note_source(download_result: dict, payload: dict) -> dict:
     }
 
 
+def analyze_image_file(
+    image_path: str,
+    vision_model: str,
+    api_key: str,
+    *,
+    log: Callable[[str], None] = lambda _msg: None,
+) -> Dict[str, str]:
+    """对单张图片做 OCR + VLM 描述，返回 {"description", "ocr_text"}。
+
+    无 api_key/vision_model 时跳过 VLM，只做 OCR。
+    单张失败不抛异常，返回空字符串兜底。
+    """
+    result: Dict[str, str] = {"description": "", "ocr_text": ""}
+    path = Path(image_path)
+    if not path.is_file():
+        log(f"⚠️  图片文件不存在：{image_path}")
+        return result
+
+    image_bytes = path.read_bytes()
+
+    # ── OCR ──
+    try:
+        from shared.ocr_service import extract_text
+
+        ocr = extract_text(image_bytes)
+        if ocr:
+            result["ocr_text"] = ocr
+            log(f"🔤 OCR 提取 {len(ocr)} 字：{path.name}")
+    except Exception as err:
+        log(f"⚠️  OCR 失败（{path.name}）：{err}")
+
+    # ── VLM 描述 ──
+    if not api_key or not vision_model:
+        log("⚠️  未配置 api_key/vision_model，跳过 VLM 描述")
+        return result
+
+    try:
+        if image_bytes[:4] == b"\x89PNG":
+            mime = "image/png"
+        elif image_bytes[:2] == b"\xff\xd8":
+            mime = "image/jpeg"
+        elif image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP":
+            mime = "image/webp"
+        else:
+            mime = "image/jpeg"
+
+        img_b64 = base64.b64encode(image_bytes).decode()
+        registry = create_default_registry()
+        profile = registry.resolve_default_profile(load_settings(), "vision")
+        provider = registry.build(profile)
+
+        prompt = (
+            "你是一名专业的图像分析助手。请用中文详细描述这张图片的内容（100-200字）。"
+            "只输出描述文字，不要 JSON，不要 markdown。"
+        )
+        raw = provider.chat(
+            ChatRequest(
+                model=vision_model,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{img_b64}"}},
+                        {"type": "text", "text": prompt},
+                    ],
+                }],
+                temperature=0.3,
+                max_tokens=400,
+            )
+        )
+        result["description"] = raw.strip()
+        log(f"🔍 VLM 描述 {len(raw)} 字：{path.name}")
+    except Exception as err:
+        log(f"⚠️  VLM 描述失败（{path.name}）：{err}")
+
+    return result
+
+
 def _steps_for_note_kind(kind: str, requested_steps: list[str]) -> list[str]:
     """根据内容类型裁剪后续步骤。"""
     steps = list(requested_steps)
@@ -1438,8 +1515,8 @@ def _steps_for_note_kind(kind: str, requested_steps: list[str]) -> list[str]:
         # 纯文本：不需要转写和截帧
         steps = [s for s in steps if s not in ("transcribe", "analyze")]
     elif kind == "image_text":
-        # 图文：不需要转写，保留图片信息（analyze 可选，但至少不能失败）
-        steps = [s for s in steps if s != "transcribe"]
+        # 图文：不需要转写，也不走视频截帧 analyze（图片分析走独立流程）
+        steps = [s for s in steps if s not in ("transcribe", "analyze")]
     elif kind == "audio":
         # 音频：需要转写，不需要截帧分析
         steps = [s for s in steps if s != "analyze"]
@@ -1558,6 +1635,43 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             "source_description": source_text_from_download[:500] if source_text_from_download else "",
             "background_context": background_context,
         })
+
+    # ── 3.6. 图集分析（image_text: OCR + VLM 逐图描述）─────────
+    if note_kind == "image_text" and images_from_download:
+        runner.store.update(task_id, status=TaskStatus.VLM.value)
+        runner.set_progress(task_id, 0.35, "图集分析中...")
+
+        def _log_img(msg: str) -> None:
+            runner.append_log(task_id, f"[图集] {msg}")
+
+        image_descriptions: list[str] = []
+        for idx, img_path in enumerate(images_from_download):
+            runner.set_progress(
+                task_id,
+                0.35 + 0.20 * (idx / len(images_from_download)),
+                f"分析图片 {idx + 1}/{len(images_from_download)}...",
+            )
+            info = analyze_image_file(
+                img_path, vision_model, api_key, log=_log_img,
+            )
+            parts: list[str] = []
+            if info["description"]:
+                parts.append(info["description"])
+            if info["ocr_text"]:
+                parts.append(f"图中文字：{info['ocr_text']}")
+            if parts:
+                image_descriptions.append(
+                    f"【图片 {idx + 1}】" + "；".join(parts)
+                )
+
+        if image_descriptions:
+            images_text = "\n\n".join(image_descriptions)
+            source_text_from_download = (
+                source_text_from_download + "\n\n" + images_text
+                if source_text_from_download
+                else images_text
+            )
+            _log_img(f"图集分析完成，{len(image_descriptions)} 张有描述")
 
     # ── 4+5. transcribe + analyze 并行步骤 ──────────────────────
     # R22: 音频转录(ASR)与视频截帧(VLM)本质独立，可并行执行。
