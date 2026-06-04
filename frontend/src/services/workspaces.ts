@@ -740,6 +740,19 @@ export async function patchLnMarkdown(
   return res.data
 }
 
+/** PATCH /workspaces/{id}/items/{itemId}/text_content — T2 纯文在线编辑 */
+export async function updateTextContent(
+  workspaceId: string,
+  itemId: string,
+  content: string,
+): Promise<{ content: string; saved_at: string }> {
+  const res = await http.patch<{ content: string; saved_at: string }>(
+    `${BASE}/${workspaceId}/items/${itemId}/text_content`,
+    { content },
+  )
+  return res.data
+}
+
 /** GET /workspaces/{id}/export/av-synthesis.md — 下载综合笔记 .md 文件 */
 export async function downloadAVSynthesisMd(workspaceId: string): Promise<void> {
   const res = await http.get(`${BASE}/${workspaceId}/export/av-synthesis.md`, {

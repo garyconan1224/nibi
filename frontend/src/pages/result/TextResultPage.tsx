@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Star, ChevronDown, ChevronRight, Layers, Copy, Check, Download } from 'lucide-react'
+import { ArrowLeft, Star, ChevronDown, ChevronRight, Layers, Copy, Check, Download, Pencil } from 'lucide-react'
 
 import {
   type TextResult,
@@ -13,6 +13,7 @@ import {
   getTextItemResult,
   getTextCompare,
   exportTextNote,
+  updateTextContent,
 } from '@/services/workspaces'
 import { PromptVersionStack } from '@/components/result/PromptVersionStack'
 
@@ -205,6 +206,13 @@ export default function TextResultPage() {
   const [translateOpen, setTranslateOpen] = useState(true)
   const [contentTab, setContentTab] = useState<'content' | 'summary' | 'chat'>('content')
 
+  // T2: 在线编辑模式
+  const [isEditing, setIsEditing] = useState(false)
+  const [editContent, setEditContent] = useState('')
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const lastSavedRef = useRef<string | null>(null)
+  const debounceTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+
   // N10: 多文对比弹窗
   const [compareState, setCompareState] = useState<
     | { kind: 'closed' }
@@ -337,6 +345,47 @@ export default function TextResultPage() {
     setExportMenuOpen(false)
   }, [workspaceId, itemId])
 
+  // T2: 进入编辑模式
+  const handleStartEdit = useCallback(() => {
+    if (!result) return
+    setEditContent(result.content)
+    lastSavedRef.current = result.content
+    setIsEditing(true)
+    setSaveState('idle')
+  }, [result])
+
+  // T2: 退出编辑模式
+  const handleCancelEdit = useCallback(() => {
+    clearTimeout(debounceTimer.current)
+    setIsEditing(false)
+    setSaveState('idle')
+  }, [])
+
+  // T2: 自动保存（1500ms debounce，复用 ln 模式）
+  useEffect(() => {
+    if (!isEditing) return
+    if (editContent === lastSavedRef.current) return
+
+    clearTimeout(debounceTimer.current)
+    debounceTimer.current = setTimeout(async () => {
+      setSaveState('saving')
+      try {
+        const { saved_at } = await updateTextContent(workspaceId, itemId, editContent)
+        lastSavedRef.current = editContent
+        setSaveState('saved')
+        // 同步到 fetchState 以便退出编辑后显示最新内容
+        setFetchState((prev) => {
+          if (prev.kind !== 'ready') return prev
+          return { kind: 'ready', data: { ...prev.data, content: editContent } }
+        })
+      } catch {
+        setSaveState('error')
+      }
+    }, 1500)
+
+    return () => clearTimeout(debounceTimer.current)
+  }, [editContent, isEditing, workspaceId, itemId])
+
   if (fetchState.kind === 'loading') {
     return (
       <div className="vm-text-scope" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
@@ -394,6 +443,32 @@ export default function TextResultPage() {
               </div>
             )}
           </div>
+          {/* T2: 编辑按钮 + 保存状态 */}
+          {isEditing ? (
+            <>
+              <span className="tx-save-status" data-state={saveState}>
+                {saveState === 'saving' && '保存中…'}
+                {saveState === 'saved' && '已保存'}
+                {saveState === 'error' && '保存失败'}
+              </span>
+              <button
+                className="btn-ghost"
+                style={{ height: 28, padding: '0 10px', fontSize: 12 }}
+                onClick={handleCancelEdit}
+              >
+                完成
+              </button>
+            </>
+          ) : (
+            <button
+              className="btn-ghost"
+              style={{ height: 28, padding: '0 10px', fontSize: 12 }}
+              onClick={handleStartEdit}
+              title="编辑正文"
+            >
+              <Pencil size={13} /> 编辑
+            </button>
+          )}
         </div>
 
         {/* 标签展示 */}
@@ -403,6 +478,14 @@ export default function TextResultPage() {
 
         {/* 正文区域 */}
         <div className="tx-content-scroll">
+          {isEditing ? (
+            <textarea
+              className="tx-edit-textarea"
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              spellCheck={false}
+            />
+          ) : (
           <div className="tx-content-body">
             {(() => {
               const paras = result.content.split(/\n{2,}/)
@@ -433,6 +516,7 @@ export default function TextResultPage() {
               })
             })()}
           </div>
+          )}
         </div>
       </div>
 

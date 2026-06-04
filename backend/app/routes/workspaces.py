@@ -2374,6 +2374,32 @@ def get_text_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
     )
 
 
+# ── T2: 文本内容在线编辑 ─────────────────────────────────
+
+
+class TextContentUpdateRequest(BaseModel):
+    content: str = Field(min_length=0, description="编辑后的文本内容")
+
+
+@router.patch("/{workspace_id}/items/{item_id}/text_content")
+def update_text_content(
+    workspace_id: str, item_id: str, req: TextContentUpdateRequest
+) -> Dict[str, Any]:
+    """更新纯文素材的正文内容（T2 在线编辑）。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+    if item.type != ItemType.TEXT.value:
+        raise HTTPException(status_code=400, detail="only text items support content editing")
+
+    results = dict(item.results or {})
+    results["content"] = req.content
+    _store.update_item(workspace_id, item_id, results=results)
+    saved_at = datetime.now(timezone.utc).isoformat()
+    return {"content": req.content, "saved_at": saved_at}
+
+
 # ── 提示词版本栈（Phase 2C.2）────────────────────────────
 
 
