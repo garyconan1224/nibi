@@ -93,6 +93,11 @@
   overflow-y: auto;
   padding: 12px 14px;
 }
+/* 问答 tab：由 NoteChatDrawer 内部管理滚动，禁用外层滚动 */
+.vm-text-scope .tx-right-scroll[data-tab="chat"] {
+  overflow: hidden;
+  padding: 0;
+}
 
 /* ─── Summary ─── */
 .vm-text-scope .tx-summary-text {

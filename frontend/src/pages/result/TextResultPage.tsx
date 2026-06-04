@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { ArrowLeft, Star, ChevronDown, ChevronRight, Layers, Copy, Check, Download } from 'lucide-react'
@@ -20,6 +20,7 @@ import './tokens.css'
 import './text-result.css'
 import { ItemTagsPanel } from '@/components/workspace/ItemTagsPanel'
 import { SummariesTab } from '@/components/SummariesTab'
+import NoteChatDrawer from '@/components/NoteChatDrawer'
 
 function renderSummary(
   summary: string | StructuredSummary | null | undefined,
@@ -202,7 +203,7 @@ export default function TextResultPage() {
   const [assocOpen, setAssocOpen] = useState(true)
   const [rewriteOpen, setRewriteOpen] = useState(true)
   const [translateOpen, setTranslateOpen] = useState(true)
-  const [contentTab, setContentTab] = useState<'content' | 'summary'>('content')
+  const [contentTab, setContentTab] = useState<'content' | 'summary' | 'chat'>('content')
 
   // N10: 多文对比弹窗
   const [compareState, setCompareState] = useState<
@@ -242,6 +243,26 @@ export default function TextResultPage() {
 
   const result = fetchState.kind === 'ready' ? fetchState.data : null
   const promptVersions = result?.prompt_versions ?? []
+
+  const chatSystemPrompt = useMemo(() => {
+    if (!result) return ''
+    const parts: string[] = [
+      '你正在协助用户理解一篇文章。回答时基于下方提供的文章全文和摘要，不要编造文章里没有的信息。',
+      '',
+      '【文章全文】',
+      result.content || '（暂无内容）',
+    ]
+    if (result.summary) {
+      const summaryText = typeof result.summary === 'string'
+        ? result.summary
+        : [result.summary.abstract, ...(result.summary.key_points?.map(kp => kp.text) ?? [])].filter(Boolean).join('\n')
+      if (summaryText) {
+        parts.push('', '【摘要】', summaryText)
+      }
+    }
+    parts.push('', '回答指引：基于上述文章内容作答；回答使用中文。')
+    return parts.join('\n')
+  }, [result])
 
   const handleAddVersion = useCallback(async (content: string) => {
     const pv = await addPromptVersion(workspaceId, itemId, content)
@@ -425,16 +446,29 @@ export default function TextResultPage() {
             <button className="vd-tab-btn" data-active={contentTab === 'summary'} onClick={() => setContentTab('summary')}>
               总结
             </button>
+            <button className="vd-tab-btn" data-active={contentTab === 'chat'} onClick={() => setContentTab('chat')}>
+              问答
+            </button>
           </div>
           {contentTab === 'content' && (
             <button className="tx-compare-btn" onClick={handleCompare}>
               <Layers size={12} /> 多文对比
             </button>
           )}
+          {contentTab === 'chat' && <div style={{ flex: 1 }} />}
         </div>
 
-        <div className="tx-right-scroll">
-          {contentTab === 'summary' ? (
+        <div className="tx-right-scroll" data-tab={contentTab}>
+          {contentTab === 'chat' ? (
+            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <NoteChatDrawer
+                workspaceId={workspaceId}
+                systemPrompt={chatSystemPrompt}
+                scopeHint="仅基于本篇文章内容回答"
+                mode="inline"
+              />
+            </div>
+          ) : contentTab === 'summary' ? (
             <div style={{ flex: 1, overflow: 'hidden', height: '100%' }}>
               <SummariesTab workspaceId={workspaceId} itemId={itemId} />
             </div>
@@ -530,7 +564,8 @@ export default function TextResultPage() {
           )}
         </div>
 
-        {/* 底部操作 */}
+        {/* 底部操作（问答 tab 时隐藏，聊天输入区已占底部） */}
+        {contentTab !== 'chat' && (
         <div className="tx-actions">
           <button
             className="tx-btn-sub"
@@ -545,6 +580,7 @@ export default function TextResultPage() {
             {favored ? '已收藏' : '收藏'}
           </button>
         </div>
+        )}
       </div>
 
       {/* N10: 多文对比弹窗 */}
