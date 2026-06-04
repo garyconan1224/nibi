@@ -1196,14 +1196,14 @@ def _persist_intermediate(runner: TaskRunner, task_id: str, result_patch: Dict[s
 def _classify_note_url(url: str) -> str:
     """根据 URL 形态给出下载器提示（非最终类型，仅用于选择下载器）。
 
-    返回: "xiaohongshu" | "text_page" | "video_audio" | "unknown"
+    返回: "xiaohongshu" | "bili_opus" | "text_page" | "video_audio" | "unknown"
     """
     lower = url.lower()
     if is_xiaohongshu_url_or_text(url):
         return "xiaohongshu"
-    # B站图文动态 /opus/ 路径
-    if "bilibili.com" in lower and "/opus/" in lower:
-        return "text_page"
+    # B站图文动态 /opus/ 路径（移动端 __INITIAL_STATE__ 适配器，不能走 load_url）
+    if ("bilibili.com" in lower and "/opus/" in lower) or "b23.tv" in lower:
+        return "bili_opus"
     # 常见文本网页平台（公众号、少数派、MBA智库等）——这些平台 yt-dlp 无法处理
     if any(d in lower for d in ("mp.weixin.qq.com", "sspai.com", "mbalib.com", "zhihu.com", "juejin.cn")):
         return "text_page"
@@ -1270,7 +1270,27 @@ def _download_note_source(
             "metadata": _nm,
         }
 
-    # ── 文本网页（B站 opus / 公众号 / 少数派 / MBA智库等）──
+    # ── B站 opus 图文动态（移动端 HTML + __INITIAL_STATE__）──
+    if url_hint == "bili_opus":
+        from backend.app.downloaders.bilibili_opus import fetch_bilibili_opus
+        log(f"📄 B站 opus → 专用适配器 ({url[:60]})")
+        _op = fetch_bilibili_opus(url)
+        if not _op.get("ok"):
+            return {"ok": False, "kind_hint": "text", "error": _op.get("error") or "B站 opus 解析失败"}
+        _imgs = _op.get("images", [])
+        kind = "image_text" if _imgs else "text"
+        return {
+            "ok": True,
+            "kind_hint": kind,
+            "source_path": "",
+            "content": _op.get("content", ""),
+            "title": _op.get("title", ""),
+            "images": _imgs,
+            "video_file": "",
+            "metadata": _op.get("meta", {}),
+        }
+
+    # ── 文本网页（公众号 / 少数派 / MBA智库等）──
     if url_hint == "text_page":
         log(f"📄 文本网页 → load_url 抽取正文 ({url[:60]})")
         try:
@@ -1377,7 +1397,7 @@ def _probe_note_source(download_result: dict, payload: dict) -> dict:
             "steps": list[str],
         }
     """
-    kind = download_result.get("kind_hint", "video")
+    kind = download_result.get("kind_hint", "text")
     title = download_result.get("title", "")
     content = download_result.get("content", "")
     images = download_result.get("images", [])
@@ -1479,7 +1499,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     markdown = ""
     download_save_path = ""
     # PROBE 结果（download 后由内容识别填充）
-    note_kind = "video"  # 默认；PROBE 后可能变为 text / image_text / audio
+    note_kind = "text"  # 默认；PROBE 后可能变为 image_text / video / audio
     source_text_from_download = ""
     images_from_download: List[str] = []
     background_context = ""
