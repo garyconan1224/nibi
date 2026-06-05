@@ -1,8 +1,9 @@
 ---
 phase: RP1（结果页第一轮内容补齐 · Result Pages v1）
 title: 音频 / 视频复刻 / 音视频学习笔记三页内容补齐与重构
-status: ready
+status: historical（RP1 历史计划，勿作当前依据）
 owner: TBD
+note_20260605: 历史 RP1 计划；其中 AVSynthesisResultPage/ln 关系描述已旧，且复刻与笔记未分离。当前 M7 单素材笔记页(NoteShell)架构以 docs/plans/track-K-M7-result-pages-redesign.md 为唯一依据，本文不作架构依据。
 estimated_hours: 50-70（拆 3 个子 phase 单独跑）
 depends_on:
   - 现有 AudioResultPage / VideoResultPage / AVSynthesisResultPage(ln) 骨架已落地

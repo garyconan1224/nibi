@@ -30,6 +30,8 @@
 
 ## 2. 整体工作流（从现在到开源 / v1 发布）
 
+> ⚠️ **2026-06-05 注记**：当前实际入口/主线以 [`docs/PROJECT_STATUS.md`](PROJECT_STATUS.md) + Track K 笔记页报告 [`docs/plans/track-K-M7-result-pages-redesign.md`](plans/track-K-M7-result-pages-redesign.md) 为准；下方「N11 后决策点 / flows」是产品完整能力（含复刻/工具），**不等于当前在做的「单素材笔记页」边界**。
+
 合并 spec 已落地，现状同步与 N1~N11 差异补齐已完成。项目现在处于 **N11 后决策点**。产品完整流程图的文本镜像见 [`docs/flows/overview.md`](flows/overview.md)。工程阶段总图：
 
 ```

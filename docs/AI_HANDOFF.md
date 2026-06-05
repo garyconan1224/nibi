@@ -1,5 +1,7 @@
 # AI Handoff
 
+> ⚠️ **2026-06-05 覆盖（最新，先读这条）**：当前临时主线 = **Track K · 单素材统一笔记页（NoteShell）架构调研定稿中**，唯一依据 [`docs/plans/track-K-M7-result-pages-redesign.md`](plans/track-K-M7-result-pages-redesign.md)。**本轮只敲定设计、不动代码**；**勿**按旧 M7 kickoff（统一 note pipeline / M8·M9）或下方 2026-06-02 的 F3/C/D 方向开工。复刻 / AI 导演仍后置。
+
 Last updated: 2026-06-02（**主干基本完成；当前在 `main`，工作区干净。下一步看 ROADMAP §2+§11，不急**）
 
 ---

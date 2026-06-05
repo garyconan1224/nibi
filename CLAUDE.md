@@ -15,6 +15,8 @@
 **当前主线**：FastAPI 后端 + React/Vite 前端。Streamlit 旧入口已于 Phase 1J 移除，当前纯 FastAPI 后端 + React/Vite 前端。
 **当前阶段**：F1（IP.9 流程缺口补齐）。H1~H5 + IP.1~IP.8 已合 main。具体 track 看 `docs/ROADMAP.md`。
 
+> ⚠️ **2026-06-05 临时主线覆盖**：当前实际在做 **Track K · 单素材统一笔记页（NoteShell）架构收口**（调研定稿中，**只定设计、不动代码**），唯一依据 [`docs/plans/track-K-M7-result-pages-redesign.md`](docs/plans/track-K-M7-result-pages-redesign.md)。**勿**按旧 M7 kickoff（统一 note pipeline / M8·M9）或 F3/[C]/[D] 直接开工；复刻 / AI 导演仍后置。
+
 ---
 
 ## 2. 沟通规则（最重要）

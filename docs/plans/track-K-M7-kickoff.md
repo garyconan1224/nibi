@@ -1,6 +1,7 @@
 ---
 title: Track K · M7 统一「笔记」流程改造 — 选笔记即可，下载后内容驱动分析（不前期判类型）
-status: ready
+status: superseded
+superseded_by: docs/plans/track-K-M7-result-pages-redesign.md
 owner: xiaomi mimo v2.5-pro（终端执行）
 created: 2026-06-04
 updated: 2026-06-04（方向重定：原"纯文页打磨"升级为"统一笔记流程"）
@@ -10,6 +11,8 @@ branch: 每个子任务独立分支 feat/k-m7-<n>-xxx，完工各自 merge
 ui_source: docs/design/components/{text_detail,processing,preflight}.jsx + LearningNotesPage(ln) + docs/DESIGN_TOKENS.md
 prereq: M1–M6 已合 main；ln 页已有「在线编辑 / AI 问答抽屉 / 多格式导出 / MD-HTML 双向同步 / 截图插入」可复用
 ---
+
+> 🛑 **2026-06-05 SUPERSEDED — 勿按本卡开工**：本卡「统一 note pipeline / 下载后内容驱动分析 / md+html 详细稿 / M8 两两合并 / M9 全混合」方向**已废弃**。当前唯一依据 [`track-K-M7-result-pages-redesign.md`](track-K-M7-result-pages-redesign.md)（单素材 NoteShell：`source.md`+`summaries/*`+`note.md`，剥离复刻，多素材后置）。下方仅作历史参考。
 
 # 0. 方向与北极星（先读，建立心智）
 

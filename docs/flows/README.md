@@ -1,5 +1,7 @@
 # Flow Text Mirrors
 
+> ⚠️ **2026-06-05 边界注记**：本目录所有 flow（text/image/audio/video/overview 等）描述的是**产品完整能力**（含复刻、提示词、各类工具），**不能直接推导为「笔记结果页」的功能**。当前「单素材笔记页 NoteShell」边界（笔记≠复刻，只留笔记向）以 [`docs/plans/track-K-M7-result-pages-redesign.md`](../plans/track-K-M7-result-pages-redesign.md) 为准。
+
 本目录是 `docs/conversation-inputs/2026-05-18-spec-merge/*.png` 的 AI 可读文本镜像，用来减少 Claude Code 终端直接读取大图造成的 token 消耗。
 
 ## 读取策略

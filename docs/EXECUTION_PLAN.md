@@ -5,6 +5,8 @@
 > **维护规则见 CLAUDE.md「项目执行计划维护流程」一节**。
 >
 > Last updated: 2026-05-31（RP1-B 已完成，下一步 RP1-C）
+>
+> ⚠️ **2026-06-05 Track K 覆盖说明**：当前临时主线是 **单素材统一笔记页（NoteShell）架构收口**，依据 [`docs/plans/track-K-M7-result-pages-redesign.md`](plans/track-K-M7-result-pages-redesign.md)，本轮只定设计不动代码。下方历史长表不重写，仅作存档；勿按旧 RP1-C / M7 pipeline 直接开工。
 
 ---
 

@@ -2,6 +2,8 @@
 
 > 本文件是「下一步该做什么」的快照。写入前必须先 `git log --oneline -20` 对账，避免把已完成阶段当作待办。
 
+> ⚠️ **2026-06-05 当前有效待办（覆盖下方旧池）**：先**确认 M7 单素材笔记页（NoteShell）信息架构**，依据 [`docs/plans/track-K-M7-result-pages-redesign.md`](plans/track-K-M7-result-pages-redesign.md)；**本轮不开始搭建 / 不动代码**。下方 2026-05-29 任务池为历史快照，勿直接捡起执行。
+
 Last updated: 2026-05-29（**当前阶段 = R21.P3.S3 followup 待 merge → 音视频端到端打通**）
 
 ---

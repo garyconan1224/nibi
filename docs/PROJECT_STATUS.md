@@ -33,7 +33,7 @@
 | ② | 选择分析(Preflight) | ✅ 100% | 按类型勾分析任务 + 智能默认 + 级联锁定 |
 | ③ | 处理过程 | ✅ ~90% | 下载/转写/截帧/OCR 流水线 + ProcessingPage + 并行提速；本地 ASR ⬜ |
 | ④ | 四类内容分析 | ~80% | 视频(70,路径3待API)/音频(80)/图片(80,风格DNA⬜)/文字(90) |
-| ⑤ | **统一笔记流程** | 🔸**当前主线** | 选「笔记」即可→下载后内容驱动分析→md/html 详细稿→选总结→编辑/问答/导出（复用 ln + handle_note_task 的 PROBE 插入点）=M7；合并=M8；混合=M9 |
+| ⑤ | **统一笔记流程** | 🔸**当前主线** | **2026-06-05 重定**：单素材统一笔记页 **NoteShell**（`source.md`原始依据 + `summaries/*`风格总结 + `note.md`主笔记 + 富文本/MD/对照视图 + html 美观产物）；架构调研定稿中、只定设计不动代码；多素材后置。依据 [`plans/track-K-M7-result-pages-redesign.md`](plans/track-K-M7-result-pages-redesign.md)。~~旧：选笔记即下载后内容驱动分析=M7/M8/M9~~ |
 | ⑥ | 知识库(汇聚) | ✅ ~85% | 工作空间=知识库 + 14 风格总结 + 跨笔记 RAG 问答 + md/Obsidian 导出；联网增强⬜ |
 | ⑦ | 再创作/AI 导演 | ⬜ 10% | 仅 Storyboard 展示；改提示词生成新内容/接生成 API = [C] |
 | ＋ | 基础设施 | ✅ | 设置/模型/性能档位/资料库/标签/收藏；加密开源[D]⬜ |
@@ -41,6 +41,8 @@
 ---
 
 ## 3. 当前主线 + 短期计划
+
+> 🛑 **2026-06-05 重定（覆盖下方 M7/M8/M9 旧描述）**：当前主线改为 **Track K · 单素材统一笔记页 NoteShell 架构收口**（调研定稿中，**只定设计不动代码**），依据 [`plans/track-K-M7-result-pages-redesign.md`](plans/track-K-M7-result-pages-redesign.md)：`source.md`+`summaries/*`+`note.md` 三层 + 富文本/MD/对照视图 + html 美观产物；剥离复刻；多素材后置。下方「M7 下载后内容驱动分析 / M8 两两合并 / M9 全混合」与旧开工卡 `track-K-M7-kickoff.md` 已 **superseded**，勿直接执行。
 
 **当前主线：Track K M7 · 统一「笔记」流程改造**（开工卡 [`track-K-M7-kickoff.md`](plans/track-K-M7-kickoff.md)，给 mimo 执行；素材 [`m7-test-fixtures.md`](plans/m7-test-fixtures.md)）
 

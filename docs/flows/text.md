@@ -1,5 +1,7 @@
 # Text Flow Text Mirror
 
+> ⚠️ **2026-06-05**：本流程是**产品完整能力**镜像（含复刻/提示词/工具），**不等于「单素材笔记页 NoteShell」边界**（笔记≠复刻）。笔记页范围看 [`track-K-M7-result-pages-redesign.md`](../plans/track-K-M7-result-pages-redesign.md)。
+
 source_image: `docs/conversation-inputs/2026-05-18-spec-merge/文字.png`
 image_size: `1454x2826`
 source_sha256: `accb7e6ff48cc5498836d50e50d019e93d2217e51c4e392d779ceab97758dfb8`

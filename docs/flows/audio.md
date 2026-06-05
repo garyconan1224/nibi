@@ -1,5 +1,7 @@
 # Audio Flow Text Mirror
 
+> ⚠️ **2026-06-05**：本流程是**产品完整能力**镜像（含复刻/提示词/工具），**不等于「单素材笔记页 NoteShell」边界**（笔记≠复刻）。笔记页范围看 [`track-K-M7-result-pages-redesign.md`](../plans/track-K-M7-result-pages-redesign.md)。
+
 source_image: `docs/conversation-inputs/2026-05-18-spec-merge/音频.png`
 image_size: `1438x2308`
 source_sha256: `fa8051445ec0a27b714945a9380741c9a13a2b6ec81d746a67f765b9b2e741e2`
