@@ -2727,6 +2727,12 @@ class TranscriptSegmentEditRequest(BaseModel):
     edited_text: str = Field(..., description="编辑后的文本，空字符串表示恢复原文")
 
 
+class NoteUpdateRequest(BaseModel):
+    """R1.1: note.md 正文写入请求体。"""
+
+    body: str = Field(..., description="正文 markdown（不含 frontmatter）")
+
+
 @router.patch("/{workspace_id}/items/{item_id}/transcript/segments/{segment_idx}")
 def update_transcript_segment(
     workspace_id: str,
@@ -2924,6 +2930,103 @@ def get_item_note(workspace_id: str, item_id: str) -> Dict[str, Any]:
         "frontmatter": frontmatter,
         "source_md": source_md,
         "note_md": note_md,
+        "summaries": summaries,
+        "note_dir": str(nd),
+    }
+
+
+@router.put("/{workspace_id}/items/{item_id}/note")
+def update_item_note(workspace_id: str, item_id: str, req: NoteUpdateRequest) -> Dict[str, Any]:
+    """R1.1: 写入 note.md 正文（保留 frontmatter 机器字段）。
+
+    逻辑：读现有 note.md → 解析旧 frontmatter（tags/media/layers 全部保留）
+    → version+1、updated_at、user_edited=true → 正文换成新 body
+    → 拼回 ---\nyaml---\nbody 写盘 → 返回完整 note（同 GET 结构）。
+    note.md 不存在时先惰性组装拿 frontmatter 再写。
+    """
+    import yaml as _yaml  # noqa: PLC0415
+
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    _find_item(rec, item_id)  # 确认 item 存在
+
+    nd = note_dir(workspace_id, item_id)
+    note_path = nd / "note.md"
+
+    # 读取或惰性初始化 frontmatter
+    frontmatter: Dict[str, Any] = {}
+    if note_path.exists():
+        raw = note_path.read_text(encoding="utf-8")
+        if raw.startswith("---\n"):
+            parts = raw.split("---\n", 2)
+            if len(parts) >= 3:
+                try:
+                    frontmatter = _yaml.safe_load(parts[1]) or {}
+                except Exception:
+                    frontmatter = {}
+    else:
+        # note.md 不存在 → 先惰性组装拿 frontmatter
+        item = _find_item(rec, item_id)
+        if item.related_task_ids:
+            for tid in reversed(item.related_task_ids):
+                task = _pipeline_runner.store.get(tid)
+                if task and task.result:
+                    merged = dict(item.results or {})
+                    merged.update(task.result)
+                    item.results = merged
+                    break
+        assemble_item_note(workspace_id, item_id, _item=item)
+        # 重新读取刚刚写入的 frontmatter
+        if note_path.exists():
+            raw = note_path.read_text(encoding="utf-8")
+            if raw.startswith("---\n"):
+                parts = raw.split("---\n", 2)
+                if len(parts) >= 3:
+                    try:
+                        frontmatter = _yaml.safe_load(parts[1]) or {}
+                    except Exception:
+                        frontmatter = {}
+
+    # 更新 frontmatter 机器字段
+    frontmatter["version"] = int(frontmatter.get("version", 1)) + 1
+    frontmatter["updated_at"] = datetime.now(timezone.utc).isoformat()
+    frontmatter["user_edited"] = True
+
+    # 序列化 + 拼回 note.md
+    fm_yaml = _yaml.dump(frontmatter, allow_unicode=True, default_flow_style=False, sort_keys=False)
+    note_content = f"---\n{fm_yaml}---\n\n{req.body}"
+    nd.mkdir(parents=True, exist_ok=True)
+    note_path.write_text(note_content, encoding="utf-8")
+
+    # 读取 source.md
+    source_md = ""
+    source_path = nd / "source.md"
+    if source_path.exists():
+        source_md = source_path.read_text(encoding="utf-8")
+
+    # 收集 summaries（复用 GET 逻辑）
+    summaries: List[Dict[str, Any]] = []
+    for sm_path in sorted(nd.glob("summaries/**/*.md")):
+        rel = sm_path.relative_to(nd)
+        parts_rel = rel.parts
+        template = parts_rel[1] if len(parts_rel) >= 2 else "unknown"
+        version_str = parts_rel[2].replace("v", "").replace(".md", "") if len(parts_rel) >= 3 else "1"
+        try:
+            version = int(version_str)
+        except ValueError:
+            version = 1
+        summaries.append({
+            "template": template,
+            "version": version,
+            "path": str(rel),
+            "content": sm_path.read_text(encoding="utf-8"),
+        })
+
+    return {
+        "frontmatter": frontmatter,
+        "source_md": source_md,
+        "note_md": note_content,
         "summaries": summaries,
         "note_dir": str(nd),
     }

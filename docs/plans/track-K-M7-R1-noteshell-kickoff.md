@@ -1,6 +1,6 @@
 ---
 title: Track K · M7 · R1 详细执行卡 —— NoteShell 壳 + 总结风格面板（先接 text）
-status: ready
+status: done
 owner: 计划=Claude(CC) / 执行=xiaomi mimo v2.5-pro
 created: 2026-06-05
 parent: docs/plans/track-K-M7-noteshell-execution-plan.md

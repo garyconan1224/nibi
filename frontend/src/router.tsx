@@ -39,6 +39,7 @@ const StoryboardPage = lazy(() => import('@/pages/StoryboardPage/index'))
 const LibraryPage = lazy(() => import('@/pages/LibraryPage/index'))
 const AVSynthesisResultPage = lazy(() => import('@/pages/results/AVSynthesisResultPage'))
 const LearningNotesPage = lazy(() => import('@/pages/results/LearningNotesPage'))
+const NoteShell = lazy(() => import('@/pages/result/NoteShell/index'))
 
 // 懒加载 fallback：保持极简，避免把额外依赖拉进主 chunk
 const RouteFallback = () => (
@@ -82,6 +83,10 @@ export const router = createBrowserRouter([
       {
         path: 'workspaces/:workspaceId/items/:itemId/text_detail',
         element: withSuspense(<TextResultPage />),
+      },
+      {
+        path: 'workspaces/:workspaceId/items/:itemId/note',
+        element: withSuspense(<NoteShell />),
       },
       {
         path: 'workspaces/:workspaceId/av-synthesis',

@@ -97,6 +97,8 @@ function groupByTemplate(items: ItemSummary[]): TemplateGroup[] {
 interface SummariesTabProps {
   workspaceId: string
   itemId: string
+  /** R1.3：NoteShell 传入时显示「应用到主笔记」按钮；旧页不传则不显示（零回归）。 */
+  onApplyToNote?: (summary: ItemSummary) => void
 }
 
 /* ── localStorage 缓存 ────────────────────────────────────────── */
@@ -150,7 +152,7 @@ function setCachedSummary(workspaceId: string, itemId: string, summary: ItemSumm
 
 /* ── 主组件 ──────────────────────────────────────────────────── */
 
-export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
+export function SummariesTab({ workspaceId, itemId, onApplyToNote }: SummariesTabProps) {
   const navigate = useNavigate()
   const [summaries, setSummaries] = useState<ItemSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -533,6 +535,14 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
                   </ReactMarkdown>
                 </div>
                 <div className="sm-compare-col-actions">
+                  {onApplyToNote && (
+                    <button
+                      onClick={() => onApplyToNote(s)}
+                      style={{ fontWeight: 600, color: 'var(--accent-pink)' }}
+                    >
+                      应用到主笔记
+                    </button>
+                  )}
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(s.content_md)
@@ -562,6 +572,14 @@ export function SummariesTab({ workspaceId, itemId }: SummariesTabProps) {
               </ReactMarkdown>
             </div>
             <div className="sm-main-actions">
+              {onApplyToNote && (
+                <button
+                  onClick={() => onApplyToNote(selected)}
+                  style={{ fontWeight: 600, color: 'var(--accent-pink)' }}
+                >
+                  应用到主笔记
+                </button>
+              )}
               <button onClick={handleCopy}>复制</button>
               <button onClick={handleRegenerate}>重新生成</button>
               <button onClick={() => handleDelete(selected.summary_id)}>删除</button>

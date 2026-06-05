@@ -828,3 +828,13 @@ export async function getItemNote(
   const res = await http.get(`${BASE}/${workspaceId}/items/${itemId}/note`)
   return res.data as ItemNote
 }
+
+/** R1.1: PUT /workspaces/{id}/items/{itemId}/note — 写入 note 正文（保留 frontmatter） */
+export async function putItemNote(
+  workspaceId: string,
+  itemId: string,
+  body: string,
+): Promise<ItemNote> {
+  const res = await http.put(`${BASE}/${workspaceId}/items/${itemId}/note`, { body })
+  return res.data as ItemNote
+}

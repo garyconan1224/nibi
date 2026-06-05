@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Star, ChevronDown, ChevronRight, Layers, Copy, Check, Download, Pencil } from 'lucide-react'
+import { ArrowLeft, Star, ChevronDown, ChevronRight, Layers, Copy, Check, Download, Pencil, FileText } from 'lucide-react'
 
 import {
   type TextResult,
@@ -425,6 +425,14 @@ export default function TextResultPage() {
           <span className="vd-sep" />
           <span className="vd-title">{result.title}</span>
           <span className="kw mono" style={{ fontSize: 10, flexShrink: 0 }}>TEXT</span>
+          <button
+            className="btn-ghost"
+            style={{ height: 24, padding: '0 8px', fontSize: 11, gap: 4, marginLeft: 6, borderRadius: 4, border: '1px solid var(--border)' }}
+            onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/note`)}
+            title="打开统一笔记（NoteShell）"
+          >
+            <FileText size={12} /> 统一笔记 <span style={{ fontSize: 9, opacity: 0.6 }}>beta</span>
+          </button>
           <div style={{ flex: 1 }} />
           {/* M5: 导出菜单 */}
           <div className="tx-export-menu-wrapper" ref={exportMenuRef}>

@@ -291,6 +291,9 @@
 - [x] **K·R0.1** note_assembler 核心（纯函数 + 单测，不接现有流程）— `feat/k-r0-1-note-assembler`，`067e083`
 - [x] **K·R0.2** 只读 API `GET /…/note`（惰性组装）+ 前端 service `getItemNote`（仅 service，不接 UI）— `257dd68`
 - [x] **K·R0.3** 文档收口：frontmatter schema v1 定稿 + EXECUTION_PLAN / COMPLETED_WORK 同步
+- [x] **K·R1.1** 后端 `PUT /…/note` 写接口 + 前端 service `putItemNote` + 测试 — `feat/k-r1-1-note-write`
+- [x] **K·R1.2** NoteShell 壳骨架 + 路由 + 读渲染 + 概览条 + TextResultPage「统一笔记(beta)」入口
+- [x] **K·R1.3** Markdown 编辑保存（CodeMirror + 1.5s debounce）+ 总结风格面板（SummariesTab onApplyToNote）+ 应用到主笔记
 
 ---
 

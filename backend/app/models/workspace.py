@@ -199,7 +199,7 @@ class WorkspaceItem:
         # 运行时迁移：老数据没有 summaries 但 results["summary"] 有内容 → 构造 legacy v1
         if not summaries:
             legacy_content = (data.get("results") or {}).get("summary") or ""
-            if legacy_content.strip():
+            if isinstance(legacy_content, str) and legacy_content.strip():
                 summaries = [ItemSummary(
                     summary_id="legacy",
                     template="legacy",
