@@ -290,6 +290,13 @@ export default function NoteShell() {
     if (saved === 'compare' && !window.matchMedia('(min-width: 1024px)').matches) return 'read'
     return valid ? (saved as ViewMode) : 'read'
   })
+  // R2.1 窄屏运行时降级：已在对照态时缩窗到 <1024px → 自动切回阅读态
+  useEffect(() => {
+    if (!isWide && viewMode === 'compare') {
+      setViewMode('read')
+      localStorage.setItem(VIEW_MODE_KEY, 'read')
+    }
+  }, [isWide, viewMode])
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [savedAt, setSavedAt] = useState<string>('')
 
