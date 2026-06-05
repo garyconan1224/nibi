@@ -2087,3 +2087,9 @@ R0 提供了只读 `GET /…/note` API 和 md 落盘，但没有编辑能力和 
 - `pnpm tsc --noEmit`：0 error
 - `pnpm build`：成功
 - `KMP_DUPLICATE_LIB_OK=TRUE .venv/bin/python -m pytest tests/backend/`：457 passed, 0 failed
+- API 烟测：创建 text item → PUT /note → GET /note，frontmatter.version 递增到 2，user_edited: true，正文读回一致
+- 前端 NoteShell 路由 HTTP 200，Vite 返回入口页
+
+### 已知基线风险（R1 非直接来源，记录备查）
+1. **`./dev.sh` 本轮运行失败**：前端 pid 写入时报 `../.local/frontend.pid: No such file or directory`。本轮手动启动前后端完成 API/路由烟测，不能写"dev.sh 验收通过"。
+2. **`pnpm test`（vitest）14 失败**：125 个测试里 111 通过、14 失败。失败集中在既有基线：SummariesTab 测试缺 Router 包裹、AddMaterialModal 旧断言、AVSynthesis 导出按钮断言。R1 对 SummariesTab 只新增可选 `onApplyToNote` 按钮，不是这些失败的直接来源。
