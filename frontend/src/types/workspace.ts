@@ -116,6 +116,23 @@ export interface StartItemResponse {
   task_type: 'download' | 'analyze' | 'create' | 'storyboard' | 'note'
 }
 
+/** R0.2: GET /…/note 返回的单条 summary 结构 */
+export interface ItemNoteSummary {
+  template: string
+  version: number
+  path: string
+  content: string
+}
+
+/** R0.2: GET /…/note 返回的完整 note 数据 */
+export interface ItemNote {
+  frontmatter: Record<string, unknown>
+  source_md: string
+  note_md: string
+  summaries: ItemNoteSummary[]
+  note_dir: string
+}
+
 /** 中文展示文案——状态 */
 export const WORKSPACE_STATUS_TEXT: Record<WorkspaceStatus, string> = {
   active: '进行中',

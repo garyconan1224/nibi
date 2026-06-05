@@ -55,6 +55,7 @@ from backend.app.models.workspace import (
     WorkspaceStatus,
 )
 from backend.app.services.audio_result_demo import build_demo_audio_result
+from backend.app.services.note_assembler import assemble_item_note, note_dir
 from backend.app.services.summary_generator import generate_summary
 from backend.app.services.summary_templates import list_template_ids
 from backend.app.services.video_result_demo import build_demo_video_result
@@ -2810,6 +2811,84 @@ def delete_summary(workspace_id: str, item_id: str, summary_id: str) -> Dict[str
     if not deleted:
         raise HTTPException(status_code=404, detail=f"summary not found: {summary_id}")
     return {"status": "deleted", "summary_id": summary_id}
+
+
+# ── Note（R0.2: 只读 note 文件 + 惰性组装）───────────────────────
+
+
+@router.get("/{workspace_id}/items/{item_id}/note")
+def get_item_note(workspace_id: str, item_id: str) -> Dict[str, Any]:
+    """读取 item 的 note 目录（source.md + note.md + summaries/*）。
+
+    惰性组装：若 notes/<item_id>/ 不存在，先从 task store 回填 results，
+    再 assemble_item_note 一次（覆盖历史 item）。
+    """
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+
+    nd = note_dir(workspace_id, item_id)
+    note_path = nd / "note.md"
+
+    # 惰性组装：目录不存在或 note.md 缺失时触发
+    if not note_path.exists():
+        # 从 task store 回填 results（与 create_summary 同逻辑）
+        if item.related_task_ids:
+            for tid in reversed(item.related_task_ids):
+                task = _pipeline_runner.store.get(tid)
+                if task and task.result:
+                    merged = dict(item.results or {})
+                    merged.update(task.result)
+                    item.results = merged
+                    break
+        assemble_item_note(workspace_id, item_id, _item=item)
+
+    # 读取文件（assemble 失败时文件可能不存在，返回空字符串）
+    source_md = ""
+    note_md = ""
+    if (nd / "source.md").exists():
+        source_md = (nd / "source.md").read_text(encoding="utf-8")
+    if note_path.exists():
+        note_md = note_path.read_text(encoding="utf-8")
+
+    # 解析 frontmatter（从 note_md 提取 YAML）
+    frontmatter: Dict[str, Any] = {}
+    if note_md.startswith("---\n"):
+        parts = note_md.split("---\n", 2)
+        if len(parts) >= 3:
+            import yaml  # noqa: PLC0415
+            try:
+                frontmatter = yaml.safe_load(parts[1]) or {}
+            except Exception:
+                pass
+
+    # 收集 summaries 文件
+    summaries: List[Dict[str, Any]] = []
+    for sm_path in sorted(nd.glob("summaries/**/*.md")):
+        rel = sm_path.relative_to(nd)
+        # summaries/<template>/v<n>.md → 提取 template 和 version
+        parts_rel = rel.parts  # ('summaries', '<template>', 'v<n>.md')
+        template = parts_rel[1] if len(parts_rel) >= 2 else "unknown"
+        version_str = parts_rel[2].replace("v", "").replace(".md", "") if len(parts_rel) >= 3 else "1"
+        try:
+            version = int(version_str)
+        except ValueError:
+            version = 1
+        summaries.append({
+            "template": template,
+            "version": version,
+            "path": str(rel),
+            "content": sm_path.read_text(encoding="utf-8"),
+        })
+
+    return {
+        "frontmatter": frontmatter,
+        "source_md": source_md,
+        "note_md": note_md,
+        "summaries": summaries,
+        "note_dir": str(nd),
+    }
 
 
 # ── InlineFrames（学习模式视频按需补图）───────────────────────────

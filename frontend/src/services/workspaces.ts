@@ -8,6 +8,7 @@
 import { http } from './client'
 import type {
   ItemAddRequest,
+  ItemNote,
   ItemType,
   PreflightSaveRequest,
   StartItemResponse,
@@ -817,4 +818,13 @@ export async function exportTextNote(
   a.click()
   a.remove()
   URL.revokeObjectURL(url)
+}
+
+/** R0.2: GET /workspaces/{id}/items/{itemId}/note — 读取 note 文件（惰性组装） */
+export async function getItemNote(
+  workspaceId: string,
+  itemId: string,
+): Promise<ItemNote> {
+  const res = await http.get(`${BASE}/${workspaceId}/items/${itemId}/note`)
+  return res.data as ItemNote
 }
