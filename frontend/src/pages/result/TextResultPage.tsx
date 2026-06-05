@@ -370,7 +370,7 @@ export default function TextResultPage() {
     debounceTimer.current = setTimeout(async () => {
       setSaveState('saving')
       try {
-        const { saved_at } = await updateTextContent(workspaceId, itemId, editContent)
+        await updateTextContent(workspaceId, itemId, editContent)
         lastSavedRef.current = editContent
         setSaveState('saved')
         // 同步到 fetchState 以便退出编辑后显示最新内容
