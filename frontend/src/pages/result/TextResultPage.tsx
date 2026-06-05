@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Star, ChevronDown, ChevronRight, Layers, Copy, Check, Download } from 'lucide-react'
+import { ArrowLeft, Star, ChevronDown, ChevronRight, Layers, Copy, Check, Download, Pencil } from 'lucide-react'
 
 import {
   type TextResult,
@@ -13,6 +13,7 @@ import {
   getTextItemResult,
   getTextCompare,
   exportTextNote,
+  updateTextContent,
 } from '@/services/workspaces'
 import { PromptVersionStack } from '@/components/result/PromptVersionStack'
 
@@ -20,6 +21,7 @@ import './tokens.css'
 import './text-result.css'
 import { ItemTagsPanel } from '@/components/workspace/ItemTagsPanel'
 import { SummariesTab } from '@/components/SummariesTab'
+import NoteChatDrawer from '@/components/NoteChatDrawer'
 
 function renderSummary(
   summary: string | StructuredSummary | null | undefined,
@@ -202,7 +204,14 @@ export default function TextResultPage() {
   const [assocOpen, setAssocOpen] = useState(true)
   const [rewriteOpen, setRewriteOpen] = useState(true)
   const [translateOpen, setTranslateOpen] = useState(true)
-  const [contentTab, setContentTab] = useState<'content' | 'summary'>('content')
+  const [contentTab, setContentTab] = useState<'content' | 'summary' | 'chat'>('content')
+
+  // T2: 在线编辑模式
+  const [isEditing, setIsEditing] = useState(false)
+  const [editContent, setEditContent] = useState('')
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const lastSavedRef = useRef<string | null>(null)
+  const debounceTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   // N10: 多文对比弹窗
   const [compareState, setCompareState] = useState<
@@ -242,6 +251,26 @@ export default function TextResultPage() {
 
   const result = fetchState.kind === 'ready' ? fetchState.data : null
   const promptVersions = result?.prompt_versions ?? []
+
+  const chatSystemPrompt = useMemo(() => {
+    if (!result) return ''
+    const parts: string[] = [
+      '你正在协助用户理解一篇文章。回答时基于下方提供的文章全文和摘要，不要编造文章里没有的信息。',
+      '',
+      '【文章全文】',
+      result.content || '（暂无内容）',
+    ]
+    if (result.summary) {
+      const summaryText = typeof result.summary === 'string'
+        ? result.summary
+        : [result.summary.abstract, ...(result.summary.key_points?.map(kp => kp.text) ?? [])].filter(Boolean).join('\n')
+      if (summaryText) {
+        parts.push('', '【摘要】', summaryText)
+      }
+    }
+    parts.push('', '回答指引：基于上述文章内容作答；回答使用中文。')
+    return parts.join('\n')
+  }, [result])
 
   const handleAddVersion = useCallback(async (content: string) => {
     const pv = await addPromptVersion(workspaceId, itemId, content)
@@ -316,6 +345,47 @@ export default function TextResultPage() {
     setExportMenuOpen(false)
   }, [workspaceId, itemId])
 
+  // T2: 进入编辑模式
+  const handleStartEdit = useCallback(() => {
+    if (!result) return
+    setEditContent(result.content)
+    lastSavedRef.current = result.content
+    setIsEditing(true)
+    setSaveState('idle')
+  }, [result])
+
+  // T2: 退出编辑模式
+  const handleCancelEdit = useCallback(() => {
+    clearTimeout(debounceTimer.current)
+    setIsEditing(false)
+    setSaveState('idle')
+  }, [])
+
+  // T2: 自动保存（1500ms debounce，复用 ln 模式）
+  useEffect(() => {
+    if (!isEditing) return
+    if (editContent === lastSavedRef.current) return
+
+    clearTimeout(debounceTimer.current)
+    debounceTimer.current = setTimeout(async () => {
+      setSaveState('saving')
+      try {
+        await updateTextContent(workspaceId, itemId, editContent)
+        lastSavedRef.current = editContent
+        setSaveState('saved')
+        // 同步到 fetchState 以便退出编辑后显示最新内容
+        setFetchState((prev) => {
+          if (prev.kind !== 'ready') return prev
+          return { kind: 'ready', data: { ...prev.data, content: editContent } }
+        })
+      } catch {
+        setSaveState('error')
+      }
+    }, 1500)
+
+    return () => clearTimeout(debounceTimer.current)
+  }, [editContent, isEditing, workspaceId, itemId])
+
   if (fetchState.kind === 'loading') {
     return (
       <div className="vm-text-scope" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
@@ -373,6 +443,32 @@ export default function TextResultPage() {
               </div>
             )}
           </div>
+          {/* T2: 编辑按钮 + 保存状态 */}
+          {isEditing ? (
+            <>
+              <span className="tx-save-status" data-state={saveState}>
+                {saveState === 'saving' && '保存中…'}
+                {saveState === 'saved' && '已保存'}
+                {saveState === 'error' && '保存失败'}
+              </span>
+              <button
+                className="btn-ghost"
+                style={{ height: 28, padding: '0 10px', fontSize: 12 }}
+                onClick={handleCancelEdit}
+              >
+                完成
+              </button>
+            </>
+          ) : (
+            <button
+              className="btn-ghost"
+              style={{ height: 28, padding: '0 10px', fontSize: 12 }}
+              onClick={handleStartEdit}
+              title="编辑正文"
+            >
+              <Pencil size={13} /> 编辑
+            </button>
+          )}
         </div>
 
         {/* 标签展示 */}
@@ -382,6 +478,14 @@ export default function TextResultPage() {
 
         {/* 正文区域 */}
         <div className="tx-content-scroll">
+          {isEditing ? (
+            <textarea
+              className="tx-edit-textarea"
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              spellCheck={false}
+            />
+          ) : (
           <div className="tx-content-body">
             {(() => {
               const paras = result.content.split(/\n{2,}/)
@@ -412,6 +516,7 @@ export default function TextResultPage() {
               })
             })()}
           </div>
+          )}
         </div>
       </div>
 
@@ -425,16 +530,29 @@ export default function TextResultPage() {
             <button className="vd-tab-btn" data-active={contentTab === 'summary'} onClick={() => setContentTab('summary')}>
               总结
             </button>
+            <button className="vd-tab-btn" data-active={contentTab === 'chat'} onClick={() => setContentTab('chat')}>
+              问答
+            </button>
           </div>
           {contentTab === 'content' && (
             <button className="tx-compare-btn" onClick={handleCompare}>
               <Layers size={12} /> 多文对比
             </button>
           )}
+          {contentTab === 'chat' && <div style={{ flex: 1 }} />}
         </div>
 
-        <div className="tx-right-scroll">
-          {contentTab === 'summary' ? (
+        <div className="tx-right-scroll" data-tab={contentTab}>
+          {contentTab === 'chat' ? (
+            <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <NoteChatDrawer
+                workspaceId={workspaceId}
+                systemPrompt={chatSystemPrompt}
+                scopeHint="仅基于本篇文章内容回答"
+                mode="inline"
+              />
+            </div>
+          ) : contentTab === 'summary' ? (
             <div style={{ flex: 1, overflow: 'hidden', height: '100%' }}>
               <SummariesTab workspaceId={workspaceId} itemId={itemId} />
             </div>
@@ -530,7 +648,8 @@ export default function TextResultPage() {
           )}
         </div>
 
-        {/* 底部操作 */}
+        {/* 底部操作（问答 tab 时隐藏，聊天输入区已占底部） */}
+        {contentTab !== 'chat' && (
         <div className="tx-actions">
           <button
             className="tx-btn-sub"
@@ -545,6 +664,7 @@ export default function TextResultPage() {
             {favored ? '已收藏' : '收藏'}
           </button>
         </div>
+        )}
       </div>
 
       {/* N10: 多文对比弹窗 */}

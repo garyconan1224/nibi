@@ -867,7 +867,7 @@
   box-shadow: 0 6px 16px rgba(124, 58, 237, 0.4);
 }
 
-/* 悬浮面板：fixed 右下角，不挤占布局（参考 FloatingTaskQueue 任务中心模式） */
+/* 悬浮面板：fixed 右下角（外框样式；内部 UI 由 NoteChatDrawer.css 提供） */
 .ln-chat-drawer {
   position: fixed;
   right: 24px;
@@ -877,112 +877,16 @@
   z-index: 40;
   display: flex;
   flex-direction: column;
-  background: var(--color-background, #fff);
-  border: 1px solid var(--color-border, #e5e7eb);
+  background: var(--bg-elev, #fff);
+  border: 1px solid var(--line, #e5e7eb);
   border-radius: 16px;
   box-shadow: var(--shadow-lg, 0 12px 32px rgba(0, 0, 0, 0.18));
   overflow: hidden;
 }
 
-/* 抽屉 header */
-.ln-chat-drawer-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--color-border, #e5e7eb);
-}
-.ln-chat-drawer-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-foreground, #111);
-}
-
-/* 作用域提示 */
-.ln-chat-scope-hint {
-  padding: 6px 12px;
-  font-size: 11px;
-  color: var(--color-muted-foreground, #6b7280);
-  background: var(--color-muted, #f9fafb);
-  border-bottom: 1px solid var(--color-border, #e5e7eb);
-  text-align: center;
-}
-
-/* 消息列表 */
-.ln-chat-messages {
-  flex: 1;
-  overflow: hidden;
-}
-.ln-chat-messages-inner {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-}
-.ln-chat-empty {
-  margin-top: 32px;
-  text-align: center;
-  font-size: 12px;
-  color: var(--color-muted-foreground, #9ca3af);
-}
-
-/* 气泡 */
-.ln-chat-bubble-row {
-  display: flex;
-  justify-content: flex-start;
-}
-.ln-chat-bubble-row.ln-chat-bubble-user {
-  justify-content: flex-end;
-}
-.ln-chat-bubble {
-  max-width: 85%;
-  white-space: pre-wrap;
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 13px;
-  line-height: 1.5;
-}
-.ln-chat-bubble-user-bg {
-  background: var(--color-violet-600, #7c3aed);
-  color: #fff;
-}
-.ln-chat-bubble-assistant-bg {
-  background: var(--color-muted, #f3f4f6);
-  color: var(--color-foreground, #111);
-}
-.ln-chat-bubble-pending {
-  opacity: 0.85;
-}
-
-/* 输入区 */
-.ln-chat-input-area {
-  border-top: 1px solid var(--color-border, #e5e7eb);
-  padding: 8px;
-}
-.ln-chat-input-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-}
-.ln-chat-textarea {
-  flex: 1;
-  resize: none;
-  font-size: 13px;
-}
-
-/* 暗色模式 */
 @media (prefers-color-scheme: dark) {
   .ln-chat-drawer {
-    background: var(--color-background, #111);
-    border-color: var(--color-border, #333);
-  }
-  .ln-chat-scope-hint {
-    background: var(--color-muted, #1a1a1a);
-  }
-  .ln-chat-bubble-assistant-bg {
-    background: var(--color-muted, #1f2937);
+    background: var(--bg-elev, #111);
+    border-color: var(--line, #333);
   }
 }
