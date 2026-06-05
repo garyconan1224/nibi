@@ -12,7 +12,7 @@
  *   - NoteEditor：轻量 CodeMirror 编辑器（不依赖 lnEditorStore）
  *   - SummariesPanel：总结风格面板（可折叠，含应用到主笔记）
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useSyncExternalStore, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -54,12 +54,31 @@ const TYPE_LABEL: Record<string, string> = {
 
 const VIEW_MODE_KEY = 'nibi-note-view-mode'
 
-type ViewMode = 'read' | 'edit'
+type ViewMode = 'read' | 'edit' | 'compare'
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed'
 
 /** 格式化 HH:mm */
 function formatTime(d: Date): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+/** useSyncExternalStore 兼容的媒体查询 hook，窄屏降级用 */
+function useMediaQuery(query: string): boolean {
+  const mql = typeof window !== 'undefined' ? window.matchMedia(query) : null
+  return useSyncExternalStore(
+    (cb: () => void) => {
+      mql?.addEventListener('change', cb)
+      return () => { mql?.removeEventListener('change', cb) }
+    },
+    () => mql?.matches ?? false,
+    () => false,
+  )
+}
+
+const viewModeLabels: Record<ViewMode, string> = {
+  read: '阅读',
+  edit: 'Markdown',
+  compare: '对照',
 }
 
 /* ────────────────── NoteEditor ────────────────── */
@@ -113,6 +132,29 @@ function NoteEditor({ markdown: md, onMarkdownChange }: NoteEditorProps) {
   }, [md])
 
   return <div ref={hostRef} className="ln-md-view" />
+}
+
+/* ────────────────── CompareView（R2.1 对照视图）────────────────── */
+
+interface CompareViewProps {
+  markdown: string
+  onMarkdownChange: (md: string) => void
+}
+
+/** 左 CodeMirror 编辑 + 右 ReactMarkdown 实时预览，各占 50%。 */
+function CompareView({ markdown, onMarkdownChange }: CompareViewProps) {
+  return (
+    <div style={{ display: 'flex', height: '100%', gap: 1, background: 'var(--border)' }}>
+      <div style={{ flex: 1, overflow: 'hidden', background: 'var(--bg)' }}>
+        <NoteEditor markdown={markdown} onMarkdownChange={onMarkdownChange} />
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 16, background: 'var(--bg)', fontSize: 14, lineHeight: 1.8, color: 'var(--ink-2)' }}>
+        <ReactMarkdown remarkPlugins={remarkPlugins}>
+          {markdown}
+        </ReactMarkdown>
+      </div>
+    </div>
+  )
 }
 
 /* ────────────────── TagChips ────────────────── */
@@ -240,10 +282,13 @@ export default function NoteShell() {
   const [error, setError] = useState<string | null>(null)
   const [tagsOpen, setTagsOpen] = useState(true)
 
-  // R1.3: 视图模式 + 保存状态
+  // R1.3 + R2.1: 视图模式 + 保存状态（兼容三值 + 窄屏降级 compare → read）
+  const isWide = useMediaQuery('(min-width: 1024px)')
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = localStorage.getItem(VIEW_MODE_KEY)
-    return saved === 'edit' ? 'edit' : 'read'
+    const valid = saved === 'read' || saved === 'edit' || saved === 'compare'
+    if (saved === 'compare' && !window.matchMedia('(min-width: 1024px)').matches) return 'read'
+    return valid ? (saved as ViewMode) : 'read'
   })
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [savedAt, setSavedAt] = useState<string>('')
@@ -327,8 +372,8 @@ export default function NoteShell() {
   const switchView = useCallback((mode: ViewMode) => {
     setViewMode(mode)
     localStorage.setItem(VIEW_MODE_KEY, mode)
-    // 切到编辑态时，同步 editingBody（以防阅读态下 note 被外部更新）
-    if (mode === 'edit' && note) {
+    // 切到编辑/对照态时，同步 editingBody（以防阅读态下 note 被外部更新）
+    if (mode !== 'read' && note) {
       setEditingBody(extractBody(note.note_md))
     }
   }, [note])
@@ -377,24 +422,26 @@ export default function NoteShell() {
 
         {/* 视图切换 */}
         <div style={{ display: 'flex', marginLeft: 12, borderRadius: 4, overflow: 'hidden', border: '1px solid var(--border)' }}>
-          {(['read', 'edit'] as ViewMode[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => switchView(m)}
-              style={{
-                padding: '2px 10px', fontSize: 11, border: 'none', cursor: 'pointer',
-                background: viewMode === m ? 'var(--ink-1)' : 'transparent',
-                color: viewMode === m ? '#fff' : 'var(--ink-3)',
-                fontWeight: viewMode === m ? 600 : 400,
-              }}
-            >
-              {m === 'read' ? '阅读' : 'Markdown'}
-            </button>
-          ))}
+          {(['read', 'edit', 'compare'] as ViewMode[])
+            .filter((m) => isWide || m !== 'compare')
+            .map((m) => (
+              <button
+                key={m}
+                onClick={() => switchView(m)}
+                style={{
+                  padding: '2px 10px', fontSize: 11, border: 'none', cursor: 'pointer',
+                  background: viewMode === m ? 'var(--ink-1)' : 'transparent',
+                  color: viewMode === m ? '#fff' : 'var(--ink-3)',
+                  fontWeight: viewMode === m ? 600 : 400,
+                }}
+              >
+                {viewModeLabels[m]}
+              </button>
+            ))}
         </div>
 
         {/* 保存状态 */}
-        {viewMode === 'edit' && (
+        {(viewMode === 'edit' || viewMode === 'compare') && (
           <span style={{ fontSize: 11, color: 'var(--ink-3)', marginLeft: 4 }}>
             {saveStatus === 'saving' && '保存中…'}
             {saveStatus === 'saved' && `已保存 ${savedAt}`}
@@ -431,14 +478,16 @@ export default function NoteShell() {
         </div>
       )}
 
-      {/* ════════ 正文区（阅读态 / Markdown 编辑态）════════ */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
+      {/* ════════ 正文区（阅读态 / Markdown 编辑态 / 对照态）════════ */}
+      <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, padding: viewMode === 'compare' ? 0 : '20px 24px', overflowY: viewMode === 'compare' ? 'hidden' : 'auto' }}>
         {viewMode === 'read' ? (
           <div style={{ fontSize: 14, lineHeight: 1.8, color: 'var(--ink-2)' }}>
             <ReactMarkdown remarkPlugins={remarkPlugins}>
               {body}
             </ReactMarkdown>
           </div>
+        ) : viewMode === 'compare' ? (
+          <CompareView markdown={editingBody} onMarkdownChange={handleEditorChange} />
         ) : (
           <NoteEditor markdown={editingBody} onMarkdownChange={handleEditorChange} />
         )}
