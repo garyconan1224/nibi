@@ -139,19 +139,50 @@ function NoteEditor({ markdown: md, onMarkdownChange }: NoteEditorProps) {
 interface CompareViewProps {
   markdown: string
   onMarkdownChange: (md: string) => void
+  sourceMd?: string
 }
 
-/** 左 CodeMirror 编辑 + 右 ReactMarkdown 实时预览，各占 50%。 */
-function CompareView({ markdown, onMarkdownChange }: CompareViewProps) {
+/** 左 CodeMirror 编辑 + 右 ReactMarkdown 实时预览，各占 50%。右栏可切 source 原文。 */
+function CompareView({ markdown, onMarkdownChange, sourceMd }: CompareViewProps) {
+  const [rightMode, setRightMode] = useState<'preview' | 'source'>('preview')
+  const hasSource = !!sourceMd
+
   return (
     <div style={{ display: 'flex', height: '100%', gap: 1, background: 'var(--border)' }}>
       <div style={{ flex: 1, overflow: 'hidden', background: 'var(--bg)' }}>
         <NoteEditor markdown={markdown} onMarkdownChange={onMarkdownChange} />
       </div>
-      <div style={{ flex: 1, overflowY: 'auto', padding: 16, background: 'var(--bg)', fontSize: 14, lineHeight: 1.8, color: 'var(--ink-2)' }}>
-        <ReactMarkdown remarkPlugins={remarkPlugins}>
-          {markdown}
-        </ReactMarkdown>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
+        {/* 右栏顶栏：预览 / source 切换 */}
+        {hasSource && (
+          <div style={{ display: 'flex', gap: 0, padding: '4px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+            {(['preview', 'source'] as const).map((rm) => (
+              <button
+                key={rm}
+                onClick={() => setRightMode(rm)}
+                style={{
+                  padding: '2px 10px', fontSize: 11, border: 'none', cursor: 'pointer',
+                  background: rightMode === rm ? 'var(--accent)' : 'transparent',
+                  color: rightMode === rm ? '#fff' : 'var(--ink-2)',
+                  borderRadius: 3,
+                }}
+              >
+                {rm === 'preview' ? '预览' : 'source 原文'}
+              </button>
+            ))}
+          </div>
+        )}
+        <div style={{ flex: 1, overflowY: 'auto', padding: 16, fontSize: 14, lineHeight: 1.8, color: 'var(--ink-2)' }}>
+          {rightMode === 'preview' || !hasSource ? (
+            <ReactMarkdown remarkPlugins={remarkPlugins}>
+              {markdown}
+            </ReactMarkdown>
+          ) : (
+            <ReactMarkdown remarkPlugins={remarkPlugins}>
+              {sourceMd!}
+            </ReactMarkdown>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -494,7 +525,7 @@ export default function NoteShell() {
             </ReactMarkdown>
           </div>
         ) : viewMode === 'compare' ? (
-          <CompareView markdown={editingBody} onMarkdownChange={handleEditorChange} />
+          <CompareView markdown={editingBody} onMarkdownChange={handleEditorChange} sourceMd={note.source_md} />
         ) : (
           <NoteEditor markdown={editingBody} onMarkdownChange={handleEditorChange} />
         )}

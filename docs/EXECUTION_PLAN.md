@@ -294,6 +294,9 @@
 - [x] **K·R1.1** 后端 `PUT /…/note` 写接口 + 前端 service `putItemNote` + 测试 — `feat/k-r1-1-note-write`
 - [x] **K·R1.2** NoteShell 壳骨架 + 路由 + 读渲染 + 概览条 + TextResultPage「统一笔记(beta)」入口
 - [x] **K·R1.3** Markdown 编辑保存（CodeMirror + 1.5s debounce）+ 总结风格面板（SummariesTab onApplyToNote）+ 应用到主笔记
+- [x] **K·R1.4** R1 收口：文档同步 + 基线风险记录（dev.sh pid / vitest 14 fail）— `677fd09`
+- [x] **K·R2.1** 对照视图 + 三态切换（read|edit|compare）+ 窄屏降级 — `feat/k-r2-1-compare-view`，`021e3f1` `5352b2e`
+- [x] **K·R2.2** R2 收口：对照右栏 source 原文切换 + 文档同步。WYSIWYG 富文本编辑器记为 backlog（需装库，单独评估）
 
 ---
 

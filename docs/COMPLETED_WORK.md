@@ -4,7 +4,7 @@
 >
 > **维护规则**：每完成一个子任务，在本文件**追加**一段（不删旧记录），格式见下方"记录模板"。
 >
-> Last updated: 2026-05-31（RP1-B+ 方案 B — 按 intent 分流入口 + 学习/复刻顶栏 toggle）
+> Last updated: 2026-06-05（Track K · R2 对照视图收口）
 
 ---
 
@@ -2093,3 +2093,30 @@ R0 提供了只读 `GET /…/note` API 和 md 落盘，但没有编辑能力和 
 ### 已知基线风险（R1 非直接来源，记录备查）
 1. **`./dev.sh` 本轮运行失败**：前端 pid 写入时报 `../.local/frontend.pid: No such file or directory`。本轮手动启动前后端完成 API/路由烟测，不能写"dev.sh 验收通过"。
 2. **`pnpm test`（vitest）14 失败**：125 个测试里 111 通过、14 失败。失败集中在既有基线：SummariesTab 测试缺 Router 包裹、AddMaterialModal 旧断言、AVSynthesis 导出按钮断言。R1 对 SummariesTab 只新增可选 `onApplyToNote` 按钮，不是这些失败的直接来源。
+
+## Track K · R2 — 对照视图 + 三态切换 + 收口（2026-06-05）
+
+分支：`feat/k-r2-1-compare-view`，含 R2.1 / R2.2 两个子任务。
+
+### 问题
+R1 完成后 NoteShell 只有「阅读 | Markdown」两态。R2 的目标是：把正文区扩展为「阅读 | Markdown | **对照**」三态。对照 = 桌面宽屏左右分栏（左编辑右预览），窄屏自动降级回两态。**不装任何新库**（复用现有 `react-markdown` + `@codemirror/*`）。
+
+### 影响范围
+- **前端 `frontend/src/pages/result/NoteShell/index.tsx`**（+50 行）：
+  - `ViewMode` 类型从 `'read' | 'edit'` 扩展为 `'read' | 'edit' | 'compare'`
+  - 切换按钮数组改为 `['read','edit','compare']`，标签「阅读 | Markdown | 对照」
+  - 新增 `CompareView` 小组件（就地定义）：左 = `<NoteEditor>`，右 = `<ReactMarkdown>`，共享 `editingBody` + `handleEditorChange`，保存逻辑完全复用 R1
+  - R2.2 增强：右栏加「预览 | source 原文」toggle（数据来自 `note.source_md`，只读）
+  - `matchMedia('(min-width: 1024px)')` 窄屏降级：窄屏不渲染「对照」按钮；localStorage 存 `compare` 时进页 fallback 到 `read`
+  - localStorage 读取兼容三值
+
+### 关键设计决策
+- **不装库**：用户 2026-06-05 拍板「先做对照视图，不装库」。真·WYSIWYG（Tiptap/Milkdown）记为 backlog，后续单独评估
+- 对照左右共享同一份 `editingBody`，左边改 = 右边实时变 = 1.5s 自动保存，零新增 save 代码
+- 窄屏降级用运行时 `matchMedia` 监听，缩窗时实时切回阅读态
+
+### 验证
+- `pnpm tsc -b`：0 error
+- `pnpm test`（vitest）：14 fail（基线，不新增）
+- 手测：三态切换正常；对照左改右实时预览；对照态自动保存 + 刷新保持；窄屏无对照按钮不卡死
+- 回归 R1：阅读/Markdown/应用到主笔记/概览条/source 折叠全部正常
