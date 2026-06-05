@@ -2005,3 +2005,46 @@ feat(rp1-c): C-1 复刻页主帧大视图 + 缩略图轨道
 - `.venv/bin/python -m pytest tests/backend/test_pipeline_tasks.py tests/test_video_analyzer_smoke.py tests/test_video_analyzer_concurrency.py tests/backend/test_performance_tier.py -q`：72 passed
 - 确定性基准（sleep 模拟单帧）：并发 3→2.8× / 6→5.5× / 8→7.3×，近线性。
 - 真实视频端到端耗时对比：**待用户跑**（需真实 SiliconFlow key + 视频；非代码层可验证）。
+
+---
+
+## Track K · R0 — note_assembler 核心 + 只读 API + 文档收口
+
+**完成日期**：2026-06-05
+**模型 / 工具**：Opus 4.8（Claude Code）
+**分支**：feat/k-r0-1-note-assembler
+**提交**：
+- R0.1：`067e083` feat(k-m7-r0.1): note_assembler 核心 + 单测
+- R0.2：`257dd68` feat(k-m7-r0.2): 只读 API GET /…/note + 前端 service
+- R0.3：文档收口（本 commit）
+
+### 问题
+R0 的目标是把 WorkspaceItem 已有的 results/tags/summaries 数据按统一 schema 序列化为 md 文件落盘，为后续 NoteShell 统一笔记页提供标准化数据层。不调 LLM，不改任何现有消费方。
+
+### 影响范围
+- **后端 `backend/app/services/note_assembler.py`**（新增，218 行）：
+  - `note_dir(ws_id, item_id)` — 返回 `<ws>/notes/<item_id>/` 路径
+  - `build_frontmatter(item, ws_id)` — 按 §3.4 schema v1 构建 frontmatter dict
+  - `build_source_md(item)` / `build_note_md(item, frontmatter)` — 按 item.type 取正文来源（text=content；audio/video=transcript 拼可读 md；image=ocr_text+description）
+  - `serialize_summaries(item, item_note_dir)` — 逐条写成 `summaries/<template>/v<n>.md`
+  - `assemble_item_note(ws_id, item_id, *, overwrite=True)` — 组装 + 落盘，best-effort 不抛异常
+- **后端 `backend/app/routes/workspaces.py`**（+79 行）：
+  - 新增 `GET /{workspace_id}/items/{item_id}/note` 路由，惰性组装：目录不存在时从 task store 回填 results 再 assemble
+- **前端 `frontend/src/types/workspace.ts`**（+17 行）：
+  - 新增 `ItemNoteSummary` / `ItemNote` 接口
+- **前端 `frontend/src/services/workspaces.ts`**（+10 行）：
+  - 新增 `getItemNote(workspaceId, itemId)` 函数（仅 service，UI 留给 R1）
+- **测试 `backend/tests/test_note_assembler.py`**（新增，437 行）：
+  - 25 项测试：4 类型 frontmatter 字段 / 正文来源 / summaries 落盘 / 幂等（overwrite=True/False）/ best-effort
+
+### 关键设计决策（§3.3 摘要）
+- per-item 目录：`<ws>/notes/<item_id>/`，用 item_id 不用 task_id（用户视角稳定）
+- note.md 初始正文 = 当前主体全文；summaries 不自动并入 note.md（R1 才「应用到主笔记」）
+- source.md = 原始依据（偏只读），text 类型与 note.md 可能相同——预期行为
+- 惰性组装：API 读时若目录不存在则自动 assemble 一次，覆盖历史 item
+- assemble 失败 best-effort（try/except + 日志），绝不阻断 item 分析主流程
+
+### 验证
+- `KMP_DUPLICATE_LIB_OK=TRUE .venv/bin/python -m pytest backend/tests/test_note_assembler.py -v`：25 passed
+- `pnpm tsc --noEmit`：通过
+- `pytest backend/tests/test_item_summary.py backend/tests/test_summaries.py backend/tests/test_structured_summary_parse.py`：32 passed，零回归

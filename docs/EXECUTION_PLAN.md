@@ -4,7 +4,7 @@
 >
 > **维护规则见 CLAUDE.md「项目执行计划维护流程」一节**。
 >
-> Last updated: 2026-05-31（RP1-B 已完成，下一步 RP1-C）
+> Last updated: 2026-06-05（Track K·R0 完成）
 >
 > ⚠️ **2026-06-05 Track K 覆盖说明**：当前临时主线是 **单素材统一笔记页（NoteShell）架构收口**，依据 [`docs/plans/track-K-M7-result-pages-redesign.md`](plans/track-K-M7-result-pages-redesign.md)，本轮只定设计不动代码。下方历史长表不重写，仅作存档；勿按旧 RP1-C / M7 pipeline 直接开工。
 
@@ -286,6 +286,11 @@
 - [x] **R23** 设置面板：性能档位（内存→whisper 模型 + 截帧密度）— `docs/plans/phase-r23-perf-tier-settings.md`，`0dbd2de feat(r23)` `4c6f586 fix(r23)`（2026-06-01 对账补勾：git 已合，文档曾漏勾）
 - [x] **R24** VLM 多帧并发提速：并发数随性能档位（low=3/medium=6/high=8）+ R22 cancel 下沉到截帧 worker — `227cc7c perf(video): VLM 多帧并发调用提速`
 - [x] **R25** VLM 多图合并再提速：多帧合并进一次 VLM 请求（多图输入，与 R24 并发叠加）— `7a9a1df` `85d7ad1`（2026-06-02 对账补勾，已合）
+
+**Track K · NoteShell 架构收口**（2026-06-05 启动）：单素材统一笔记页。详细计划：[`docs/plans/track-K-M7-noteshell-execution-plan.md`](plans/track-K-M7-noteshell-execution-plan.md)
+- [x] **K·R0.1** note_assembler 核心（纯函数 + 单测，不接现有流程）— `feat/k-r0-1-note-assembler`，`067e083`
+- [x] **K·R0.2** 只读 API `GET /…/note`（惰性组装）+ 前端 service `getItemNote`（仅 service，不接 UI）— `257dd68`
+- [x] **K·R0.3** 文档收口：frontmatter schema v1 定稿 + EXECUTION_PLAN / COMPLETED_WORK 同步
 
 ---
 

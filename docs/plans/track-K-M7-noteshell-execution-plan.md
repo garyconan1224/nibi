@@ -1,8 +1,9 @@
 ---
 title: Track K · M7 NoteShell 五期执行计划（R0–R5；R0 已展开，R1–R5 概览）
-status: ready            # R0 可执行；R1–R5 概览，待逐期展开
+status: done            # R0 已完成（R0.1+R0.2+R0.3）
 owner: 计划=Claude(CC) / 执行=xiaomi mimo v2.5-pro
 created: 2026-06-05
+completed_date: 2026-06-05
 parent: docs/plans/track-K-M7-result-pages-redesign.md
 decisions: |
   用户 2026-06-05 拍板：
