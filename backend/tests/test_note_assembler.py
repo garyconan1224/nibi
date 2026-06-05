@@ -224,6 +224,38 @@ class TestBuildMd:
         src = build_source_md(item)
         assert "播客内容" in src
 
+    def test_audio_transcript_segments_fallback(self) -> None:
+        """音频只有 transcript_segments（无 transcript）时，应从 segments 拼出正文。"""
+        item = _make_item(
+            item_type="audio",
+            results={
+                "transcript_segments": [
+                    {"start": 0.0, "end": 5.0, "text": "第一段转录"},
+                    {"start": 5.0, "end": 10.0, "text": "第二段转录"},
+                ],
+            },
+        )
+        src = build_source_md(item)
+        assert "第一段转录" in src
+        assert "第二段转录" in src
+        assert "[0.0s]" in src
+
+    def test_video_transcript_segments_fallback(self) -> None:
+        """视频 transcript 为空 list 时，应从 transcript_segments 拼出正文。"""
+        item = _make_item(
+            item_type="video",
+            results={
+                "transcript": [],
+                "transcript_segments": [
+                    {"start": 0.0, "end": 3.0, "text": "开场白"},
+                    {"start": 3.0, "end": 8.0, "text": "正文内容"},
+                ],
+            },
+        )
+        src = build_source_md(item)
+        assert "开场白" in src
+        assert "正文内容" in src
+
     def test_image_ocr_and_description(self) -> None:
         item = _image_item()
         src = build_source_md(item)

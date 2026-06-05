@@ -277,6 +277,44 @@ def _on_analysis_success_autotag(completed_task: TaskRecord, runner) -> None:  #
 for _tt in ("analyze", "text", "audio", "image"):
     _pipeline_runner.register_success_callback(_tt, _on_analysis_success_autotag)
 
+
+def _assemble_note_for_task(task: TaskRecord, runner) -> None:  # type: ignore[type-arg]
+    """对引用 task.task_id 的所有 workspace items 触发 note 惰性组装（同步逻辑）。
+
+    只在 notes/<item_id>/ 不存在时组装（幂等：已组装的跳过）。
+    任何异常都不阻塞主流程。
+    """
+    for ws in _store.list_all():
+        for item in ws.items:
+            if task.task_id not in item.related_task_ids:
+                continue
+            nd = note_dir(ws.workspace_id, item.item_id)
+            if (nd / "note.md").exists():
+                continue
+            # 从 task store 回填 results（与 get_item_note 同逻辑）
+            merged = dict(item.results or {})
+            if task.result:
+                merged.update(task.result)
+            item.results = merged
+            try:
+                assemble_item_note(ws.workspace_id, item.item_id, _item=item)
+            except Exception:
+                pass
+
+
+def _on_analysis_success_assemble(completed_task: TaskRecord, runner) -> None:  # type: ignore[type-arg]
+    """task SUCCESS 后异步触发 note 组装（不阻塞 task worker 线程）。"""
+    threading.Thread(
+        target=_assemble_note_for_task,
+        args=(completed_task, runner),
+        daemon=True,
+        name=f"assemble-{completed_task.task_id}",
+    ).start()
+
+
+for _tt in ("analyze", "text", "audio", "image"):
+    _pipeline_runner.register_success_callback(_tt, _on_analysis_success_assemble)
+
 WORKSPACE_UPLOAD_ROOT: Path = DATA_DIR / "workspaces"
 MAX_UPLOAD_BYTES = 500 * 1024 * 1024
 UPLOAD_CHUNK_BYTES = 1024 * 1024
