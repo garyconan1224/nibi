@@ -49,9 +49,12 @@ if [[ ! -d frontend/node_modules ]]; then
 fi
 printf "${BLUE}▶ 启动前端 :%s${NC}\n" "$VITE_PORT"
 export VITE_BACKEND_BASE_URL="http://127.0.0.1:$BACKEND_PORT"
-(cd frontend && nohup pnpm dev --host --port "$VITE_PORT" \
-    > ../.local/frontend.log 2>&1 &
- echo $! > ../.local/frontend.pid)
+(
+    cd frontend
+    nohup pnpm dev --host --port "$VITE_PORT" \
+        > ../.local/frontend.log 2>&1 &
+    echo $! > ../.local/frontend.pid
+)
 
 # ── 健康探测 ──────────────────────────────────────────────────
 printf "${BLUE}▶ 等待后端就绪…${NC}\n"

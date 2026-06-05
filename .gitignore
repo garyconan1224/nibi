@@ -24,6 +24,7 @@ __pycache__/
 # Design source archives (already extracted to docs/design/)
 # Frontend (Vite + React)
 # Local agent/tool instructions
+.codex/
 data/*.db
 data/chats/
 data/cookies/
