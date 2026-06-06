@@ -31,6 +31,7 @@ interface LocationState {
   workspaceId?: string
   itemId?: string
   url?: string
+  taskType?: string
 }
 
 const STUCK_MS = 10 * 60 * 1000
@@ -324,7 +325,13 @@ export default function ProcessingPage() {
                     if (!isSuccess) return
                     const wid = workspaceId ?? 'default'
                     if (itemId) {
-                      navigate(`/workspaces/${wid}/items/${itemId}/overview`)
+                      // NI.2: note task 完成后直接进 NoteShell
+                      const isNote = (state?.taskType ?? taskType) === 'note'
+                      navigate(
+                        isNote
+                          ? `/workspaces/${wid}/items/${itemId}/note`
+                          : `/workspaces/${wid}/items/${itemId}/overview`,
+                      )
                     } else {
                       // 兜底：跳转到资料库，用户可从那里找到结果
                       navigate('/library')

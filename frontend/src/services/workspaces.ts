@@ -222,6 +222,29 @@ export async function startItemPipeline(
   return res.data
 }
 
+// ── NI.1: 生成笔记（智能识别）──────────────────────────────
+
+export interface GenerateNoteResponse {
+  workspace: WorkspaceRecord
+  task_id: string
+  task_type: string
+  item_type: string
+  item_id: string
+}
+
+/** POST /workspaces/{id}/items/generate-note — 生成笔记统一入口 */
+export async function generateNote(
+  workspaceId: string,
+  url: string,
+  name?: string,
+): Promise<GenerateNoteResponse> {
+  const res = await http.post<GenerateNoteResponse>(
+    `${BASE}/${workspaceId}/items/generate-note`,
+    { url, name },
+  )
+  return res.data
+}
+
 // ── Phase 1G: 视频结果页聚合 ──────────────────────────────
 
 export interface VideoResultFrame {
