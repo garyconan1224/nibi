@@ -516,6 +516,17 @@ export default function NoteShell() {
         </div>
       )}
 
+      {/* ════════ R3.1: image 类型 — 正文上方显示原图 ════════ */}
+      {itemType === 'image' && note.media?.images?.[0] && (
+        <div style={{ padding: '0 24px', flexShrink: 0, maxHeight: '40%', overflow: 'auto', borderBottom: '1px solid var(--border)' }}>
+          <img
+            src={note.media.images[0]}
+            alt={title || '原图'}
+            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block', margin: '12px auto', borderRadius: 6 }}
+          />
+        </div>
+      )}
+
       {/* ════════ 正文区（阅读态 / Markdown 编辑态 / 对照态）════════ */}
       <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, padding: viewMode === 'compare' ? 0 : '20px 24px', overflowY: viewMode === 'compare' ? 'hidden' : 'auto' }}>
         {viewMode === 'read' ? (

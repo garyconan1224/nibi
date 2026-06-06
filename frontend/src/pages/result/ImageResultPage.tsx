@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, BarChart2, Check, Copy, Settings2, Star } from 'lucide-react'
+import { ArrowLeft, BarChart2, Check, Copy, FileText, Settings2, Star } from 'lucide-react'
 
 import {
   type ImageCompareResult,
@@ -265,6 +265,14 @@ export default function ImageResultPage() {
           <span className="vd-sep" />
           <span className="vd-title">{result.image.title}</span>
           <span className="kw mono" style={{ fontSize: 10, flexShrink: 0 }}>IMAGE</span>
+          <button
+            className="btn-ghost"
+            style={{ height: 24, padding: '0 8px', fontSize: 11, gap: 4, marginLeft: 6, borderRadius: 4, border: '1px solid var(--border)' }}
+            onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/note`)}
+            title="打开统一笔记（NoteShell）"
+          >
+            <FileText size={12} /> 统一笔记 <span style={{ fontSize: 9, opacity: 0.6 }}>beta</span>
+          </button>
           {result.source === 'demo_fixture' && (
             <span className="mono" style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'var(--accent-warm)', color: '#fff', fontWeight: 600 }} title="demo fixture">DEMO</span>
           )}

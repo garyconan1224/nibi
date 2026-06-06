@@ -124,6 +124,14 @@ export interface ItemNoteSummary {
   content: string
 }
 
+/** R3.1: note API 返回的 media 结构（按 item.type 填充） */
+export interface NoteMedia {
+  images?: string[]        // image 类型：图片 URL 列表
+  video?: { url: string; duration: number }  // video 类型
+  frames?: { sec: number; url: string }[]    // video 类型：关键帧
+  audio?: string           // audio 类型：音频 URL
+}
+
 /** R0.2: GET /…/note 返回的完整 note 数据 */
 export interface ItemNote {
   frontmatter: Record<string, unknown>
@@ -131,6 +139,8 @@ export interface ItemNote {
   note_md: string
   summaries: ItemNoteSummary[]
   note_dir: string
+  media: NoteMedia         // R3.1: 媒体 URL（实时从 results 提取）
+  transcript: unknown      // R3.1: 转录数据（video/audio 时为 list）
 }
 
 /** 中文展示文案——状态 */

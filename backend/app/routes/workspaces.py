@@ -74,6 +74,38 @@ router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 _store = WorkspaceStore()
 
 
+# R3.1: 本地路径 → /static/... URL（供前端 <img> / <video> / <audio> src 使用）
+def to_static_url(path: str | Path) -> str:
+    """将本地文件路径转为 /static/... URL。
+
+    规则：
+    - 已经是 /static/ 开头 → 原样返回
+    - 绝对路径在 DATA_DIR 下且文件存在 → /static/<相对路径>
+    - 相对路径（如 workspaces/ws1/images/a.png）→ 按 DATA_DIR / 相对路径 解析
+    - 其他（外部 URL / 路径不在 data 下 / 文件不存在）→ 返回空串
+    """
+    if not path:
+        return ""
+    s = str(path)
+    if s.startswith("/static/"):
+        return s
+    data_resolved = DATA_DIR.resolve()
+    try:
+        p = Path(s).resolve()
+        if (data_resolved in p.parents or p == data_resolved) and p.exists():
+            return "/static/" + p.relative_to(data_resolved).as_posix()
+    except (ValueError, OSError):
+        pass
+    # 相对路径兜底：当作相对于 DATA_DIR
+    candidate = data_resolved / s
+    try:
+        if candidate.exists():
+            return "/static/" + candidate.resolve().relative_to(data_resolved).as_posix()
+    except (ValueError, OSError):
+        pass
+    return ""
+
+
 def _task_config_value(tasks: Dict[str, Any], *keys: str) -> Any:
     """Return the first present task config, preserving False boolean values."""
     for key in keys:
@@ -2926,12 +2958,65 @@ def get_item_note(workspace_id: str, item_id: str) -> Dict[str, Any]:
             "content": sm_path.read_text(encoding="utf-8"),
         })
 
+    # ── R3.1: 从 results 实时提取 media URL + transcript ──
+    results = item.results or {}
+    item_type = item.type  # "image" | "video" | "audio" | "text"
+    media: Dict[str, Any] = {}
+    transcript: Any = None
+
+    if item_type == "image":
+        # image results 无 image_path；图片在 item.source_value
+        img_url = ""
+        if item.source == "url":
+            img_url = item.source_value
+        else:
+            # upload：source_value 是本地绝对路径
+            img_url = to_static_url(item.source_value)
+        media["images"] = [img_url] if img_url else []
+
+    elif item_type == "video":
+        # 视频文件 URL（与 get_video_result 同逻辑：优先 workspace/videos/ 下找）
+        _video_url = ""
+        _vid_dir = DATA_DIR / "workspaces" / workspace_id / "videos"
+        if _vid_dir.is_dir():
+            _vid_files = sorted(_vid_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
+            if _vid_files:
+                _video_url = to_static_url(_vid_files[0])
+        if not _video_url:
+            _video_url = item.source_value if item.source == "url" else ""
+        duration = float(results.get("duration_sec") or results.get("duration") or 0)
+        media["video"] = {"url": _video_url, "duration": duration}
+        # frames（可能已 materialize 为 /static URL，也可能是绝对路径）
+        frames_data = results.get("frames") or []
+        media["frames"] = []
+        for f in frames_data:
+            fp = f.get("frame_image_path") or f.get("image_path") or ""
+            sec = f.get("sec", 0)
+            media["frames"].append({"sec": sec, "url": fp if fp.startswith("/static/") else to_static_url(fp)})
+        # transcript
+        transcript = results.get("transcript") or []
+
+    elif item_type == "audio":
+        # 音频文件：results.audio.filename 存在 workspace/<id>/audio/ 下
+        audio_info = results.get("audio") if isinstance(results.get("audio"), dict) else {}
+        audio_url = ""
+        if audio_info.get("filename"):
+            audio_path = DATA_DIR / "workspaces" / workspace_id / "audio" / audio_info["filename"]
+            audio_url = to_static_url(audio_path)
+        if not audio_url and audio_info.get("url"):
+            audio_url = audio_info["url"]  # URL 来源
+        media["audio"] = audio_url
+        # transcript：优先结构化 segments，降级为纯文本
+        transcript = results.get("transcript_segments") or results.get("transcript") or []
+
     return {
         "frontmatter": frontmatter,
         "source_md": source_md,
         "note_md": note_md,
         "summaries": summaries,
         "note_dir": str(nd),
+        "media": media,
+        "transcript": transcript,
     }
 
 
@@ -2949,7 +3034,7 @@ def update_item_note(workspace_id: str, item_id: str, req: NoteUpdateRequest) ->
     rec = _store.get(workspace_id)
     if rec is None:
         raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
-    _find_item(rec, item_id)  # 确认 item 存在
+    item = _find_item(rec, item_id)
 
     nd = note_dir(workspace_id, item_id)
     note_path = nd / "note.md"
@@ -2967,7 +3052,6 @@ def update_item_note(workspace_id: str, item_id: str, req: NoteUpdateRequest) ->
                     frontmatter = {}
     else:
         # note.md 不存在 → 先惰性组装拿 frontmatter
-        item = _find_item(rec, item_id)
         if item.related_task_ids:
             for tid in reversed(item.related_task_ids):
                 task = _pipeline_runner.store.get(tid)
@@ -3023,12 +3107,58 @@ def update_item_note(workspace_id: str, item_id: str, req: NoteUpdateRequest) ->
             "content": sm_path.read_text(encoding="utf-8"),
         })
 
+    # ── R3.1: 从 results 实时提取 media URL + transcript（与 GET 同逻辑）──
+    results = item.results or {}
+    item_type = item.type
+    media: Dict[str, Any] = {}
+    transcript: Any = None
+
+    if item_type == "image":
+        img_url = ""
+        if item.source == "url":
+            img_url = item.source_value
+        else:
+            img_url = to_static_url(item.source_value)
+        media["images"] = [img_url] if img_url else []
+
+    elif item_type == "video":
+        _video_url = ""
+        _vid_dir = DATA_DIR / "workspaces" / workspace_id / "videos"
+        if _vid_dir.is_dir():
+            _vid_files = sorted(_vid_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
+            if _vid_files:
+                _video_url = to_static_url(_vid_files[0])
+        if not _video_url:
+            _video_url = item.source_value if item.source == "url" else ""
+        duration = float(results.get("duration_sec") or results.get("duration") or 0)
+        media["video"] = {"url": _video_url, "duration": duration}
+        frames_data = results.get("frames") or []
+        media["frames"] = []
+        for f in frames_data:
+            fp = f.get("frame_image_path") or f.get("image_path") or ""
+            sec = f.get("sec", 0)
+            media["frames"].append({"sec": sec, "url": fp if fp.startswith("/static/") else to_static_url(fp)})
+        transcript = results.get("transcript") or []
+
+    elif item_type == "audio":
+        audio_info = results.get("audio") if isinstance(results.get("audio"), dict) else {}
+        audio_url = ""
+        if audio_info.get("filename"):
+            audio_path = DATA_DIR / "workspaces" / workspace_id / "audio" / audio_info["filename"]
+            audio_url = to_static_url(audio_path)
+        if not audio_url and audio_info.get("url"):
+            audio_url = audio_info["url"]
+        media["audio"] = audio_url
+        transcript = results.get("transcript_segments") or results.get("transcript") or []
+
     return {
         "frontmatter": frontmatter,
         "source_md": source_md,
         "note_md": note_content,
         "summaries": summaries,
         "note_dir": str(nd),
+        "media": media,
+        "transcript": transcript,
     }
 
 
