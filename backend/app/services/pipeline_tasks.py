@@ -1604,6 +1604,11 @@ def _compose_images_with_llm(
         )
         composed = raw.strip()
         if composed:
+            # NI.3 guard: 有 static_url 的图但输出里没 /static/ 引用 → 视为合成失败
+            expected_urls = [img["static_url"] for img in image_infos if img.get("static_url")]
+            if expected_urls and "/static/" not in composed:
+                log("⚠️  LLM 输出未包含图片引用，回退到原逻辑")
+                return ""
             log(f"✅ 图文语境合成完成，{len(composed)} 字")
             return composed
         log("⚠️  LLM 返回空，回退到原逻辑")

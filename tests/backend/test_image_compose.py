@@ -139,3 +139,23 @@ class TestComposeImagesWithLlm:
             log=lambda _m: None,
         )
         assert result == ""
+
+    @patch("backend.app.services.pipeline_tasks.create_default_registry")
+    def test_llm_returns_text_without_image_refs_fallback(self, mock_registry_fn):
+        """LLM 返回非空纯文字但漏掉图片引用 → 视为合成失败，走兜底。"""
+        mock_provider = MagicMock()
+        mock_provider.chat.return_value = "# 咖啡店笔记\n\n今天去了咖啡店，拿铁很好喝。"
+        mock_profile = MagicMock()
+        mock_profile.default_models.get.return_value = "gpt-4o"
+        mock_registry_fn.return_value.resolve_default_profile.return_value = mock_profile
+        mock_registry_fn.return_value.build.return_value = mock_provider
+
+        settings = SimpleNamespace(openai_api_key="sk-test", text_model="gpt-4o")
+        result = _compose_images_with_llm(
+            source_text="正文",
+            image_infos=_IMAGE_INFOS,
+            settings=settings,
+            payload={},
+            log=lambda _m: None,
+        )
+        assert result == ""  # 无 /static/ 引用 → fallback
