@@ -344,7 +344,7 @@ def _on_analysis_success_assemble(completed_task: TaskRecord, runner) -> None:  
     ).start()
 
 
-for _tt in ("analyze", "text", "audio", "image"):
+for _tt in ("analyze", "text", "audio", "image", "note"):
     _pipeline_runner.register_success_callback(_tt, _on_analysis_success_assemble)
 
 WORKSPACE_UPLOAD_ROOT: Path = DATA_DIR / "workspaces"
@@ -402,6 +402,12 @@ class ItemAddRequest(BaseModel):
     source: str = Field(description="url|local")
     source_value: str = Field(description="URL 或本地路径")
     name: str = Field(default="", description="可选显示名，未填则从 source_value 推导")
+
+
+class GenerateNoteRequest(BaseModel):
+    """NI.1: 「生成笔记」统一入口请求体。"""
+    url: str = Field(description="粘贴的链接（小红书/视频/网页等）")
+    name: str = Field(default="", description="可选显示名")
 
 
 class PreflightSaveRequest(BaseModel):
@@ -551,6 +557,13 @@ def _validate_network_url(raw: str) -> str:
         )
     if not parsed.netloc:
         raise HTTPException(status_code=400, detail="URL host cannot be empty")
+    # NI.1: 拦截无有效域名的 URL（如 "not a url" → "https://not"）
+    hostname = (parsed.hostname or "").lower()
+    if hostname not in ("localhost",) and "." not in hostname and not hostname.replace(".", "").isdigit():
+        raise HTTPException(
+            status_code=400,
+            detail=f"URL host is not a valid domain: {parsed.netloc}",
+        )
     return value
 
 
@@ -1622,6 +1635,87 @@ def start_item_pipeline(workspace_id: str, item_id: str) -> Dict[str, Any]:
         "workspace": rec.to_dict(),
         "task_id": task_rec.task_id,
         "task_type": task_type,
+    }
+
+
+# ── NI.1: 「生成笔记」统一入口 ────────────────────────────────
+
+_SNIFF_TO_ITEM_TYPE: Dict[str, str] = {
+    "video": ItemType.VIDEO.value,
+    "audio": ItemType.AUDIO.value,
+    "image": ItemType.IMAGE.value,
+    "text": ItemType.TEXT.value,
+}
+
+# 图文平台：sniff_url 报 "text" 但实际含图，应落为 image 类型
+_IMAGE_TEXT_PLATFORMS: frozenset = frozenset({"xiaohongshu"})
+
+
+@router.post("/{workspace_id}/items/generate-note")
+def generate_note(workspace_id: str, req: GenerateNoteRequest) -> Dict[str, Any]:
+    """NI.1: 粘贴链接 → 自动识别类型 → 创建 item + note task → 关联。
+
+    流程：sniff_url 推断 type → 创建 workspace item → 创建 note task
+    → 写回 item.related_task_ids。
+    """
+    url = req.url.strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="url 不能为空")
+
+    # NI.1: 复用现有 URL 校验（scheme/netloc 检查 + 规整）
+    url = _validate_network_url(url)
+
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+
+    # 1. 嗅探 URL 类型 → 映射 ItemType（图文平台且 primary_type=text 时 override 为 image）
+    try:
+        sniff = sniff_url(url)
+        if sniff.platform in _IMAGE_TEXT_PLATFORMS and sniff.primary_type == "text":
+            item_type = ItemType.IMAGE.value
+        else:
+            item_type = _SNIFF_TO_ITEM_TYPE.get(sniff.primary_type, ItemType.TEXT.value)
+    except Exception:
+        item_type = ItemType.TEXT.value
+
+    # 2. 创建 workspace item
+    item = WorkspaceItem(
+        item_id=str(uuid.uuid4()),
+        type=item_type,
+        source="url",
+        source_value=url,
+        name=(req.name.strip() or _derive_item_name(url)),
+    )
+    try:
+        rec = _store.add_item(workspace_id, item)
+    except KeyError as err:
+        raise HTTPException(status_code=404, detail=str(err)) from err
+
+    # 3. 创建 note task（复用 handle_note_task 统一流程）
+    try:
+        task_rec = _pipeline_runner.create_task(
+            "default_project",
+            "note",
+            {"url": url, "workspace_id": workspace_id},
+        )
+    except ValueError as err:
+        raise HTTPException(status_code=409, detail=str(err)) from err
+
+    # 4. 关联 task → item（写回 related_task_ids + 状态 processing）
+    new_ids = list(item.related_task_ids) + [task_rec.task_id]
+    rec = _store.update_item(
+        workspace_id,
+        item.item_id,
+        related_task_ids=new_ids,
+        status=ItemStatus.PROCESSING.value,
+    )
+
+    return {
+        "workspace": rec.to_dict(),
+        "task_id": task_rec.task_id,
+        "task_type": "note",
+        "item_type": item_type,
     }
 
 
@@ -2965,14 +3059,22 @@ def get_item_note(workspace_id: str, item_id: str) -> Dict[str, Any]:
     transcript: Any = None
 
     if item_type == "image":
-        # image results 无 image_path；图片在 item.source_value
-        img_url = ""
-        if item.source == "url":
-            img_url = item.source_value
+        # NI.1: note task 产出 results["images"]（下载的图片路径列表），优先使用
+        result_images = results.get("images") or []
+        if result_images:
+            media["images"] = [
+                to_static_url(p) if not str(p).startswith("/static/") else str(p)
+                for p in result_images
+            ]
         else:
-            # upload：source_value 是本地绝对路径
-            img_url = to_static_url(item.source_value)
-        media["images"] = [img_url] if img_url else []
+            # 原有逻辑：图片在 item.source_value
+            img_url = ""
+            if item.source == "url":
+                img_url = item.source_value
+            else:
+                # upload：source_value 是本地绝对路径
+                img_url = to_static_url(item.source_value)
+            media["images"] = [img_url] if img_url else []
 
     elif item_type == "video":
         # 视频文件 URL（与 get_video_result 同逻辑：优先 workspace/videos/ 下找）

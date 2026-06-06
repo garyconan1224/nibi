@@ -108,7 +108,8 @@ def _build_body(item: WorkspaceItem) -> str:
     item_type = item.type
 
     if item_type == "text":
-        return results.get("content", "") or results.get("summary", "")
+        # NI.1: note task 产出 results["markdown"]，优先使用
+        return results.get("markdown") or results.get("content", "") or results.get("summary", "")
 
     if item_type in ("audio", "video"):
         # 优先用 transcript（str 或 list），再兜底 transcript_segments，最后 summary
@@ -150,6 +151,10 @@ def _build_body(item: WorkspaceItem) -> str:
         return results.get("summary", "")
 
     if item_type == "image":
+        # NI.1: note task 产出 results["markdown"]（含图集描述），优先使用
+        md = results.get("markdown", "")
+        if md:
+            return md
         parts = []
         ocr = results.get("ocr_text", "")
         if ocr:
