@@ -1,8 +1,11 @@
 ---
 title: Track K · M7 · NI 详细执行卡 —— 「生成笔记」智能入口（添加侧，走后端统一流程）
-status: ready
-owner: 计划=Claude(CC) / 执行=xiaomi mimo v2.5-pro
+status: done
+owner: 计划=Claude(CC) / 执行=xiaomi mimo v2.5-pro + Claude(CC)
 created: 2026-06-06
+completed_date: 2026-06-06
+commits: c7bee83 (NI.1), 0e7cfb4 (NI.2-redo), f63ea5f (NI.3), 5476bc6 (NI.4 merge)
+actual_hours: 4
 parent: docs/plans/track-K-M7-noteshell-execution-plan.md
 position: 插在 R3 与 R4 之间 —— 用户 2026-06-06 定：它是 R2/R3 真实测试的前置（没有正确素材入口，结果页测不准）
 depends: R0/R1/R2/R3（NoteShell + 媒体接入已 done）；后端 handle_note_task 统一流程已存在

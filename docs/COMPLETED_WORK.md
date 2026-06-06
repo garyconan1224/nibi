@@ -4,9 +4,37 @@
 >
 > **维护规则**：每完成一个子任务，在本文件**追加**一段（不删旧记录），格式见下方"记录模板"。
 >
-> Last updated: 2026-06-05（Track K · R2 对照视图收口）
+> Last updated: 2026-06-06（Track K · NI.4 端到端收口）
 
 ---
+
+## Track K · NI.1–NI.4 —「生成笔记」智能入口（全流程）
+
+**完成日期**：2026-06-06
+**模型 / 工具**：xiaomi mimo v2.5-pro（NI.1/NI.2-redo/NI.3）+ Claude Sonnet 4.6（NI.4 端到端测试+文档收口）
+**分支**：`feat/k-ni-1-note-task-intake` → `feat/k-ni-2-redo-zero-config` → `feat/k-ni-3-image-compose`（全部已合 main）
+**提交**：
+- NI.1：`c7bee83` feat(k-ni.1): 后端打通「生成笔记」统一入口 — generate-note 端点 + assemble 回调 + note_assembler 兜底
+- NI.2-redo：`0e7cfb4` feat(k-ni.2-redo): 前端「生成笔记」零配置入口 — 第五卡片 + noteMode 简化界面
+- NI.3：`f63ea5f` feat(k-ni.3): 后端图文语境合成 — VLM+OCR → LLM 语境插图 → markdown 含图
+- NI.4 收口：`5476bc6` Merge（端到端验证通过后合入）
+
+### 问题
+「添加素材」原本只支持手选类型（视频/音频/图文/文字），用户需先判断内容类型才能解析。小红书图文选"文字"会丢图。用户需要一条零配置的「粘贴链接→自动识别→生成笔记」统一流程。
+
+### 改动范围
+- **后端 workspaces.py**：`POST /{ws}/items/generate-note` 端点（sniff → 创建 item → 创建 note task → 关联）
+- **后端 pipeline_tasks.py**：`handle_note_task` image_text 分支升级（VLM+OCR → `_compose_images_with_llm()` 语境插图 → markdown 含 `![](/static/...)` 图引用）
+- **前端 AddMaterialModal**：新增并列第五卡片「生成笔记」，选中后只显示链接输入框+嗅探提示，隐藏分析任务/采集模式等配置
+- **测试**：`tests/backend/test_image_compose.py`（8 个用例），475 个回归测试全绿
+
+### 端到端验证（NI.4 测试结果）
+| 来源 | generate-note | Note API | NoteShell 图文混排 | 备注 |
+|------|--------------|----------|------------------|------|
+| 小红书图文 | ✅ task SUCCESS | ✅ media.images 3张 | ✅ ReactMarkdown 内联渲染 | 图按语境插入正文，alt 描述完整 |
+| B站视频 | ✅ task SUCCESS | ✅ note_md 有内容 | ✅ 正常渲染 | 回归通过 |
+| B站 opus | ✅ task SUCCESS | ⚠️ source_md 为空 | — | 已知预存问题：opus sniff 为 video 类型 |
+| 网页 | 未单独测（复用 video/text 路径） | — | — | sniff 逻辑已覆盖 |
 
 ## Phase R13.6 — yt-dlp metadata 覆盖到 audio/note handler
 

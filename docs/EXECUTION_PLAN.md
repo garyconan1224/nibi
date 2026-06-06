@@ -4,7 +4,7 @@
 >
 > **维护规则见 CLAUDE.md「项目执行计划维护流程」一节**。
 >
-> Last updated: 2026-06-05（Track K·R0 完成）
+> Last updated: 2026-06-06（Track K·NI.4 端到端收口）
 >
 > ⚠️ **2026-06-05 Track K 覆盖说明**：当前临时主线是 **单素材统一笔记页（NoteShell）架构收口**，依据 [`docs/plans/track-K-M7-result-pages-redesign.md`](plans/track-K-M7-result-pages-redesign.md)，本轮只定设计不动代码。下方历史长表不重写，仅作存档；勿按旧 RP1-C / M7 pipeline 直接开工。
 
@@ -297,6 +297,13 @@
 - [x] **K·R1.4** R1 收口：文档同步 + 基线风险记录（dev.sh pid / vitest 14 fail）— `677fd09`
 - [x] **K·R2.1** 对照视图 + 三态切换（read|edit|compare）+ 窄屏降级 — `feat/k-r2-1-compare-view`，`021e3f1` `5352b2e`
 - [x] **K·R2.2** R2 收口：对照右栏 source 原文切换 + 文档同步。WYSIWYG 富文本编辑器记为 backlog（需装库，单独评估）
+- [x] **K·R3.1** note API 出 media+transcript + 图片 inline + image 入口 — `feat/k-r3-1-note-api-media`，`fd3300b`
+- [x] **K·R3.2** video companion 播放器+转录轴接入 NoteShell — `feat/k-r3-2-video-companion`，`eb3ec2e`
+- [x] **K·R3.3** audio companion 音频播放器+转录轴接入 NoteShell — `feat/k-r3-3-audio-companion`，`999b363`
+- [x] **K·NI.1** 后端「生成笔记」统一入口：generate-note 端点 + assemble 回调 + note_assembler 兜底 — `feat/k-ni-1-note-task-intake`，`c7bee83`
+- [x] **K·NI.2-redo** 前端「生成笔记」零配置入口：第五卡片 + noteMode 简化界面 — `feat/k-ni-2-redo-zero-config`，`0e7cfb4`
+- [x] **K·NI.3** 后端图文智能合成：VLM+OCR → LLM 语境插图 → markdown 含图 — `feat/k-ni-3-image-compose`，`f63ea5f`
+- [x] **K·NI.4** 端到端 + 收口：小红书图文 → NoteShell 图文混排渲染 ✓；四来源回归 ✓（opus source_md 空为已知预存问题）；文档收口
 
 ---
 
