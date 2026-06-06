@@ -27,6 +27,7 @@ import type { ItemNote } from '@/types/workspace'
 import type { ItemSummary } from '@/services/summaries'
 import { Badge } from '@/components/ui/badge'
 import { SYSTEM_TAG_DIMENSIONS } from '@/constants/tagDimensions'
+import NoteMediaCompanion from './NoteMediaCompanion'
 import { SummariesTab } from '@/components/SummariesTab'
 
 // remarkGfm 类型与 react-markdown 不完全兼容
@@ -544,6 +545,14 @@ export default function NoteShell() {
 
       {/* ════════ 伴随区 ════════ */}
       <div style={{ flexShrink: 0, maxHeight: '40%', overflowY: 'auto' }}>
+        {/* R3.2: video companion — 播放器 + 转录轴 */}
+        {itemType === 'video' && note.media?.video?.url && (
+          <NoteMediaCompanion
+            media={note.media}
+            transcript={Array.isArray(note.transcript) ? note.transcript as never : []}
+            workspaceId={workspaceId}
+          />
+        )}
         {/* 总结风格面板 */}
         <SummariesPanel
           workspaceId={workspaceId}

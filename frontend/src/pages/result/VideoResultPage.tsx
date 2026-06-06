@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, BookOpen, Check, CheckSquare, Copy, Download, Film, Maximize2, MinusSquare, Pause, Pencil, Play, Settings2, Square, Star, X } from 'lucide-react'
+import { ArrowLeft, BookOpen, Check, CheckSquare, Copy, Download, FileText, Film, Maximize2, MinusSquare, Pause, Pencil, Play, Settings2, Square, Star, X } from 'lucide-react'
 
 import {
   type PromptVersion,
@@ -639,6 +639,14 @@ export default function VideoResultPage() {
           <span className="kw" style={{ fontSize: 10, background: 'var(--accent-green)', color: '#fff', padding: '2px 8px', borderRadius: 6 }}>
             {result.detected_template ? `自动识别：${result.detected_template}` : (result.video_template || '其它')}
           </span>
+          <button
+            className="btn-ghost"
+            style={{ height: 24, padding: '0 8px', fontSize: 11, gap: 4, marginLeft: 6, borderRadius: 4, border: '1px solid var(--border)' }}
+            onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/note`)}
+            title="打开统一笔记（NoteShell）"
+          >
+            <FileText size={12} /> 统一笔记 <span style={{ fontSize: 9, opacity: 0.6 }}>beta</span>
+          </button>
           {/* 学习/复刻 toggle */}
           <div className="vd-mode-toggle">
             <button
@@ -843,6 +851,14 @@ export default function VideoResultPage() {
               DEMO
             </span>
           )}
+          <button
+            className="btn-ghost"
+            style={{ height: 24, padding: '0 8px', fontSize: 11, gap: 4, marginLeft: 6, borderRadius: 4, border: '1px solid var(--border)' }}
+            onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/note`)}
+            title="打开统一笔记（NoteShell）"
+          >
+            <FileText size={12} /> 统一笔记 <span style={{ fontSize: 9, opacity: 0.6 }}>beta</span>
+          </button>
           {/* 学习/复刻 toggle */}
           <div className="vd-mode-toggle">
             <button
