@@ -306,6 +306,8 @@
 - [x] **K·NI.4** 端到端 + 收口：小红书图文 → NoteShell 图文混排渲染 ✓；四来源回归 ✓（opus source_md 空为已知预存问题）；文档收口
 - [x] **K·R4.1** 任务中心笔记向素材直达 NoteShell：MaterialCard + FavoritesTab + ResultsOverview 路由分流（replica 走原路，其余 → `/note`）— `feat/k-r4-1-note-route`
 - [x] **K·R4.2** overview 收敛 + 剩余落点统一直达：共享 helper 提取 + LibraryPage 改用 + ResultsOverview 兜底跳转 + library API 加 preflight — `feat/k-r4-2-overview-converge`
+- [x] **K·R4.3** NoteShell 补齐 问AI/导出/TOC：NoteChatDrawer 接入 + Markdown+Obsidian 双导出 + h2/h3 侧栏目录 + item 级 Obsidian zip 端点 — `feat/k-r4-3-noteshell-caps`
+- [x] **K·R4.4** R4 全线回归 + 收口：四类型路由 ✓ / Library 入口 ✓ / NoteShell 功能 ✓ / 旧链接不 404 ✓ / tsc ✓ / pytest 53 passed ✓
 
 ---
 
