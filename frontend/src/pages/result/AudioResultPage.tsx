@@ -364,6 +364,14 @@ export default function AudioResultPage() {
         <span className="vd-sep" />
         <span className="vd-title">{result.audio?.title || result.audio?.filename || '音频'}</span>
         <span className="kw mono" style={{ fontSize: 10, flexShrink: 0 }}>AUDIO · {result.audio?.duration_str || formatSec(totalSec)}</span>
+        <button
+          className="btn-ghost"
+          style={{ height: 24, padding: '0 8px', fontSize: 11, gap: 4, marginLeft: 6, borderRadius: 4, border: '1px solid var(--border)' }}
+          onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/note`)}
+          title="打开统一笔记（NoteShell）"
+        >
+          <FileText size={12} /> 统一笔记 <span style={{ fontSize: 9, opacity: 0.6 }}>beta</span>
+        </button>
         {result.source === 'demo_fixture' && (
           <span className="mono" style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'var(--accent-warm)', color: '#fff', fontWeight: 600 }} title="demo fixture">DEMO</span>
         )}

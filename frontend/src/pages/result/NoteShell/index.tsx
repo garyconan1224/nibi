@@ -545,8 +545,15 @@ export default function NoteShell() {
 
       {/* ════════ 伴随区 ════════ */}
       <div style={{ flexShrink: 0, maxHeight: '40%', overflowY: 'auto' }}>
-        {/* R3.2: video companion — 播放器 + 转录轴 */}
-        {itemType === 'video' && note.media?.video?.url && (
+        {/* R3.2/R3.3: video/audio companion — 播放器 + 转录轴 */}
+        {(itemType === 'video' && note.media?.video?.url) && (
+          <NoteMediaCompanion
+            media={note.media}
+            transcript={Array.isArray(note.transcript) ? note.transcript as never : []}
+            workspaceId={workspaceId}
+          />
+        )}
+        {(itemType === 'audio' && note.media?.audio) && (
           <NoteMediaCompanion
             media={note.media}
             transcript={Array.isArray(note.transcript) ? note.transcript as never : []}
