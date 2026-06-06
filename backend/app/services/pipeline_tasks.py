@@ -1853,6 +1853,10 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         video_file = ""
         if download_save_path and Path(download_save_path).is_file():
             video_file = download_save_path
+            # analyze 轨只处理当前视频，避免共享目录旧视频污染笔记
+            videos = [p for p in videos if p.resolve() == Path(video_file).resolve()]
+            if not videos:
+                videos = [Path(video_file)]
         else:
             if download_save_path:
                 runner.append_log(
