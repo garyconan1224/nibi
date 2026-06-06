@@ -33,17 +33,16 @@ const DETAIL_ROUTE: Record<ItemType, string> = {
   text: 'text_detail',
 }
 
-/** 根据 item 类型和 intent 决定详情页路由 */
+/** 根据 item intent 决定详情页路由：笔记向直达 NoteShell，复刻向走原路由 */
 function resolveDetailRoute(workspaceId: string, item: WorkspaceItem): string {
-  // video 类型：learning intent 跳 /ln，其它跳 video_detail
+  // 笔记向（非 replica）→ 直达 NoteShell
+  if (item.preflight?.intent !== 'replica') {
+    return `/workspaces/${workspaceId}/items/${item.item_id}/note`
+  }
+  // 复刻向（replica）→ 保留原逻辑
   if (item.type === 'video') {
-    const intent = item.preflight?.intent
-    if (intent === 'learning') {
-      return `/workspaces/${workspaceId}/ln`
-    }
     return `/workspaces/${workspaceId}/items/${item.item_id}/video_detail`
   }
-  // 非 video 类型：走原路由
   return `/workspaces/${workspaceId}/items/${item.item_id}/${DETAIL_ROUTE[item.type]}`
 }
 

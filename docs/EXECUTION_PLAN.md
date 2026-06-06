@@ -304,6 +304,7 @@
 - [x] **K·NI.2-redo** 前端「生成笔记」零配置入口：第五卡片 + noteMode 简化界面 — `feat/k-ni-2-redo-zero-config`，`0e7cfb4`
 - [x] **K·NI.3** 后端图文智能合成：VLM+OCR → LLM 语境插图 → markdown 含图 — `feat/k-ni-3-image-compose`，`f63ea5f`
 - [x] **K·NI.4** 端到端 + 收口：小红书图文 → NoteShell 图文混排渲染 ✓；四来源回归 ✓（opus source_md 空为已知预存问题）；文档收口
+- [x] **K·R4.1** 任务中心笔记向素材直达 NoteShell：MaterialCard + FavoritesTab + ResultsOverview 路由分流（replica 走原路，其余 → `/note`）— `feat/k-r4-1-note-route`
 
 ---
 
