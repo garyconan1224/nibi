@@ -102,6 +102,16 @@ export async function sniffUrl(url: string): Promise<SniffResult> {
   return res.data
 }
 
+/** POST /workspaces/{id}/items/generate-note — 零配置生成笔记 */
+export async function generateNote(
+  workspaceId: string,
+  url: string,
+  name?: string,
+): Promise<{ task_id: string; task_type: string; item_type: string }> {
+  const res = await http.post(`${BASE}/${workspaceId}/items/generate-note`, { url, name })
+  return res.data
+}
+
 /** POST /workspaces/{id}/items — 添加素材 */
 export async function addWorkspaceItem(
   workspaceId: string,

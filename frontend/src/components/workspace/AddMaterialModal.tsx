@@ -8,6 +8,7 @@ import {
   FileVideo,
   Link2,
   Sparkles,
+  Wand2,
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -27,6 +28,7 @@ import {
   addWorkspaceItem,
   savePreflight,
   startItemPipeline,
+  generateNote,
 } from '@/services/workspaces'
 import type {
   AnalysisScope,
@@ -253,6 +255,9 @@ export function AddMaterialModal({
   // ── 视频用途模式 + 图片采集模式 ──
   const [videoIntent, setVideoIntent] = useState<'learning' | 'replica'>('learning')
   const [imageMode, setImageMode] = useState<'replica_prompt' | 'ocr'>('replica_prompt')
+
+  // ── NI.2-redo: 生成笔记零配置模式 ──
+  const [noteMode, setNoteMode] = useState(false)
 
   // ── 链接预填来源 hint ──
   const [linkPreviewSource, setLinkPreviewSource] = useState<string | null>(null)
@@ -715,8 +720,45 @@ export function AddMaterialModal({
     }
   }
 
+  // ── NI.2-redo: 生成笔记（智能识别）──
+  const handleGenerateNote = async () => {
+    if (!effectiveUrl) {
+      setError('请先输入素材链接')
+      return
+    }
+    setSubmitting(true)
+    setError(null)
+
+    try {
+      // 1. 无工作空间时自动创建
+      let wsId = workspaceIds[0]
+      if (!wsId) {
+        const ws = await autoCreateWorkspace({ hint_url: effectiveUrl })
+        wsId = ws.workspace_id
+        toast.info(`已自动创建工作空间「${ws.name}」`)
+      }
+
+      // 2. 调 generate-note 端点（sniff + 创建 item + note task + 关联）
+      const result = await generateNote(wsId, effectiveUrl, effectiveSniff?.title ?? undefined)
+
+      toast.success('笔记生成中', { description: `${result.item_type} · ${effectiveUrl}` })
+
+      onAdded?.()
+      onOpenChange(false)
+      navigate(`/processing/${result.task_id}`, {
+        state: { url: effectiveUrl, workspaceId: wsId, taskType: 'note' },
+      })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '生成笔记失败'
+      setError(msg)
+      toast.error(msg)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   // ── 派生值 ──
-  const hasContent = effectiveUrl.length > 0 && (showScopeCards || selectedTypes.length > 0)
+  const hasContent = effectiveUrl.length > 0 && (noteMode || showScopeCards || selectedTypes.length > 0)
   const enabledCount = useMemo(() => {
     let n = 0
     for (const t of selectedTypes) {
@@ -828,7 +870,11 @@ export function AddMaterialModal({
                       type="button"
                       className="type-card"
                       data-active={active ? 'true' : 'false'}
-                      onClick={() => selectable && toggleType(t)}
+                      onClick={() => {
+                        if (!selectable) return
+                        setNoteMode(false)
+                        toggleType(t)
+                      }}
                       disabled={!selectable}
                     >
                       <Icon size={22} />
@@ -837,6 +883,20 @@ export function AddMaterialModal({
                     </button>
                   )
                 })}
+                {/* NI.2-redo: 生成笔记零配置入口 */}
+                <button
+                  type="button"
+                  className="type-card"
+                  data-active={noteMode ? 'true' : 'false'}
+                  onClick={() => {
+                    setNoteMode((prev) => !prev)
+                    setSelectedTypes([])
+                  }}
+                >
+                  <Wand2 size={22} />
+                  <div className="tc-l">生成笔记</div>
+                  <div className="mono tc-en">智能识别 · 零配置</div>
+                </button>
               </div>
             )}
           </div>
@@ -875,6 +935,13 @@ export function AddMaterialModal({
                 {internalSniff ? '已识别' : '输入后自动识别'}
               </span>
             </div>
+            )}
+            {/* noteMode: 显示 sniff 识别结果 */}
+            {noteMode && effectiveSniff && (
+              <div className="mono" style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>
+                ✓ 识别为 {sniffTypes.map(t => TYPE_META[t].label).join(' + ')}
+                {effectiveSniff.title ? ` · ${effectiveSniff.title}` : ''}
+              </div>
             )}
           </div>
 
@@ -919,8 +986,8 @@ export function AddMaterialModal({
             </div>
           )}
 
-          {/* ③ 分析任务（文字素材跳过） */}
-          {selectedTypes.length > 0 && !selectedTypes.every(t => t === 'text') && (
+          {/* ③ 分析任务（文字素材跳过；生成笔记模式隐藏） */}
+          {!noteMode && selectedTypes.length > 0 && !selectedTypes.every(t => t === 'text') && (
             <div className="m-section">
               <div className="eyebrow" style={{ marginBottom: 10 }}>
                 ③ 勾选分析任务 · 已按类型智能默认
@@ -1200,8 +1267,8 @@ export function AddMaterialModal({
             </details>
           )}
 
-          {/* ④ 识别用背景（文字素材跳过） */}
-          {!selectedTypes.every(t => t === 'text') && (
+          {/* ④ 识别用背景（文字素材跳过；生成笔记模式隐藏） */}
+          {!noteMode && selectedTypes.length > 0 && !selectedTypes.every(t => t === 'text') && (
             <div className="m-section">
               <div className="eyebrow" style={{ marginBottom: 10 }}>
                 ④ 识别用背景（可选 · 喂给 ASR/VLM 提升专有名词识别）
@@ -1226,26 +1293,47 @@ export function AddMaterialModal({
         <div className="m-foot">
           <span className="mono modal-foot-status">
             <span className="chip-dot" style={{ marginRight: 6 }} />
-            {showScopeCards
-              ? `${SCOPE_META[analysisScope].label} · ${SCOPE_META[analysisScope].sub}`
-              : `已勾选 ${enabledCount} 项 · ${selectedTypes.length} 种素材类型`}
+            {noteMode
+              ? '生成笔记 · 智能识别'
+              : showScopeCards
+                ? `${SCOPE_META[analysisScope].label} · ${SCOPE_META[analysisScope].sub}`
+                : `已勾选 ${enabledCount} 项 · ${selectedTypes.length} 种素材类型`}
           </span>
           <div className="modal-actions">
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handleQuickSubmit}
-              disabled={!hasContent || submitting}
-            >
-              {submitting ? (
-                '提交中…'
-              ) : (
-                <>
-                  <Sparkles size={14} />
-                  一键解析
-                </>
-              )}
-            </button>
+            {noteMode ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleGenerateNote}
+                disabled={!effectiveUrl || submitting}
+                title="自动识别内容类型，生成图文笔记"
+              >
+                {submitting ? (
+                  '处理中…'
+                ) : (
+                  <>
+                    <Wand2 size={14} />
+                    生成笔记
+                  </>
+                )}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleQuickSubmit}
+                disabled={!hasContent || submitting}
+              >
+                {submitting ? (
+                  '提交中…'
+                ) : (
+                  <>
+                    <Sparkles size={14} />
+                    一键解析
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </DialogContent>
