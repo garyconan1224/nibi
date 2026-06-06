@@ -1,28 +1,7 @@
 import { Star } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import type { WorkspaceItem, ItemType } from '@/types/workspace'
-
-/** 类型 → 结果路由后缀 */
-const RESULT_ROUTE: Record<ItemType, string> = {
-  video: 'result',
-  image: 'image_result',
-  audio: 'audio_result',
-  text: 'text_result',
-}
-
-/** 根据 item intent 决定跳转路径：笔记向直达 NoteShell，复刻向走原路由 */
-function resolveItemRoute(workspaceId: string, item: WorkspaceItem): string {
-  // 笔记向（非 replica）→ 直达 NoteShell
-  if (item.preflight?.intent !== 'replica') {
-    return `/workspaces/${workspaceId}/items/${item.item_id}/note`
-  }
-  // 复刻向（replica）→ 保留原逻辑
-  if (item.type === 'video') {
-    return `/workspaces/${workspaceId}/items/${item.item_id}/video_detail`
-  }
-  const suffix = RESULT_ROUTE[item.type]
-  return `/workspaces/${workspaceId}/items/${item.item_id}/${suffix}`
-}
+import type { WorkspaceItem } from '@/types/workspace'
+import { resolveItemRoute } from '@/lib/resolveItemRoute'
 
 interface FavoritesTabProps {
   /** 当前 workspace 的 favorites（item_id 列表） */

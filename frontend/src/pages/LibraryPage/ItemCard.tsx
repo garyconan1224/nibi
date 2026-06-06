@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import type { LibraryItem } from '@/services/library'
 import { Mic, Music } from 'lucide-react'
+import { resolveItemRoute } from '@/lib/resolveItemRoute'
 import {
   TYPE_ICON,
   STATE_COLOR,
@@ -35,7 +36,7 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
     if (selectMode && onToggleSelect) {
       onToggleSelect(item.item_id, item.workspace_id)
     } else if (isDone) {
-      navigate(`/workspaces/${item.workspace_id}/items/${item.item_id}/overview`)
+      navigate(resolveItemRoute(item.workspace_id, item))
     } else {
       // 未完成 → 进 ProcessingPage；用首个关联 task 兜底
       const tid = item.related_task_ids?.[0] ?? ''

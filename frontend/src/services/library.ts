@@ -16,6 +16,7 @@ export interface LibraryItem {
   thumbnail: string | null
   results_summary: { has_summary: boolean; has_transcript: boolean }
   primary_task_status: string | null
+  preflight?: { intent?: string; [key: string]: unknown }
   related_task_ids?: string[]
   uploader?: string | null
   has_subtitle?: boolean

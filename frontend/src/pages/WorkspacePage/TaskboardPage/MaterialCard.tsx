@@ -4,6 +4,7 @@ import { FileVideo, FileAudio, FileImage, FileText, MoreHorizontal, Film, Subtit
 import type { WorkspaceItem, ItemType } from '@/types/workspace'
 import { TranscriptPreviewModal } from '@/components/workspace/TranscriptPreviewModal'
 import { StoryboardLaunchModal } from './StoryboardLaunchModal'
+import { resolveItemRoute } from '@/lib/resolveItemRoute'
 
 /** 类型 → 图标 */
 const TYPE_ICON: Record<ItemType, React.ElementType> = {
@@ -43,28 +44,6 @@ const STATUS_LABEL: Record<string, string> = {
   processing: '处理中',
   pending: '等待中',
   failed: '失败',
-}
-
-/** status → 结果路由后缀 */
-const RESULT_ROUTE: Record<ItemType, string> = {
-  video: 'result',
-  image: 'image_result',
-  audio: 'audio_result',
-  text: 'text_result',
-}
-
-/** 根据 item intent 决定跳转路径：笔记向直达 NoteShell，复刻向走原路由 */
-function resolveItemRoute(workspaceId: string, item: WorkspaceItem): string {
-  // 笔记向（非 replica）→ 直达 NoteShell
-  if (item.preflight?.intent !== 'replica') {
-    return `/workspaces/${workspaceId}/items/${item.item_id}/note`
-  }
-  // 复刻向（replica）→ 保留原逻辑
-  if (item.type === 'video') {
-    return `/workspaces/${workspaceId}/items/${item.item_id}/video_detail`
-  }
-  const suffix = RESULT_ROUTE[item.type]
-  return `/workspaces/${workspaceId}/items/${item.item_id}/${suffix}`
 }
 
 interface MaterialCardProps {

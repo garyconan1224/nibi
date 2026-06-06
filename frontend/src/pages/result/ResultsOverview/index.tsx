@@ -24,27 +24,7 @@ import { ItemTagsPanel } from '@/components/workspace/ItemTagsPanel'
 
 import '../tokens.css'
 import './overview.css'
-
-/** type → detail 页路由后缀 */
-const DETAIL_ROUTE: Record<ItemType, string> = {
-  video: 'video_detail',
-  audio: 'audio_detail',
-  image: 'image_detail',
-  text: 'text_detail',
-}
-
-/** 根据 item intent 决定详情页路由：笔记向直达 NoteShell，复刻向走原路由 */
-function resolveDetailRoute(workspaceId: string, item: WorkspaceItem): string {
-  // 笔记向（非 replica）→ 直达 NoteShell
-  if (item.preflight?.intent !== 'replica') {
-    return `/workspaces/${workspaceId}/items/${item.item_id}/note`
-  }
-  // 复刻向（replica）→ 保留原逻辑
-  if (item.type === 'video') {
-    return `/workspaces/${workspaceId}/items/${item.item_id}/video_detail`
-  }
-  return `/workspaces/${workspaceId}/items/${item.item_id}/${DETAIL_ROUTE[item.type]}`
-}
+import { resolveItemRoute } from '@/lib/resolveItemRoute'
 
 type ItemResult = VideoResult | AudioResult | ImageResult | TextResult
 
@@ -164,6 +144,11 @@ export default function ResultsOverview() {
         const item = ws.items.find((it) => it.item_id === itemId)
         if (!item) {
           setPageState({ kind: 'error', message: '素材不存在' })
+          return
+        }
+        // R4.2: 笔记向素材访问 /overview 时自动跳转到 /note
+        if (item.preflight?.intent !== 'replica') {
+          navigate(resolveItemRoute(workspaceId, item), { replace: true })
           return
         }
 
@@ -512,7 +497,7 @@ export default function ResultsOverview() {
                 <button
                   className="btn-ghost"
                   style={{ fontSize: 11, height: 24, padding: '0 8px' }}
-                  onClick={() => pageState.kind === 'ready' && navigate(resolveDetailRoute(workspaceId, pageState.item))}
+                  onClick={() => pageState.kind === 'ready' && navigate(resolveItemRoute(workspaceId, pageState.item))}
                 >
                   查看全部
                 </button>
@@ -551,7 +536,7 @@ export default function ResultsOverview() {
           {/* 打开详情 — 大按钮 */}
           <button
             className="ov-detail-btn"
-            onClick={() => pageState.kind === 'ready' && navigate(resolveDetailRoute(workspaceId, pageState.item))}
+            onClick={() => pageState.kind === 'ready' && navigate(resolveItemRoute(workspaceId, pageState.item))}
           >
             打开详情 <ArrowRight size={14} />
           </button>
@@ -571,7 +556,7 @@ export default function ResultsOverview() {
           <div className="ov-side-actions">
             <button
               className="ov-side-action"
-              onClick={() => pageState.kind === 'ready' && navigate(resolveDetailRoute(workspaceId, pageState.item))}
+              onClick={() => pageState.kind === 'ready' && navigate(resolveItemRoute(workspaceId, pageState.item))}
             >
               <BookOpen size={14} />
               <span>{ITEM_TYPE_TEXT[itemType]}详情</span>

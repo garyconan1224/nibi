@@ -1115,6 +1115,7 @@ def get_library(include_trashed: bool = False) -> Dict[str, Any]:
                     "has_transcript": bool(results.get("transcript")),
                 },
                 "primary_task_status": _item_primary_task_status(item),
+                "preflight": item.preflight.to_dict() if hasattr(item, 'preflight') else {},
                 "uploader": str(results.get("video_uploader") or "") or None,
                 "has_subtitle": bool(results.get("subtitle_paths")),
                 "has_chapters": bool(results.get("chapters") or (results.get("av_synthesis") or {}).get("chapters")),

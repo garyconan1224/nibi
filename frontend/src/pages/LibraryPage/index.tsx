@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { fetchLibrary, deleteItem, batchDeleteItems, type LibraryItem, type LibraryResponse } from '@/services/library'
 import { deleteWorkspace, startItemPipeline } from '@/services/workspaces'
 import { useLibraryStore, type SortBy } from '@/store/libraryStore'
+import { resolveItemRoute } from '@/lib/resolveItemRoute'
 import { FilterChips } from './FilterChips'
 import { SortMenu } from './SortMenu'
 import { ViewToggle } from './ViewToggle'
@@ -270,7 +271,7 @@ export default function LibraryPage() {
 
   const handleOpenItem = useCallback((item: LibraryItem) => {
     if (item.status === 'done') {
-      navigate(`/workspaces/${item.workspace_id}/items/${item.item_id}/overview`)
+      navigate(resolveItemRoute(item.workspace_id, item))
     } else {
       // 未完成 → 不进结果页，提示用户
       toast.info('该素材尚在分析中，请从任务面板查看进度')
