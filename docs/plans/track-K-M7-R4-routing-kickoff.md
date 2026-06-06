@@ -29,21 +29,24 @@ R4 把这条路径缩短：笔记向素材（intent !== 'replica'）点卡片直
 
 ### 涉及文件
 
-| 文件 | R4.1 | R4.2 |
-|---|---|---|
+| 文件 | R4.1 | R4.2 | R4.3 |
+|---|---|---|---|
 | `MaterialCard.tsx` | ✅ 本地→共享 | — |
 | `FavoritesTab.tsx` | ✅ 本地→共享 | — |
 | `ResultsOverview/index.tsx` | ✅ 本地→共享 | ✅ useEffect 兜底跳转 |
 | `LibraryPage/ItemCard.tsx` | — | ✅ 用共享 helper |
 | `LibraryPage/index.tsx` | — | ✅ 用共享 helper |
-| `backend/app/routes/workspaces.py` | — | ✅ library API 加 preflight |
+| `backend/app/routes/workspaces.py` | — | ✅ library API 加 preflight | ✅ item note Obsidian export |
 | `frontend/src/services/library.ts` | — | ✅ LibraryItem 加 preflight 类型 |
+| `frontend/src/services/workspaces.ts` | — | — | ✅ item note export service |
+| `frontend/src/pages/result/NoteShell/index.tsx` | — | — | ✅ 问 AI / 导出 / TOC |
 
 ### 不动的东西
 
 - 旧路由（`/overview`、`/_detail`、`/ln`）不删、不改，直接访问仍可用
 - storyboard（复刻流）不碰
 - `_detail/_result` 页本身不改
+- `/ln`、`/av-synthesis` 路由和旧页面不删、不改，继续作为遗留入口保留
 - ProcessingPage 现有 note→/note 跳转不动
 
 ## R4 子任务
@@ -87,3 +90,27 @@ R4 把这条路径缩短：笔记向素材（intent !== 'replica'）点卡片直
 - 复刻素材 /overview 保留
 - 旧链接不 404
 - `pnpm -C frontend tsc -b` 绿
+
+### R4.3 NoteShell 补齐通用笔记能力 ✅
+
+**目标**：在统一 NoteShell 内补齐通用笔记能力，让用户不再必须回到旧 `/ln` 或 `/av-synthesis` 才能完成常用笔记操作。
+
+**边界**：
+1. 只补当前单素材 NoteShell 能力：问 AI、导出、目录 TOC
+2. `/ln`、`/av-synthesis` 路由和旧页面不动，作为遗留入口保留
+3. 不碰多素材综合、不碰复刻、不开 PDF/Word 导出
+
+**改动**：
+1. `NoteShell/index.tsx` 顶栏加「问 AI」按钮，复用通用 `NoteChatDrawer`，作用域为当前 `note.md` 正文 + 转录上下文
+2. `NoteShell/index.tsx` 顶栏加「导出」菜单：Markdown 前端直接下载；Obsidian 走 item 级 zip
+3. `NoteShell/index.tsx` 阅读态从 h2/h3 提取侧栏 TOC，点击滚动到正文标题
+4. `frontend/src/services/workspaces.ts` 增加 `exportItemNoteObsidian`
+5. `backend/app/routes/workspaces.py` 增加 `GET /workspaces/{ws}/items/{item}/note/export?format=obsidian`
+6. `tests/backend/test_item_note_write.py` 覆盖 Obsidian zip 与不支持格式
+
+**验收**：
+- NoteShell 顶栏可打开问 AI 面板，prompt 只包含当前笔记与转录
+- NoteShell 可导出 `.md` 和 Obsidian zip
+- 有 h2/h3 的笔记显示 TOC，点击可跳到标题
+- `cd frontend && pnpm exec tsc -b` 绿
+- `.venv/bin/python -m pytest tests/backend/test_item_note_write.py -q` 绿

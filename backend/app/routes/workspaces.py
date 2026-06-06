@@ -32,7 +32,7 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from backend.app.models.tasks import TERMINAL_STATUS_VALUES, TaskStatus
 
@@ -3277,6 +3277,68 @@ def update_item_note(workspace_id: str, item_id: str, req: NoteUpdateRequest) ->
         "media": media,
         "transcript": transcript,
     }
+
+
+@router.get("/{workspace_id}/items/{item_id}/note/export")
+def export_item_note(workspace_id: str, item_id: str, format: str = "obsidian") -> StreamingResponse:
+    """R4.3: 导出单素材 NoteShell 笔记为 Obsidian zip。"""
+    if format != "obsidian":
+        raise HTTPException(status_code=400, detail=f"unsupported format: {format!r}; use obsidian")
+
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+
+    nd = note_dir(workspace_id, item_id)
+    note_path = nd / "note.md"
+    if not note_path.exists():
+        if item.related_task_ids:
+            for tid in reversed(item.related_task_ids):
+                task = _pipeline_runner.store.get(tid)
+                if task and task.result:
+                    merged = dict(item.results or {})
+                    merged.update(task.result)
+                    item.results = merged
+                    break
+        assemble_item_note(workspace_id, item_id, _item=item)
+
+    if not note_path.exists():
+        raise HTTPException(status_code=404, detail="note not generated")
+
+    note_md = note_path.read_text(encoding="utf-8")
+    body = note_md
+    if note_md.startswith("---\n"):
+        parts = note_md.split("---\n", 2)
+        if len(parts) >= 3:
+            body = parts[2].lstrip()
+
+    title = item.name or item_id
+    h1 = re.search(r"^#\s+(.+)$", body, re.MULTILINE)
+    if h1:
+        title = h1.group(1).strip()
+    safe_title = re.sub(r'[/\\:*?"<>|]+', "_", title).strip("._ ") or "note"
+
+    exported_md = f"""---
+title: {title}
+source: {item.source_value or workspace_id}
+workspace_id: {workspace_id}
+item_id: {item_id}
+tags: [nibi, noteshell]
+---
+
+{body}"""
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(f"{safe_title}.md", exported_md)
+    buf.seek(0)
+    filename = f"{safe_title}-obsidian.zip"
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
+    )
 
 
 # ── InlineFrames（学习模式视频按需补图）───────────────────────────

@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import zipfile
 import yaml
 from pathlib import Path
 
@@ -194,3 +195,35 @@ def test_creates_note_md_when_missing(client: TestClient):
     # GET 也能读到
     get_data = client.get(f"/workspaces/{ws_id}/items/{item_id}/note").json()
     assert new_body in get_data["note_md"]
+
+
+def test_export_item_note_obsidian_zip(client: TestClient):
+    """GET note/export?format=obsidian 返回只包含当前 item note 的 zip。"""
+    ws_id, item_id = _create_ws_and_item(client)
+    _seed_note_md(
+        ws_id=ws_id,
+        item_id=item_id,
+        content="---\nschema_version: 1\ntype: text\n---\n\n# 导出标题\n\n## 摘要\n\n正文",
+    )
+
+    resp = client.get(f"/workspaces/{ws_id}/items/{item_id}/note/export?format=obsidian")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/zip"
+
+    zip_path = note_dir(ws_id, item_id) / "out.zip"
+    zip_path.write_bytes(resp.content)
+    with zipfile.ZipFile(zip_path) as zf:
+        names = zf.namelist()
+        assert names == ["导出标题.md"]
+        content = zf.read(names[0]).decode("utf-8")
+
+    assert "title: 导出标题" in content
+    assert "item_id:" in content
+    assert "## 摘要" in content
+
+
+def test_export_item_note_rejects_unsupported_format(client: TestClient):
+    """note/export 目前只支持 Obsidian，避免误用旧 ws 级 PDF/Word 链路。"""
+    ws_id, item_id = _create_ws_and_item(client)
+    resp = client.get(f"/workspaces/{ws_id}/items/{item_id}/note/export?format=pdf")
+    assert resp.status_code == 400

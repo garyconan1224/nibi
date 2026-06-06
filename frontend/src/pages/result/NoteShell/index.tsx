@@ -12,23 +12,25 @@
  *   - NoteEditor：轻量 CodeMirror 编辑器（不依赖 lnEditorStore）
  *   - SummariesPanel：总结风格面板（可折叠，含应用到主笔记）
  */
-import { useCallback, useEffect, useSyncExternalStore, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useSyncExternalStore, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowLeft, ChevronDown, ChevronRight, FileText } from 'lucide-react'
+import { ArrowLeft, BookOpenCheck, ChevronDown, ChevronRight, Download, FileText, List, MessageCircle } from 'lucide-react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown as cmMarkdown } from '@codemirror/lang-markdown'
+import { toast } from 'sonner'
 
-import { getItemNote, putItemNote } from '@/services/workspaces'
+import { exportItemNoteObsidian, getItemNote, putItemNote } from '@/services/workspaces'
 import type { ItemNote } from '@/types/workspace'
 import type { ItemSummary } from '@/services/summaries'
 import { Badge } from '@/components/ui/badge'
 import { SYSTEM_TAG_DIMENSIONS } from '@/constants/tagDimensions'
 import NoteMediaCompanion from './NoteMediaCompanion'
 import { SummariesTab } from '@/components/SummariesTab'
+import NoteChatDrawer from '@/components/NoteChatDrawer'
 
 // remarkGfm 类型与 react-markdown 不完全兼容
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -58,9 +60,81 @@ const VIEW_MODE_KEY = 'nibi-note-view-mode'
 type ViewMode = 'read' | 'edit' | 'compare'
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed'
 
+interface TocEntry {
+  id: string
+  text: string
+  level: number
+}
+
 /** 格式化 HH:mm */
 function formatTime(d: Date): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+/** 从 markdown 正文提取 h2/h3 生成 TOC。 */
+function extractToc(md: string): TocEntry[] {
+  const entries: TocEntry[] = []
+  for (const line of md.split('\n')) {
+    const match = line.match(/^(#{2,3})\s+(.+)$/)
+    if (!match) continue
+    entries.push({
+      id: `note-heading-${entries.length}`,
+      text: match[2].trim(),
+      level: match[1].length,
+    })
+  }
+  return entries
+}
+
+function headingId(text: string, toc: TocEntry[]): string | undefined {
+  return toc.find((entry) => entry.text === text)?.id
+}
+
+function safeFilename(name: string): string {
+  return name.replace(/[/\\:*?"<>|]/g, '_').trim().slice(0, 80) || 'note'
+}
+
+function formatTranscriptForPrompt(raw: unknown): string {
+  if (typeof raw === 'string') return raw.trim()
+  if (!Array.isArray(raw)) return ''
+  return raw
+    .map((seg) => {
+      if (!seg || typeof seg !== 'object') return ''
+      const data = seg as Record<string, unknown>
+      const time = data.t_str ?? data.start ?? data.t_sec
+      const text = data.edited_text ?? data.text
+      if (!text) return ''
+      return time !== undefined ? `[${String(time)}] ${String(text)}` : String(text)
+    })
+    .filter(Boolean)
+    .join('\n')
+}
+
+function buildChatSystemPrompt(body: string, transcript: unknown): string {
+  const parts = [
+    '你正在协助用户理解一篇单素材笔记。回答时只能基于下方 note.md 正文和转录上下文，不要编造笔记里没有的信息。',
+    '',
+    '【note.md 正文】',
+    body || '（暂无笔记内容）',
+  ]
+  const transcriptText = formatTranscriptForPrompt(transcript)
+  if (transcriptText) {
+    parts.push('', '【转录上下文】', transcriptText)
+  }
+  parts.push('', '回答指引：基于上述笔记作答；如果用户问到时间点，请引用对应转录；回答使用中文。')
+  return parts.join('\n')
+}
+
+function downloadMarkdownFile(markdown: string, title: string): void {
+  const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${safeFilename(title)}.md`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }
 
 /** useSyncExternalStore 兼容的媒体查询 hook，窄屏降级用 */
@@ -313,6 +387,8 @@ export default function NoteShell() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [tagsOpen, setTagsOpen] = useState(true)
+  const [chatOpen, setChatOpen] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
 
   // R1.3 + R2.1: 视图模式 + 保存状态（兼容三值 + 窄屏降级 compare → read）
   const isWide = useMediaQuery('(min-width: 1024px)')
@@ -417,6 +493,44 @@ export default function NoteShell() {
     }
   }, [note])
 
+  const noteBody = note ? extractBody(note.note_md) : ''
+  const currentBody = viewMode === 'read' ? noteBody : editingBody
+  const toc = useMemo(() => extractToc(currentBody), [currentBody])
+  const chatSystemPrompt = useMemo(
+    () => buildChatSystemPrompt(currentBody, note?.transcript),
+    [currentBody, note?.transcript],
+  )
+
+  const handleTocJump = useCallback((id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
+
+  const handleExportMarkdown = useCallback(() => {
+    if (!note) return
+    const title = String((note.frontmatter as Record<string, unknown>)?.title ?? 'note')
+    downloadMarkdownFile(currentBody, title)
+    setExportOpen(false)
+  }, [currentBody, note])
+
+  const handleExportObsidian = useCallback(async () => {
+    try {
+      const blob = await exportItemNoteObsidian(workspaceId, itemId)
+      const title = String((note?.frontmatter as Record<string, unknown> | undefined)?.title ?? 'note')
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${safeFilename(title)}-obsidian.zip`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      setExportOpen(false)
+    } catch (err) {
+      console.error('Obsidian 导出失败:', err)
+      toast.error('Obsidian 包导出失败，请重试')
+    }
+  }, [workspaceId, itemId, note])
+
   // ─── loading / error ───
   if (loading) {
     return (
@@ -443,7 +557,6 @@ export default function NoteShell() {
   const title = String(fm.title ?? '')
   const itemType = String(fm.type ?? 'text')
   const tags = (fm.tags ?? {}) as Record<string, unknown>
-  const body = extractBody(note.note_md)
   const hasTags = tags && Object.keys(tags).length > 0
 
   return (
@@ -489,6 +602,55 @@ export default function NoteShell() {
         )}
 
         <div style={{ flex: 1 }} />
+        <button
+          className="btn-ghost"
+          onClick={() => setChatOpen((open) => !open)}
+          style={{ height: 28, padding: '0 10px', fontSize: 12 }}
+          title="基于当前笔记问 AI"
+        >
+          <MessageCircle size={13} /> 问 AI
+        </button>
+        <div style={{ position: 'relative' }}>
+          <button
+            className="btn-ghost"
+            onClick={() => setExportOpen((open) => !open)}
+            style={{ height: 28, padding: '0 10px', fontSize: 12 }}
+            title="导出当前笔记"
+          >
+            <Download size={13} /> 导出
+          </button>
+          {exportOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                right: 0,
+                top: 34,
+                zIndex: 20,
+                minWidth: 160,
+                padding: '4px',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                background: 'var(--bg)',
+                boxShadow: '0 8px 24px rgba(15,23,42,.12)',
+              }}
+            >
+              <button
+                className="btn-ghost"
+                onClick={handleExportMarkdown}
+                style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
+              >
+                <FileText size={13} /> Markdown
+              </button>
+              <button
+                className="btn-ghost"
+                onClick={() => void handleExportObsidian()}
+                style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
+              >
+                <BookOpenCheck size={13} /> Obsidian 包
+              </button>
+            </div>
+          )}
+        </div>
         <Badge variant="outline" style={{ fontSize: 10 }}>
           <FileText size={10} /> NoteShell
         </Badge>
@@ -529,11 +691,24 @@ export default function NoteShell() {
       )}
 
       {/* ════════ 正文区（阅读态 / Markdown 编辑态 / 对照态）════════ */}
-      <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, padding: viewMode === 'compare' ? 0 : '20px 24px', overflowY: viewMode === 'compare' ? 'hidden' : 'auto' }}>
+      <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex' }}>
+        <div style={{ flex: 1, minWidth: 0, padding: viewMode === 'compare' ? 0 : '20px 24px', overflowY: viewMode === 'compare' ? 'hidden' : 'auto' }}>
         {viewMode === 'read' ? (
           <div style={{ fontSize: 14, lineHeight: 1.8, color: 'var(--ink-2)' }}>
-            <ReactMarkdown remarkPlugins={remarkPlugins}>
-              {body}
+            <ReactMarkdown
+              remarkPlugins={remarkPlugins}
+              components={{
+                h2: ({ children, ...props }) => {
+                  const text = String(children)
+                  return <h2 id={headingId(text, toc)} {...props}>{children}</h2>
+                },
+                h3: ({ children, ...props }) => {
+                  const text = String(children)
+                  return <h3 id={headingId(text, toc)} {...props}>{children}</h3>
+                },
+              }}
+            >
+              {noteBody}
             </ReactMarkdown>
           </div>
         ) : viewMode === 'compare' ? (
@@ -541,10 +716,59 @@ export default function NoteShell() {
         ) : (
           <NoteEditor markdown={editingBody} onMarkdownChange={handleEditorChange} />
         )}
+        </div>
+        {viewMode === 'read' && toc.length > 0 && (
+          <aside
+            style={{
+              width: 220,
+              flexShrink: 0,
+              borderLeft: '1px solid var(--border)',
+              padding: '16px 14px',
+              overflowY: 'auto',
+              background: 'var(--bg)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 12, fontWeight: 700, color: 'var(--ink-2)' }}>
+              <List size={14} /> 目录
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {toc.map((entry) => (
+                <button
+                  key={entry.id}
+                  onClick={() => handleTocJump(entry.id)}
+                  style={{
+                    width: '100%',
+                    padding: entry.level === 3 ? '5px 8px 5px 18px' : '5px 8px',
+                    border: 'none',
+                    borderRadius: 4,
+                    background: 'transparent',
+                    color: 'var(--ink-3)',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    lineHeight: 1.4,
+                    textAlign: 'left',
+                  }}
+                >
+                  {entry.text}
+                </button>
+              ))}
+            </div>
+          </aside>
+        )}
       </div>
 
       {/* ════════ 伴随区 ════════ */}
       <div style={{ flexShrink: 0, maxHeight: '40%', overflowY: 'auto' }}>
+        {chatOpen && (
+          <div style={{ height: 320, borderTop: '1px solid var(--border)', display: 'flex', overflow: 'hidden' }}>
+            <NoteChatDrawer
+              workspaceId={workspaceId}
+              systemPrompt={chatSystemPrompt}
+              scopeHint="仅基于当前 note.md 与转录上下文回答"
+              mode="inline"
+            />
+          </div>
+        )}
         {/* R3.2/R3.3: video/audio companion — 播放器 + 转录轴 */}
         {(itemType === 'video' && note.media?.video?.url) && (
           <NoteMediaCompanion

@@ -861,3 +861,15 @@ export async function putItemNote(
   const res = await http.put(`${BASE}/${workspaceId}/items/${itemId}/note`, { body })
   return res.data as ItemNote
 }
+
+/** R4.3: GET /workspaces/{id}/items/{itemId}/note/export?format=obsidian */
+export async function exportItemNoteObsidian(
+  workspaceId: string,
+  itemId: string,
+): Promise<Blob> {
+  const res = await http.get(`${BASE}/${workspaceId}/items/${itemId}/note/export`, {
+    params: { format: 'obsidian' },
+    responseType: 'blob',
+  })
+  return res.data as Blob
+}
