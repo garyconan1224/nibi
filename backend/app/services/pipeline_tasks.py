@@ -1508,6 +1508,111 @@ def analyze_image_file(
     return result
 
 
+def _img_to_static_url(img_path: str, data_dir: Path) -> str:
+    """将图片绝对路径转为 /static/... URL（复用 workspaces.to_static_url 逻辑）。"""
+    s = str(img_path)
+    if s.startswith("/static/"):
+        return s
+    try:
+        p = Path(s).resolve()
+        data_resolved = data_dir.resolve()
+        if (data_resolved in p.parents or p == data_resolved) and p.exists():
+            return "/static/" + p.relative_to(data_resolved).as_posix()
+    except (ValueError, OSError):
+        pass
+    return ""
+
+
+def _compose_images_with_llm(
+    *,
+    source_text: str,
+    image_infos: list[dict],
+    settings: Any,
+    payload: Dict[str, Any],
+    log: Callable[[str], None],
+) -> str:
+    """NI.3: 用 LLM 把图片按语境插入正文，输出完整 markdown。
+
+    image_infos: [{"idx": int, "description": str, "ocr_text": str, "static_url": str}]
+    失败返回空串（调用方 fallback 到原逻辑）。
+    """
+    api_key = (
+        str(payload.get("api_key") or "").strip()
+        or (settings.openai_api_key or "").strip()
+    )
+    if not api_key:
+        log("⚠️  无 api_key，跳过图文语境合成")
+        return ""
+
+    try:
+        registry = create_default_registry()
+        profile = registry.resolve_default_profile(settings, "chat")
+        provider = registry.build(profile)
+        model = (
+            str(payload.get("text_model") or "").strip()
+            or profile.default_models.get("chat")
+            or (settings.text_model or "").strip()
+        )
+        if not model:
+            log("⚠️  未配置 text_model，跳过图文语境合成")
+            return ""
+    except Exception as exc:
+        log(f"⚠️  LLM 初始化失败，跳过图文语境合成：{exc}")
+        return ""
+
+    # 构造图列表
+    img_lines: list[str] = []
+    for img in image_infos:
+        parts = [f"图{img['idx']}"]
+        if img["description"]:
+            parts.append(f"描述: {img['description']}")
+        if img["ocr_text"]:
+            parts.append(f"OCR文字: {img['ocr_text']}")
+        if img["static_url"]:
+            parts.append(f"URL: {img['static_url']}")
+        img_lines.append(" | ".join(parts))
+    img_list_text = "\n".join(img_lines)
+
+    sys_prompt = (
+        "你是一名专业的图文编辑。任务：把图片按内容语境插入到正文最相关的位置，输出完整 markdown。\n"
+        "规则：\n"
+        "1. 文字型图片（以 OCR 文字为主）：将 OCR 内容自然融入正文相应段落，不另起图片块。\n"
+        "2. 配图/插图（以视觉描述为主）：用 ![简短描述](图片URL) 插到内容最相关的段落附近。\n"
+        "3. 信息完整不丢：正文原文、每张图的描述/OCR 都要体现在输出中。\n"
+        "4. 保持原文结构和语义，不要编造新内容。\n"
+        "5. 直接输出 markdown，不要加任何解释说明。"
+    )
+
+    body = source_text[:12000]
+    user_prompt = (
+        f"# 正文\n{body}\n\n"
+        f"# 图片列表（共 {len(image_infos)} 张）\n{img_list_text}\n\n"
+        "请将图片按语境插入正文，输出完整 markdown："
+    )
+
+    try:
+        raw = provider.chat(
+            ChatRequest(
+                model=model,
+                messages=[
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.3,
+                max_tokens=4096,
+            )
+        )
+        composed = raw.strip()
+        if composed:
+            log(f"✅ 图文语境合成完成，{len(composed)} 字")
+            return composed
+        log("⚠️  LLM 返回空，回退到原逻辑")
+        return ""
+    except Exception as exc:
+        log(f"⚠️  图文语境合成失败，回退到原逻辑：{exc}")
+        return ""
+
+
 def _steps_for_note_kind(kind: str, requested_steps: list[str]) -> list[str]:
     """根据内容类型裁剪后续步骤。"""
     steps = list(requested_steps)
@@ -1636,7 +1741,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             "background_context": background_context,
         })
 
-    # ── 3.6. 图集分析（image_text: OCR + VLM 逐图描述）─────────
+    # ── 3.6. 图集分析（image_text: OCR + VLM 逐图描述 + LLM 语境合成）──
     if note_kind == "image_text" and images_from_download:
         runner.store.update(task_id, status=TaskStatus.VLM.value)
         runner.set_progress(task_id, 0.35, "图集分析中...")
@@ -1644,7 +1749,9 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         def _log_img(msg: str) -> None:
             runner.append_log(task_id, f"[图集] {msg}")
 
-        image_descriptions: list[str] = []
+        data_dir = Path(load_settings().data_dir)
+        image_infos: list[dict] = []
+        image_descriptions: list[str] = []  # 兜底用
         for idx, img_path in enumerate(images_from_download):
             runner.set_progress(
                 task_id,
@@ -1654,6 +1761,14 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             info = analyze_image_file(
                 img_path, vision_model, api_key, log=_log_img,
             )
+            static_url = _img_to_static_url(img_path, data_dir)
+            image_infos.append({
+                "idx": idx + 1,
+                "description": info["description"],
+                "ocr_text": info["ocr_text"],
+                "static_url": static_url,
+            })
+            # 兜底：纯文本描述（LLM 合成失败时使用）
             parts: list[str] = []
             if info["description"]:
                 parts.append(info["description"])
@@ -1665,13 +1780,26 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 )
 
         if image_descriptions:
-            images_text = "\n\n".join(image_descriptions)
-            source_text_from_download = (
-                source_text_from_download + "\n\n" + images_text
-                if source_text_from_download
-                else images_text
-            )
             _log_img(f"图集分析完成，{len(image_descriptions)} 张有描述")
+
+            # NI.3: 尝试 LLM 语境合成（图文混排 markdown）
+            composed = _compose_images_with_llm(
+                source_text=source_text_from_download,
+                image_infos=image_infos,
+                settings=load_settings(),
+                payload=payload,
+                log=_log_img,
+            )
+            if composed:
+                source_text_from_download = composed
+            else:
+                # 兜底：回退到原逻辑（描述堆末尾）
+                images_text = "\n\n".join(image_descriptions)
+                source_text_from_download = (
+                    source_text_from_download + "\n\n" + images_text
+                    if source_text_from_download
+                    else images_text
+                )
 
     # ── 4+5. transcribe + analyze 并行步骤 ──────────────────────
     # R22: 音频转录(ASR)与视频截帧(VLM)本质独立，可并行执行。

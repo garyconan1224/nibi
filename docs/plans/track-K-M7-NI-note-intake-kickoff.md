@@ -104,3 +104,23 @@ NI.1（generate-note 端点 + assemble + 兜底）已合（c7bee83）。NI.2 实
 - **R4**：路由收敛**纳入「生成笔记产出 item → 直达 NoteShell」**（与列表直达统一），方向不变。
 - **R5**：`note.html` 带图**复用 NI.3 成果**，不重复造。
 - **待观察 ·「结果页做按需分析」**（重新 OCR/VLM/换角度/对片段深入）：用户 2026-06-06 定「NI/R 做完再看」。现阶段用现有 **总结风格(14)+AI 问答+编辑** 覆盖事后处理，**暂不新增专门期**；真碰到缺口再评估（可能 R6）。
+
+---
+
+# 9. NI.3 实施记录（2026-06-06）
+
+**改动范围**：仅后端 `backend/app/services/pipeline_tasks.py` + 新测试，不动前端。
+
+**实现要点**：
+1. `handle_note_task` 的 image_text 分支（原 3.6 步）升级：保留 `analyze_image_file` 逐图 VLM+OCR → 收集结构化 `image_infos`（含 `/static/` URL）→ 调 `_compose_images_with_llm()` 一次 LLM 合成。
+2. `_compose_images_with_llm()`：system prompt 指导 LLM 区分「文字型图 → OCR 融入正文」与「配图 → `![](url)` 按语境插入」；输入正文 + 图列表(描述/OCR/URL)，输出完整 markdown。
+3. `_img_to_static_url()`：复用 `workspaces.to_static_url` 逻辑，将 data 下绝对路径转 `/static/...`。
+4. **兜底**：无 api_key / LLM 失败 / 返回空 → 回退原逻辑（描述堆末尾），best-effort 不报错不阻断。
+5. 合成结果写入 `source_text_from_download` → step 6 → `results["markdown"]`，`note_assembler` 已会用它。
+
+**测试**（`tests/backend/test_image_compose.py`，8 passed）：
+- LLM 合成成功 → 输出含 `![...](/static/...)` 图引用 + 图不在末尾堆叠
+- LLM 返回空 → fallback 空串
+- 无 api_key → 跳过
+- LLM 异常 → 不阻断
+- `_img_to_static_url` 路径转换正确
