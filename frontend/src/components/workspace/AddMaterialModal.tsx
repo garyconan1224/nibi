@@ -746,7 +746,7 @@ export function AddMaterialModal({
       onAdded?.()
       onOpenChange(false)
       navigate(`/processing/${result.task_id}`, {
-        state: { url: effectiveUrl, workspaceId: wsId, taskType: 'note' },
+        state: { url: effectiveUrl, workspaceId: wsId, taskType: 'note', itemId: result.item_id },
       })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '生成笔记失败'
