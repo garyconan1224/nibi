@@ -16,6 +16,7 @@ from typing import Any, Callable, Dict, List, Optional
 from backend.app.models.tasks import TaskRecord, TaskStatus
 from backend.app.services.task_runner import TaskRunner
 from shared.config import (
+    DATA_DIR,
     get_workspace_json_dir,
     get_workspace_root,
     get_workspace_text_dir,
@@ -1754,7 +1755,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         def _log_img(msg: str) -> None:
             runner.append_log(task_id, f"[图集] {msg}")
 
-        data_dir = Path(load_settings().data_dir)
+        data_dir = DATA_DIR
         image_infos: list[dict] = []
         image_descriptions: list[str] = []  # 兜底用
         for idx, img_path in enumerate(images_from_download):
