@@ -104,7 +104,7 @@ export default function ProcessingPage() {
     if (analyze && analyze.task_id !== taskId) {
       navigate(`/processing/${analyze.task_id}`, {
         replace: true,
-        state: { workspaceId, itemId },
+        state: { workspaceId, itemId, taskType: state?.taskType },
       })
     }
   }, [task, allTasks, taskId, navigate, workspaceId, itemId])

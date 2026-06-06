@@ -973,6 +973,11 @@ def _item_thumbnail(item: WorkspaceItem, results: dict = None) -> Optional[str]:
                 if frames[0].get(key):
                     path = str(frames[0][key])
                     break
+    # NI.3: 图文笔记的 images 数组（第一张图作为缩略图）
+    if not path and item.type == "image":
+        images = results.get("images") or []
+        if images and isinstance(images[0], str) and images[0]:
+            path = images[0]
     if not path and item.type == "audio":
         audio = results.get("audio") if isinstance(results.get("audio"), dict) else {}
         audio_filename = str(audio.get("filename") or "").strip()
@@ -1018,6 +1023,14 @@ def _item_display_name(
     audio_filename = str(audio.get("filename") or "").strip()
     if audio_filename:
         return Path(audio_filename).stem
+
+    # NI.3: 从 video_file 路径提取标题（图文笔记场景：video_file 是本地文件夹/文件路径）
+    video_file = str(results.get("video_file") or "").strip()
+    if video_file:
+        stem = Path(video_file).stem
+        # 路径 stem 有意义且不是纯 UUID/数字时用作标题
+        if stem and not stem.replace("-", "").isdigit() and len(stem) > 2:
+            return stem
 
     raw_name = item.name or ""
     source_tail = item.source_value.split("/")[-1] if item.source_value else ""
@@ -1716,6 +1729,7 @@ def generate_note(workspace_id: str, req: GenerateNoteRequest) -> Dict[str, Any]
         "task_id": task_rec.task_id,
         "task_type": "note",
         "item_type": item_type,
+        "item_id": item.item_id,
     }
 
 

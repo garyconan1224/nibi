@@ -219,6 +219,7 @@ export interface GenerateNoteResponse {
   task_id: string
   task_type: string
   item_type: string
+  item_id: string
 }
 
 /** POST /workspaces/{id}/items/generate-note — 生成笔记统一入口 */
