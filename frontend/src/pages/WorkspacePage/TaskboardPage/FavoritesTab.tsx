@@ -10,13 +10,14 @@ const RESULT_ROUTE: Record<ItemType, string> = {
   text: 'text_result',
 }
 
-/** 根据 item 类型和 intent 决定跳转路径 */
+/** 根据 item intent 决定跳转路径：笔记向直达 NoteShell，复刻向走原路由 */
 function resolveItemRoute(workspaceId: string, item: WorkspaceItem): string {
+  // 笔记向（非 replica）→ 直达 NoteShell
+  if (item.preflight?.intent !== 'replica') {
+    return `/workspaces/${workspaceId}/items/${item.item_id}/note`
+  }
+  // 复刻向（replica）→ 保留原逻辑
   if (item.type === 'video') {
-    const intent = item.preflight?.intent
-    if (intent === 'learning') {
-      return `/workspaces/${workspaceId}/ln`
-    }
     return `/workspaces/${workspaceId}/items/${item.item_id}/video_detail`
   }
   const suffix = RESULT_ROUTE[item.type]
