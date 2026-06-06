@@ -11,7 +11,9 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any, Dict, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 import requests
 
@@ -56,6 +58,47 @@ def fetch_bilibili_opus(url: str) -> Dict[str, Any]:
         return {"ok": False, "error": "未找到 window.__INITIAL_STATE__，页面结构可能已变"}
 
     return _parse_opus_state(state)
+
+
+def download_opus_images(
+    image_urls: List[str],
+    output_dir: str,
+) -> List[str]:
+    """下载 opus 图片到本地目录，返回本地路径列表。
+
+    与 shared/xiaohongshu_share.py 的图片下载模式对齐：
+    存到 data/workspaces/<ws>/image/<opus_id>/01.jpg 等。
+
+    Args:
+        image_urls: 远程图片 URL 列表
+        output_dir: 本地存储目录（已创建）
+
+    Returns:
+        成功下载的本地文件路径列表
+    """
+    if not image_urls:
+        return []
+
+    out = Path(output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    session = requests.Session()
+    session.headers.update({"User-Agent": _MOBILE_UA, "Referer": "https://www.bilibili.com/"})
+    saved: list[str] = []
+
+    for i, url in enumerate(image_urls):
+        try:
+            ext = Path(urlparse(url).path).suffix.lower() or ".jpg"
+            if ext not in (".jpg", ".jpeg", ".png", ".webp", ".gif"):
+                ext = ".jpg"
+            local_path = out / f"{i + 1:02d}{ext}"
+            resp = session.get(url, timeout=_SESSION_TIMEOUT)
+            resp.raise_for_status()
+            local_path.write_bytes(resp.content)
+            saved.append(str(local_path))
+        except Exception as e:
+            logger.warning("opus 图片下载失败 [%s]: %s", url, e)
+
+    return saved
 
 
 # ── 内部实现 ──────────────────────────────────────────────────────

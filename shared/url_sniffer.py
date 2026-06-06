@@ -39,6 +39,7 @@ _PLATFORM_DOMAIN_MAP: dict[str, tuple[str, str, list[str]]] = {
 _PLATFORM_PATH_RULES: dict[str, list[tuple[re.Pattern, str, list[str]]]] = {
     "bilibili": [
         (re.compile(r"/video/", re.IGNORECASE), "video", ["video", "audio"]),
+        (re.compile(r"/opus/", re.IGNORECASE), "image_text", ["image_text"]),
         (re.compile(r"/read/", re.IGNORECASE), "text", ["text"]),
         (re.compile(r"/audio/", re.IGNORECASE), "audio", ["audio"]),
         (re.compile(r"/bangumi/", re.IGNORECASE), "video", ["video", "audio"]),

@@ -1273,20 +1273,31 @@ def _download_note_source(
 
     # ── B站 opus 图文动态（移动端 HTML + __INITIAL_STATE__）──
     if url_hint == "bili_opus":
-        from backend.app.downloaders.bilibili_opus import fetch_bilibili_opus
+        from backend.app.downloaders.bilibili_opus import fetch_bilibili_opus, download_opus_images
         log(f"📄 B站 opus → 专用适配器 ({url[:60]})")
         _op = fetch_bilibili_opus(url)
         if not _op.get("ok"):
             return {"ok": False, "kind_hint": "text", "error": _op.get("error") or "B站 opus 解析失败"}
-        _imgs = _op.get("images", [])
-        kind = "image_text" if _imgs else "text"
+        _remote_imgs = _op.get("images", [])
+        _local_imgs: list[str] = []
+        _content = _op.get("content", "")
+        _opus_out = ""
+        if _remote_imgs:
+            _opus_id = (re.search(r"/opus/(\d+)", url) or [None, "unknown"])[1]
+            _opus_out = get_workspace_root(record.project_id) / "image" / f"opus_{_opus_id}"
+            _local_imgs = download_opus_images(_remote_imgs, str(_opus_out))
+            # 替换 content 中的远程 URL 为本地路径（供 _img_to_static_url 转 /static/）
+            for _r, _l in zip(_remote_imgs, _local_imgs):
+                _content = _content.replace(_r, _l)
+            log(f"📥 opus 图片已下载: {len(_local_imgs)}/{len(_remote_imgs)} 张")
+        kind = "image_text" if _local_imgs else "text"
         return {
             "ok": True,
             "kind_hint": kind,
-            "source_path": "",
-            "content": _op.get("content", ""),
+            "source_path": str(_opus_out) if _local_imgs else "",
+            "content": _content,
             "title": _op.get("title", ""),
-            "images": _imgs,
+            "images": _local_imgs,
             "video_file": "",
             "metadata": _op.get("meta", {}),
         }
