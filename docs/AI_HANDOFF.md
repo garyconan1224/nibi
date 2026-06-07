@@ -1,6 +1,8 @@
 # AI Handoff
 
-> ⚠️ **2026-06-05 覆盖（最新，先读这条）**：当前临时主线 = **Track K · 单素材统一笔记页（NoteShell）架构调研定稿中**，唯一依据 [`docs/plans/track-K-M7-result-pages-redesign.md`](plans/track-K-M7-result-pages-redesign.md)。**本轮只敲定设计、不动代码**；**勿**按旧 M7 kickoff（统一 note pipeline / M8·M9）或下方 2026-06-02 的 F3/C/D 方向开工。复刻 / AI 导演仍后置。
+> ⚠️ **2026-06-07 覆盖（最新，先读这条）**：笔记功能新增「一比一蓝图」[`docs/plans/track-K-note-flow-blueprint.md`](plans/track-K-note-flow-blueprint.md)（用户手绘流程/UI 图忠实复刻 + 疑点①②③⑤已确认，④图片/图文暂缓）。**重要对账**：Track K 的 **R1~R4 NoteShell 代码早已合入 main**（见 `docs/EXECUTION_PLAN.md`「Track K」区块），因此下方各处「只定设计、不动代码」均已**过时**。当前进行：以蓝图对照已落地代码，列「如何修改 / 增加」清单（动手前都问用户）。
+>
+> ⚠️ **2026-06-05 覆盖**：当前临时主线 = **Track K · 单素材统一笔记页（NoteShell）架构调研定稿中**，唯一依据 [`docs/plans/track-K-M7-result-pages-redesign.md`](plans/track-K-M7-result-pages-redesign.md)。**本轮只敲定设计、不动代码**；**勿**按旧 M7 kickoff（统一 note pipeline / M8·M9）或下方 2026-06-02 的 F3/C/D 方向开工。复刻 / AI 导演仍后置。
 
 Last updated: 2026-06-02（**主干基本完成；当前在 `main`，工作区干净。下一步看 ROADMAP §2+§11，不急**）
 
