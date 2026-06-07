@@ -334,9 +334,12 @@ note: >
 
 ---
 
-# 附录 B · 下一步（用户已定）
+# 附录 B · 进度与下一步（2026-06-07 更新）
 
-复刻完成后，**以本文为基线，对照现有 NoteShell 代码与产物**，产出「图里有、但代码还没做 / 做得不一样」的差距清单，再由用户决定改哪里。本步骤只读代码、不改代码。
+- ✅ 流程图一比一复刻完成（§1–§4）+ 疑点 ①②③⑤ 确认（附录 A）。
+- ✅ 差距清单完成：以蓝图对照 NoteShell 代码，见 **附录 D**。**关键结论**：很多「缺」其实是「ln 旧页有、NoteShell 新壳没接通」，属接入工作而非从零开发。
+- 🔴 **视频笔记当前问题较多**（用户 2026-06-07 反馈），已知问题见 **附录 E**。
+- **下一步（用户已定）**：① 先固定本蓝图；② 用户手测，把各类型笔记的具体问题逐条记录；③ 再结合本蓝图（应有）+ 实际代码（现状）定修复方案、做修复。**修视频笔记 bug 优先于按蓝图加新功能。** 那 6 个未提交的「在途修复」先记录、暂不提交（见附录 E.1）。
 
 ---
 
@@ -382,3 +385,67 @@ note: >
 - 具体怎么落地（加哪个标记字段、编排怎么切），属于「下一步对照代码」时再细化的实现细节。
 
 **用户 2026-06-07 决定：先不定，留到差距清单阶段、看完代码现状全貌后再从 A / B / C 里选。**
+
+> 差距清单阶段已核实现状（附录 D）：代码 type 只有 image/text/video/audio 四类，图文（小红书/opus）采集端有 `image_text` 识别但落库并入 `image`。④仍暂缓，待视频 bug 处理告一段落再定。
+
+---
+
+# 附录 D · 差距清单（流程图 vs 现有代码，2026-06-07 核实）
+
+> 用途：作为「流程图（应有）vs 代码（现状）」的固定对照，供后续手测 + 修复参考。
+> **关键发现**：NoteShell 是后做的「统一壳」，ln（旧 LearningNotesPage）里多个成熟交互**没有全部接进 NoteShell**；很多「缺失」其实是「ln 有、新壳没接通」——属**接入工作**，非从零开发。
+
+## D.1 已满足（蓝图要的、NoteShell 已具备）
+
+- 源 MD + 富文本（只读渲染）展示；**读 / 编辑 / 对照**三态 + source 原文对照
+- 标准总结 + 换总结风格；AI 问答（抽屉）；Markdown / Obsidian 导出 + TOC 目录
+- 音 / 视频播放器 + 转录轴字幕高亮跟随 + 转录轴 ↔ 播放器互跳
+- 图文混排（正文按位置显示图）；截帧频率设置页
+
+## D.2 差距（区分 ln 有 / NoteShell 接没接）
+
+| # | 蓝图能力 | ln 旧页 | NoteShell 新壳 | 性质 |
+|---|---|---|---|---|
+| 1 | 视频截帧插入 md | ✅ `LNVideoPanel` 截图插入按钮 | ⚠️ 按钮在，但编辑器「不依赖 n」→ **疑插不进**（待实测） | 接通 |
+| 2 | 正文点时间码跳音 / 视频 | ✅ `HtmlView`（replaceTsInString + onSeek） | ❌ 用 ReactMarkdown 没接 | 接通 / 移植 |
+| 3 | 转录轴 ↔ 播放器互跳 | ✅ | ✅ 已接（NoteMediaCompanion） | 已可用 |
+| 4 | 点正文总结内容跳时间轴 | ✅ `HtmlView` | ❌ 没接 | 接通 |
+| 5 | 图片点击放大 | ❌ ln 也无 | ❌ | 新做 |
+| 6 | 点图片（非截图）加入 md | ❌ | ❌ | 新做 |
+| 7 | 多图展示 | — | 🟡 只显示 `images[0]` | 完善 |
+| 8 | 富文本所见即所得编辑 | ❌（都是 CodeMirror 源码） | ❌ R2.2 backlog（需装库） | 新做 |
+| ④ | 图片 / 图文分形态 | 采集端有 `image_text` | type 并入 `image`，不分形态 | 暂缓（附录 C） |
+
+代码依据：截图 [LNVideoPanel.tsx:70](frontend/src/pages/results/LearningNotesPage/LNVideoPanel.tsx:70)（nStore 插入）+ NoteShell 注释「NoteEditor 不依赖 n」；正文时间码 [HtmlView.tsx:166](frontend/src/pages/results/LearningNotesPage/HtmlView.tsx:166) vs NoteShell read 态用 ReactMarkdown（[index.tsx:723](frontend/src/pages/result/NoteShell/index.tsx:723)）；图片 [index.tsx:710](frontend/src/pages/result/NoteShell/index.tsx:710)（只取 images[0]、img 无 onClick）。
+
+## D.3 待实测确认
+
+- ① 截帧在 NoteShell 是否真插不进（点「截图插入」看是否提示「未找到笔记编辑器」）。
+
+---
+
+# 附录 E · 视频笔记已知问题（2026-06-07，待手测 + 修复）
+
+> 用户 2026-06-07 反馈视频笔记问题较多。先记录，后续用户手测补充具体现象，再结合本蓝图（应有）+ 代码（现状）定修复方案。
+
+## E.1 工作区有一组「在途修复」（6 个未提交改动，未验证）
+
+正好针对部分问题，但**改到一半、未提交、未验证**（用户决定先记录、暂不提交）：
+
+| 文件 | 改动 | 对应修的问题 |
+|---|---|---|
+| `note_assembler.py` | 视频 media 补 `video.url`；摘要插正文 | 视频播不了 |
+| `routes/workspaces.py` | generate_note 注入 LLM key + model | 问答 / 摘要不工作 |
+| `av_synthesis/llm.py` | 修 `default_models` 取值 | 同上 |
+| `pipeline_tasks.py` | b23.tv 短链解析 + LLM 摘要生成 | 视频短链被误判图文 |
+| `bilibili_opus.py` | opus 桌面端兜底 | opus 图文 |
+| `NoteShell/index.tsx` | 修被错当文字的图片语法渲染 | 图片不显示 |
+
+## E.2 疑似仍未修的问题（在途改动里**没看到**对应修复）
+
+- **下载完没转码就显示任务完成** —— 转码步骤疑似被跳过？待查 `handle_note_task` 视频步骤编排。
+- **进结果页布局有问题** —— NoteShell 视频笔记布局，待查。
+
+## E.3 下一步（用户定）
+
+用户手测 → 逐条记录视频 / 各类型笔记的具体问题 → 结合本蓝图 + 代码 → 定修复方案 → 修复。
