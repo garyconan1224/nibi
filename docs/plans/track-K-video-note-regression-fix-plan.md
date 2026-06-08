@@ -268,3 +268,96 @@ relates:
   - ✅ 改动集中在 `NoteShell/index.tsx` + 2 个新组件（SourceMdModal、问AI 悬浮）。
 - **验证**：富文本/md tab 在中列顶部、默认富文本 ✓；导出在右上角 ✓；问AI 悬浮泡泡、不盖 md ✓；源md 弹悬浮框 ✓；右侧点总结→中间替换、版本可切 ✓；字幕时间码/高亮/点击跳转**仍正常**（回归 8.x）✓。
 - ⚠️ **视觉部分（悬浮泡泡/弹层/美化）mimo 先发用户一版示意确认再细抠**。
+
+---
+
+# 10. 第五轮：总结体系 + 字幕编辑 + source.md 增强（用户实测 9.x 后 · 2026-06-08）
+
+9.x 布局做完后，用户提 5 点，集中在「内容质量 + 编辑能力」，**大量动后端**。本章拆 3 个独立子阶段，**每阶段单独 commit + 验收再下一个**。
+
+## 10.0 已确认决策（开工前提）
+
+1. **点1 总结面板**：右侧列表**只管「看 + 切」**，「新建总结」收进弹窗。
+2. **点2 版本**：每个模板**首版 = v0**，重生成 = v1/v2…；每个版本**可改自定义名**。
+3. **点5 标准总结**：新建「标准总结」模板（学 wdkns 教学化结构）+ **自动嵌入关键帧截图**（图文并茂）。
+4. 点3（字幕双击编辑→同步 source.md）、点4（source.md 加视频元数据）按下方规划，复用现成接口。
+
+## 10.1 三子阶段划分（不准跨阶段顺手做，破坏 git 颗粒度）
+
+| 阶段 | 内容 | 主要文件 | 风险 |
+|---|---|---|---|
+| **R1** 总结面板交互 | 点1 + 点2 | SummariesTab.tsx、models/workspace.py、workspaces.py(summaries) | 中 |
+| **R2** 字幕编辑闭环 + source.md | 点3 + 点4 | LNTranscriptPanel.tsx、NoteShell、workspaces.py(transcript)、note_assembler.py、pipeline_tasks.py | 中 |
+| **R3** 标准总结·嵌帧 | 点5 | summary_templates.py、summary_generator.py | 高（prompt+嵌图） |
+
+## 10.2 阶段 R1 · 总结面板（点1 + 点2）
+
+**点1 前端**（[SummariesTab.tsx](frontend/src/components/SummariesTab.tsx)）：重做成两块——
+- 【版本列表】每条 = `模板名 · v{n}`（或自定义名），**点一下立即应用到中间正文**（复用 `onApplyToNote`），高亮当前应用项；同模板多版本并排可切。**去掉**现在内联的 模板chips / 「选择其他模板」下拉 / 背景输入框 / 生成按钮。
+- 【+ 新建总结】按钮 → 弹窗（仿 [FramePickerModal](frontend/src/components/FramePickerModal.tsx) 的 modal 风格）：模板选择 + 可选「补充背景」textarea + 「生成」。生成成功→关弹窗、新版本进列表。
+
+**点2 后端**：
+- [models/workspace.py](backend/app/models/workspace.py) `ItemSummary` 加 `name: str = ""`（含 `to_dict`/`from_dict`）。
+- 版本从 0 起：改 `_store.next_version_for_template`，**首版返回 0**（现在从 1）。
+- 新增改名接口：`PATCH /workspaces/{ws}/items/{item}/summaries/{summary_id}`，body `{name}`，设 `summary.name`。
+
+**点2 前端**：版本标签显示 `v0/v1/…`；有自定义名时显示名（双击或小图标→改名输入框→调改名接口）。
+
+**R1 验收**：右侧列表点选即换中间正文；新建走弹窗；版本从 v0 起；能改名且持久。
+
+## 10.3 阶段 R2 · 字幕编辑闭环 + source.md 增强（点3 + 点4）
+
+**点3 字幕双击编辑**——基础设施已有，别重造：
+- 后端接口已存在：`PATCH .../transcript/segments/{idx}`（[workspaces.py:2937](backend/app/routes/workspaces.py:2937)），写 `edited_text` 进 `results["transcript_segments"]`。
+- 前端交互已存在：[AudioResultPage](frontend/src/pages/result/AudioResultPage.tsx) 已实现「双击某行→编辑→保存 `n`(edited_text)」，service `editTranscriptSegment`([workspaces.ts:513](frontend/src/services/workspaces.ts:513))。
+- **要做**：① 前端把这套双击编辑搬到视频笔记左侧 [LNTranscriptPanel](frontend/src/pages/results/LearningNotesPage/LNTranscriptPanel.tsx)（双击行→inline 输入→调 editTranscriptSegment→刷新该行显示 edited_text）。② 后端扩展 `update_transcript_segment`：写完 results 后**额外两步**——(a) 同步更新 note 目录 `transcript.json`（把该行改后的文字落盘，扛重启，对应 8.3）；(b) **重建 source.md**（用 edited_text 优先，调 `build_source_md`/`assemble_item_note`），让「源md 内容也跟着调整」。
+
+**点4 source.md 更详细**：
+- plumb 元数据：[pipeline_tasks.py](backend/app/services/pipeline_tasks.py) 下载回调现在只把 `video_title`/`cover_thumbnail` 写进 result（:517/:520）；补上 `description`/`author`/`upload_date`（B站 [bilibili_nocookie.py:189](backend/app/downloaders/bilibili_nocookie.py:189) 的 VideoMeta 已有这些字段）。
+- [build_source_md](backend/app/services/note_assembler.py:175) 顶部加「视频信息」头：
+  ```
+  ## 视频信息
+  - 链接：{source_url}
+  - 标题：{title}
+  - 作者：{author}
+  - 时长：{duration} / 发布：{upload_date}
+
+  > {description}
+
+  ## 转写正文
+  …（现有转写，edited_text 优先）
+  ```
+
+**R2 验收**：视频笔记双击字幕能改字；改完源md 里那句也变；重启后改动还在；source.md 顶部有链接/作者/简介。
+
+## 10.4 阶段 R3 · 标准总结·嵌关键帧（点5）
+
+**新增「标准总结」模板**（[summary_templates.py](backend/app/services/summary_templates.py) `TEMPLATES` 加一项 `standard`）。system_prompt（草案，开工时按需微调）：
+
+```
+你是一名优秀的讲解型笔记作者。把下面这段视频转写重写成一篇结构化中文学习笔记——
+不是按字幕时间堆砌，而是重组成有教学逻辑的讲解。要求：
+1. 用 markdown，## 分节、### 分小节。
+2. 开头一段「背景/动机」：这视频解决什么问题、为什么值得看。
+3. 每个主题按「是什么→为什么→怎么做→例子→小结」展开，过渡自然，不要流水账。
+4. 关键信号用引用块：> 💡 **要点**（必记核心）/ > 📎 **背景**（前置知识）/ > ⚠️ **注意**（易错点）。
+5. 公式/代码先用大白话讲意图再给出。
+6. 结尾 ## 总结与延伸：作者收尾 + 你提炼的核心要点 + 可行动 takeaway。
+7. 跳过寒暄/广告/一键三连。
+8. 若给了「关键帧清单」，在讲到对应内容处用 [[图N]] 插入配图（N=帧号），图文并茂；
+   只在画面确实支撑该处讲解时插，不硬塞。
+```
+
+**生成器改造**（[summary_generator.py](backend/app/services/summary_generator.py)）：仅对 `standard` 模板——
+- user_prompt 注入「关键帧清单」：遍历 `item.results["frames"]`，每帧一行 `[图{i} @{mm:ss}] {description_zh}`（复用 [_collect_frame_descriptions](backend/app/services/pipeline_tasks.py:766) 同款字段 `description_zh`/`sec`）。
+- 生成后 **post-process**：正则把 `[[图N]]` → `![{该帧description}]({该帧 frame_url})`，frame_url 取 `frames[N]` 的 image path（转 /static）。越界的 `[[图N]]` 删掉不报错。
+
+**R3 验收**：标准总结是结构化教学笔记（有背景/分节/要点框/末尾综合）；正文按内容嵌入了对应关键帧图；中间默认展示它。
+
+## 10.5 红线 + 通用要求
+
+- 每阶段：`cd frontend && npx tsc --noEmit && vite build` + `.venv/bin/python -m pytest`（动后端就跑 note/summary 套件）过了再 commit；commit `feat(k-10.Rx): …`。
+- ❌ 不准动 8.x 的 transcript 格式/持久化核心（`_normalize_note_transcript`/`_note_transcript`），点3 是**在其上加同步**，不是改它。
+- ❌ 不引入新库（点5 嵌帧用现有 markdown 图片语法，不要富文本编辑器）。
+- ❌ 单阶段跨文件超 6 个先停下问用户。
+- ⚠️ 点1 弹窗/点5 排版**涉及视觉，先发用户一版再细抠**。
