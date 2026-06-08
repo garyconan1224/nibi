@@ -15,7 +15,7 @@
 **当前主线**：FastAPI 后端 + React/Vite 前端。Streamlit 旧入口已于 Phase 1J 移除，当前纯 FastAPI 后端 + React/Vite 前端。
 **当前阶段**：F1（IP.9 流程缺口补齐）。H1~H5 + IP.1~IP.8 已合 main。具体 track 看 `docs/ROADMAP.md`。
 
-> ⚠️ **2026-06-05 临时主线覆盖**：当前实际在做 **Track K · 单素材统一笔记页（NoteShell）架构收口**（调研定稿中，**只定设计、不动代码**），唯一依据 [`docs/plans/track-K-M7-result-pages-redesign.md`](docs/plans/track-K-M7-result-pages-redesign.md)。**勿**按旧 M7 kickoff（统一 note pipeline / M8·M9）或 F3/[C]/[D] 直接开工；复刻 / AI 导演仍后置。
+> ⚠️ **2026-06-08 临时主线覆盖（最新）**：当前在做 **Track K · 视频笔记「入口收敛 + 回归修复」**——执行计划 [`docs/plans/track-K-video-note-regression-fix-plan.md`](docs/plans/track-K-video-note-regression-fix-plan.md)（交付 mimo 执行），设计基准 [`docs/plans/track-K-note-flow-blueprint.md`](docs/plans/track-K-note-flow-blueprint.md)。**战略：不重写，现有项目删除式收敛**——只留「生成笔记 → note task → NoteShell」一套（删手动模式/音视频综合/课程笔记入口，删前先抢救可复用能力）。**注意**：R1~R4 NoteShell 代码早已合入 main，旧「只定设计、不动代码」说法**已废止**；**勿**按旧 M7 kickoff / redesign.md / F3·[C]·[D] 开工；复刻 / AI 导演仍后置。
 
 ---
 

@@ -1,6 +1,8 @@
 # AI Handoff
 
-> ⚠️ **2026-06-07 覆盖（最新，先读这条）**：笔记功能新增「一比一蓝图」[`docs/plans/track-K-note-flow-blueprint.md`](plans/track-K-note-flow-blueprint.md)（用户手绘流程/UI 图忠实复刻 + 疑点①②③⑤已确认，④图片/图文暂缓）。**重要对账**：Track K 的 **R1~R4 NoteShell 代码早已合入 main**（见 `docs/EXECUTION_PLAN.md`「Track K」区块），因此下方各处「只定设计、不动代码」均已**过时**。当前进行：以蓝图对照已落地代码，列「如何修改 / 增加」清单（动手前都问用户）。
+> ⚠️ **2026-06-08 覆盖（最新，先读这条）**：当前主线 = **视频笔记「入口收敛 + 回归修复」**，已诊断 + 定战略 + 出计划，**交付 mimo 执行**：计划 [`docs/plans/track-K-video-note-regression-fix-plan.md`](plans/track-K-video-note-regression-fix-plan.md)（5 阶段 A–E + §2.5 删除前能力抢救清单），设计基准 [`docs/plans/track-K-note-flow-blueprint.md`](plans/track-K-note-flow-blueprint.md)。**战略：不重写，删除式收敛**（只留 生成笔记 → note task → NoteShell）。工作区有 6 个未提交代码改动（小红书视频分流 [pipeline_tasks.py:1273] + 在途修复），计划已说明**保留**给 mimo。
+>
+> ⚠️ **2026-06-07 覆盖**：笔记功能新增「一比一蓝图」[`docs/plans/track-K-note-flow-blueprint.md`](plans/track-K-note-flow-blueprint.md)（用户手绘流程/UI 图忠实复刻 + 疑点①②③⑤已确认，④图片/图文暂缓）。**重要对账**：Track K 的 **R1~R4 NoteShell 代码早已合入 main**（见 `docs/EXECUTION_PLAN.md`「Track K」区块），因此下方各处「只定设计、不动代码」均已**过时**。当前进行：以蓝图对照已落地代码，列「如何修改 / 增加」清单（动手前都问用户）。
 >
 > ⚠️ **2026-06-05 覆盖**：当前临时主线 = **Track K · 单素材统一笔记页（NoteShell）架构调研定稿中**，唯一依据 [`docs/plans/track-K-M7-result-pages-redesign.md`](plans/track-K-M7-result-pages-redesign.md)。**本轮只敲定设计、不动代码**；**勿**按旧 M7 kickoff（统一 note pipeline / M8·M9）或下方 2026-06-02 的 F3/C/D 方向开工。复刻 / AI 导演仍后置。
 

@@ -4,9 +4,9 @@
 >
 > **维护规则见 CLAUDE.md「项目执行计划维护流程」一节**。
 >
-> Last updated: 2026-06-06（Track K·NI.4 端到端收口）
+> Last updated: 2026-06-08（Track K 视频笔记入口收敛 + 回归修复计划，交付 mimo）
 >
-> ⚠️ **2026-06-05 Track K 覆盖说明**：当前临时主线是 **单素材统一笔记页（NoteShell）架构收口**，依据 [`docs/plans/track-K-M7-result-pages-redesign.md`](plans/track-K-M7-result-pages-redesign.md)，本轮只定设计不动代码。下方历史长表不重写，仅作存档；勿按旧 RP1-C / M7 pipeline 直接开工。
+> ⚠️ **2026-06-08 Track K 覆盖说明（最新）**：当前临时主线 = **视频笔记「入口收敛 + 回归修复」**，执行计划 [`docs/plans/track-K-video-note-regression-fix-plan.md`](plans/track-K-video-note-regression-fix-plan.md)（交 mimo），设计基准 [`docs/plans/track-K-note-flow-blueprint.md`](plans/track-K-note-flow-blueprint.md)。**战略：不重写，删除式收敛**——只留「生成笔记 → note task → NoteShell」一套。R1~R4 已合 main，旧「只定设计不动代码」**已废止**。下方历史长表仅存档。
 
 ---
 

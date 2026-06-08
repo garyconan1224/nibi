@@ -35,6 +35,22 @@ relates:
 
 ---
 
+# 2.5 删除前能力抢救（重要：删之前先抢救可复用的）
+
+**原则**：每个要删的东西，删前先问「里面有没有别处用得上的能力 / 逻辑」——**有就先迁移到合适位置再删，没有才直接删**。拿不准是否还有用的，**停下问用户**。
+
+**已知抢救清单**（mimo 删前逐项确认）：
+
+| 被删项 | 可抢救 / 借鉴的能力 | 去处 |
+|---|---|---|
+| 手动模式精细控制 | 总结路径（只看画面/只听字幕/音视频综合）、总结深度、识别背景提示词 | 评估接入 note task 或作「生成笔记」高级选项；确实用不上才删 |
+| 截帧间隔 / 帧数 | 已在 ScreenshotPage 设置页（蓝图 §2「每几帧截图设置页设置」） | 已有，确认**不随手动模式误删** |
+| **`av_synthesis` 后端** | `pdf_builder` / `docx_builder` / `obsidian_builder`（**PDF/docx 导出 = NoteShell 目前没有**，NoteShell 只有 md+Obsidian） | **保留 builder**，作 NoteShell 未来 PDF/docx 导出的基础；只删前端「综合笔记 feature」 |
+| 旧结果页（Video/Audio/Image/Text ResultPage） | NoteShell 可能缺的展示（关键帧画廊、音频特定 UI 等） | 删前对比 NoteShell，缺的借鉴过去 |
+| 课程笔记 ln 页 | `LNVideoPanel`/`HtmlView`/`MdView`/`LNTranscriptPanel` | 已在阶段 E 保留并迁移（删的是 ln **页面入口**，不是组件） |
+
+---
+
 # 3. 分阶段执行（每阶段独立 commit，做完验证再下一步）
 
 ## 阶段 A · 前端入口收敛（只留「生成笔记」）
