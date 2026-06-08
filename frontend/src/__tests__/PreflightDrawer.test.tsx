@@ -301,49 +301,6 @@ describe('PreflightDrawer analysisScope', () => {
     )
   })
 
-  it('analysisScope=av_combined 时 summary_path 为 音视频综合', async () => {
-    autoCreateWorkspaceMock.mockResolvedValue({
-      workspace_id: 'ws-1',
-      name: '自动工作空间',
-    })
-    addWorkspaceItemMock.mockResolvedValue({
-      items: [{ item_id: 'item-1', type: 'video' }],
-    })
-    savePreflightMock.mockResolvedValue({})
-    startItemPipelineMock.mockResolvedValue({ task_id: 'task-video' })
-
-    render(
-      <PreflightDrawer
-        {...defaultProps}
-        stagedConfig={{
-          types: ['video'],
-          features: {},
-          background: {},
-          workspaceIds: ['ws-1'],
-          analysisScope: 'av_combined',
-        }}
-      />,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: /开始解析/ }))
-
-    await waitFor(() => {
-      expect(savePreflightMock).toHaveBeenCalledTimes(1)
-    })
-
-    expect(savePreflightMock).toHaveBeenCalledWith(
-      'ws-1',
-      'item-1',
-      expect.objectContaining({
-        tasks: expect.objectContaining({
-          summary: expect.objectContaining({
-            summary_path: '音视频综合',
-          }),
-        }),
-      }),
-    )
-  })
-
   it('stage 模式传递 analysisScope 到 onSaveStaged', () => {
     const onSaveStaged = vi.fn()
     render(

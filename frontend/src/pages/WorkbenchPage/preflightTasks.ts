@@ -186,18 +186,6 @@ export function applyCascades(
       if (s.srt) { s.srt = { ...s.srt, on: false }; disabled.srt = '只看画面无 ASR' }
       if (s.music) { s.music = { ...s.music, on: false }; disabled.music = '只看画面不分析音频' }
     }
-    if (scope === 'av_combined') {
-      if (s.summary) {
-        s.summary = { ...s.summary, on: true, summary_path: '音视频综合' }
-        locks['summary.summary_path'] = '音视频综合 · 路径已锁定'
-      }
-    }
-  }
-
-  // R17: 综合笔记勾选时强制 summary_path = 音视频综合
-  if (kind === 'video' && features?.av_synthesis && s.summary) {
-    s.summary = { ...s.summary, on: true, summary_path: '音视频综合' }
-    locks['summary.summary_path'] = '综合笔记模式 · 路径锁定为音视频综合'
   }
 
   if (kind === 'video' && s.summary) {

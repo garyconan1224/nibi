@@ -182,13 +182,6 @@ export function PreflightDrawer({
             if (fp) fp.on = true
             const srt = (entry.srt as Record<string, unknown>)
             if (srt) srt.on = false
-          } else if (scope === 'av_combined') {
-            summaryGroup.on = true
-            summaryGroup.summary_path = '音视频综合'
-            const fp = (entry.frame_prompt as Record<string, unknown>)
-            if (fp) fp.on = true
-            const srt = (entry.srt as Record<string, unknown>)
-            if (srt) srt.on = true
           }
         }
       }
@@ -219,13 +212,6 @@ export function PreflightDrawer({
     for (const [taskId, featureId] of Object.entries(TASK_TO_FEATURE[taskKind])) {
       map[featureId] = Boolean(effective[taskId]?.on)
     }
-    if (
-      taskKind === 'video' &&
-      sc?.features?.video?.av_synthesis &&
-      effective.summary?.summary_path === '音视频综合'
-    ) {
-      map.av_synthesis = true
-    }
     return map
   }
 
@@ -238,7 +224,7 @@ export function PreflightDrawer({
       // analysisScope 决定默认 kind
       if (sc?.analysisScope === 'audio_only') {
         setKind('audio')
-      } else if (sc?.analysisScope === 'visual_only' || sc?.analysisScope === 'av_combined') {
+      } else if (sc?.analysisScope === 'visual_only') {
         setKind('video')
       } else {
         setKind(kindFromType)

@@ -184,9 +184,9 @@ describe('FloatingTaskQueue v2', () => {
           progress: 0.5,
         }),
         makeTask({
-          task_id: 'av_synthesis-001',
+          task_id: 'note-002',
           project_id: 'workspace-1',
-          task_type: 'av_synthesis',
+          task_type: 'note',
           payload: { url: 'https://www.bilibili.com/video/BV1LSRhBQErk' },
           status: 'PENDING',
           progress: 0,

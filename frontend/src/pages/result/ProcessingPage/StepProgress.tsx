@@ -54,7 +54,7 @@ interface StepWithState {
 }
 
 // 覆盖全 pipeline 的终端任务类型（SUCCESS = 整条流水线完成）
-const TERMINAL_TASK_TYPES = new Set(['analyze', 'av_synthesis', 'note'])
+const TERMINAL_TASK_TYPES = new Set(['analyze', 'note'])
 
 export function deriveSteps(currentStatus: string, progress: number, taskType: string): StepWithState[] {
   const stages = visibleStages(taskType)

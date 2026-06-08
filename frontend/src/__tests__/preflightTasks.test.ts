@@ -138,21 +138,6 @@ describe('applyCascades', () => {
     expect(disabled.music).toBeTruthy()
     expect(state.summary.summary_path).toBe('只看画面')
   })
-
-  it('applyCascades(video, av_combined) 锁定 summary_path = 音视频综合', () => {
-    const init = buildInitialTasks('video')
-    const { state } = applyCascades('video', init, 1, 'av_combined')
-    expect(state.summary.summary_path).toBe('音视频综合')
-    expect(state.summary.on).toBe(true)
-  })
-
-  it('勾选 av_synthesis 时路径锁为音视频综合', () => {
-    const init = buildInitialTasks('video')
-    const features = { av_synthesis: true }
-    const { state, locks } = applyCascades('video', init, 1, undefined, features)
-    expect(state.summary.summary_path).toBe('音视频综合')
-    expect(locks['summary.summary_path']).toMatch(/综合笔记/)
-  })
 })
 
 describe('buildInitialTasks', () => {

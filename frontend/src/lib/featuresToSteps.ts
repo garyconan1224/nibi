@@ -120,7 +120,6 @@ export function getAllFeatures(type: ItemType): Feature[] {
 export const FEATURES_BY_SCOPE: Record<AnalysisScope, Feature[]> = {
   audio_only: ['transcribe_summary', 'speaker_diarize', 'subtitle_export', 'music_analysis'],
   visual_only: ['visual_prompt', 'video_summary'],
-  av_combined: ['visual_prompt', 'video_summary', 'subtitle_export', 'music_analysis'],
 }
 
 /** R17 新表：scope → 主 chip 列表（仅 video 输入时按 scope 渲染） */
@@ -134,11 +133,6 @@ export const FEATURES_BY_SCOPE_V2: Record<AnalysisScope, FeatureDef[]> = {
       hint: 'Whisper 转写 + LLM 总结，细调里选模板、音色、字幕' },
     { id: 'music_analysis',     label: '音乐分析',       defaultChecked: false,
       hint: 'BPM / 调性 / 乐器 / 风格 + 可选 Suno 提示词' },
-  ],
-  av_combined: [
-    { id: 'visual_analysis',    label: '画面分析',       defaultChecked: true },
-    { id: 'transcribe_summary', label: '人声转写+总结',  defaultChecked: true },
-    { id: 'music_analysis',     label: '音乐分析',       defaultChecked: false },
   ],
 }
 
