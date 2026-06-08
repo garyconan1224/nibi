@@ -102,7 +102,7 @@ def build_frontmatter(item: WorkspaceItem, workspace_id: str) -> Dict[str, Any]:
         frames = results.get("frames", [])
         if frames:
             media["frames"] = [
-                {"sec": f.get("sec", 0), "path": f.get("frame_path", "")}
+                {"sec": f.get("sec", 0), "path": f.get("image_path") or f.get("frame_image_path") or ""}
                 for f in frames
                 if isinstance(f, dict)
             ]
