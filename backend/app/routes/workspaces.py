@@ -778,6 +778,16 @@ def _sync_item_with_tasks(item: WorkspaceItem) -> Optional[Dict[str, Any]]:
     if latest_success is not None and latest_success.result:
         merged = dict(item.results or {})
         merged.update(latest_success.result)
+        # 保留 item.results 中 transcript_segments 的 edited_text（用户在字幕轴的编辑）
+        # task result 不含 edited_text，直接 update 会覆盖掉用户的编辑
+        _item_segs = (item.results or {}).get("transcript_segments") or []
+        _task_segs = merged.get("transcript_segments") or []
+        if _item_segs and _task_segs:
+            for i in range(min(len(_item_segs), len(_task_segs))):
+                _et = _item_segs[i].get("edited_text")
+                if _et:
+                    _task_segs[i] = {**_task_segs[i], "edited_text": _et}
+            merged["transcript_segments"] = _task_segs
         # 若最新 task 没提供 cover_thumbnail，从更早的 SUCCESS task 补（下载封面优先）
         if not merged.get("cover_thumbnail"):
             for tid in item.related_task_ids:
@@ -2085,8 +2095,13 @@ def get_item_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
             if 0 <= _idx < len(v_results["frames"]):
                 v_results["frames"][_idx]["title"] = _new_title
 
-    # N7b / av_combined：规范化 transcript 为数组（前端 VideoResult.transcript 期望 array）
-    if v_results.get("summary_path") in ("subtitle", "av_combined"):
+    # 规范化 transcript 为数组（前端 VideoResult.transcript 期望 array）
+    # 优先从 transcript_segments 构建（含 edited_text 优先 + 时间码），
+    # 兜底从 transcript 字段（字符串或数组）。
+    _segments = v_results.get("transcript_segments") or []
+    if _segments:
+        v_results["transcript"] = normalize_transcript(_segments)
+    else:
         raw_transcript = v_results.get("transcript")
         if isinstance(raw_transcript, str):
             v_results["transcript"] = (
@@ -2094,9 +2109,11 @@ def get_item_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
                 if raw_transcript.strip()
                 else []
             )
+        elif isinstance(raw_transcript, list) and raw_transcript:
+            # list of dicts（可能是 start/end/text 或 t_sec/t_str/text）
+            v_results["transcript"] = normalize_transcript(raw_transcript)
         elif not isinstance(raw_transcript, list):
             v_results["transcript"] = []
-        v_results.setdefault("frames", [])
     # visual_only：确保 transcript 为空数组，frames 从 json_outputs 物化
     if v_results.get("summary_path") == "visual_only":
         v_results.setdefault("transcript", [])

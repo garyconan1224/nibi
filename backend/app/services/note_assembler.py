@@ -163,12 +163,27 @@ def _build_body(item: WorkspaceItem) -> str:
         return results.get("markdown") or results.get("content", "") or results.get("summary", "")
 
     if item_type in ("audio", "video"):
-        # 优先用 transcript（str 或 list），再兜底 transcript_segments，最后 summary
+        # 优先用 transcript_segments（含 edited_text 优先，R2 字幕编辑同步），
+        # 再兜底 transcript（str 或 list），最后 summary
+        segments = results.get("transcript_segments")
+        if isinstance(segments, list) and segments:
+            lines = []
+            for seg in segments:
+                if isinstance(seg, dict):
+                    start = seg.get("start", "")
+                    text = str(seg.get("edited_text") or seg.get("text", ""))
+                    if start != "":
+                        lines.append(f"**[{start}s]** {text}")
+                    else:
+                        lines.append(text)
+            joined = "\n\n".join(lines)
+            if joined.strip():
+                return joined
+        # 兜底：transcript（str 或 list）
         transcript = results.get("transcript")
         if isinstance(transcript, str) and transcript.strip():
             return transcript
         if isinstance(transcript, list) and transcript:
-            # transcript 可能是 list of dicts（video 的 display lines）或 list of str
             lines = []
             for seg in transcript:
                 if isinstance(seg, dict):
@@ -183,18 +198,6 @@ def _build_body(item: WorkspaceItem) -> str:
             joined = "\n\n".join(lines)
             if joined.strip():
                 return joined
-        # 兜底：transcript_segments（音频 handler 常见字段）
-        segments = results.get("transcript_segments")
-        if isinstance(segments, list) and segments:
-            lines = []
-            for seg in segments:
-                if isinstance(seg, dict):
-                    start = seg.get("start", "")
-                    text = str(seg.get("edited_text") or seg.get("text", ""))
-                    if start != "":
-                        lines.append(f"**[{start}s]** {text}")
-                    else:
-                        lines.append(text)
             joined = "\n\n".join(lines)
             if joined.strip():
                 return joined
