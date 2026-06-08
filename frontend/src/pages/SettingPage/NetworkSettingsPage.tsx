@@ -47,6 +47,8 @@ const NetworkSettingsPage = () => {
 
   const [draft, setDraft] = useState<NetworkDraft>(baseline)
   const [isSaving, setIsSaving] = useState(false)
+  const [tavilyTesting, setTavilyTesting] = useState(false)
+  const [tavilyTestResult, setTavilyTestResult] = useState<{ ok: boolean; message: string } | null>(null)
 
   // 基线刷新：仅在 store 侧值变化时同步（避免本地草稿被外部回填覆盖）
   useEffect(() => {
@@ -221,7 +223,7 @@ const NetworkSettingsPage = () => {
             className="text-sm font-mono"
           />
         </FieldRow>
-        <div className="px-6 pb-4">
+        <div className="px-6 pb-4 flex items-center gap-3">
           <a
             href="https://app.tavily.com"
             target="_blank"
@@ -230,6 +232,32 @@ const NetworkSettingsPage = () => {
           >
             → 去 tavily.com 免费注册（2 分钟）
           </a>
+          <button
+            type="button"
+            disabled={tavilyTesting}
+            onClick={async () => {
+              setTavilyTesting(true)
+              setTavilyTestResult(null)
+              try {
+                const { http } = await import('@/services/client')
+                const res = await http.post('/providers/tavily/test')
+                setTavilyTestResult(res.data)
+              } catch (err: unknown) {
+                const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '请求失败'
+                setTavilyTestResult({ ok: false, message: msg })
+              } finally {
+                setTavilyTesting(false)
+              }
+            }}
+            className="rounded border px-3 py-1 text-xs font-medium hover:bg-accent disabled:opacity-50"
+          >
+            {tavilyTesting ? '测试中…' : '测试连接'}
+          </button>
+          {tavilyTestResult && (
+            <span className={`text-xs ${tavilyTestResult.ok ? 'text-green-600' : 'text-red-500'}`}>
+              {tavilyTestResult.ok ? '✓' : '✗'} {tavilyTestResult.message}
+            </span>
+          )}
         </div>
       </Section>
     </div>

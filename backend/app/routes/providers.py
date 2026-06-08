@@ -118,6 +118,24 @@ def update_tavily_key(req: TavilyKeyRequest) -> Dict[str, Any]:
     return {"has_key": bool(req.api_key.strip())}
 
 
+@router.post("/tavily/test")
+def test_tavily_key() -> Dict[str, Any]:
+    """用已保存的 Tavily Key 发一次真实搜索，验证连通性。"""
+    settings = load_settings()
+    api_key = settings.tavily_api_key.strip()
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Tavily API Key 未配置")
+    try:
+        from tavily import TavilyClient
+
+        client = TavilyClient(api_key=api_key)
+        response = client.search("hello world", max_results=1, search_depth="basic")
+        count = len(response.get("results", []))
+        return {"ok": True, "message": f"连接成功，返回 {count} 条结果"}
+    except Exception as exc:
+        return {"ok": False, "message": f"连接失败: {exc}"}
+
+
 @router.get("/{provider_id}")
 def get_provider(provider_id: str) -> Dict[str, Any]:
     """获取单个提供商详情；**响应不再回传 api_key 明文**，仅保留 has_api_key 标识。"""
