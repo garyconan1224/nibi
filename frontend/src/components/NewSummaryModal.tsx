@@ -30,6 +30,7 @@ const TEMPLATE_OPTIONS: { value: string; label: string }[] = [
   { value: 'outline', label: '大纲' },
   { value: 'qa', label: '问答卡(Anki)' },
   { value: 'actions', label: '行动清单' },
+  { value: 'standard', label: '标准总结' },
 ]
 
 const QUICK_CARDS: { value: string; label: string; desc: string }[] = [

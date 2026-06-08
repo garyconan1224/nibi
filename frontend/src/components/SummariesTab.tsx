@@ -47,6 +47,7 @@ const TEMPLATE_LABEL_MAP: Record<string, string> = {
   outline: '大纲',
   qa: '问答卡(Anki)',
   actions: '行动清单',
+  standard: '标准总结',
 }
 
 function templateLabel(id: string): string {
