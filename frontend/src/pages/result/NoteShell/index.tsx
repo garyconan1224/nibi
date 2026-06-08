@@ -36,6 +36,8 @@ import LNTranscriptPanel from '@/pages/results/LearningNotesPage/LNTranscriptPan
 import '@/pages/results/LearningNotesPage/learning-notes.css'
 import { SummariesTab } from '@/components/SummariesTab'
 import NoteChatDrawer from '@/components/NoteChatDrawer'
+import { SourceMdModal } from './SourceMdModal'
+import { FloatingAskAi } from './FloatingAskAi'
 import { useLnEditorStore } from '@/store/lnEditorStore'
 import { parseTs, TS_RE } from '@/pages/results/LearningNotesPage/HtmlView'
 
@@ -541,7 +543,7 @@ export default function NoteShell() {
   const videoRef = useRef<LNVideoPanelHandle>(null)
   const [currentTime, setCurrentTime] = useState(0)
   const [summariesOpen, setSummariesOpen] = useState(false)
-  const [sourceOpen, setSourceOpen] = useState(false)
+  const [sourceModalOpen, setSourceModalOpen] = useState(false)
   const handleTimeUpdate = useCallback((t: number) => setCurrentTime(t), [])
   const handleSeek = useCallback((sec: number) => {
     videoRef.current?.seekTo(sec)
@@ -980,92 +982,49 @@ export default function NoteShell() {
             </div>
           </div>
 
-          {/* ── 右列：操作区 / 问AI（互斥；问AI 占满右列、加宽，绝不盖住中列 md）── */}
+          {/* ── 右列：操作区（瘦身后只剩 源md悬浮触发 + 换总结）── */}
           <div style={{
-            width: chatOpen ? 380 : 220, flexShrink: 0,
+            width: 220, flexShrink: 0,
             borderLeft: '1px solid var(--line)',
             display: 'flex', flexDirection: 'column',
             overflow: 'hidden',
             background: 'var(--bg-elev)',
-            transition: 'width .2s var(--ease, ease)',
           }}>
-            {chatOpen ? (
-              /* 问 AI 面板：占满右列，关闭回到操作区 */
-              <>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px 8px 14px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--accent-2)' }}>
-                    <MessageCircle size={13} /> 问 AI
-                  </span>
-                  <button className="btn-ghost" onClick={() => setChatOpen(false)} style={{ height: 26, padding: '0 8px', fontSize: 11 }}>
-                    <ChevronRight size={13} /> 收起
-                  </button>
-                </div>
-                <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
-                  <NoteChatDrawer
+            {/* 操作区顶部标题栏 */}
+            <div style={{ padding: '10px 14px 8px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-2)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--mono)' }}>操作区</span>
+            </div>
+
+            {/* 可滚动内容区 */}
+            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
+
+              {/* 源 md → 点击弹悬浮框（点4） */}
+              <button
+                className="btn-ghost"
+                onClick={() => note.source_md && setSourceModalOpen(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-start', height: 36, padding: '0 14px', fontSize: 12, borderRadius: 0, borderBottom: '1px solid var(--line)', flexShrink: 0 }}
+              >
+                <FileCode size={13} /> 源 md
+              </button>
+
+              {/* 换总结 */}
+              <button
+                className="btn-ghost"
+                onClick={() => setSummariesOpen((v) => !v)}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-start', height: 36, padding: '0 14px', fontSize: 12, borderRadius: 0, borderBottom: '1px solid var(--line)', flexShrink: 0, color: summariesOpen ? 'var(--accent-2)' : undefined }}
+              >
+                <RefreshCw size={13} /> 换总结
+              </button>
+              {summariesOpen && (
+                <div style={{ borderBottom: '1px solid var(--line)', maxHeight: 300, overflowY: 'auto' }}>
+                  <SummariesTab
                     workspaceId={workspaceId}
-                    systemPrompt={chatSystemPrompt}
-                    scopeHint="仅基于当前 note.md 与转录上下文回答"
-                    mode="inline"
+                    itemId={itemId}
+                    onApplyToNote={(s) => { handleApplyToNote(s); setSummariesOpen(false) }}
                   />
                 </div>
-              </>
-            ) : (
-              <>
-                {/* 操作区顶部标题栏 */}
-                <div style={{ padding: '10px 14px 8px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-2)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--mono)' }}>操作区</span>
-                </div>
-
-                {/* 可滚动内容区 */}
-                <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
-
-                  {/* 源 md */}
-                  <button
-                    className="btn-ghost"
-                    onClick={() => setSourceOpen((v) => !v)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-start', height: 36, padding: '0 14px', fontSize: 12, borderRadius: 0, borderBottom: '1px solid var(--line)', flexShrink: 0, color: sourceOpen ? 'var(--accent-2)' : undefined }}
-                  >
-                    <FileCode size={13} /> 源 md
-                  </button>
-                  {sourceOpen && note.source_md && (
-                    <div style={{ padding: '8px 12px', fontSize: 11, lineHeight: 1.6, color: 'var(--ink-3)', borderBottom: '1px solid var(--line)', maxHeight: 220, overflowY: 'auto', background: 'var(--bg-sunken)' }}>
-                      <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'var(--mono)', margin: 0 }}>{note.source_md}</pre>
-                    </div>
-                  )}
-
-                  {/* 换总结 */}
-                  <button
-                    className="btn-ghost"
-                    onClick={() => setSummariesOpen((v) => !v)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-start', height: 36, padding: '0 14px', fontSize: 12, borderRadius: 0, borderBottom: '1px solid var(--line)', flexShrink: 0, color: summariesOpen ? 'var(--accent-2)' : undefined }}
-                  >
-                    <RefreshCw size={13} /> 换总结
-                  </button>
-                  {summariesOpen && (
-                    <div style={{ borderBottom: '1px solid var(--line)', maxHeight: 300, overflowY: 'auto' }}>
-                      <SummariesTab
-                        workspaceId={workspaceId}
-                        itemId={itemId}
-                        onApplyToNote={(s) => { handleApplyToNote(s); setSummariesOpen(false) }}
-                      />
-                    </div>
-                  )}
-
-                  <div style={{ flex: 1, minHeight: 16 }} />
-
-                  {/* AI 问答 */}
-                  <button
-                    className="btn-ghost"
-                    onClick={() => setChatOpen(true)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-start', height: 36, padding: '0 14px', fontSize: 12, borderRadius: 0, borderTop: '1px solid var(--line)', flexShrink: 0 }}
-                  >
-                    <MessageCircle size={13} /> 问 AI
-                  </button>
-
-
-                </div>
-              </>
-            )}
+              )}
+            </div>
           </div>
         </div>
       ) : (
@@ -1103,6 +1062,22 @@ export default function NoteShell() {
           </div>
         </>
       )}
+
+      {/* 问 AI 悬浮泡泡（点6：仅视频笔记，仿 FloatingTaskQueue） */}
+      {isVideoNote && (
+        <FloatingAskAi
+          workspaceId={workspaceId}
+          systemPrompt={chatSystemPrompt}
+          scopeHint="仅基于当前 note.md 与转录上下文回答"
+        />
+      )}
+
+      {/* 源 md 悬浮框（点4：仿 TranscriptPreviewModal） */}
+      <SourceMdModal
+        open={sourceModalOpen}
+        sourceMd={note.source_md ?? ''}
+        onClose={() => setSourceModalOpen(false)}
+      />
     </div>
   )
 }
