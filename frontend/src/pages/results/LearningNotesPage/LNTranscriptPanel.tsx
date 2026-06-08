@@ -11,6 +11,8 @@ interface LNTranscriptPanelProps {
   onSeek: (sec: number) => void
   workspaceId: string
   itemId: string
+  /** 字幕保存成功后回调（父组件可借此刷新 source.md 展示） */
+  onSaved?: () => void
 }
 
 function activeTranscriptIdx(
@@ -30,6 +32,7 @@ export default function LNTranscriptPanel({
   onSeek,
   workspaceId,
   itemId,
+  onSaved,
 }: LNTranscriptPanelProps) {
   const activeIdx = useMemo(
     () => activeTranscriptIdx(transcript, currentTime),
@@ -41,6 +44,8 @@ export default function LNTranscriptPanel({
   // ── 双击编辑状态 ──
   const [editingIdx, setEditingIdx] = useState<number | null>(null)
   const [editText, setEditText] = useState('')
+  // 乐观更新：保存成功后立即在面板回显新文字（key=段下标），免刷新；重进页面组件重挂即清空
+  const [localEdits, setLocalEdits] = useState<Record<number, string>>({})
 
   useEffect(() => {
     if (activeRef.current) {
@@ -51,20 +56,28 @@ export default function LNTranscriptPanel({
   const handleEditSave = useCallback(
     async (idx: number) => {
       const trimmed = editText.trim()
-      const original = transcript[idx]?.text || ''
-      if (trimmed === original) {
+      const current = localEdits[idx] ?? transcript[idx]?.text ?? ''
+      if (trimmed === current) {
         setEditingIdx(null)
         return
       }
       try {
         await updateTranscriptSegment(workspaceId, itemId, idx, trimmed)
+        // 乐观更新：空内容 = 恢复原文（移除 override 回退到原 text），否则记下新文字
+        setLocalEdits((prev) => {
+          const next = { ...prev }
+          if (trimmed) next[idx] = trimmed
+          else delete next[idx]
+          return next
+        })
         toast.success('字幕已保存')
+        onSaved?.()
       } catch {
         toast.error('保存失败，请重试')
       }
       setEditingIdx(null)
     },
-    [editText, transcript, workspaceId, itemId],
+    [editText, transcript, workspaceId, itemId, localEdits, onSaved],
   )
 
   const handleEditCancel = useCallback(() => {
@@ -72,9 +85,9 @@ export default function LNTranscriptPanel({
     setEditText('')
   }, [])
 
-  function handleQuote(line: VideoResultTranscriptLine, e: React.MouseEvent) {
+  function handleQuote(line: VideoResultTranscriptLine, text: string, e: React.MouseEvent) {
     e.stopPropagation()
-    const md = `> [${line.t_str}] ${line.text}\n`
+    const md = `> [${line.t_str}] ${text}\n`
     const inserted = insertAtCursor(md)
     if (inserted) {
       toast.success('已引用字幕')
@@ -95,6 +108,7 @@ export default function LNTranscriptPanel({
     <div className="ln-transcript-panel">
       {transcript.map((line, i) => {
         const isEditing = editingIdx === i
+        const displayText = localEdits[i] ?? line.text
         return (
           <div
             key={`${line.t_sec}-${i}`}
@@ -105,7 +119,7 @@ export default function LNTranscriptPanel({
             onDoubleClick={(e) => {
               e.stopPropagation()
               setEditingIdx(i)
-              setEditText(line.text)
+              setEditText(displayText)
             }}
           >
             <span className="ln-tr-time">{line.t_str}</span>
@@ -123,12 +137,12 @@ export default function LNTranscriptPanel({
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (
-              <span className="ln-tr-text">{line.text}</span>
+              <span className="ln-tr-text">{displayText}</span>
             )}
             <button
               className="ln-tr-quote"
               title="引用到笔记"
-              onClick={(e) => handleQuote(line, e)}
+              onClick={(e) => handleQuote(line, displayText, e)}
             >
               <Quote size={12} />
             </button>

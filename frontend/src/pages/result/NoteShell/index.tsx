@@ -569,6 +569,16 @@ export default function NoteShell() {
 
   useEffect(() => { fetchNote() }, [fetchNote])
 
+  // 字幕保存成功后轻量刷新 source.md（不 setLoading、不重置正文编辑态；字幕编辑只动 source.md/transcript）
+  const refreshAfterTranscriptEdit = useCallback(async () => {
+    try {
+      const data = await getItemNote(workspaceId, itemId)
+      setNote(data)
+    } catch {
+      /* 字幕已落盘，source.md 展示刷新失败不阻塞 */
+    }
+  }, [workspaceId, itemId])
+
   // 视频笔记默认富文本（read），加载时强制归位
   const videoDefaultedRef = useRef(false)
   useEffect(() => {
@@ -940,6 +950,9 @@ export default function NoteShell() {
                   transcript={note.transcript as VideoResultTranscriptLine[]}
                   currentTime={currentTime}
                   onSeek={handleSeek}
+                  workspaceId={workspaceId}
+                  itemId={itemId}
+                  onSaved={refreshAfterTranscriptEdit}
                 />
               </div>
             ) : (
