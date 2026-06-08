@@ -38,16 +38,35 @@ def build_prompt(
     return tpl.system_prompt, user_prompt
 
 
-def _call_llm(system_prompt: str, user_prompt: str) -> Tuple[str, str]:
-    """同步调用 LLM，返回 (content, model_used)。"""
+def _call_llm(
+    system_prompt: str,
+    user_prompt: str,
+    provider_id: str = "",
+    model: str = "",
+) -> Tuple[str, str]:
+    """同步调用 LLM，返回 (content, model_used)。
+
+    provider_id/model 可选覆盖：为空时走默认 profile。
+    """
     from src.vidmirror.core.providers import ChatRequest
     from src.vidmirror.core.providers.registry import create_default_registry
 
     settings = load_settings()
     registry = create_default_registry()
-    profile = registry.resolve_default_profile(settings, "chat")
+
+    if provider_id:
+        # 用户指定了 provider
+        profile = next(
+            (p for p in settings.providers if p.id == provider_id and p.enabled),
+            None,
+        )
+        if profile is None:
+            raise RuntimeError(f"provider 不存在或未启用: {provider_id}")
+    else:
+        profile = registry.resolve_default_profile(settings, "chat")
+
     provider = registry.build(profile)
-    chat_model = str(
+    chat_model = model.strip() if model else str(
         profile.default_models.get("chat") or ""
     ).strip()
     if not chat_model:
@@ -70,10 +89,44 @@ def generate_summary(
     item: WorkspaceItem,
     template_id: str,
     background: str = "",
+    provider_id: str = "",
+    model: str = "",
+    search_web: bool = False,
 ) -> ItemSummary:
-    """生成一份总结并返回 ItemSummary（不负责持久化）。"""
+    """生成一份总结并返回 ItemSummary（不负责持久化）。
+
+    search_web=True 时，先用内容关键词联网搜索，结果拼入 prompt。
+    """
+    # ── 联网搜索（可选） ──────────────────────────────────
+    search_context = ""
+    if search_web:
+        from backend.app.services.web_search import (
+            format_search_context,
+            search_web_context,
+        )
+
+        # 用标题/背景/内容前 200 字构造搜索关键词
+        title = (item.results or {}).get("title") or ""
+        transcript = (item.results or {}).get("transcript", "")
+        if isinstance(transcript, list):
+            transcript = " ".join(
+                seg.get("text", "") for seg in transcript if isinstance(seg, dict)
+            )
+        query = title or background[:100] or transcript[:200]
+        if query.strip():
+            search_results = search_web_context(query.strip(), max_results=5)
+            search_context = format_search_context(search_results)
+
     system_prompt, user_prompt = build_prompt(item, template_id, background)
-    content_md, model_used = _call_llm(system_prompt, user_prompt)
+
+    # 搜索结果拼到 user_prompt 前面
+    if search_context:
+        user_prompt = f"{search_context}\n\n{user_prompt}"
+
+    content_md, model_used = _call_llm(
+        system_prompt, user_prompt,
+        provider_id=provider_id, model=model,
+    )
 
     return ItemSummary(
         summary_id=str(uuid.uuid4()),

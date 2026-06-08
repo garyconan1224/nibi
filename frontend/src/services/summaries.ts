@@ -30,10 +30,17 @@ export async function createSummary(
   itemId: string,
   template: string,
   background_for_summary = '',
+  options: { provider_id?: string; model?: string; search_web?: boolean } = {},
 ): Promise<ItemSummary> {
   const { data } = await http.post<ItemSummary>(
     `/workspaces/${workspaceId}/items/${itemId}/summaries`,
-    { template, background_for_summary },
+    {
+      template,
+      background_for_summary,
+      provider_id: options.provider_id ?? '',
+      model: options.model ?? '',
+      search_web: options.search_web ?? false,
+    },
     { timeout: 120_000 },  // LLM 调用可能慢
   )
   return data

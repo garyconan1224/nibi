@@ -1,15 +1,17 @@
 /**
  * NewSummaryModal — 新建总结弹窗。
  *
- * 仿 FramePickerModal 风格的居中 modal。
- * 内含：模板选择（grid + 下拉）+ 可选「补充背景」textarea + 「生成」按钮。
+ * 内含：模板选择（grid + 下拉）+ 模型选择 + 联网搜索开关
+ *      + 可选「补充背景」textarea + 「生成」按钮。
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+
+import { listProviders, type ProviderInfo } from '@/services/providers'
 
 import './new-summary-modal.css'
 
-/* ── 模板选项（与 SummariesTab 对齐） ─────────────────────── */
+/* ── 模板选项 ────────────────────────────────────────────── */
 
 const TEMPLATE_OPTIONS: { value: string; label: string }[] = [
   { value: 'concise', label: '简洁摘要' },
@@ -41,7 +43,13 @@ const QUICK_VALUES = new Set(QUICK_CARDS.map((c) => c.value))
 
 interface NewSummaryModalProps {
   creating: boolean
-  onSubmit: (template: string, background: string) => void
+  onSubmit: (opts: {
+    template: string
+    background: string
+    providerId: string
+    model: string
+    searchWeb: boolean
+  }) => void
   onClose: () => void
 }
 
@@ -52,9 +60,25 @@ export function NewSummaryModal({
 }: NewSummaryModalProps) {
   const [template, setTemplate] = useState('concise')
   const [background, setBackground] = useState('')
+  const [searchWeb, setSearchWeb] = useState(false)
+
+  // 模型选择
+  const [providers, setProviders] = useState<ProviderInfo[]>([])
+  const [selectedProvider, setSelectedProvider] = useState('')
+  const [customModel, setCustomModel] = useState('')
+
+  useEffect(() => {
+    listProviders().then(setProviders).catch(() => {})
+  }, [])
 
   const handleGenerate = () => {
-    onSubmit(template, background)
+    onSubmit({
+      template,
+      background,
+      providerId: selectedProvider,
+      model: customModel,
+      searchWeb,
+    })
   }
 
   return (
@@ -98,6 +122,43 @@ export function NewSummaryModal({
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* 模型选择 + 联网开关 */}
+          <div className="nsm-section">
+            <div className="nsm-section-label">模型与搜索</div>
+            <div className="nsm-row" style={{ marginBottom: 8 }}>
+              <span className="nsm-field-label">模型：</span>
+              <select
+                value={selectedProvider}
+                onChange={(e) => setSelectedProvider(e.target.value)}
+                className="nsm-select"
+              >
+                <option value="">默认模型</option>
+                {providers.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="nsm-row" style={{ marginBottom: 8 }}>
+              <span className="nsm-field-label">自定义模型名：</span>
+              <input
+                type="text"
+                className="nsm-input"
+                value={customModel}
+                onChange={(e) => setCustomModel(e.target.value)}
+                placeholder="留空用默认（如 gpt-4o）"
+              />
+            </div>
+            <label className="nsm-toggle-row">
+              <input
+                type="checkbox"
+                checked={searchWeb}
+                onChange={(e) => setSearchWeb(e.target.checked)}
+              />
+              <span className="nsm-toggle-label">联网搜索补充上下文</span>
+              <span className="nsm-toggle-hint">（需配置 TAVILY_API_KEY）</span>
+            </label>
           </div>
 
           {/* 补充背景 */}

@@ -153,6 +153,7 @@ describe('SummariesTab', () => {
         'item-1',
         'concise',
         '',
+        { provider_id: '', model: '', search_web: false },
       )
     })
   })

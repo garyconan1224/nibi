@@ -2966,6 +2966,9 @@ class SummaryCreateRequest(BaseModel):
 
     template: str = Field(..., description="模板 id（concise / detailed / ...）")
     background_for_summary: str = Field("", description="总结用背景信息（可选）")
+    provider_id: str = Field("", description="指定 provider（空 = 默认）")
+    model: str = Field("", description="指定模型（空 = provider 默认）")
+    search_web: bool = Field(False, description="是否联网搜索补充上下文")
 
 
 def _ensure_valid_template(template_id: str) -> None:
@@ -3017,7 +3020,12 @@ async def create_summary(
     next_ver = _store.next_version_for_template(workspace_id, item_id, req.template)
 
     def _do_generate() -> ItemSummary:
-        summary = generate_summary(item, req.template, req.background_for_summary)
+        summary = generate_summary(
+            item, req.template, req.background_for_summary,
+            provider_id=req.provider_id,
+            model=req.model,
+            search_web=req.search_web,
+        )
         summary.version = next_ver
         return summary
 
