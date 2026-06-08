@@ -202,3 +202,69 @@ relates:
 - 顺序：先 8.0 布局骨架（发用户确认）→ 再 8.1 各项交互 → 最后 8.1#7 美化。
 - 验证：对照蓝图 §3.5 + 用户设计图逐条过；播放时字幕跟随高亮+滚动；截图插入后字幕仍在；操作区四项可用；对照可滚动；主区是标准总结。
 - ⚠️ **8.0/8.1#7 涉及视觉，mimo 改前发用户一版布局/样式确认再动**，别闷头改完。
+
+## 8.3 第三轮实测结果（Opus/Sonnet 已修 · 2026-06-08）
+
+8.1 表里多数是**显示/交互**层，但用户实测后发现真凶在**后端数据**，已由 Opus 修掉并落 3 个 commit：
+
+- `ae2b628` k-8.1：design tokens + 字幕类型 cast + CompareView 滚动 + 截图自动切模式（后撤）
+- `cc6ba8a` k-8.2：**字幕格式根因** —— 后端返回 `{start,end}`、前端要 `{t_sec,t_str}`，字段名对不上 → 时间码不显示/点不动；GET 读 segments、PUT 读 string → 保存后「暂无字幕」。新增 `_normalize_note_transcript` 统一两接口。撤掉截图自动跳模式；中列标签改 `富文本/md格式`、删「源md对照」；问AI 移右列不盖 md。
+- `cc6ba8a`+`4c84b88` k-8.3：**字幕时间码持久化** —— 原本只在内存 `item.results`，后端一重启即丢。`note_assembler` 落盘 `transcript.json`，GET/PUT 内存优先、空则从盘恢复。新增 4 测试，note 套件 65 全过。
+
+实测确认：字幕时间码 ✅ 高亮跟随 ✅ 点击跳转 ✅ 截图不丢字幕 ✅。**问题 1/2/5 真正解决**。
+
+---
+
+# 9. 第四轮：NoteShell 视频笔记布局/交互细化（用户实测 8.x 后 · 2026-06-08）
+
+8.x 把字幕根因修通后，用户对**布局摆放**提出 7 点细化反馈。本章把这 7 点落成 mimo 可执行项。
+
+## 9.0 两个已确认的方向（开工前提，别再纠结）
+
+1. **富文本 / md格式 语义（用户定 A）**：
+   - **富文本 = 渲染态（ReactMarkdown），默认，只读** —— 美观、当导出预览看。
+   - **md格式 = 源码态（CodeMirror），可编辑** —— 改字、截图插入都在这档。
+   - 「能编辑的所见即所得富文本」需引入新库（TipTap/Lexical）+ md↔富文本 往返保真，**本期不做**，单独立 **R2.2 阶段**。终态可无缝去掉 md 档，但**现在保留两档**。
+2. **点3「标准总结 + 设置切换」（用户定：只做前半）**：中间**只显示当前已应用的总结**（即 `note.md`）。「设置里切换默认总结模板」**后置**，本期 mimo **不碰后端总结生成**。
+
+## 9.1 目标布局（视频笔记三列；mimo 照此实现）
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ ← 返回   [真实标题] 视频                                   [导出 ▾]     │  ← 点7：导出回右上角固定
+├──────────────────────┬─────────────────────────────────┬────────────┤
+│ 视频播放器            │ 〔富文本 | md格式〕 ← 点1：tab 在内容正上方   │ 操作区      │
+│ [截图插入]            │ ┌─────────────────────────────┐ │ · 源 md ─→悬浮(点4)│
+│                      │ │ 主体 = 当前已应用总结 note.md  │ │ · 总结列表  │
+│ ── 实时字幕 ──        │ │ 富文本(渲染·默认) / md格式(可编辑)│ │   点选→替换主体│
+│ 00:00 高亮跟随        │ │                              │ │   下方版本切换(点5)│
+│                      │ └─────────────────────────────┘ │            │
+│                      │  目录（富文本态时显示）            │            │
+└──────────────────────┴─────────────────────────────────┴────────────┘
+                                                  〔💬 问 AI〕← 点6：悬浮泡泡（仿任务队列）
+```
+
+右列瘦身后**只剩**：源md(悬浮触发) + 总结列表(点选替换+版本)。**问AI、导出移出右列**。
+
+## 9.2 七点逐项落地（含精确锚点，mimo 别重写整文件，按点改）
+
+| # | 用户要求 | 现状锚点 | 改法 |
+|---|---|---|---|
+| 1 | 富文本/md格式 切换移到**中间内容正上方**，与内容同板块 | 现在顶栏 [index.tsx:800-818](frontend/src/pages/result/NoteShell/index.tsx:800) | 把这段 segmented 切换从顶栏**移到中列容器顶部**，做成中列局部 tab 栏（贴着内容上沿、同一边框内）。顶栏只留 返回/标题/类型/导出 |
+| 2 | 默认**富文本**(渲染只读) | 默认 viewMode 来自 localStorage/`'read'` | 视频笔记**默认 `read`（=富文本）**；两档：富文本=`read`(ReactMarkdown)、md格式=`edit`(CodeMirror 可编辑)。视频笔记不再出现 `compare` |
+| 3 | 中间=当前已应用总结(note.md)；设置切换后置 | 中间已渲染 `note.md` ✓ | **保持**。本期不做设置切换、不碰后端 |
+| 4 | 源md 点击**弹悬浮框**（现在内联太挤） | 右列内联展开 [index.tsx:1009-1021](frontend/src/pages/result/NoteShell/index.tsx:1009) | 新建 `SourceMdModal`（**仿** [TranscriptPreviewModal](frontend/src/components/workspace/TranscriptPreviewModal.tsx)：`position:fixed` 遮罩 + 居中卡片 + onClose）。点「源md」→开弹层显示 `note.source_md`，宽松排版、可滚动 |
+| 5 | 右侧选总结**直接替换中间**；下方版本切换 | 右列 [SummariesTab](frontend/src/components/SummariesTab.tsx)（已按 template 分组 + version） | 让总结列表**点某条直接 `handleApplyToNote`**（替换 note.md 主体）；同模板多版本在其下 `v1/v2` 可切。复用 SummariesTab 的 `groupByTemplate`，把「需先勾再应用」改成「点即应用 + 高亮当前」 |
+| 6 | 问AI 改**悬浮**（仿任务队列） | 占右列 [index.tsx:1043-1050](frontend/src/pages/result/NoteShell/index.tsx:1043) | 新建悬浮泡泡，**仿** [FloatingTaskQueue](frontend/src/components/FloatingTaskQueue.tsx)（`position:fixed; right:24; bottom:24; zIndex:38` 按钮→popover）。popover 内嵌 [NoteChatDrawer](frontend/src/components/NoteChatDrawer.tsx)。**从右列移除问AI** |
+| 7 | 导出回**右上角固定** | 视频在右列 [:1052-1071](frontend/src/pages/result/NoteShell/index.tsx:1052)；非视频已在顶栏 [:856-890](frontend/src/pages/result/NoteShell/index.tsx:856) | 删掉顶栏导出的 `!isVideoNote &&` 条件，让导出按钮对**所有类型**都在顶栏右上角；右列移除导出 |
+
+## 9.3 执行顺序 + 验证 + 红线
+
+- **顺序**：先点7+点1（顶栏/中列 tab 归位，骨架）→ 点6+点4（抽出悬浮：问AI/源md）→ 点5（总结点选替换+版本）→ 最后统一过 DESIGN_TOKENS 美化。每步可 `npx tsc --noEmit` + `vite build` 自检，分小 commit。
+- **红线（别破坏 8.x 已修好的）**：
+  - ❌ 不准动后端 `note_assembler.py` / `workspaces.py` 的 transcript 逻辑（字幕格式+持久化刚修好）。
+  - ❌ 不准动 `LNVideoPanel` 的截图逻辑、`LNTranscriptPanel` 的 `t_sec/t_str` 联动。
+  - ❌ 不引入新库（WYSIWYG 是 R2.2，不在本期）。
+  - ✅ 改动集中在 `NoteShell/index.tsx` + 2 个新组件（SourceMdModal、问AI 悬浮）。
+- **验证**：富文本/md tab 在中列顶部、默认富文本 ✓；导出在右上角 ✓；问AI 悬浮泡泡、不盖 md ✓；源md 弹悬浮框 ✓；右侧点总结→中间替换、版本可切 ✓；字幕时间码/高亮/点击跳转**仍正常**（回归 8.x）✓。
+- ⚠️ **视觉部分（悬浮泡泡/弹层/美化）mimo 先发用户一版示意确认再细抠**。
