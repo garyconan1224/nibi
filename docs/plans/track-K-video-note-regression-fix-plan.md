@@ -305,6 +305,8 @@ relates:
 
 **R1 验收**：右侧列表点选即换中间正文；新建走弹窗；版本从 v0 起；能改名且持久。
 
+> **R1 实际落地（2026-06-08，已 merge main）**：点1 列表+新建弹窗 ✅、点2 版本 v0/改名 ✅，**用户额外加了「总结生成时选模型 + Tavily 联网搜索」整套**（providerStore 双下拉 + Tavily 设置页/测试连接 + search_web 开关）。这部分独立于 R2，R2 锚点不受影响。
+
 ## 10.3 阶段 R2 · 字幕编辑闭环 + source.md 增强（点3 + 点4）
 
 **点3 字幕双击编辑**——基础设施已有，别重造：
@@ -314,7 +316,7 @@ relates:
 
 **点4 source.md 更详细**：
 - plumb 元数据：[pipeline_tasks.py](backend/app/services/pipeline_tasks.py) 下载回调现在只把 `video_title`/`cover_thumbnail` 写进 result（:517/:520）；补上 `description`/`author`/`upload_date`（B站 [bilibili_nocookie.py:189](backend/app/downloaders/bilibili_nocookie.py:189) 的 VideoMeta 已有这些字段）。
-- [build_source_md](backend/app/services/note_assembler.py:175) 顶部加「视频信息」头：
+- [build_source_md](backend/app/services/note_assembler.py:220)（注：8.3 加 helper 后行号下移）顶部加「视频信息」头：
   ```
   ## 视频信息
   - 链接：{source_url}
