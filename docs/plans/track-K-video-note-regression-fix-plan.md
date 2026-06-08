@@ -275,6 +275,8 @@ relates:
 
 9.x 布局做完后，用户提 5 点，集中在「内容质量 + 编辑能力」，**大量动后端**。本章拆 3 个独立子阶段，**每阶段单独 commit + 验收再下一个**。
 
+> 📎 **R2 实测后续 · 问题 2（字幕一段 20 秒太长）已拆为独立执行卡**：[`docs/plans/track-K-segment-refiner-plan.md`](track-K-segment-refiner-plan.md)（引擎无关字幕切分层 `segment_refiner`，不引入新 ASR 库）。问题 1（双击保存失败）已修于 commit `1aa619e`；问题 3（source.md 视频元数据）非新视频 bug，元数据已在 [pipeline_tasks.py:520](../../backend/app/services/pipeline_tasks.py:520) 接好，仅旧数据无。
+
 ## 10.0 已确认决策（开工前提）
 
 1. **点1 总结面板**：右侧列表**只管「看 + 切」**，「新建总结」收进弹窗。
