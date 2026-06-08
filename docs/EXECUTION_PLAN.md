@@ -308,6 +308,8 @@
 - [x] **K·R4.2** overview 收敛 + 剩余落点统一直达：共享 helper 提取 + LibraryPage 改用 + ResultsOverview 兜底跳转 + library API 加 preflight — `feat/k-r4-2-overview-converge`
 - [x] **K·R4.3** NoteShell 补齐 问AI/导出/TOC：NoteChatDrawer 接入 + Markdown+Obsidian 双导出 + h2/h3 侧栏目录 + item 级 Obsidian zip 端点 — `feat/k-r4-3-noteshell-caps`
 - [x] **K·R4.4** R4 全线回归 + 收口：四类型路由 ✓ / Library 入口 ✓ / NoteShell 功能 ✓ / 旧链接不 404 ✓ / tsc ✓ / pytest 53 passed ✓
+- [x] **K·8** NoteShell 视频笔记布局重构（对齐蓝图 §3.5）+ 字幕格式统一 + 时间码持久化 — `19a3bad` `ae2b628` `cc6ba8a` `4c84b88`
+- [x] **K·9** NoteShell 视频笔记布局/交互细化 7 点：导出回顶栏 + 视图切换移中列 + 视频默认富文本 + 问AI悬浮泡泡 + 源md弹层 + 总结点选替换+版本高亮 — `b78a409` `e2f681b` `308c317`
 - [ ] **K·蓝图对照**（2026-06-07）用户手绘流程/UI 图 → 一比一蓝图 [`docs/plans/track-K-note-flow-blueprint.md`](plans/track-K-note-flow-blueprint.md)（疑点①②③⑤已确认；④图片/图文暂缓）。**下一步：以蓝图对照 R1~R4 已落地代码，列「如何修改/增加」差距清单（只读不改，动手前问用户）**
 
 ---
