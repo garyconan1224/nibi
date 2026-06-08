@@ -347,6 +347,41 @@ def _on_analysis_success_assemble(completed_task: TaskRecord, runner) -> None:  
 for _tt in ("analyze", "text", "audio", "image", "note"):
     _pipeline_runner.register_success_callback(_tt, _on_analysis_success_assemble)
 
+
+# ── 7.2 标题全链路：note task 成功后回写 item.name ─────────────
+
+
+def _on_note_success_write_title(completed_task: TaskRecord, runner) -> None:  # type: ignore[type-arg]
+    """note task 完成后，把真实标题回写 item.name。
+
+    仅在 item.name 仍为 URL/ID 占位时覆盖，避免覆盖用户自定义名。
+    """
+    video_title = str((completed_task.result or {}).get("video_title") or "").strip()
+    if not video_title:
+        return
+
+    for ws in _store.list_all():
+        for item in ws.items:
+            if completed_task.task_id not in item.related_task_ids:
+                continue
+            # 判断 item.name 是否仍是占位名（_derive_item_name 产出）
+            raw_name = item.name or ""
+            derived = _derive_item_name(item.source_value or "")
+            is_placeholder = (
+                not raw_name
+                or raw_name == derived
+                or raw_name == (item.source_value or "")
+            )
+            if is_placeholder and raw_name != video_title:
+                try:
+                    _store.update_item(ws.workspace_id, item.item_id, name=video_title)
+                except Exception:
+                    pass
+
+
+_pipeline_runner.register_success_callback("note", _on_note_success_write_title)
+
+
 WORKSPACE_UPLOAD_ROOT: Path = DATA_DIR / "workspaces"
 MAX_UPLOAD_BYTES = 500 * 1024 * 1024
 UPLOAD_CHUNK_BYTES = 1024 * 1024

@@ -1274,6 +1274,14 @@ def _download_note_source(
         _note_type = str(_nm.get("type") or "normal")
         _title = str(_nm.get("title") or "小红书笔记")
         _desc = str(_nm.get("desc") or "")
+        # 7.2: 实时写入 video_title，让 ProcessingPage 在下载阶段就显示真实标题
+        if _title and _title != "小红书笔记":
+            try:
+                _cur = dict(record.result or {})
+                _cur["video_title"] = _title
+                runner.store.update(record.task_id, result=_cur)
+            except Exception:
+                pass
         if not _xhs.get("ok"):
             # 视频失败也标 video，便于上层按"视频失败"提示而非生成空图文笔记
             _fail_kind = "video" if _note_type == "video" else "image_text"
@@ -2143,6 +2151,15 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         "json_output_basenames": [p.name for p in json_paths],
         "json_output_dir":       str(project_json_dir.resolve()),
     }
+    # 7.2 标题全链路：把下载阶段解析到的真实标题写入 result，
+    # 供 success callback 回写 item.name（解决 NoteShell 显示 ID/BV 号的问题）
+    _source_title = ""
+    if "download" in steps:
+        _source_title = str((dl_result or {}).get("title") or "").strip()
+    if not _source_title:
+        _source_title = str((probe.get("source_title") if "download" in steps else "") or "").strip()
+    if _source_title:
+        result["video_title"] = _source_title
     # M7: 附加 PROBE 识别结果
     if note_kind != "video":
         result["note_kind"] = note_kind
