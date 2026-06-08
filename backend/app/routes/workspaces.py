@@ -57,6 +57,7 @@ from backend.app.models.workspace import (
 from backend.app.services.audio_result_demo import build_demo_audio_result
 from backend.app.services.note_assembler import (
     assemble_item_note,
+    build_source_md,
     extract_transcript_from_results,
     normalize_transcript,
     note_dir,
@@ -2955,6 +2956,36 @@ def update_transcript_segment(
     segs[segment_idx] = seg
     results["transcript_segments"] = segs
     _store.update_item(workspace_id, item_id, results=results)
+
+    # R2：同步更新 note 目录 transcript.json（扛重启）+ 重建 source.md
+    try:
+        import json as _json
+        nd = note_dir(workspace_id, item_id)
+        # 落盘 transcript.json：每段用 edited_text 覆盖 text
+        persisted = []
+        for s in segs:
+            entry = dict(s)
+            edited = entry.get("edited_text")
+            if edited:
+                entry["text"] = edited
+            entry.pop("edited_text", None)
+            # 确保 t_str 存在
+            if "t_sec" in entry and "t_str" not in entry:
+                t_sec_val = float(entry.get("t_sec") or 0)
+                entry["t_str"] = f"{int(t_sec_val) // 60}:{int(t_sec_val) % 60:02d}"
+            persisted.append(entry)
+        (nd / "transcript.json").write_text(
+            _json.dumps(persisted, ensure_ascii=False), encoding="utf-8"
+        )
+        # 重建 source.md：重新取 item（results 已更新）
+        rec2 = _store.get(workspace_id)
+        if rec2:
+            item2 = _find_item(rec2, item_id)
+            source_md = build_source_md(item2)
+            (nd / "source.md").write_text(source_md, encoding="utf-8")
+    except Exception:
+        logger.warning("update_transcript_segment: 同步 note 文件失败（best-effort）", exc_info=True)
+
     return {"segment_idx": segment_idx, "edited_text": seg["edited_text"]}
 
 

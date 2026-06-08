@@ -524,6 +524,10 @@ def handle_download_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, An
         result["video_uploader"] = out["uploader"]
     if out.get("thumbnail_url"):
         result["video_thumbnail_url"] = out["thumbnail_url"]
+    if out.get("description"):
+        result["video_description"] = out["description"]
+    if out.get("upload_date"):
+        result["video_upload_date"] = out["upload_date"]
     return result
 
 
@@ -542,7 +546,7 @@ def _apply_ytdlp_metadata_to_task(
     - 调用 workspaces._maybe_rename_workspace_from_video_title 触发 workspace 改名（如适用）
     """
     meta: Dict[str, Any] = {}
-    for key in ("title", "duration", "uploader", "thumbnail_url"):
+    for key in ("title", "duration", "uploader", "thumbnail_url", "description", "upload_date"):
         val = dl_result.get(key)
         if not val:
             continue

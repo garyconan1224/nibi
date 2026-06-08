@@ -1,13 +1,16 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Quote } from 'lucide-react'
 import { toast } from 'sonner'
 import type { VideoResultTranscriptLine } from '@/services/workspaces'
+import { updateTranscriptSegment } from '@/services/workspaces'
 import { useLnEditorStore } from '@/store/lnEditorStore'
 
 interface LNTranscriptPanelProps {
   transcript: VideoResultTranscriptLine[]
   currentTime: number
   onSeek: (sec: number) => void
+  workspaceId: string
+  itemId: string
 }
 
 function activeTranscriptIdx(
@@ -25,6 +28,8 @@ export default function LNTranscriptPanel({
   transcript,
   currentTime,
   onSeek,
+  workspaceId,
+  itemId,
 }: LNTranscriptPanelProps) {
   const activeIdx = useMemo(
     () => activeTranscriptIdx(transcript, currentTime),
@@ -33,11 +38,39 @@ export default function LNTranscriptPanel({
   const activeRef = useRef<HTMLDivElement>(null)
   const insertAtCursor = useLnEditorStore((s) => s.insertAtCursor)
 
+  // ── 双击编辑状态 ──
+  const [editingIdx, setEditingIdx] = useState<number | null>(null)
+  const [editText, setEditText] = useState('')
+
   useEffect(() => {
     if (activeRef.current) {
       activeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
   }, [activeIdx])
+
+  const handleEditSave = useCallback(
+    async (idx: number) => {
+      const trimmed = editText.trim()
+      const original = transcript[idx]?.text || ''
+      if (trimmed === original) {
+        setEditingIdx(null)
+        return
+      }
+      try {
+        await updateTranscriptSegment(workspaceId, itemId, idx, trimmed)
+        toast.success('字幕已保存')
+      } catch {
+        toast.error('保存失败，请重试')
+      }
+      setEditingIdx(null)
+    },
+    [editText, transcript, workspaceId, itemId],
+  )
+
+  const handleEditCancel = useCallback(() => {
+    setEditingIdx(null)
+    setEditText('')
+  }, [])
 
   function handleQuote(line: VideoResultTranscriptLine, e: React.MouseEvent) {
     e.stopPropagation()
@@ -60,25 +93,48 @@ export default function LNTranscriptPanel({
 
   return (
     <div className="ln-transcript-panel">
-      {transcript.map((line, i) => (
-        <div
-          key={`${line.t_sec}-${i}`}
-          ref={i === activeIdx ? activeRef : undefined}
-          className="ln-tr-row"
-          data-active={i === activeIdx}
-          onClick={() => onSeek(line.t_sec)}
-        >
-          <span className="ln-tr-time">{line.t_str}</span>
-          <span className="ln-tr-text">{line.text}</span>
-          <button
-            className="ln-tr-quote"
-            title="引用到笔记"
-            onClick={(e) => handleQuote(line, e)}
+      {transcript.map((line, i) => {
+        const isEditing = editingIdx === i
+        return (
+          <div
+            key={`${line.t_sec}-${i}`}
+            ref={i === activeIdx ? activeRef : undefined}
+            className="ln-tr-row"
+            data-active={i === activeIdx}
+            onClick={() => !isEditing && onSeek(line.t_sec)}
+            onDoubleClick={(e) => {
+              e.stopPropagation()
+              setEditingIdx(i)
+              setEditText(line.text)
+            }}
           >
-            <Quote size={12} />
-          </button>
-        </div>
-      ))}
+            <span className="ln-tr-time">{line.t_str}</span>
+            {isEditing ? (
+              <input
+                className="ln-tr-edit-input"
+                autoFocus
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleEditSave(i)
+                  if (e.key === 'Escape') handleEditCancel()
+                }}
+                onBlur={() => handleEditSave(i)}
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <span className="ln-tr-text">{line.text}</span>
+            )}
+            <button
+              className="ln-tr-quote"
+              title="引用到笔记"
+              onClick={(e) => handleQuote(line, e)}
+            >
+              <Quote size={12} />
+            </button>
+          </div>
+        )
+      })}
     </div>
   )
 }

@@ -300,6 +300,8 @@ export default function LearningNotesPage() {
                   transcript={pageState.transcript}
                   currentTime={currentTime}
                   onSeek={(sec) => videoPanelRef.current?.seekTo(sec)}
+                  workspaceId={workspaceId}
+                  itemId={pageState.videoItem.item_id}
                 />
               </div>
             </div>

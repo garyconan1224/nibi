@@ -560,6 +560,8 @@ def run_ytdlp_download(
                     "duration": meta_src.get("duration") or 0,  # seconds (int/float)
                     "uploader": meta_src.get("uploader") or meta_src.get("channel") or "",
                     "thumbnail_url": meta_src.get("thumbnail") or "",
+                    "description": meta_src.get("description") or "",
+                    "upload_date": meta_src.get("upload_date") or "",
                     "error": "",
                     "error_full": "",
                     "percent": 100.0,

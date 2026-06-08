@@ -47,7 +47,8 @@ def normalize_transcript(raw: Any) -> List[Dict[str, Any]]:
     for seg in raw:
         if not isinstance(seg, dict):
             continue
-        text = str(seg.get("text", "")).strip()
+        # edited_text 优先（R2：字幕编辑后三处一致生效的显示层）
+        text = str(seg.get("edited_text") or seg.get("text", "")).strip()
         if not text:
             continue
         if "t_sec" in seg:
@@ -171,7 +172,7 @@ def _build_body(item: WorkspaceItem) -> str:
             lines = []
             for seg in transcript:
                 if isinstance(seg, dict):
-                    text = seg.get("text", "")
+                    text = str(seg.get("edited_text") or seg.get("text", ""))
                     start = seg.get("start", "")
                     if start != "":
                         lines.append(f"**[{start}s]** {text}")
@@ -189,7 +190,7 @@ def _build_body(item: WorkspaceItem) -> str:
             for seg in segments:
                 if isinstance(seg, dict):
                     start = seg.get("start", "")
-                    text = seg.get("text", "")
+                    text = str(seg.get("edited_text") or seg.get("text", ""))
                     if start != "":
                         lines.append(f"**[{start}s]** {text}")
                     else:
@@ -219,7 +220,51 @@ def _build_body(item: WorkspaceItem) -> str:
 
 def build_source_md(item: WorkspaceItem) -> str:
     """生成 source.md 内容（原始依据）。"""
-    return _build_body(item)
+    body = _build_body(item)
+    # R2：视频类型加「视频信息」头（链接/标题/作者/时长/发布日 + 简介）
+    if item.type == "video":
+        results = item.results or {}
+        source_url = item.source_value or ""
+        title = results.get("video_title", "")
+        author = results.get("video_uploader", "")
+        duration = results.get("video_duration", "")
+        upload_date = results.get("video_upload_date", "")
+        description = results.get("video_description", "")
+        # 格式化时长（秒 → mm:ss 或 hh:mm:ss）
+        duration_str = ""
+        if duration:
+            try:
+                secs = int(float(duration))
+                if secs >= 3600:
+                    duration_str = f"{secs // 3600}:{(secs % 3600) // 60:02d}:{secs % 60:02d}"
+                else:
+                    duration_str = f"{secs // 60}:{secs % 60:02d}"
+            except (ValueError, TypeError):
+                duration_str = str(duration)
+        header_lines = ["## 视频信息", ""]
+        if source_url:
+            header_lines.append(f"- 链接：{source_url}")
+        if title:
+            header_lines.append(f"- 标题：{title}")
+        if author:
+            header_lines.append(f"- 作者：{author}")
+        time_parts = []
+        if duration_str:
+            time_parts.append(f"时长：{duration_str}")
+        if upload_date:
+            time_parts.append(f"发布：{upload_date}")
+        if time_parts:
+            header_lines.append(f"- {' / '.join(time_parts)}")
+        if description:
+            header_lines.append("")
+            # 截断过长简介
+            desc_short = description[:500]
+            if len(description) > 500:
+                desc_short += "…"
+            header_lines.append(f"> {desc_short}")
+        header_lines.extend(["", "## 转写正文", ""])
+        body = "\n".join(header_lines) + body
+    return body
 
 
 def build_note_md(item: WorkspaceItem, frontmatter: Dict[str, Any]) -> str:
