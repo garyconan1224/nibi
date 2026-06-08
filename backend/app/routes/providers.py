@@ -95,6 +95,29 @@ async def get_provider_models(provider_id: str) -> Dict[str, Any]:
     return {"models": models}
 
 
+# ── Tavily 联网搜索 API Key（必须在 /{provider_id} 之前）──────
+
+
+class TavilyKeyRequest(BaseModel):
+    api_key: str = ""
+
+
+@router.get("/tavily")
+def get_tavily_key() -> Dict[str, Any]:
+    """获取 Tavily API Key 配置状态（不回发明文）。"""
+    settings = load_settings()
+    return {"has_key": bool(settings.tavily_api_key.strip())}
+
+
+@router.put("/tavily")
+def update_tavily_key(req: TavilyKeyRequest) -> Dict[str, Any]:
+    """更新 Tavily API Key。空字符串 = 清除。"""
+    settings = load_settings()
+    new_settings = replace(settings, tavily_api_key=req.api_key.strip())
+    save_settings(new_settings)
+    return {"has_key": bool(req.api_key.strip())}
+
+
 @router.get("/{provider_id}")
 def get_provider(provider_id: str) -> Dict[str, Any]:
     """获取单个提供商详情；**响应不再回传 api_key 明文**，仅保留 has_api_key 标识。"""
@@ -234,26 +257,3 @@ def create_provider(req: ProviderCreateRequest) -> Dict[str, Any]:
         "has_api_key": bool(new_profile.api_key.strip()),
         "default_models": new_profile.default_models,
     }
-
-
-# ── Tavily 联网搜索 API Key ──────────────────────────────────
-
-
-class TavilyKeyRequest(BaseModel):
-    api_key: str = ""
-
-
-@router.get("/tavily")
-def get_tavily_key() -> Dict[str, Any]:
-    """获取 Tavily API Key 配置状态（不回发明文）。"""
-    settings = load_settings()
-    return {"has_key": bool(settings.tavily_api_key.strip())}
-
-
-@router.put("/tavily")
-def update_tavily_key(req: TavilyKeyRequest) -> Dict[str, Any]:
-    """更新 Tavily API Key。空字符串 = 清除。"""
-    settings = load_settings()
-    new_settings = replace(settings, tavily_api_key=req.api_key.strip())
-    save_settings(new_settings)
-    return {"has_key": bool(req.api_key.strip())}
