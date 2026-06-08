@@ -42,6 +42,7 @@ from shared.video_analyzer import (
     run_batch_analysis,
 )
 from shared.video_download_ytdlp import fetch_ytdlp_metadata, is_platform_url, run_ytdlp_download
+from shared.segment_refiner import refine_segments
 from shared.xiaohongshu_share import is_xiaohongshu_url_or_text, run_xiaohongshu_download
 from src.vidmirror.core.providers import ChatRequest
 from src.vidmirror.core.providers.registry import create_default_registry
@@ -288,6 +289,9 @@ def _run_video_model_path(
 
     transcript_text = "\n".join(line["text"] for line in all_transcript_lines)
     combined_summary = "\n\n".join(summaries) if summaries else ""
+
+    # R2 segment_refiner：切细过长字幕段（在存入 results 前）
+    all_transcript_segments = refine_segments(all_transcript_segments)
 
     final_result: Dict[str, Any] = {
         "json_outputs": [],
@@ -750,6 +754,9 @@ def _run_subtitle_summary(
         audio_path.unlink(missing_ok=True)
     except Exception:
         pass
+
+    # segment_refiner：切细过长字幕段（在存入 results 前）
+    transcript_segments = refine_segments(transcript_segments)
 
     # 规范化 transcript 为数组格式（前端 VideoResult.transcript 期望 VideoResultTranscriptLine[]）
     transcript_lines = _build_display_transcript_lines(transcript_text, transcript_segments)
@@ -2151,6 +2158,9 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     # ── 7. 构建最终返回结果 ────────────────────────────────────
     runner.set_progress(task_id, 0.98, "任务完成")
 
+    # segment_refiner：切细过长字幕段（在存入 results 前）
+    transcript_segments = refine_segments(transcript_segments)
+
     json_paths = sorted(project_json_dir.glob("*_视觉数据.json"))
 
     result: Dict[str, Any] = {
@@ -3546,6 +3556,9 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     if audio_duration_sec <= 0:
         audio_duration_sec = float(vad_result.total_duration or 0)
     audio_title = str(yt_dlp_meta.get("video_title") or audio_filename)
+
+    # segment_refiner：切细过长字幕段（在存入 results 前）
+    transcript_segments = refine_segments(transcript_segments)
 
     result: Dict[str, Any] = {
         "task_id": task_id,
