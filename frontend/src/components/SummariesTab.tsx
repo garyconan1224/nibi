@@ -99,6 +99,8 @@ interface SummariesTabProps {
   itemId: string
   /** R1.3：NoteShell 传入时显示「应用到主笔记」按钮；旧页不传则不显示（零回归）。 */
   onApplyToNote?: (summary: ItemSummary) => void
+  /** k-9.5：当前已应用到笔记的 summary ID，用于高亮显示 */
+  activeSummaryId?: string
 }
 
 /* ── localStorage 缓存 ────────────────────────────────────────── */
@@ -152,7 +154,7 @@ function setCachedSummary(workspaceId: string, itemId: string, summary: ItemSumm
 
 /* ── 主组件 ──────────────────────────────────────────────────── */
 
-export function SummariesTab({ workspaceId, itemId, onApplyToNote }: SummariesTabProps) {
+export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummaryId }: SummariesTabProps) {
   const navigate = useNavigate()
   const [summaries, setSummaries] = useState<ItemSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -466,11 +468,17 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote }: SummariesTa
         {groups.map((g) => (
           <div key={g.template} className="sm-group">
             <div className="sm-group-label">{g.label}</div>
-            {g.versions.map((s) => (
+            {g.versions.map((s) => {
+              const isActive = activeSummaryId === s.summary_id || selected?.summary_id === s.summary_id
+              return (
               <div
                 key={s.summary_id}
-                className={`sm-version-item ${selected?.summary_id === s.summary_id ? 'active' : ''}`}
-                onClick={() => setSelected(s)}
+                className={`sm-version-item ${isActive ? 'active' : ''}`}
+                onClick={() => {
+                  setSelected(s)
+                  // k-9.5: 点即应用（当有 onApplyToNote 时）
+                  onApplyToNote?.(s)
+                }}
               >
                 <input
                   type="checkbox"
@@ -502,7 +510,8 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote }: SummariesTa
                   ×
                 </button>
               </div>
-            ))}
+              )
+            })}
           </div>
         ))}
       </aside>

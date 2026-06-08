@@ -544,6 +544,7 @@ export default function NoteShell() {
   const [currentTime, setCurrentTime] = useState(0)
   const [summariesOpen, setSummariesOpen] = useState(false)
   const [sourceModalOpen, setSourceModalOpen] = useState(false)
+  const [activeSummaryId, setActiveSummaryId] = useState<string | undefined>(undefined)
   const handleTimeUpdate = useCallback((t: number) => setCurrentTime(t), [])
   const handleSeek = useCallback((sec: number) => {
     videoRef.current?.seekTo(sec)
@@ -625,6 +626,7 @@ export default function NoteShell() {
       const updated = await putItemNote(workspaceId, itemId, summary.content_md)
       setNote(updated)
       setEditingBody(summary.content_md)
+      setActiveSummaryId(summary.summary_id)
       setSaveStatus('saved')
       setSavedAt(formatTime(new Date()))
     } catch {
@@ -1020,7 +1022,8 @@ export default function NoteShell() {
                   <SummariesTab
                     workspaceId={workspaceId}
                     itemId={itemId}
-                    onApplyToNote={(s) => { handleApplyToNote(s); setSummariesOpen(false) }}
+                    onApplyToNote={handleApplyToNote}
+                    activeSummaryId={activeSummaryId}
                   />
                 </div>
               )}
