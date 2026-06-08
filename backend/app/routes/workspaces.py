@@ -55,7 +55,12 @@ from backend.app.models.workspace import (
     WorkspaceStatus,
 )
 from backend.app.services.audio_result_demo import build_demo_audio_result
-from backend.app.services.note_assembler import assemble_item_note, note_dir
+from backend.app.services.note_assembler import (
+    assemble_item_note,
+    extract_transcript_from_results,
+    normalize_transcript,
+    note_dir,
+)
 from backend.app.services.summary_generator import generate_summary
 from backend.app.services.summary_templates import list_template_ids
 from backend.app.services.video_result_demo import build_demo_video_result
@@ -3056,50 +3061,34 @@ def delete_summary(workspace_id: str, item_id: str, summary_id: str) -> Dict[str
 # ── Note（R0.2: 只读 note 文件 + 惰性组装）───────────────────────
 
 
-def _fmt_ts_short(sec: float) -> str:
-    """秒 → 'MM:SS' 时间码。"""
-    total = max(0, int(sec))
-    m, s = divmod(total, 60)
-    return f"{m:02d}:{s:02d}"
+def _note_transcript(results: Dict[str, Any], nd: Path) -> List[Dict[str, Any]]:
+    """GET/PUT 共用：取规范化的字幕 [{t_sec, t_str, text}]。
 
+    内存 results 优先；内存为空（如后端重启后 item.results 丢失）则从 note 目录
+    transcript.json 兜底读取——修复"时间码不落盘、重启即丢"。
 
-def _normalize_note_transcript(results: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """把 results 里的 transcript 统一规范成前端要的 [{t_sec, t_str, text}]。
-
-    GET 和 PUT 共用，避免两边读法不一致（曾导致：GET 读 transcript_segments 拿到
-    list，PUT 只读 transcript 拿到 string → 保存后前端 Array.isArray=false 变"暂无字幕"）。
-
-    来源优先级：transcript_segments（带时间码）> transcript。兼容三种格式：
-      - [{start, end, text}]（transcriber 段格式）→ start 映射成 t_sec
-      - [{t_sec, t_str, text}]（已规范）→ 原样保留
-      - 纯字符串 → 单行 t_sec=0
+    规范化逻辑统一走 note_assembler，避免 GET 读 segments / PUT 读 string 这类两边不一致。
     """
-    raw = results.get("transcript_segments") or results.get("transcript") or []
+    segs = extract_transcript_from_results(results)
+    if segs:
+        # best-effort 回填：内存有、磁盘还没有 → 顺手落盘，让它扛过下次重启
+        tp = nd / "transcript.json"
+        if not tp.exists():
+            try:
+                nd.mkdir(parents=True, exist_ok=True)
+                tp.write_text(json.dumps(segs, ensure_ascii=False), encoding="utf-8")
+            except Exception:
+                pass
+        return segs
 
-    # 字符串：降级为单行（无时间码）
-    if isinstance(raw, str):
-        text = raw.strip()
-        return [{"t_sec": 0.0, "t_str": "00:00", "text": text}] if text else []
-
-    if not isinstance(raw, list):
-        return []
-
-    lines: List[Dict[str, Any]] = []
-    for seg in raw:
-        if not isinstance(seg, dict):
-            continue
-        text = str(seg.get("text", "")).strip()
-        if not text:
-            continue
-        if "t_sec" in seg:
-            t_sec = float(seg.get("t_sec") or 0)
-            t_str = str(seg.get("t_str") or _fmt_ts_short(t_sec))
-        else:
-            # transcriber 段格式：start/end
-            t_sec = float(seg.get("start") or 0)
-            t_str = _fmt_ts_short(t_sec)
-        lines.append({"t_sec": t_sec, "t_str": t_str, "text": text})
-    return lines
+    # 内存没有 → 落盘兜底
+    tp = nd / "transcript.json"
+    if tp.exists():
+        try:
+            return normalize_transcript(json.loads(tp.read_text(encoding="utf-8")))
+        except Exception:
+            return []
+    return []
 
 
 @router.get("/{workspace_id}/items/{item_id}/note")
@@ -3219,7 +3208,7 @@ def get_item_note(workspace_id: str, item_id: str) -> Dict[str, Any]:
             sec = f.get("sec", 0)
             media["frames"].append({"sec": sec, "url": fp if fp.startswith("/static/") else to_static_url(fp)})
         # transcript（优先 segments 带时间码，降级为纯文本规范化）
-        transcript = _normalize_note_transcript(results)
+        transcript = _note_transcript(results, nd)
 
     elif item_type == "audio":
         # 音频文件：results.audio.filename 存在 workspace/<id>/audio/ 下
@@ -3232,7 +3221,7 @@ def get_item_note(workspace_id: str, item_id: str) -> Dict[str, Any]:
             audio_url = audio_info["url"]  # URL 来源
         media["audio"] = audio_url
         # transcript：统一规范成 [{t_sec, t_str, text}]
-        transcript = _normalize_note_transcript(results)
+        transcript = _note_transcript(results, nd)
 
     return {
         "frontmatter": frontmatter,
@@ -3371,7 +3360,7 @@ def update_item_note(workspace_id: str, item_id: str, req: NoteUpdateRequest) ->
             sec = f.get("sec", 0)
             media["frames"].append({"sec": sec, "url": fp if fp.startswith("/static/") else to_static_url(fp)})
         # transcript：与 GET 同逻辑，统一规范成 [{t_sec, t_str, text}]（修复保存后变 string → 暂无字幕）
-        transcript = _normalize_note_transcript(results)
+        transcript = _note_transcript(results, nd)
 
     elif item_type == "audio":
         audio_info = results.get("audio") if isinstance(results.get("audio"), dict) else {}
@@ -3382,7 +3371,7 @@ def update_item_note(workspace_id: str, item_id: str, req: NoteUpdateRequest) ->
         if not audio_url and audio_info.get("url"):
             audio_url = audio_info["url"]
         media["audio"] = audio_url
-        transcript = _normalize_note_transcript(results)
+        transcript = _note_transcript(results, nd)
 
     return {
         "frontmatter": frontmatter,

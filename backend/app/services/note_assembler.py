@@ -10,6 +10,7 @@ source.md + note.md（frontmatter + 正文）+ summaries/<template>/v<n>.md，
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -20,6 +21,50 @@ from backend.app.models.workspace import ItemSummary, WorkspaceItem
 from shared.config import get_workspace_root
 
 logger = logging.getLogger(__name__)
+
+
+def _fmt_ts_short(sec: float) -> str:
+    """秒 → 'MM:SS' 时间码。"""
+    total = max(0, int(sec))
+    m, s = divmod(total, 60)
+    return f"{m:02d}:{s:02d}"
+
+
+def normalize_transcript(raw: Any) -> List[Dict[str, Any]]:
+    """把任意 transcript 形态统一规范成前端要的 [{t_sec, t_str, text}]。
+
+    兼容三种格式：
+      - [{start, end, text}]（transcriber 段格式）→ start 映射成 t_sec
+      - [{t_sec, t_str, text}]（已规范，含落盘 transcript.json）→ 原样保留
+      - 纯字符串 → 单行 t_sec=0
+    """
+    if isinstance(raw, str):
+        text = raw.strip()
+        return [{"t_sec": 0.0, "t_str": "00:00", "text": text}] if text else []
+    if not isinstance(raw, list):
+        return []
+    lines: List[Dict[str, Any]] = []
+    for seg in raw:
+        if not isinstance(seg, dict):
+            continue
+        text = str(seg.get("text", "")).strip()
+        if not text:
+            continue
+        if "t_sec" in seg:
+            t_sec = float(seg.get("t_sec") or 0)
+            t_str = str(seg.get("t_str") or _fmt_ts_short(t_sec))
+        else:
+            # transcriber 段格式：start/end
+            t_sec = float(seg.get("start") or 0)
+            t_str = _fmt_ts_short(t_sec)
+        lines.append({"t_sec": t_sec, "t_str": t_str, "text": text})
+    return lines
+
+
+def extract_transcript_from_results(results: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """从 results 取 transcript（segments 优先），规范成 [{t_sec, t_str, text}]。"""
+    raw = results.get("transcript_segments") or results.get("transcript") or []
+    return normalize_transcript(raw)
 
 # ── 常量 ──────────────────────────────────────────────────────────
 _SCHEMA_VERSION = 1
@@ -288,6 +333,18 @@ def _assemble_inner(
     source_path = nd / "source.md"
     source_path.write_text(source_content, encoding="utf-8")
     note_path.write_text(note_content, encoding="utf-8")
+
+    # 持久化带时间码的字幕（修复"内存才有、重启即丢"——note 接口会优先读它兜底）
+    try:
+        segs = extract_transcript_from_results(item.results or {})
+        # 只在拿到真实时间码（非单行 t_sec=0 的纯文本降级）时才落盘，避免覆盖更好的数据
+        has_timed = any(float(s.get("t_sec") or 0) > 0 for s in segs)
+        if segs and (has_timed or not (nd / "transcript.json").exists()):
+            (nd / "transcript.json").write_text(
+                json.dumps(segs, ensure_ascii=False), encoding="utf-8"
+            )
+    except Exception:
+        logger.warning("note_assembler: 写 transcript.json 失败（best-effort）", exc_info=True)
 
     # summaries
     written = serialize_summaries(item, nd)

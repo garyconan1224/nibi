@@ -239,3 +239,55 @@ def test_video_item_note_prefers_result_video_file(client: TestClient, tmp_path:
     data = resp.json()
     assert data["media"]["video"]["url"].endswith("/preferred.mp4")
     assert "unrelated-newer.mp4" not in data["media"]["video"]["url"]
+
+
+# ── k-8.2/8.3: transcript 规范化 + 落盘兜底 ────────────────────────────────────
+
+
+class TestNoteTranscript:
+    """字幕统一规范成 [{t_sec,t_str,text}] + 重启后从 transcript.json 兜底。"""
+
+    def test_normalize_start_end_to_t_sec(self) -> None:
+        """transcriber 段格式 {start,end} → {t_sec,t_str}（修复字段名对不上前端）。"""
+        from backend.app.services.note_assembler import normalize_transcript
+
+        out = normalize_transcript(
+            [
+                {"start": 0.0, "end": 21.72, "text": "第一段"},
+                {"start": 21.72, "end": 33.78, "text": "第二段"},
+            ]
+        )
+        assert out == [
+            {"t_sec": 0.0, "t_str": "00:00", "text": "第一段"},
+            {"t_sec": 21.72, "t_str": "00:21", "text": "第二段"},
+        ]
+
+    def test_normalize_string_fallback(self) -> None:
+        """纯字符串 → 单行 t_sec=0（无时间码降级，但仍是 list 不是 str）。"""
+        from backend.app.services.note_assembler import normalize_transcript
+
+        out = normalize_transcript("整段文本")
+        assert out == [{"t_sec": 0.0, "t_str": "00:00", "text": "整段文本"}]
+        assert normalize_transcript("") == []
+
+    def test_note_transcript_persists_and_survives_restart(self, tmp_path: Path) -> None:
+        """内存有 → 落盘 transcript.json；内存清空（模拟重启）→ 从盘恢复带时间码字幕。"""
+        nd = tmp_path / "notes" / "item-x"
+        results = {
+            "transcript_segments": [
+                {"start": 0.0, "end": 10.0, "text": "A"},
+                {"start": 21.72, "end": 30.0, "text": "B"},
+            ]
+        }
+        out = ws_module._note_transcript(results, nd)
+        assert len(out) == 2 and out[1]["t_str"] == "00:21"
+        assert (nd / "transcript.json").exists()
+
+        # 模拟后端重启：item.results 丢失 → 仍能从落盘恢复
+        out2 = ws_module._note_transcript({}, nd)
+        assert out2 == out
+
+    def test_note_transcript_empty_when_nothing(self, tmp_path: Path) -> None:
+        """内存空 + 无落盘 → 返回空 list（前端显示"暂无字幕"，不报错）。"""
+        out = ws_module._note_transcript({}, tmp_path / "notes" / "none")
+        assert out == []
