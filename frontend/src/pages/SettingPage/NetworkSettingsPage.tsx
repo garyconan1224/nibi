@@ -22,6 +22,7 @@ interface NetworkDraft extends Record<string, unknown> {
   poToken: string
   visitorData: string
   cookieBaseDirs: string
+  tavilyApiKey: string
 }
 
 const NetworkSettingsPage = () => {
@@ -32,6 +33,7 @@ const NetworkSettingsPage = () => {
   const poToken        = useConfigStore((s) => s.poToken)
   const visitorData    = useConfigStore((s) => s.visitorData)
   const cookieBaseDirs = useConfigStore((s) => s.cookieBaseDirs)
+  const tavilyApiKey   = useConfigStore((s) => s.tavilyApiKey)
   const setConfig      = useConfigStore((s) => s.setConfig)
 
   const setSaveBar   = useSettingsShellStore((s) => s.setSaveBar)
@@ -39,8 +41,8 @@ const NetworkSettingsPage = () => {
 
   // 基线快照：来自持久化 store；store 外部变更时（例如另一个 Tab 修改）通过 useEffect 同步
   const baseline = useMemo<NetworkDraft>(
-    () => ({ httpProxy, poToken, visitorData, cookieBaseDirs }),
-    [httpProxy, poToken, visitorData, cookieBaseDirs],
+    () => ({ httpProxy, poToken, visitorData, cookieBaseDirs, tavilyApiKey }),
+    [httpProxy, poToken, visitorData, cookieBaseDirs, tavilyApiKey],
   )
 
   const [draft, setDraft] = useState<NetworkDraft>(baseline)
@@ -52,7 +54,8 @@ const NetworkSettingsPage = () => {
       prev.httpProxy === baseline.httpProxy &&
       prev.poToken === baseline.poToken &&
       prev.visitorData === baseline.visitorData &&
-      prev.cookieBaseDirs === baseline.cookieBaseDirs
+      prev.cookieBaseDirs === baseline.cookieBaseDirs &&
+      prev.tavilyApiKey === baseline.tavilyApiKey
         ? prev
         : baseline,
     )
@@ -72,7 +75,7 @@ const NetworkSettingsPage = () => {
     setDraft(baseline)
   }, [baseline])
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     setIsSaving(true)
     try {
       const next: NetworkDraft = {
@@ -80,15 +83,21 @@ const NetworkSettingsPage = () => {
         poToken: draft.poToken.trim(),
         visitorData: draft.visitorData.trim(),
         cookieBaseDirs: draft.cookieBaseDirs,
+        tavilyApiKey: draft.tavilyApiKey.trim(),
       }
       setConfig(next)
       setDraft(next)
       guard.commit(next)
+      // 同步 Tavily key 到后端
+      if (next.tavilyApiKey !== baseline.tavilyApiKey) {
+        const { http } = await import('@/services/client')
+        await http.put('/providers/tavily', { api_key: next.tavilyApiKey })
+      }
       toast.success(t('network.saved'))
     } finally {
       setIsSaving(false)
     }
-  }, [draft, setConfig, guard, t])
+  }, [draft, setConfig, guard, t, baseline.tavilyApiKey])
 
   // SaveBar 桥：推送脏计数 + 保存/重置回调；卸载归零
   useEffect(() => {
@@ -189,6 +198,39 @@ const NetworkSettingsPage = () => {
             className="min-h-[88px] text-sm font-mono"
           />
         </FieldRow>
+      </Section>
+
+      {/* ── Section D · 联网搜索 ── */}
+      <Section
+        icon={<Network className="size-4" />}
+        title="联网搜索"
+        description="总结生成时可选联网搜索补充上下文，需要 Tavily API Key"
+      >
+        <FieldRow
+          htmlFor="tavily-key"
+          label="Tavily API Key"
+          hint="免费注册 tavily.com 即可获得（1000 次/月）"
+          dirty={dirty.tavilyApiKey}
+        >
+          <Input
+            id="tavily-key"
+            type="password"
+            value={draft.tavilyApiKey}
+            onChange={(e) => patch({ tavilyApiKey: e.target.value })}
+            placeholder="tvly-xxxxxxxxxx"
+            className="text-sm font-mono"
+          />
+        </FieldRow>
+        <div className="px-6 pb-4">
+          <a
+            href="https://app.tavily.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-primary underline"
+          >
+            → 去 tavily.com 免费注册（2 分钟）
+          </a>
+        </div>
       </Section>
     </div>
   )

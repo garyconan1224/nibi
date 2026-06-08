@@ -1,13 +1,15 @@
 /**
  * NewSummaryModal — 新建总结弹窗。
  *
- * 内含：模板选择（grid + 下拉）+ 模型选择 + 联网搜索开关
- *      + 可选「补充背景」textarea + 「生成」按钮。
+ * 模板选择 + 模型选择（复用 providerStore 双下拉）+ 联网搜索开关
+ * + 可选「补充背景」textarea + 「生成」按钮。
+ * 模型选择记忆上次（configStore）。
  */
 
 import { useEffect, useState } from 'react'
 
-import { listProviders, type ProviderInfo } from '@/services/providers'
+import { useProviderStore, type Model } from '@/store/providerStore'
+import { useConfigStore } from '@/store/configStore'
 
 import './new-summary-modal.css'
 
@@ -62,21 +64,47 @@ export function NewSummaryModal({
   const [background, setBackground] = useState('')
   const [searchWeb, setSearchWeb] = useState(false)
 
-  // 模型选择
-  const [providers, setProviders] = useState<ProviderInfo[]>([])
-  const [selectedProvider, setSelectedProvider] = useState('')
-  const [customModel, setCustomModel] = useState('')
+  // ── 模型选择：复用 providerStore + configStore 记忆 ──
+  const providers = useProviderStore((s) => s.providers)
+  const providerModels = useProviderStore((s) => s.providerModels)
+  const modelsLoading = useProviderStore((s) => s.modelsLoading)
+  const fetchProviders = useProviderStore((s) => s.fetchProviders)
 
+  const savedProviderId = useConfigStore((s) => s.summaryProviderId)
+  const savedModelId = useConfigStore((s) => s.summaryModelId)
+  const setConfig = useConfigStore((s) => s.setConfig)
+
+  const [providerId, setProviderId] = useState(savedProviderId)
+  const [modelId, setModelId] = useState(savedModelId)
+
+  // 拉取 provider 列表（如果还没有）
   useEffect(() => {
-    listProviders().then(setProviders).catch(() => {})
-  }, [])
+    if (providers.length === 0) fetchProviders()
+  }, [providers.length, fetchProviders])
+
+  // 可用 provider（有 chat 能力的）
+  const chatProviders = providers.filter(
+    (p) => p.enabled && (p.capabilities ?? []).includes('chat'),
+  )
+
+  // 当前 provider 的模型列表
+  const models: Model[] = providerId ? providerModels[providerId] ?? [] : []
+  const isLoading = providerId ? !!modelsLoading[providerId] : false
+
+  // 切换 provider 时清空 model
+  const handleProviderChange = (id: string) => {
+    setProviderId(id)
+    setModelId('')
+  }
 
   const handleGenerate = () => {
+    // 记忆本次选择
+    setConfig({ summaryProviderId: providerId, summaryModelId: modelId })
     onSubmit({
       template,
       background,
-      providerId: selectedProvider,
-      model: customModel,
+      providerId,
+      model: modelId,
       searchWeb,
     })
   }
@@ -124,32 +152,38 @@ export function NewSummaryModal({
             </div>
           </div>
 
-          {/* 模型选择 + 联网开关 */}
+          {/* 模型选择（与 PreflightConfigPanel 对齐的双下拉） */}
           <div className="nsm-section">
-            <div className="nsm-section-label">模型与搜索</div>
-            <div className="nsm-row" style={{ marginBottom: 8 }}>
-              <span className="nsm-field-label">模型：</span>
+            <div className="nsm-section-label">模型</div>
+            <div className="nsm-model-row">
               <select
-                value={selectedProvider}
-                onChange={(e) => setSelectedProvider(e.target.value)}
+                value={providerId}
+                onChange={(e) => handleProviderChange(e.target.value)}
                 className="nsm-select"
               >
-                <option value="">默认模型</option>
-                {providers.map((p) => (
+                <option value="">默认供应商</option>
+                {chatProviders.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
+              <select
+                value={modelId}
+                onChange={(e) => setModelId(e.target.value)}
+                disabled={!providerId || isLoading}
+                className="nsm-select"
+              >
+                <option value="">
+                  {isLoading ? '加载中…' : models.length === 0 && providerId ? '无可用模型' : '默认模型'}
+                </option>
+                {models.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name || m.id}</option>
+                ))}
+              </select>
             </div>
-            <div className="nsm-row" style={{ marginBottom: 8 }}>
-              <span className="nsm-field-label">自定义模型名：</span>
-              <input
-                type="text"
-                className="nsm-input"
-                value={customModel}
-                onChange={(e) => setCustomModel(e.target.value)}
-                placeholder="留空用默认（如 gpt-4o）"
-              />
-            </div>
+          </div>
+
+          {/* 联网搜索开关 */}
+          <div className="nsm-section">
             <label className="nsm-toggle-row">
               <input
                 type="checkbox"
@@ -157,7 +191,7 @@ export function NewSummaryModal({
                 onChange={(e) => setSearchWeb(e.target.checked)}
               />
               <span className="nsm-toggle-label">联网搜索补充上下文</span>
-              <span className="nsm-toggle-hint">（需配置 TAVILY_API_KEY）</span>
+              <span className="nsm-toggle-hint">（需在设置中配置 Tavily API Key）</span>
             </label>
           </div>
 

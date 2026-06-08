@@ -139,6 +139,13 @@ export interface ConfigState {
   /** Cookie 基目录（多行，每行一个绝对路径；为空则使用默认目录） */
   cookieBaseDirs: string
 
+  /** Tavily 联网搜索 API Key */
+  tavilyApiKey: string
+  /** 总结弹窗上次选择的 provider_id（记忆用） */
+  summaryProviderId: string
+  /** 总结弹窗上次选择的 model（记忆用） */
+  summaryModelId: string
+
   /** 下载器配置(M3 新增,后端持久化镜像) */
   downloadConfig: DownloadConfig
 
@@ -232,6 +239,11 @@ const DEFAULT_CONFIG: Omit<ConfigState, ConfigStateActionKey> = {
   poToken: '',
   visitorData: '',
   cookieBaseDirs: '',
+
+  // Tavily 联网搜索 + 总结弹窗模型记忆
+  tavilyApiKey: '',
+  summaryProviderId: '',
+  summaryModelId: '',
 
   // M3:下载器配置镜像(真相源=后端),持久化提供首屏快照,loadDownloadConfig 按需刷新
   downloadConfig: DEFAULT_DOWNLOAD_CONFIG,

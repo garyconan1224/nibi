@@ -173,6 +173,14 @@
   color: var(--ink-4);
 }
 
+/* ── 模型双下拉 ────────────────────────────────────── */
+
+.nsm-model-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
 .nsm-footer {
   padding: 12px 18px;
   border-top: 1px solid var(--line);

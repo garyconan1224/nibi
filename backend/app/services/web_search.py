@@ -20,7 +20,10 @@ class SearchResult(TypedDict):
 
 def search_web_context(query: str, max_results: int = 5) -> List[SearchResult]:
     """用 Tavily 搜索补充上下文。无 key 或搜索失败时返回空列表。"""
-    api_key = os.getenv("TAVILY_API_KEY", "").strip()
+    # 优先从 settings 读，fallback 到环境变量
+    from shared.settings_store import load_settings
+    settings = load_settings()
+    api_key = settings.tavily_api_key.strip() or os.getenv("TAVILY_API_KEY", "").strip()
     if not api_key:
         logger.info("TAVILY_API_KEY 未配置，跳过联网搜索")
         return []

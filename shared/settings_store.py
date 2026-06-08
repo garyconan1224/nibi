@@ -378,6 +378,7 @@ class AppSettings:
     download: DownloadConfig = field(default_factory=DownloadConfig)
     prompt_formats: PromptFormatsConfig = field(default_factory=PromptFormatsConfig)
     performance: PerformanceConfig = field(default_factory=PerformanceConfig)
+    tavily_api_key: str = ""
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "AppSettings":
@@ -402,6 +403,7 @@ class AppSettings:
             download=DownloadConfig.from_dict(data.get("download")),
             prompt_formats=PromptFormatsConfig.from_dict(data.get("prompt_formats")),
             performance=PerformanceConfig.from_dict(data.get("performance")),
+            tavily_api_key=str(data.get("tavily_api_key") or ""),
         )
 
 
