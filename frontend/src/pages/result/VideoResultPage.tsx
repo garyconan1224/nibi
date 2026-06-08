@@ -652,10 +652,10 @@ export default function VideoResultPage() {
             <button
               className={`vd-mode-btn${isLearning ? ' active' : ''}`}
               data-active={isLearning}
-              onClick={() => navigate(`/workspaces/${workspaceId}/ln`)}
+              onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/note`)}
             >
               <BookOpen size={12} />
-              <span>学习笔记</span>
+              <span>笔记</span>
             </button>
             <button
               className={`vd-mode-btn${!isLearning ? ' active' : ''}`}
@@ -864,10 +864,10 @@ export default function VideoResultPage() {
             <button
               className={`vd-mode-btn${isLearning ? ' active' : ''}`}
               data-active={isLearning}
-              onClick={() => navigate(`/workspaces/${workspaceId}/ln`)}
+              onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/note`)}
             >
               <BookOpen size={12} />
-              <span>学习笔记</span>
+              <span>笔记</span>
             </button>
             <button
               className={`vd-mode-btn${!isLearning ? ' active' : ''}`}

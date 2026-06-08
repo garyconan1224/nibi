@@ -15,6 +15,7 @@ import { Card } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { resolveItemRoute } from '@/lib/resolveItemRoute'
 
 type TabKey = 'all' | ItemType
 
@@ -48,21 +49,7 @@ function collectFavorites(workspaces: WorkspaceRecord[]): FavoriteEntry[] {
 
 function resultRouteFor(entry: FavoriteEntry): string {
   const { workspace, item } = entry
-  // video 类型：learning intent 跳 /ln，其它跳 video_detail
-  if (item.type === 'video') {
-    const intent = item.preflight?.intent
-    if (intent === 'learning') {
-      return `/workspaces/${workspace.workspace_id}/ln`
-    }
-    return `/workspaces/${workspace.workspace_id}/items/${item.item_id}/video_detail`
-  }
-  const map: Record<string, string> = {
-    audio: 'audio_result',
-    image: 'image_result',
-    text: 'text_result',
-  }
-  const suffix = map[item.type] ?? 'result'
-  return `/workspaces/${workspace.workspace_id}/items/${item.item_id}/${suffix}`
+  return resolveItemRoute(workspace.workspace_id, item)
 }
 
 export default function FavoritesPage() {

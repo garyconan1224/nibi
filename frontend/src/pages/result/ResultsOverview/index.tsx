@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, ArrowRight, BookOpen, Clapperboard, Download, Loader2, MessageSquare, RotateCcw, Star } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ArrowRight, BookOpen, Clapperboard, Download, Loader2, MessageSquare, RotateCcw } from 'lucide-react'
 
 import {
   type AudioResult,
@@ -540,17 +540,6 @@ export default function ResultsOverview() {
           >
             打开详情 <ArrowRight size={14} />
           </button>
-
-          {/* R19: 综合笔记入口 */}
-          {pageState.kind === 'ready' && Boolean((pageState.item.results as Record<string, unknown>)?.av_synthesis_path) && (
-            <button
-              className="ov-side-action"
-              onClick={() => navigate(`/workspaces/${workspaceId}/av-synthesis`)}
-            >
-              <Star size={14} />
-              <span>综合笔记已就绪</span>
-            </button>
-          )}
 
           {/* Action 小列表 */}
           <div className="ov-side-actions">

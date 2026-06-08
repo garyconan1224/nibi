@@ -736,14 +736,6 @@ export async function downloadSubtitles(
   URL.revokeObjectURL(url)
 }
 
-/** GET /workspaces/{id}/av-synthesis — 获取综合笔记 markdown 原文 */
-export async function getAVSynthesisMarkdown(workspaceId: string): Promise<string> {
-  const res = await http.get<string>(`${BASE}/${workspaceId}/av-synthesis`, {
-    responseType: 'text',
-  } as never)
-  return res.data as unknown as string
-}
-
 /** GET /workspaces/{id}/ln — 获取学习笔记 markdown 原文 */
 export async function getLnMarkdown(workspaceId: string): Promise<string> {
   const res = await http.get<string>(`${BASE}/${workspaceId}/ln`, {
@@ -775,42 +767,6 @@ export async function updateTextContent(
     { content },
   )
   return res.data
-}
-
-/** GET /workspaces/{id}/export/av-synthesis.md — 下载综合笔记 .md 文件 */
-export async function downloadAVSynthesisMd(workspaceId: string): Promise<void> {
-  const res = await http.get(`${BASE}/${workspaceId}/export/av-synthesis.md`, {
-    responseType: 'blob',
-  })
-  const url = URL.createObjectURL(res.data as Blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = '综合笔记.md'
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  URL.revokeObjectURL(url)
-}
-
-/** POST /workspaces/{id}/notes/export — 综合笔记多格式导出 */
-export async function exportNotes(
-  workspaceId: string,
-  format: 'pdf' | 'docx' | 'obsidian',
-): Promise<void> {
-  const extMap = { pdf: 'pdf', docx: 'docx', obsidian: 'zip' }
-  const res = await http.post(
-    `${BASE}/${workspaceId}/notes/export`,
-    { format },
-    { responseType: 'blob' },
-  )
-  const url = URL.createObjectURL(res.data as Blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `综合笔记.${extMap[format]}`
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  URL.revokeObjectURL(url)
 }
 
 /** GET /workspaces/{id}/ln/export?format=obsidian — 导出 Obsidian zip 包 */

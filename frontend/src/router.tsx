@@ -37,8 +37,6 @@ const WorkbenchPage = lazy(() => import('@/pages/WorkbenchPage/index'))
 const ProcessingPage = lazy(() => import('@/pages/result/ProcessingPage/index'))
 const StoryboardPage = lazy(() => import('@/pages/StoryboardPage/index'))
 const LibraryPage = lazy(() => import('@/pages/LibraryPage/index'))
-const AVSynthesisResultPage = lazy(() => import('@/pages/results/AVSynthesisResultPage'))
-const LearningNotesPage = lazy(() => import('@/pages/results/LearningNotesPage'))
 const NoteShell = lazy(() => import('@/pages/result/NoteShell/index'))
 
 // 懒加载 fallback：保持极简，避免把额外依赖拉进主 chunk
@@ -87,14 +85,6 @@ export const router = createBrowserRouter([
       {
         path: 'workspaces/:workspaceId/items/:itemId/note',
         element: withSuspense(<NoteShell />),
-      },
-      {
-        path: 'workspaces/:workspaceId/av-synthesis',
-        element: withSuspense(<AVSynthesisResultPage />),
-      },
-      {
-        path: 'workspaces/:workspaceId/ln',
-        element: withSuspense(<LearningNotesPage />),
       },
       // 旧路由兼容（保留一个 release，loader redirect 到新路径）
       {
@@ -146,4 +136,3 @@ export const router = createBrowserRouter([
     ],
   },
 ])
-
