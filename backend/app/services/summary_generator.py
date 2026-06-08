@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Tuple
+
+logger = logging.getLogger(__name__)
 
 from backend.app.models.workspace import ItemSummary, WorkspaceItem
 from backend.app.services.summary_templates import get_template
@@ -122,6 +125,7 @@ def generate_summary(
     # 搜索结果拼到 user_prompt 前面
     if search_context:
         user_prompt = f"{search_context}\n\n{user_prompt}"
+        logger.info("联网搜索上下文已拼入 prompt（%d 字）", len(search_context))
 
     content_md, model_used = _call_llm(
         system_prompt, user_prompt,

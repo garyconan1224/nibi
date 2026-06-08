@@ -32,6 +32,7 @@ def search_web_context(query: str, max_results: int = 5) -> List[SearchResult]:
         from tavily import TavilyClient
 
         client = TavilyClient(api_key=api_key)
+        logger.info("Tavily 搜索: query=%s, max_results=%d", query[:80], max_results)
         response = client.search(query, max_results=max_results, search_depth="basic")
         results: List[SearchResult] = []
         for item in response.get("results", []):
@@ -40,6 +41,7 @@ def search_web_context(query: str, max_results: int = 5) -> List[SearchResult]:
                 "snippet": item.get("content", ""),
                 "url": item.get("url", ""),
             })
+        logger.info("Tavily 搜索完成: %d 条结果", len(results))
         return results
     except Exception as exc:
         logger.warning("Tavily 搜索失败: %s", exc)
