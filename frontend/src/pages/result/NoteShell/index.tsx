@@ -566,16 +566,18 @@ export default function NoteShell() {
 
   useEffect(() => { fetchNote() }, [fetchNote])
 
-  // 视频笔记没有 compare（源md对照）档，localStorage 残留 compare 时归位到 read
+  // 视频笔记默认富文本（read），加载时强制归位
+  const videoDefaultedRef = useRef(false)
   useEffect(() => {
-    if (!note) return
+    if (!note || videoDefaultedRef.current) return
     const fmType = String(((note.frontmatter ?? {}) as Record<string, unknown>).type ?? '')
     const isVid = fmType === 'video' && !!note.media?.video?.url
-    if (isVid && viewMode === 'compare') {
+    if (isVid) {
+      videoDefaultedRef.current = true
       setViewMode('read')
       localStorage.setItem(VIEW_MODE_KEY, 'read')
     }
-  }, [note, viewMode])
+  }, [note])
 
   // ─── debounce 自动保存 ───
   const doSave = useCallback(async (body: string) => {
@@ -822,91 +824,50 @@ export default function NoteShell() {
           {TYPE_LABEL[itemType] ?? itemType.toUpperCase()}
         </span>
 
-        {/* 视图切换（视频笔记只有 富文本/md格式 两档，源md在右侧操作区） */}
-        <div style={{ display: 'flex', marginLeft: 12, borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--line)' }}>
-          {(['read', 'edit', 'compare'] as ViewMode[])
-            .filter((m) => (isVideoNote ? m !== 'compare' : (isWide || m !== 'compare')))
-            .map((m) => (
-              <button
-                key={m}
-                onClick={() => switchView(m)}
-                style={{
-                  padding: '3px 12px', fontSize: 11, border: 'none', cursor: 'pointer',
-                  background: viewMode === m ? (isVideoNote ? 'var(--accent-2)' : 'var(--ink)') : 'transparent',
-                  color: viewMode === m ? '#fff' : 'var(--ink-3)',
-                  fontWeight: viewMode === m ? 600 : 400,
-                  transition: 'background .15s, color .15s',
-                }}
-              >
-                {(isVideoNote ? videoViewModeLabels : viewModeLabels)[m]}
-              </button>
-            ))}
-        </div>
-
-        {/* 保存状态 */}
-        {(viewMode === 'edit' || viewMode === 'compare') && (
-          <span style={{ fontSize: 11, color: 'var(--ink-3)', marginLeft: 4 }}>
-            {saveStatus === 'saving' && '保存中…'}
-            {saveStatus === 'saved' && `已保存 ${savedAt}`}
-            {saveStatus === 'failed' && <span style={{ color: 'var(--accent-pink)' }}>保存失败</span>}
-          </span>
-        )}
-
         <div style={{ flex: 1 }} />
-        {/* 问AI / 导出：视频笔记在右列操作区，非视频在顶栏 */}
-        {!isVideoNote && (
-          <>
-            <button
-              className="btn-ghost"
-              onClick={() => setChatOpen((open) => !open)}
-              style={{ height: 28, padding: '0 10px', fontSize: 12 }}
-              title="基于当前笔记问 AI"
+
+        {/* 导出（所有类型都在顶栏右上角） */}
+        <div style={{ position: 'relative' }}>
+          <button
+            className="btn-ghost"
+            onClick={() => setExportOpen((open) => !open)}
+            style={{ height: 28, padding: '0 10px', fontSize: 12 }}
+            title="导出当前笔记"
+          >
+            <Download size={13} /> 导出
+          </button>
+          {exportOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                right: 0,
+                top: 34,
+                zIndex: 20,
+                minWidth: 160,
+                padding: '4px',
+                border: '1px solid var(--line)',
+                borderRadius: 'var(--radius-sm)',
+                background: 'var(--bg)',
+                boxShadow: 'var(--shadow-md)',
+              }}
             >
-              <MessageCircle size={13} /> 问 AI
-            </button>
-            <div style={{ position: 'relative' }}>
               <button
                 className="btn-ghost"
-                onClick={() => setExportOpen((open) => !open)}
-                style={{ height: 28, padding: '0 10px', fontSize: 12 }}
-                title="导出当前笔记"
+                onClick={handleExportMarkdown}
+                style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
               >
-                <Download size={13} /> 导出
+                <FileText size={13} /> Markdown
               </button>
-              {exportOpen && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    right: 0,
-                    top: 34,
-                    zIndex: 20,
-                    minWidth: 160,
-                    padding: '4px',
-                    border: '1px solid var(--line)',
-                    borderRadius: 'var(--radius-sm)',
-                    background: 'var(--bg)',
-                    boxShadow: 'var(--shadow-md)',
-                  }}
-                >
-                  <button
-                    className="btn-ghost"
-                    onClick={handleExportMarkdown}
-                    style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
-                  >
-                    <FileText size={13} /> Markdown
-                  </button>
-                  <button
-                    className="btn-ghost"
-                    onClick={() => void handleExportObsidian()}
-                    style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
-                  >
-                    <BookOpenCheck size={13} /> Obsidian 包
-                  </button>
-                </div>
-              )}
+              <button
+                className="btn-ghost"
+                onClick={() => void handleExportObsidian()}
+                style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
+              >
+                <BookOpenCheck size={13} /> Obsidian 包
+              </button>
             </div>
-          </>
-        )}
+          )}
+        </div>
         <Badge variant="outline" style={{ fontSize: 10 }}>
           <FileText size={10} /> NoteShell
         </Badge>
@@ -984,10 +945,39 @@ export default function NoteShell() {
             )}
           </div>
 
-          {/* ── 中列：正文（标准总结 / 富文本 / 源md对照）+ TOC ── */}
-          <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
-            {noteContent}
-            {tocAside}
+          {/* ── 中列：视图切换 tab + 正文（富文本/md格式）+ TOC ── */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+            {/* 视图切换 tab（点1：移到中列内容正上方） */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 0, padding: '0 24px', flexShrink: 0, borderBottom: '1px solid var(--line)', height: 36 }}>
+              {(['read', 'edit'] as ViewMode[]).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => switchView(m)}
+                  style={{
+                    padding: '6px 16px', fontSize: 12, border: 'none', cursor: 'pointer', background: 'transparent',
+                    color: viewMode === m ? 'var(--accent-2)' : 'var(--ink-4)',
+                    fontWeight: viewMode === m ? 600 : 400,
+                    borderBottom: viewMode === m ? '2px solid var(--accent-2)' : '2px solid transparent',
+                    transition: 'color .15s, border-color .15s',
+                  }}
+                >
+                  {videoViewModeLabels[m]}
+                </button>
+              ))}
+              {/* 保存状态（编辑态才显示） */}
+              {viewMode === 'edit' && (
+                <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-4)' }}>
+                  {saveStatus === 'saving' && '保存中…'}
+                  {saveStatus === 'saved' && `已保存 ${savedAt}`}
+                  {saveStatus === 'failed' && <span style={{ color: 'var(--accent)' }}>保存失败</span>}
+                </span>
+              )}
+            </div>
+            {/* 正文 + TOC 横排 */}
+            <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+              {noteContent}
+              {tocAside}
+            </div>
           </div>
 
           {/* ── 右列：操作区 / 问AI（互斥；问AI 占满右列、加宽，绝不盖住中列 md）── */}
@@ -1072,26 +1062,6 @@ export default function NoteShell() {
                     <MessageCircle size={13} /> 问 AI
                   </button>
 
-                  {/* 导出 */}
-                  <div style={{ position: 'relative', flexShrink: 0 }}>
-                    <button
-                      className="btn-ghost"
-                      onClick={() => setExportOpen((v) => !v)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-start', height: 36, padding: '0 14px', fontSize: 12, borderRadius: 0, borderTop: '1px solid var(--line)', color: exportOpen ? 'var(--accent-2)' : undefined }}
-                    >
-                      <Download size={13} /> 导出
-                    </button>
-                    {exportOpen && (
-                      <div style={{ position: 'absolute', right: 0, bottom: 36, zIndex: 20, minWidth: 140, padding: 4, border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-elev)', boxShadow: 'var(--shadow-md)' }}>
-                        <button className="btn-ghost" onClick={() => { handleExportMarkdown(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}>
-                          <FileText size={13} /> Markdown
-                        </button>
-                        <button className="btn-ghost" onClick={() => { void handleExportObsidian(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}>
-                          <BookOpenCheck size={13} /> Obsidian
-                        </button>
-                      </div>
-                    )}
-                  </div>
 
                 </div>
               </>
