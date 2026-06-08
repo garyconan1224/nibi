@@ -1,10 +1,11 @@
 /**
  * SummariesTab 组件测试。
  *
- * 测试：列表渲染 / 新建调用 / 删除调用 / 选中状态。
+ * 测试：列表渲染 / 新建弹窗 / 删除调用 / 选中状态 / 对比模式。
  */
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { SummariesTab } from '@/components/SummariesTab'
@@ -16,12 +17,14 @@ const mocks = vi.hoisted(() => ({
   listSummaries: vi.fn(),
   createSummary: vi.fn(),
   deleteSummary: vi.fn(),
+  renameSummary: vi.fn(),
 }))
 
 vi.mock('@/services/summaries', () => ({
   listSummaries: mocks.listSummaries,
   createSummary: mocks.createSummary,
   deleteSummary: mocks.deleteSummary,
+  renameSummary: mocks.renameSummary,
 }))
 
 vi.mock('sonner', () => ({
@@ -33,9 +36,10 @@ vi.mock('sonner', () => ({
 const SUMMARY_1: ItemSummary = {
   summary_id: 's1',
   template: 'concise',
-  version: 1,
+  version: 0,
+  name: '',
   background_for_summary: '',
-  content_md: '# 简洁摘要 v1\n\n这是第一版摘要',
+  content_md: '# 简洁摘要 v0\n\n这是第一版摘要',
   model_used: 'openai/gpt-4o',
   created_at: '2026-05-28T12:00:00Z',
 }
@@ -43,9 +47,10 @@ const SUMMARY_1: ItemSummary = {
 const SUMMARY_2: ItemSummary = {
   summary_id: 's2',
   template: 'concise',
-  version: 2,
+  version: 1,
+  name: '',
   background_for_summary: '背景信息',
-  content_md: '# 简洁摘要 v2\n\n这是第二版',
+  content_md: '# 简洁摘要 v1\n\n这是第二版',
   model_used: 'openai/gpt-4o',
   created_at: '2026-05-28T13:00:00Z',
 }
@@ -53,7 +58,8 @@ const SUMMARY_2: ItemSummary = {
 const SUMMARY_DETAILED: ItemSummary = {
   summary_id: 's3',
   template: 'detailed',
-  version: 1,
+  version: 0,
+  name: '',
   background_for_summary: '',
   content_md: '## 要点\n\n- 要点1\n- 要点2',
   model_used: 'deepseek/deepseek-chat',
@@ -63,7 +69,8 @@ const SUMMARY_DETAILED: ItemSummary = {
 const SUMMARY_QUOTES: ItemSummary = {
   summary_id: 's4',
   template: 'quotes',
-  version: 1,
+  version: 0,
+  name: '',
   background_for_summary: '',
   content_md: '> 金句一\n\n> 金句二',
   model_used: 'openai/gpt-4o',
@@ -77,65 +84,63 @@ describe('SummariesTab', () => {
     vi.clearAllMocks()
   })
 
-  it('加载后显示总结列表', async () => {
+  it('加载后显示扁平版列表', async () => {
     mocks.listSummaries.mockResolvedValue([SUMMARY_1, SUMMARY_2, SUMMARY_DETAILED])
 
-    render(<SummariesTab workspaceId="ws-1" itemId="item-1" />)
+    render(<MemoryRouter><SummariesTab workspaceId="ws-1" itemId="item-1" /></MemoryRouter>)
 
     await waitFor(() => {
-      expect(screen.getByText('简洁摘要')).toBeTruthy()
-      expect(screen.getByText('详细要点')).toBeTruthy()
+      // 扁平列表每条 = 模板名 · v{n}（label + preview 可能都匹配，用 getAllByText）
+      expect(screen.getAllByText(/简洁摘要.*v0/).length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText(/简洁摘要.*v1/).length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText(/详细要点.*v0/).length).toBeGreaterThanOrEqual(1)
     })
-
-    // 版本号 — 用 getAllByText 因为列表和主显示区都有
-    expect(screen.getAllByText(/v1/).length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText('v2')).toBeTruthy()
   })
 
   it('自动选中第一项并渲染 markdown', async () => {
     mocks.listSummaries.mockResolvedValue([SUMMARY_1])
 
-    render(<SummariesTab workspaceId="ws-1" itemId="item-1" />)
+    render(<MemoryRouter><SummariesTab workspaceId="ws-1" itemId="item-1" /></MemoryRouter>)
 
     await waitFor(() => {
-      // 标题和 markdown 内容各出现一次
-      expect(screen.getAllByText(/简洁摘要.*v1/).length).toBeGreaterThanOrEqual(1)
+      // 列表项 + 标题都显示
+      expect(screen.getAllByText(/简洁摘要.*v0/).length).toBeGreaterThanOrEqual(1)
     })
-    // markdown 内容
-    expect(screen.getByText(/这是第一版摘要/)).toBeTruthy()
+    // markdown 内容（preview 也可能包含相同文字，用 getAllByText）
+    expect(screen.getAllByText(/这是第一版摘要/).length).toBeGreaterThanOrEqual(1)
   })
 
   it('点击版本切换选中', async () => {
     mocks.listSummaries.mockResolvedValue([SUMMARY_1, SUMMARY_2])
 
-    render(<SummariesTab workspaceId="ws-1" itemId="item-1" />)
+    render(<MemoryRouter><SummariesTab workspaceId="ws-1" itemId="item-1" /></MemoryRouter>)
 
     await waitFor(() => {
-      expect(screen.getByText('v2')).toBeTruthy()
+      expect(screen.getAllByText(/简洁摘要.*v1/).length).toBeGreaterThanOrEqual(1)
     })
 
-    // 点击 v2
-    fireEvent.click(screen.getByText('v2'))
+    // 点击 v1 条目（取第一个匹配 — 列表项里的 label）
+    fireEvent.click(screen.getAllByText(/简洁摘要.*v1/)[0])
 
     await waitFor(() => {
-      expect(screen.getByText(/这是第二版/)).toBeTruthy()
+      expect(screen.getAllByText(/这是第二版/).length).toBeGreaterThanOrEqual(1)
     })
   })
 
-  it('点击「+ 新建」展开面板，点击「生成」调用 createSummary', async () => {
+  it('点击「+ 新建」打开弹窗，点击「生成」调用 createSummary', async () => {
     mocks.listSummaries.mockResolvedValue([SUMMARY_1])
     mocks.createSummary.mockResolvedValue(SUMMARY_2)
 
-    render(<SummariesTab workspaceId="ws-1" itemId="item-1" />)
+    render(<MemoryRouter><SummariesTab workspaceId="ws-1" itemId="item-1" /></MemoryRouter>)
 
     await waitFor(() => {
       expect(screen.getByText('+ 新建')).toBeTruthy()
     })
 
-    // 展开新建面板
+    // 打开弹窗
     fireEvent.click(screen.getByText('+ 新建'))
 
-    // 生成按钮
+    // 弹窗里的生成按钮
     const generateBtn = screen.getByText('生成')
     expect(generateBtn).toBeTruthy()
 
@@ -156,10 +161,10 @@ describe('SummariesTab', () => {
     mocks.listSummaries.mockResolvedValue([SUMMARY_1])
     mocks.deleteSummary.mockResolvedValue(undefined)
 
-    render(<SummariesTab workspaceId="ws-1" itemId="item-1" />)
+    render(<MemoryRouter><SummariesTab workspaceId="ws-1" itemId="item-1" /></MemoryRouter>)
 
     await waitFor(() => {
-      expect(screen.getByText('v1')).toBeTruthy()
+      expect(screen.getAllByText(/简洁摘要.*v0/).length).toBeGreaterThanOrEqual(1)
     })
 
     // 主显示区的删除按钮
@@ -171,23 +176,23 @@ describe('SummariesTab', () => {
     })
   })
 
-  it('空列表显示提示', async () => {
+  it('空列表显示新建引导', async () => {
     mocks.listSummaries.mockResolvedValue([])
 
-    render(<SummariesTab workspaceId="ws-1" itemId="item-1" />)
+    render(<MemoryRouter><SummariesTab workspaceId="ws-1" itemId="item-1" /></MemoryRouter>)
 
     await waitFor(() => {
-      expect(screen.getByText(/暂无总结/)).toBeTruthy()
+      expect(screen.getByText(/生成一份内容总结/)).toBeTruthy()
     })
   })
 
   it('勾选 2 份后进入对比模式，并排显示', async () => {
     mocks.listSummaries.mockResolvedValue([SUMMARY_1, SUMMARY_2, SUMMARY_DETAILED])
 
-    render(<SummariesTab workspaceId="ws-1" itemId="item-1" />)
+    render(<MemoryRouter><SummariesTab workspaceId="ws-1" itemId="item-1" /></MemoryRouter>)
 
     await waitFor(() => {
-      expect(screen.getByText('v2')).toBeTruthy()
+      expect(screen.getAllByText(/简洁摘要.*v1/).length).toBeGreaterThanOrEqual(1)
     })
 
     // 找到所有 checkbox
@@ -198,16 +203,16 @@ describe('SummariesTab', () => {
     fireEvent.click(checkboxes[0])
     fireEvent.click(checkboxes[1])
 
-    // 「进入对比」按钮出现
-    const enterBtn = screen.getByText(/进入对比/)
+    // 「对比」按钮出现
+    const enterBtn = screen.getByText(/对比/)
     expect(enterBtn).toBeTruthy()
 
     // 进入对比
     fireEvent.click(enterBtn)
 
     // 两份内容应同时显示（split view）
-    expect(screen.getByText(/这是第一版摘要/)).toBeTruthy()
-    expect(screen.getByText(/这是第二版/)).toBeTruthy()
+    expect(screen.getAllByText(/这是第一版摘要/).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText(/这是第二版/).length).toBeGreaterThanOrEqual(1)
 
     // 退出对比按钮出现
     expect(screen.getByText(/退出对比/)).toBeTruthy()
@@ -218,10 +223,10 @@ describe('SummariesTab', () => {
       [SUMMARY_1, SUMMARY_2, SUMMARY_DETAILED, SUMMARY_QUOTES],
     )
 
-    render(<SummariesTab workspaceId="ws-1" itemId="item-1" />)
+    render(<MemoryRouter><SummariesTab workspaceId="ws-1" itemId="item-1" /></MemoryRouter>)
 
     await waitFor(() => {
-      expect(screen.getByText('金句提取')).toBeTruthy()
+      expect(screen.getAllByText(/金句提取/).length).toBeGreaterThanOrEqual(1)
     })
 
     const checkboxes = screen.getAllByRole('checkbox')

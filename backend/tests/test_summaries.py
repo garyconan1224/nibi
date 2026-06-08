@@ -87,26 +87,26 @@ class TestCreateSummary:
         assert data["template"] == "concise"
         assert data["content_md"] == "# 摘要\n\n生成内容"
         assert data["model_used"] == "openai/gpt-4o"
-        assert data["version"] == 1
+        assert data["version"] == 0  # 首版 = v0
 
     @patch("backend.app.routes.workspaces.generate_summary")
     def test_create_version_increment(self, mock_gen: MagicMock) -> None:
-        """同模板第二次生成 → version=2。"""
+        """同模板第二次生成 → version=1。"""
         mock_gen.return_value = ItemSummary(
-            summary_id="s-1", template="concise", version=1, content_md="v1",
+            summary_id="s-1", template="concise", version=0, content_md="v0",
         )
         client.post("/workspaces/ws-1/items/item-1/summaries", json={
             "template": "concise",
         })
 
         mock_gen.return_value = ItemSummary(
-            summary_id="s-2", template="concise", version=2, content_md="v2",
+            summary_id="s-2", template="concise", version=1, content_md="v1",
         )
         resp = client.post("/workspaces/ws-1/items/item-1/summaries", json={
             "template": "concise",
         })
         assert resp.status_code == 201
-        assert resp.json()["version"] == 2
+        assert resp.json()["version"] == 1
 
     def test_invalid_template(self) -> None:
         resp = client.post("/workspaces/ws-1/items/item-1/summaries", json={

@@ -6,6 +6,7 @@ export interface ItemSummary {
   summary_id: string
   template: string
   version: number
+  name: string
   background_for_summary: string
   content_md: string
   model_used: string
@@ -59,4 +60,18 @@ export async function deleteSummary(
   await http.delete(
     `/workspaces/${workspaceId}/items/${itemId}/summaries/${summaryId}`,
   )
+}
+
+/** PATCH 改名（空字符串 = 清除自定义名）。 */
+export async function renameSummary(
+  workspaceId: string,
+  itemId: string,
+  summaryId: string,
+  name: string,
+): Promise<ItemSummary> {
+  const { data } = await http.patch<ItemSummary>(
+    `/workspaces/${workspaceId}/items/${itemId}/summaries/${summaryId}`,
+    { name },
+  )
+  return data
 }

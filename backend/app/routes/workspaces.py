@@ -3058,6 +3058,29 @@ def delete_summary(workspace_id: str, item_id: str, summary_id: str) -> Dict[str
     return {"status": "deleted", "summary_id": summary_id}
 
 
+class SummaryRenameRequest(BaseModel):
+    name: str = ""
+
+
+@router.patch("/{workspace_id}/items/{item_id}/summaries/{summary_id}")
+def rename_summary(
+    workspace_id: str,
+    item_id: str,
+    summary_id: str,
+    req: SummaryRenameRequest,
+) -> Dict[str, Any]:
+    """改名指定总结版本（空字符串 = 清除自定义名）。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    _find_item(rec, item_id)  # 确认 item 存在
+    try:
+        summary = _store.rename_item_summary(workspace_id, item_id, summary_id, req.name)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return summary.to_dict()
+
+
 # ── Note（R0.2: 只读 note 文件 + 惰性组装）───────────────────────
 
 

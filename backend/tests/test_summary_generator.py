@@ -92,7 +92,7 @@ class TestGenerateSummary:
         assert result.model_used == "openai/gpt-4o"
         assert result.background_for_summary == "背景"
         assert result.summary_id  # uuid 非空
-        assert result.version == 1  # 默认 1，调用方负责覆盖
+        assert result.version == 0  # 默认 0，调用方负责覆盖
 
     @patch("backend.app.services.summary_generator._call_llm")
     def test_llm_called_with_correct_prompts(self, mock_llm: MagicMock) -> None:
@@ -123,21 +123,21 @@ class TestWorkspaceStoreSummaryHelpers:
     def test_next_version_for_template_first(self) -> None:
         store = _make_store_with_item()
         ver = store.next_version_for_template("ws-1", "item-1", "concise")
-        assert ver == 1
+        assert ver == 0  # 首版 = v0
 
     def test_next_version_for_template_increment(self) -> None:
         store = _make_store_with_item()
-        s1 = ItemSummary(summary_id="s1", template="concise", version=1)
+        s1 = ItemSummary(summary_id="s1", template="concise", version=0)
         store.add_item_summary("ws-1", "item-1", s1)
         ver = store.next_version_for_template("ws-1", "item-1", "concise")
-        assert ver == 2
+        assert ver == 1
 
     def test_next_version_different_templates_independent(self) -> None:
         store = _make_store_with_item()
-        s1 = ItemSummary(summary_id="s1", template="concise", version=1)
+        s1 = ItemSummary(summary_id="s1", template="concise", version=0)
         store.add_item_summary("ws-1", "item-1", s1)
         ver = store.next_version_for_template("ws-1", "item-1", "detailed")
-        assert ver == 1  # 不同 template 独立计数
+        assert ver == 0  # 不同 template 独立计数，首版 = v0
 
     def test_add_item_summary(self) -> None:
         store = _make_store_with_item()

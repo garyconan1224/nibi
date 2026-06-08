@@ -259,7 +259,7 @@ class WorkspaceStore:
             if item is None:
                 raise KeyError(f"item not found: {item_id}")
             existing = [s for s in item.summaries if s.template == template_id]
-            return max((s.version for s in existing), default=0) + 1
+            return max((s.version for s in existing), default=-1) + 1
 
     def add_item_summary(
         self, workspace_id: str, item_id: str, summary: ItemSummary
@@ -295,6 +295,24 @@ class WorkspaceStore:
             item.updated_at = _now_iso()
             self._save(rec)
             return True
+
+    def rename_item_summary(
+        self, workspace_id: str, item_id: str, summary_id: str, name: str
+    ) -> "ItemSummary":
+        """改名指定 summary 并落盘。"""
+        with self._lock:
+            rec = self._records.get(workspace_id)
+            if rec is None:
+                raise KeyError(f"workspace not found: {workspace_id}")
+            item = next((it for it in rec.items if it.item_id == item_id), None)
+            if item is None:
+                raise KeyError(f"item not found: {item_id}")
+            summary = next((s for s in item.summaries if s.summary_id == summary_id), None)
+            if summary is None:
+                raise KeyError(f"summary not found: {summary_id}")
+            summary.name = name
+            self._save(rec)
+            return summary
 
     # ── InlineFrames ──────────────────────────────────────────
 

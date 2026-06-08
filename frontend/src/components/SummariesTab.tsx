@@ -1,9 +1,9 @@
 /**
  * SummariesTab — 结果页「总结」标签页。
  *
- * 左侧：按 template 分组的总结列表（可展开版本）。
+ * 左侧：扁平版列表（点即应用到正文，高亮当前项，双击可改名）。
  * 右侧：主显示区（react-markdown 渲染）。
- * 底部/弹窗：新建总结面板。
+ * + 新建 → NewSummaryModal 弹窗。
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -18,8 +18,11 @@ import {
   createSummary,
   deleteSummary,
   listSummaries,
+  renameSummary,
   type ItemSummary,
 } from '@/services/summaries'
+
+import { NewSummaryModal } from './NewSummaryModal'
 
 import './summaries-tab.css'
 
@@ -27,90 +30,39 @@ import './summaries-tab.css'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const remarkPlugins: any[] = [remarkGfm]
 
-/* ── 模板选项（与 backend summary_templates.py 对齐） ────────── */
+/* ── 模板标签（与 backend summary_templates.py 对齐） ─────── */
 
-const TEMPLATE_OPTIONS: { value: string; label: string }[] = [
-  { value: 'concise', label: '简洁摘要' },
-  { value: 'detailed', label: '详细要点' },
-  { value: 'quotes', label: '金句提取' },
-  { value: 'meeting', label: '会议纪要' },
-  { value: 'xhs', label: '小红书风格' },
-  { value: 'longform', label: '公众号长文' },
-  { value: 'lecture', label: '教学笔记' },
-  { value: 'interview', label: '访谈整理' },
-  { value: 'shownotes', label: '播客 shownotes' },
-  { value: 'oral', label: '口播稿' },
-  { value: 'steps', label: '步骤教程' },
-  { value: 'outline', label: '大纲' },
-  { value: 'qa', label: '问答卡(Anki)' },
-  { value: 'actions', label: '行动清单' },
-]
-
-/** 4 个常用模板（segmented control 展示） */
-const QUICK_TEMPLATES = [
-  { value: 'concise', label: '精简' },
-  { value: 'lecture', label: '教学' },
-  { value: 'oral', label: '口播' },
-  { value: 'steps', label: '教程' },
-]
-
-/** 4 个常用模板卡片（空态引导 2×2 grid） */
-const QUICK_TEMPLATE_CARDS: { value: string; label: string; desc: string }[] = [
-  { value: 'concise', label: '精简摘要', desc: '几句话概括核心内容' },
-  { value: 'lecture', label: '教学笔记', desc: '知识点 + 例子 + 重点' },
-  { value: 'oral', label: '口播稿', desc: '可直接念的口语化文案' },
-  { value: 'steps', label: '步骤教程', desc: '有序步骤清单，可照着做' },
-]
-
-const TEMPLATE_LABEL_MAP = Object.fromEntries(
-  TEMPLATE_OPTIONS.map((o) => [o.value, o.label]),
-)
+const TEMPLATE_LABEL_MAP: Record<string, string> = {
+  concise: '简洁摘要',
+  detailed: '详细要点',
+  quotes: '金句提取',
+  meeting: '会议纪要',
+  xhs: '小红书风格',
+  longform: '公众号长文',
+  lecture: '教学笔记',
+  interview: '访谈整理',
+  shownotes: '播客 shownotes',
+  oral: '口播稿',
+  steps: '步骤教程',
+  outline: '大纲',
+  qa: '问答卡(Anki)',
+  actions: '行动清单',
+}
 
 function templateLabel(id: string): string {
   return TEMPLATE_LABEL_MAP[id] ?? id
 }
 
-/* ── 分组结构 ────────────────────────────────────────────────── */
-
-interface TemplateGroup {
-  template: string
-  label: string
-  versions: ItemSummary[]
+/** 版本显示名：有自定义 name 则显示 name，否则 模板名 · v{n} */
+function versionLabel(s: ItemSummary): string {
+  if (s.name) return s.name
+  return `${templateLabel(s.template)} · v${s.version}`
 }
 
-function groupByTemplate(items: ItemSummary[]): TemplateGroup[] {
-  const map = new Map<string, ItemSummary[]>()
-  for (const s of items) {
-    const arr = map.get(s.template) ?? []
-    arr.push(s)
-    map.set(s.template, arr)
-  }
-  return Array.from(map.entries()).map(([tpl, versions]) => ({
-    template: tpl,
-    label: templateLabel(tpl),
-    versions: versions.sort((a, b) => a.version - b.version),
-  }))
-}
-
-/* ── Props ───────────────────────────────────────────────────── */
-
-interface SummariesTabProps {
-  workspaceId: string
-  itemId: string
-  /** R1.3：NoteShell 传入时显示「应用到主笔记」按钮；旧页不传则不显示（零回归）。 */
-  onApplyToNote?: (summary: ItemSummary) => void
-  /** k-9.5：当前已应用到笔记的 summary ID，用于高亮显示 */
-  activeSummaryId?: string
-}
-
-/* ── localStorage 缓存 ────────────────────────────────────────── */
+/* ── localStorage 缓存 ──────────────────────────────────── */
 
 const CACHE_PREFIX = 'nibi_summary_cache_'
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 小时
-
-function getCacheKey(workspaceId: string, itemId: string, template: string): string {
-  return `${CACHE_PREFIX}${workspaceId}_${itemId}_${template}`
-}
 
 interface CachedSummary {
   summary_id: string
@@ -122,7 +74,7 @@ interface CachedSummary {
 
 function getCachedSummary(workspaceId: string, itemId: string, template: string): CachedSummary | null {
   try {
-    const key = getCacheKey(workspaceId, itemId, template)
+    const key = `${CACHE_PREFIX}${workspaceId}_${itemId}_${template}`
     const raw = localStorage.getItem(key)
     if (!raw) return null
     const cached = JSON.parse(raw) as CachedSummary
@@ -138,7 +90,7 @@ function getCachedSummary(workspaceId: string, itemId: string, template: string)
 
 function setCachedSummary(workspaceId: string, itemId: string, summary: ItemSummary): void {
   try {
-    const key = getCacheKey(workspaceId, itemId, summary.template)
+    const key = `${CACHE_PREFIX}${workspaceId}_${itemId}_${summary.template}`
     const cached: CachedSummary = {
       summary_id: summary.summary_id,
       content_md: summary.content_md,
@@ -152,25 +104,34 @@ function setCachedSummary(workspaceId: string, itemId: string, summary: ItemSumm
   }
 }
 
-/* ── 主组件 ──────────────────────────────────────────────────── */
+/* ── Props ─────────────────────────────────────────────── */
+
+interface SummariesTabProps {
+  workspaceId: string
+  itemId: string
+  onApplyToNote?: (summary: ItemSummary) => void
+  activeSummaryId?: string
+}
+
+/* ── 主组件 ────────────────────────────────────────────── */
 
 export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummaryId }: SummariesTabProps) {
   const navigate = useNavigate()
   const [summaries, setSummaries] = useState<ItemSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<ItemSummary | null>(null)
-  const [showNew, setShowNew] = useState(false)
+  const [showModal, setShowModal] = useState(false)
   const [creating, setCreating] = useState(false)
 
   // 对比模式
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isCompareMode, setIsCompareMode] = useState(false)
 
-  // 新建表单状态
-  const [newTemplate, setNewTemplate] = useState('concise')
-  const [newBackground, setNewBackground] = useState('')
+  // 改名
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
 
-  /* ── 加载列表 ────────────────────────────────────────────── */
+  /* ── 加载列表 ────────────────────────────────────────── */
 
   const refresh = useCallback(async () => {
     try {
@@ -191,17 +152,16 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
     refresh()
   }, [refresh])
 
-  /* ── 创建 ────────────────────────────────────────────────── */
+  /* ── 创建（从弹窗回调） ─────────────────────────────── */
 
-  const handleCreate = useCallback(async () => {
+  const handleCreate = useCallback(async (template: string, background: string) => {
     // 检查 localStorage 缓存
-    const cached = getCachedSummary(workspaceId, itemId, newTemplate)
-    if (cached && !newBackground) {
-      // 从缓存中找到对应的 summary
-      const cachedSummary = summaries.find(s => s.summary_id === cached.summary_id)
+    const cached = getCachedSummary(workspaceId, itemId, template)
+    if (cached && !background) {
+      const cachedSummary = summaries.find((s) => s.summary_id === cached.summary_id)
       if (cachedSummary) {
-        toast.success(`使用缓存的 ${templateLabel(newTemplate)}`)
-        setShowNew(false)
+        toast.success(`使用缓存的 ${templateLabel(template)}`)
+        setShowModal(false)
         setSelected(cachedSummary)
         return
       }
@@ -209,21 +169,13 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
 
     setCreating(true)
     try {
-      const s = await createSummary(
-        workspaceId,
-        itemId,
-        newTemplate,
-        newBackground,
-      )
-      // 写入缓存
+      const s = await createSummary(workspaceId, itemId, template, background)
       setCachedSummary(workspaceId, itemId, s)
       toast.success(`${templateLabel(s.template)} v${s.version} 生成完成`)
-      setShowNew(false)
-      setNewBackground('')
+      setShowModal(false)
       await refresh()
       setSelected(s)
     } catch (err: unknown) {
-      // 检查 axios 500 错误中的 "chat model" 关键词
       const axiosData = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
       if (axiosData && axiosData.includes('chat model')) {
         toast.error('请先在设置中配置 LLM 模型', {
@@ -236,9 +188,9 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
     } finally {
       setCreating(false)
     }
-  }, [workspaceId, itemId, newTemplate, newBackground, refresh, summaries])
+  }, [workspaceId, itemId, refresh, summaries, navigate])
 
-  /* ── 删除 ────────────────────────────────────────────────── */
+  /* ── 删除 ────────────────────────────────────────────── */
 
   const handleDelete = useCallback(
     async (summaryId: string) => {
@@ -256,7 +208,36 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
     [workspaceId, itemId, selected, refresh],
   )
 
-  /* ── 复制 markdown ───────────────────────────────────────── */
+  /* ── 改名 ────────────────────────────────────────────── */
+
+  const startRename = useCallback((s: ItemSummary) => {
+    setEditingId(s.summary_id)
+    setEditingName(s.name || '')
+  }, [])
+
+  const commitRename = useCallback(async () => {
+    if (!editingId) return
+    try {
+      const updated = await renameSummary(workspaceId, itemId, editingId, editingName.trim())
+      setSummaries((prev) => prev.map((s) => (s.summary_id === editingId ? { ...s, name: updated.name } : s)))
+      if (selected?.summary_id === editingId) {
+        setSelected((prev) => (prev ? { ...prev, name: updated.name } : prev))
+      }
+      toast.success('已改名')
+    } catch {
+      toast.error('改名失败')
+    } finally {
+      setEditingId(null)
+      setEditingName('')
+    }
+  }, [editingId, editingName, workspaceId, itemId, selected])
+
+  const cancelRename = useCallback(() => {
+    setEditingId(null)
+    setEditingName('')
+  }, [])
+
+  /* ── 复制 markdown ───────────────────────────────────── */
 
   const handleCopy = useCallback(() => {
     if (selected) {
@@ -265,14 +246,7 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
     }
   }, [selected])
 
-  const handleRegenerate = useCallback(() => {
-    if (!selected) return
-    setNewTemplate(selected.template)
-    setNewBackground(selected.background_for_summary || '')
-    setShowNew(true)
-  }, [selected])
-
-  /* ── 对比模式 ────────────────────────────────────────────── */
+  /* ── 对比模式 ────────────────────────────────────────── */
 
   const toggleSelect = useCallback((summaryId: string) => {
     setSelectedIds((prev) => {
@@ -297,104 +271,38 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
     setSelectedIds(new Set())
   }, [])
 
-  /* ── 分组 ────────────────────────────────────────────────── */
-
-  const groups = useMemo(() => groupByTemplate(summaries), [summaries])
-
   const compareItems = useMemo(
     () => summaries.filter((s) => selectedIds.has(s.summary_id)),
     [summaries, selectedIds],
   )
 
-  /* ── 渲染 ────────────────────────────────────────────────── */
+  /* ── 渲染 ────────────────────────────────────────────── */
 
   if (loading) {
     return <div style={{ padding: 24, color: 'var(--ink-3)' }}>加载中…</div>
   }
 
-  // ── 空态：居中引导卡片 ────────────────────────────────────
-  if (summaries.length === 0 && !showNew) {
+  // ── 空态：居中引导 ────────────────────────────────────
+  if (summaries.length === 0) {
     return (
       <div className="sm-empty-guide">
         <h2 className="sm-empty-title">生成一份内容总结</h2>
         <p className="sm-empty-subtitle">选一个模板，AI 帮你把转录文本整理成可读笔记</p>
-        <div className="sm-template-grid">
-          {QUICK_TEMPLATE_CARDS.map((t) => (
-            <button
-              key={t.value}
-              className="sm-template-card"
-              onClick={() => {
-                setNewTemplate(t.value)
-                setShowNew(true)
-              }}
-            >
-              <span className="sm-template-card-label">{t.label}</span>
-              <span className="sm-template-card-desc">{t.desc}</span>
-            </button>
-          ))}
-        </div>
-        <button
-          className="sm-link-more"
-          onClick={() => {
-            setNewTemplate('concise')
-            setShowNew(true)
-          }}
-        >
-          + 更多模板
+        <button className="sm-btn-generate" onClick={() => setShowModal(true)}>
+          + 新建总结
         </button>
+        {showModal && (
+          <NewSummaryModal
+            creating={creating}
+            onSubmit={handleCreate}
+            onClose={() => setShowModal(false)}
+          />
+        )}
       </div>
     )
   }
 
-  // ── 空态 + 新建面板展开 ──────────────────────────────────
-  if (summaries.length === 0 && showNew) {
-    return (
-      <div className="sm-empty-guide">
-        <h2 className="sm-empty-title">生成一份内容总结</h2>
-        <p className="sm-empty-subtitle">选一个模板，AI 帮你把转录文本整理成可读笔记</p>
-        <div className="sm-template-grid">
-          {QUICK_TEMPLATE_CARDS.map((t) => (
-            <button
-              key={t.value}
-              className={`sm-template-card ${newTemplate === t.value ? 'active' : ''}`}
-              onClick={() => setNewTemplate(t.value)}
-            >
-              <span className="sm-template-card-label">{t.label}</span>
-              <span className="sm-template-card-desc">{t.desc}</span>
-            </button>
-          ))}
-        </div>
-        <div className="sm-empty-more-select">
-          <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>更多模板：</span>
-          <select
-            value={QUICK_TEMPLATE_CARDS.some(t => t.value === newTemplate) ? '' : newTemplate}
-            onChange={(e) => e.target.value && setNewTemplate(e.target.value)}
-            className="sm-select"
-          >
-            <option value="" disabled>选择其他模板</option>
-            {TEMPLATE_OPTIONS.filter(o => !QUICK_TEMPLATE_CARDS.some(t => t.value === o.value)).map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        </div>
-        <textarea
-          value={newBackground}
-          onChange={(e) => setNewBackground(e.target.value)}
-          placeholder="补充背景信息，帮助 LLM 更好理解…（可选）"
-          className="sm-textarea sm-empty-textarea"
-          rows={3}
-        />
-        <div className="sm-empty-actions">
-          <button className="sm-btn-back" onClick={() => setShowNew(false)}>返回</button>
-          <button className="sm-btn-generate" onClick={handleCreate} disabled={creating}>
-            {creating ? '生成中…' : '生成'}
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  // ── 有总结：sidebar + main ────────────────────────────────
+  // ── 有总结：sidebar + main ────────────────────────────
   return (
     <div className="sm-summaries-root">
       {/* 左侧列表 */}
@@ -414,7 +322,7 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
             )}
             <button
               className="sm-btn-new"
-              onClick={() => setShowNew(!showNew)}
+              onClick={() => setShowModal(true)}
               title="新建总结"
             >
               + 新建
@@ -422,98 +330,75 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
           </div>
         </div>
 
-        {/* 新建面板（有总结时的简化版） */}
-        {showNew && (
-          <div className="sm-new-panel">
-            <div className="sm-segmented">
-              {QUICK_TEMPLATES.map((t) => (
-                <button
-                  key={t.value}
-                  className={`sm-segment ${newTemplate === t.value ? 'active' : ''}`}
-                  onClick={() => setNewTemplate(t.value)}
-                  type="button"
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-              <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>更多：</span>
-              <select
-                value={QUICK_TEMPLATES.some(t => t.value === newTemplate) ? '' : newTemplate}
-                onChange={(e) => e.target.value && setNewTemplate(e.target.value)}
-                className="sm-select"
-                style={{ flex: 1 }}
-              >
-                <option value="" disabled>选择其他模板</option>
-                {TEMPLATE_OPTIONS.filter(o => !QUICK_TEMPLATES.some(t => t.value === o.value)).map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </div>
-            <textarea
-              value={newBackground}
-              onChange={(e) => setNewBackground(e.target.value)}
-              placeholder="补充背景信息…（可选）"
-              className="sm-textarea"
-              rows={2}
-            />
-            <button className="sm-btn-generate" onClick={handleCreate} disabled={creating}>
-              {creating ? '生成中…' : '生成'}
-            </button>
-          </div>
-        )}
-
-        {/* 分组列表 */}
-        {groups.map((g) => (
-          <div key={g.template} className="sm-group">
-            <div className="sm-group-label">{g.label}</div>
-            {g.versions.map((s) => {
-              const isActive = activeSummaryId === s.summary_id || selected?.summary_id === s.summary_id
-              return (
-              <div
-                key={s.summary_id}
-                className={`sm-version-item ${isActive ? 'active' : ''}`}
-                onClick={() => {
+        {/* 扁平版列表：每条 = 模板名·v{n} 或自定义名 */}
+        {summaries.map((s) => {
+          const isActive = activeSummaryId === s.summary_id || selected?.summary_id === s.summary_id
+          const isEditing = editingId === s.summary_id
+          return (
+            <div
+              key={s.summary_id}
+              className={`sm-version-item ${isActive ? 'active' : ''}`}
+              onClick={() => {
+                if (!isEditing) {
                   setSelected(s)
-                  // k-9.5: 点即应用（当有 onApplyToNote 时）
                   onApplyToNote?.(s)
-                }}
-              >
-                <input
-                  type="checkbox"
-                  className="sm-checkbox"
-                  checked={selectedIds.has(s.summary_id)}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={() => toggleSelect(s.summary_id)}
-                  title={
-                    !selectedIds.has(s.summary_id) && selectedIds.size >= MAX_COMPARE
-                      ? `最多对比 ${MAX_COMPARE} 份`
-                      : undefined
-                  }
-                />
-                <div className="sm-version-info">
-                  <span className="sm-version-label">v{s.version}</span>
-                  <span className="sm-version-preview">
-                    {s.content_md.replace(/[#*_>\-\n]/g, ' ').trim().slice(0, 30)}
-                    {s.content_md.length > 30 ? '…' : ''}
-                  </span>
-                </div>
-                <button
-                  className="sm-btn-delete"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDelete(s.summary_id)
-                  }}
-                  title="删除"
-                >
-                  ×
-                </button>
+                }
+              }}
+              onDoubleClick={(e) => {
+                e.stopPropagation()
+                startRename(s)
+              }}
+            >
+              <input
+                type="checkbox"
+                className="sm-checkbox"
+                checked={selectedIds.has(s.summary_id)}
+                onClick={(e) => e.stopPropagation()}
+                onChange={() => toggleSelect(s.summary_id)}
+                title={
+                  !selectedIds.has(s.summary_id) && selectedIds.size >= MAX_COMPARE
+                    ? `最多对比 ${MAX_COMPARE} 份`
+                    : undefined
+                }
+              />
+              <div className="sm-version-info">
+                {isEditing ? (
+                  <input
+                    className="sm-rename-input"
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onBlur={commitRename}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commitRename()
+                      if (e.key === 'Escape') cancelRename()
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    autoFocus
+                    placeholder={versionLabel(s)}
+                  />
+                ) : (
+                  <>
+                    <span className="sm-version-label">{versionLabel(s)}</span>
+                    <span className="sm-version-preview">
+                      {s.content_md.replace(/[#*_>\-\n]/g, ' ').trim().slice(0, 30)}
+                      {s.content_md.length > 30 ? '…' : ''}
+                    </span>
+                  </>
+                )}
               </div>
-              )
-            })}
-          </div>
-        ))}
+              <button
+                className="sm-btn-delete"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleDelete(s.summary_id)
+                }}
+                title="删除"
+              >
+                ×
+              </button>
+            </div>
+          )
+        })}
       </aside>
 
       {/* 右侧主显示 */}
@@ -523,9 +408,7 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
             {compareItems.map((s) => (
               <div key={s.summary_id} className="sm-compare-col">
                 <div className="sm-compare-col-head">
-                  <span className="sm-main-title">
-                    {templateLabel(s.template)} v{s.version}
-                  </span>
+                  <span className="sm-main-title">{versionLabel(s)}</span>
                   <span className="sm-main-meta">
                     {new Date(s.created_at).toLocaleString()}
                     {s.model_used && ` · ${s.model_used}`}
@@ -567,9 +450,7 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
         ) : selected ? (
           <>
             <div className="sm-main-header">
-              <span className="sm-main-title">
-                {templateLabel(selected.template)} v{selected.version}
-              </span>
+              <span className="sm-main-title">{versionLabel(selected)}</span>
               <span className="sm-main-meta">
                 {new Date(selected.created_at).toLocaleString()}
                 {selected.model_used && ` · ${selected.model_used}`}
@@ -590,7 +471,7 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
                 </button>
               )}
               <button onClick={handleCopy}>复制</button>
-              <button onClick={handleRegenerate}>重新生成</button>
+              <button onClick={() => setShowModal(true)}>重新生成</button>
               <button onClick={() => handleDelete(selected.summary_id)}>删除</button>
             </div>
           </>
@@ -608,6 +489,15 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
           </div>
         )}
       </main>
+
+      {/* 新建弹窗 */}
+      {showModal && (
+        <NewSummaryModal
+          creating={creating}
+          onSubmit={handleCreate}
+          onClose={() => setShowModal(false)}
+        />
+      )}
     </div>
   )
 }

@@ -78,7 +78,7 @@ def generate_summary(
     return ItemSummary(
         summary_id=str(uuid.uuid4()),
         template=template_id,
-        version=1,  # 调用方负责设置正确 version
+        version=0,  # 调用方负责设置正确 version
         background_for_summary=background,
         content_md=content_md,
         model_used=model_used,
