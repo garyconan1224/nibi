@@ -9,10 +9,11 @@
  * 子组件拆分：
  *   - TagChips：frontmatter.tags → 标签 chips 展示
  *   - SourcePanel：source.md 只读区（可折叠）
- *   - NoteEditor：轻量 CodeMirror 编辑器（不依赖 lnEditorStore）
+ *   - NoteEditor：轻量 CodeMirror 编辑器（注册到 lnEditorStore，复用截图插入能力）
  *   - SummariesPanel：总结风格面板（可折叠，含应用到主笔记）
  */
-import { useCallback, useEffect, useMemo, useSyncExternalStore, useRef, useState } from 'react'
+import { cloneElement, isValidElement, useCallback, useEffect, useMemo, useSyncExternalStore, useRef, useState } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -28,9 +29,11 @@ import type { ItemNote } from '@/types/workspace'
 import type { ItemSummary } from '@/services/summaries'
 import { Badge } from '@/components/ui/badge'
 import { SYSTEM_TAG_DIMENSIONS } from '@/constants/tagDimensions'
-import NoteMediaCompanion from './NoteMediaCompanion'
+import NoteMediaCompanion, { type NoteMediaCompanionHandle } from './NoteMediaCompanion'
 import { SummariesTab } from '@/components/SummariesTab'
 import NoteChatDrawer from '@/components/NoteChatDrawer'
+import { useLnEditorStore } from '@/store/lnEditorStore'
+import { parseTs, TS_RE } from '@/pages/results/LearningNotesPage/HtmlView'
 
 // remarkGfm 类型与 react-markdown 不完全兼容
 
@@ -164,6 +167,70 @@ function downloadMarkdownFile(markdown: string, title: string): void {
   URL.revokeObjectURL(url)
 }
 
+/** 把 ReactMarkdown children 里的 [mm:ss] / [mm:ss~mm:ss] 渲染为可点击跳转 chip。 */
+export function renderNoteTimestampChildren(
+  children: ReactNode,
+  onSeek: (sec: number) => void,
+): ReactNode {
+  if (typeof children === 'string') {
+    return replaceNoteTimestampString(children, onSeek)
+  }
+  if (Array.isArray(children)) {
+    return children.map((child, idx) => (
+      <span key={`ts-child-${idx}`}>
+        {renderNoteTimestampChildren(child, onSeek)}
+      </span>
+    ))
+  }
+  if (isValidElement(children)) {
+    if (children.type === 'code' || children.type === 'pre') return children
+    const el = children as ReactElement<{ children?: ReactNode }>
+    const nextChildren = renderNoteTimestampChildren(el.props.children, onSeek)
+    if (nextChildren === el.props.children) return children
+    return cloneElement(el, undefined, nextChildren)
+  }
+  return children
+}
+
+function replaceNoteTimestampString(text: string, onSeek: (sec: number) => void): ReactNode {
+  const parts: ReactNode[] = []
+  let lastIdx = 0
+  let match: RegExpExecArray | null
+
+  TS_RE.lastIndex = 0
+  while ((match = TS_RE.exec(text)) !== null) {
+    if (match.index > lastIdx) {
+      parts.push(text.slice(lastIdx, match.index))
+    }
+
+    const ts = match[1]
+    const sec = parseTs(ts)
+    const display = match[0]
+
+    parts.push(
+      <button
+        key={`note-ts-${match.index}`}
+        type="button"
+        className="ln-ts-chip"
+        onClick={(event) => {
+          event.preventDefault()
+          onSeek(sec)
+        }}
+        title={match[2] ? `跳转到 ${ts}（区间 ${ts} ~ ${match[2]}）` : `跳转到 ${ts}`}
+      >
+        {display}
+      </button>,
+    )
+    lastIdx = match.index + match[0].length
+  }
+
+  if (lastIdx < text.length) {
+    parts.push(text.slice(lastIdx))
+  }
+
+  return parts.length > 0 ? parts : text
+}
+
 /** useSyncExternalStore 兼容的媒体查询 hook，窄屏降级用 */
 function useMediaQuery(query: string): boolean {
   const mql = typeof window !== 'undefined' ? window.matchMedia(query) : null
@@ -190,7 +257,7 @@ interface NoteEditorProps {
   onMarkdownChange: (md: string) => void
 }
 
-/** 轻量 CodeMirror 编辑器（独立于 ln 的 MdView，不依赖 lnEditorStore）。 */
+/** 轻量 CodeMirror 编辑器（复用 lnEditorStore 让截图按钮插入到当前光标）。 */
 function NoteEditor({ markdown: md, onMarkdownChange }: NoteEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
@@ -217,7 +284,13 @@ function NoteEditor({ markdown: md, onMarkdownChange }: NoteEditorProps) {
     })
     const view = new EditorView({ state, parent: hostRef.current })
     viewRef.current = view
-    return () => { view.destroy(); viewRef.current = null }
+    useLnEditorStore.getState().setCmView(view)
+    return () => {
+      const store = useLnEditorStore.getState()
+      if (store.cmView === view) store.setCmView(null)
+      view.destroy()
+      viewRef.current = null
+    }
     // 只挂载一次
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -438,6 +511,7 @@ export default function NoteShell() {
   // 编辑中的 body 文本（debounce 源头）
   const [editingBody, setEditingBody] = useState('')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mediaCompanionRef = useRef<NoteMediaCompanionHandle>(null)
   // 标记是否从「应用到主笔记」触发的刷新，避免 debounce 冲突
   const applyingRef = useRef(false)
 
@@ -530,6 +604,10 @@ export default function NoteShell() {
 
   const handleTocJump = useCallback((id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
+
+  const handleMarkdownSeek = useCallback((sec: number) => {
+    mediaCompanionRef.current?.seekTo(sec)
   }, [])
 
   const handleExportMarkdown = useCallback(() => {
@@ -733,6 +811,12 @@ export default function NoteShell() {
                   const text = String(children)
                   return <h3 id={headingId(text, toc)} {...props}>{children}</h3>
                 },
+                p: ({ children, ...props }) => (
+                  <p {...props}>{renderNoteTimestampChildren(children, handleMarkdownSeek)}</p>
+                ),
+                li: ({ children, ...props }) => (
+                  <li {...props}>{renderNoteTimestampChildren(children, handleMarkdownSeek)}</li>
+                ),
                 img: ({ src, alt, ...props }) => (
                   <img
                     src={src}
@@ -808,6 +892,7 @@ export default function NoteShell() {
         {/* R3.2/R3.3: video/audio companion — 播放器 + 转录轴 */}
         {(itemType === 'video' && note.media?.video?.url) && (
           <NoteMediaCompanion
+            ref={mediaCompanionRef}
             media={note.media}
             transcript={Array.isArray(note.transcript) ? note.transcript as never : []}
             workspaceId={workspaceId}
@@ -815,6 +900,7 @@ export default function NoteShell() {
         )}
         {(itemType === 'audio' && note.media?.audio) && (
           <NoteMediaCompanion
+            ref={mediaCompanionRef}
             media={note.media}
             transcript={Array.isArray(note.transcript) ? note.transcript as never : []}
             workspaceId={workspaceId}

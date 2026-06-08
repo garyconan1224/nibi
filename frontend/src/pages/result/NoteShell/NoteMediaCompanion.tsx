@@ -5,7 +5,7 @@
  * 新建 NoteAudioPanel + LNTranscriptPanel（audio）。
  * 内部维护 currentTime 实现播放器 ↔ 转录轴双向联动。
  */
-import { useCallback, useRef, useState } from 'react'
+import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react'
 
 import LNVideoPanel, { type LNVideoPanelHandle } from '@/pages/results/LearningNotesPage/LNVideoPanel'
 import LNTranscriptPanel from '@/pages/results/LearningNotesPage/LNTranscriptPanel'
@@ -28,7 +28,14 @@ interface NoteMediaCompanionProps {
   workspaceId?: string
 }
 
-export default function NoteMediaCompanion({ media, transcript, workspaceId }: NoteMediaCompanionProps) {
+export interface NoteMediaCompanionHandle {
+  seekTo: (sec: number) => void
+}
+
+const NoteMediaCompanion = forwardRef<NoteMediaCompanionHandle, NoteMediaCompanionProps>(function NoteMediaCompanion(
+  { media, transcript, workspaceId },
+  ref,
+) {
   const [currentTime, setCurrentTime] = useState(0)
   const videoRef = useRef<LNVideoPanelHandle>(null)
   const audioRef = useRef<NoteAudioPanelHandle>(null)
@@ -43,6 +50,10 @@ export default function NoteMediaCompanion({ media, transcript, workspaceId }: N
     videoRef.current?.seekTo(sec)
     audioRef.current?.seekTo(sec)
   }, [])
+
+  useImperativeHandle(ref, () => ({
+    seekTo: handleSeek,
+  }), [handleSeek])
 
   // video 分支
   if (media.video?.url) {
@@ -99,4 +110,6 @@ export default function NoteMediaCompanion({ media, transcript, workspaceId }: N
   }
 
   return null
-}
+})
+
+export default NoteMediaCompanion
