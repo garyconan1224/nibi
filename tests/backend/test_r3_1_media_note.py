@@ -192,3 +192,50 @@ def test_url_image_item_note_returns_external_url(client: TestClient) -> None:
     assert resp.status_code == 200
     data = resp.json()
     assert data["media"]["images"] == ["https://example.com/photo.jpg"]
+
+
+def test_video_item_note_prefers_result_video_file(client: TestClient, tmp_path: Path) -> None:
+    """video note 的播放器 URL 应优先使用 results.video_file，而不是扫目录最新文件。"""
+    data_dir = tmp_path / "data"
+    ws_id = "video-note-ws"
+    video_dir = data_dir / "workspaces" / ws_id / "videos"
+    video_dir.mkdir(parents=True)
+    preferred = video_dir / "preferred.mp4"
+    unrelated = video_dir / "unrelated-newer.mp4"
+    preferred.write_bytes(b"preferred")
+    unrelated.write_bytes(b"unrelated")
+
+    resp = client.post("/workspaces", json={"name": "video-note", "workspace_id": ws_id})
+    # create endpoint ignores supplied workspace_id, so use returned id for consistency
+    ws_id = resp.json()["workspace_id"]
+    video_dir = data_dir / "workspaces" / ws_id / "videos"
+    video_dir.mkdir(parents=True, exist_ok=True)
+    preferred = video_dir / "preferred.mp4"
+    unrelated = video_dir / "unrelated-newer.mp4"
+    preferred.write_bytes(b"preferred")
+    unrelated.write_bytes(b"unrelated")
+
+    resp = client.post(
+        f"/workspaces/{ws_id}/items",
+        json={
+            "type": "video",
+            "source": "url",
+            "source_value": "https://example.com/video",
+        },
+    )
+    item_id = resp.json()["items"][-1]["item_id"]
+
+    rec = ws_module._store.get(ws_id)
+    item = next(i for i in rec.items if i.item_id == item_id)
+    item.results = {
+        "video_file": str(preferred),
+        "duration": 12,
+    }
+
+    with patch.object(ws_module, "DATA_DIR", data_dir):
+        resp = client.get(f"/workspaces/{ws_id}/items/{item_id}/note")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["media"]["video"]["url"].endswith("/preferred.mp4")
+    assert "unrelated-newer.mp4" not in data["media"]["video"]["url"]

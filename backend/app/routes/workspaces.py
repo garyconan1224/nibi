@@ -3112,10 +3112,17 @@ def get_item_note(workspace_id: str, item_id: str) -> Dict[str, Any]:
             media["images"] = [img_url] if img_url else []
 
     elif item_type == "video":
-        # 视频文件 URL（与 get_video_result 同逻辑：优先 workspace/videos/ 下找）
+        # 视频文件 URL：优先用 note task 结果中的确切 video_file，扫目录只作 fallback。
         _video_url = ""
+        _result_video = str(results.get("video_file") or results.get("video_url") or "").strip()
+        if _result_video:
+            _video_url = (
+                _result_video
+                if _result_video.startswith(("http://", "https://", "/static/"))
+                else to_static_url(_result_video)
+            )
         _vid_dir = DATA_DIR / "workspaces" / workspace_id / "videos"
-        if _vid_dir.is_dir():
+        if not _video_url and _vid_dir.is_dir():
             _vid_files = sorted(_vid_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
             if _vid_files:
                 _video_url = to_static_url(_vid_files[0])
@@ -3260,8 +3267,15 @@ def update_item_note(workspace_id: str, item_id: str, req: NoteUpdateRequest) ->
 
     elif item_type == "video":
         _video_url = ""
+        _result_video = str(results.get("video_file") or results.get("video_url") or "").strip()
+        if _result_video:
+            _video_url = (
+                _result_video
+                if _result_video.startswith(("http://", "https://", "/static/"))
+                else to_static_url(_result_video)
+            )
         _vid_dir = DATA_DIR / "workspaces" / workspace_id / "videos"
-        if _vid_dir.is_dir():
+        if not _video_url and _vid_dir.is_dir():
             _vid_files = sorted(_vid_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
             if _vid_files:
                 _video_url = to_static_url(_vid_files[0])

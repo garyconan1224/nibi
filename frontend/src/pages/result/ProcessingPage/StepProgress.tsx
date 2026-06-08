@@ -17,7 +17,7 @@ const STAGE_ICON_MAP: Record<string, typeof Download> = {
 // R16.2 各任务类型应跳过的阶段（不显示在步骤流里）
 const SKIP_STAGES_BY_TYPE: Record<string, string[]> = {
   audio: ['FRAMES', 'VLM'],
-  note: ['PROBE', 'FRAMES', 'VLM', 'ASR'],
+  note: ['PROBE', 'STORE'],
 }
 
 function visibleStages(taskType: string): typeof PROCESSING_STAGES {

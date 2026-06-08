@@ -41,4 +41,11 @@ describe('deriveSteps', () => {
       expect(step.pct).toBe(0)
     })
   })
+
+  it('taskType=note 显示完整视频笔记步骤', () => {
+    const steps = deriveSteps('ASR', 0.35, 'note')
+    const ids = steps.map((s) => s.id)
+
+    expect(ids).toEqual(['DOWNLOAD', 'ASR', 'FRAMES', 'VLM', 'SUM'])
+  })
 })
