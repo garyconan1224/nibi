@@ -4,7 +4,6 @@ import type { AnalysisScope, ItemType } from '@/types/workspace'
 
 export type Feature =
   | 'visual_analysis'        // R17: 新增，替代 visual_prompt + video_summary
-  | 'av_synthesis'           // R17: 新增，综合笔记（仅 av_combined）
   | 'visual_prompt'
   | 'video_summary'
   | 'subtitle_export'
@@ -65,13 +64,11 @@ const NEEDS_TRANSCRIBE: ReadonlySet<Feature> = new Set([
   'subtitle_export',
   'transcribe_summary',
   'speaker_diarize',
-  'av_synthesis',      // R17: 综合笔记需要 asr
 ])
 
 /** R17: feature → 后端 task id 映射 */
 const TASK_TYPE_MAP: Record<Feature, string[]> = {
   visual_analysis:    ['frame_extract', 'vlm_analyze'],
-  av_synthesis:       ['frame_extract', 'vlm_analyze', 'asr', 'av_synthesis'],
   transcribe_summary: ['asr', 'summary'],
   music_analysis:     ['music_analyze'],
   visual_prompt:      ['frame_extract', 'vlm_analyze'],
@@ -139,9 +136,6 @@ export const FEATURES_BY_SCOPE_V2: Record<AnalysisScope, FeatureDef[]> = {
       hint: 'BPM / 调性 / 乐器 / 风格 + 可选 Suno 提示词' },
   ],
   av_combined: [
-    { id: 'av_synthesis',       label: '综合笔记',       defaultChecked: true,
-      badge: '⭐', highlight: true,
-      hint: '画面 + 转写时间戳对齐，生成图文教学笔记（可导出 MD）' },
     { id: 'visual_analysis',    label: '画面分析',       defaultChecked: true },
     { id: 'transcribe_summary', label: '人声转写+总结',  defaultChecked: true },
     { id: 'music_analysis',     label: '音乐分析',       defaultChecked: false },
@@ -155,12 +149,6 @@ export function expandFeatureIds(ids: string[]): string[] {
     if (id === 'visual_analysis') {
       out.add('visual_prompt')
       out.add('video_summary')
-    } else if (id === 'av_synthesis') {
-      out.add('av_synthesis')
-      out.add('visual_prompt')
-      out.add('video_summary')
-      out.add('transcribe_summary')
-      out.add('subtitle_export')
     } else {
       out.add(id)
     }
