@@ -33,8 +33,35 @@ import { SummariesTab } from '@/components/SummariesTab'
 import NoteChatDrawer from '@/components/NoteChatDrawer'
 
 // remarkGfm 类型与 react-markdown 不完全兼容
+
+/** remark 插件：将被 remark 错误当 text 的 ![alt](url) 修正为 image 节点。 */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const remarkPlugins: any[] = [remarkGfm]
+const fixBrokenImagesPlugin = () => (tree: any) => {
+  const IMG_RE = /!\[([^\]]*)\]\(([^)]+)\)/g
+  for (const node of tree.children || []) {
+    if (node.type !== 'paragraph') continue
+    const children = node.children || []
+    // 只处理纯 text paragraph，把 text 里的 ![alt](url) 拆成 image 节点
+    const newChildren: any[] = []
+    for (const child of children) {
+      if (child.type !== 'text') { newChildren.push(child); continue }
+      let lastIdx = 0
+      let m: RegExpExecArray | null
+      IMG_RE.lastIndex = 0
+      while ((m = IMG_RE.exec(child.value))) {
+        if (m.index > lastIdx) newChildren.push({ type: 'text', value: child.value.slice(lastIdx, m.index) })
+        newChildren.push({ type: 'image', url: m[2], alt: m[1], title: null, children: [{ type: 'text', value: m[1] }] })
+        lastIdx = m.index + m[0].length
+      }
+      if (lastIdx < child.value.length) newChildren.push({ type: 'text', value: child.value.slice(lastIdx) })
+      if (!IMG_RE.test(child.value) && lastIdx === 0) newChildren.push(child)
+    }
+    if (newChildren.length) node.children = newChildren
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const remarkPlugins: any[] = [remarkGfm, fixBrokenImagesPlugin]
 
 /* ────────────────── helpers ────────────────── */
 
@@ -706,6 +733,15 @@ export default function NoteShell() {
                   const text = String(children)
                   return <h3 id={headingId(text, toc)} {...props}>{children}</h3>
                 },
+                img: ({ src, alt, ...props }) => (
+                  <img
+                    src={src}
+                    alt={alt || ''}
+                    style={{ maxWidth: '100%', borderRadius: 6, margin: '8px 0' }}
+                    loading="lazy"
+                    {...props}
+                  />
+                ),
               }}
             >
               {noteBody}

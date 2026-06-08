@@ -1194,16 +1194,33 @@ def _persist_intermediate(runner: TaskRunner, task_id: str, result_patch: Dict[s
 
 # ── note task 下载/识别/步骤调度 helpers ────────────────────
 
+def _resolve_b23_url(url: str) -> str:
+    """解析 b23.tv 短链 → 真实 URL；非短链或解析失败返回原 URL。"""
+    if "b23.tv" not in url.lower():
+        return url
+    try:
+        import urllib.request as _req
+        req = _req.Request(url, method="HEAD", headers={"User-Agent": "Mozilla/5.0"})
+        resp = _req.urlopen(req, timeout=8)
+        resolved = resp.url
+        return resolved if resolved else url
+    except Exception:
+        return url
+
+
 def _classify_note_url(url: str) -> str:
     """根据 URL 形态给出下载器提示（非最终类型，仅用于选择下载器）。
 
     返回: "xiaohongshu" | "bili_opus" | "text_page" | "video_audio" | "unknown"
     """
+    # b23.tv 短链先解析到真实 URL，再按真实 URL 判断类型
+    if "b23.tv" in url.lower():
+        url = _resolve_b23_url(url)
     lower = url.lower()
     if is_xiaohongshu_url_or_text(url):
         return "xiaohongshu"
     # B站图文动态 /opus/ 路径（移动端 __INITIAL_STATE__ 适配器，不能走 load_url）
-    if ("bilibili.com" in lower and "/opus/" in lower) or "b23.tv" in lower:
+    if "bilibili.com" in lower and "/opus/" in lower:
         return "bili_opus"
     # 常见文本网页平台（公众号、少数派、MBA智库等）——这些平台 yt-dlp 无法处理
     if any(d in lower for d in ("mp.weixin.qq.com", "sspai.com", "mbalib.com", "zhihu.com", "juejin.cn")):
@@ -1240,6 +1257,8 @@ def _download_note_source(
         }
     """
     log = lambda m: runner.append_log(task_id, m)
+    # b23.tv 短链在入口处统一解析为真实 URL，后续所有适配器用真实 URL 工作
+    url = _resolve_b23_url(url)
     url_hint = _classify_note_url(url)
 
     # ── 小红书 ──
@@ -1251,21 +1270,38 @@ def _download_note_source(
             url_or_text=url, output_dir=str(_xhs_out), log=log,
             progress_callback=lambda p, msg: runner.set_progress(task_id, 0.02 + p * 0.28, msg),
         )
-        if not _xhs.get("ok"):
-            return {"ok": False, "kind_hint": "image_text", "error": _xhs.get("error") or "小红书解析失败"}
         _nm = _xhs.get("note_meta") or {}
+        _note_type = str(_nm.get("type") or "normal")
+        _title = str(_nm.get("title") or "小红书笔记")
+        _desc = str(_nm.get("desc") or "")
+        if not _xhs.get("ok"):
+            # 视频失败也标 video，便于上层按"视频失败"提示而非生成空图文笔记
+            _fail_kind = "video" if _note_type == "video" else "image_text"
+            return {"ok": False, "kind_hint": _fail_kind, "error": _xhs.get("error") or "小红书解析失败"}
+        # 视频笔记：save_path = 视频文件路径，走完整视频流程（转录 + 截帧分析 + 播放）
+        if _note_type == "video":
+            return {
+                "ok": True,
+                "kind_hint": "video",
+                "source_path": "",
+                "content": _desc,
+                "title": _title,
+                "images": [],
+                "video_file": _xhs.get("save_path") or "",
+                "metadata": _nm,
+            }
+        # 图文笔记：save_path = 图片目录
         _note_dir = _xhs.get("save_path") or ""
         _imgs = sorted(
             str(_p) for _p in Path(_note_dir).glob("*")
             if _p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")
         ) if _note_dir and Path(_note_dir).is_dir() else []
-        _desc = str(_nm.get("desc") or "")
         return {
             "ok": True,
             "kind_hint": "image_text",
             "source_path": _note_dir,
             "content": _desc,
-            "title": str(_nm.get("title") or "小红书笔记"),
+            "title": _title,
             "images": _imgs,
             "video_file": "",
             "metadata": _nm,
@@ -2054,6 +2090,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         return partial
 
     # ── 6. note 步骤（汇总 markdown）──────────────────────────
+    llm_summary = ""
     if "note" in steps:
         runner.store.update(task_id, status=TaskStatus.SUM.value)
         runner.set_progress(task_id, 0.90, "整理笔记内容...")
@@ -2065,9 +2102,22 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         else:
             markdown = "（未找到可用的分析或转录内容，请检查前置步骤是否已执行）"
 
+        # ── LLM 生成摘要（视频/音频类型有转录文本时）──
+        llm_summary = ""
+        if api_key and transcript_text and len(transcript_text) > 50:
+            try:
+                from backend.app.services.av_synthesis.llm import llm_global_summary
+                runner.append_log(task_id, "📝 生成 LLM 摘要...")
+                llm_summary = llm_global_summary(transcript_text, api_key)
+                if llm_summary:
+                    runner.append_log(task_id, f"📝 LLM 摘要生成完成（{len(llm_summary)} 字）")
+            except Exception as e:
+                runner.append_log(task_id, f"⚠️ LLM 摘要生成失败（不影响主流程）: {e}")
+
         completed_steps.append("note")
         _persist_intermediate(runner, task_id, {
             "markdown": markdown,
+            "llm_summary": llm_summary,
             "completed_steps": completed_steps[:],
         })
 
@@ -2086,6 +2136,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         "transcript":            transcript_text,
         "analysis":              analysis_text,
         "markdown":              markdown,
+        "llm_summary":           llm_summary,
         "completed_steps":       completed_steps,
         "video_file":            download_save_path,
         "json_outputs":          [str(p.resolve()) for p in json_paths],

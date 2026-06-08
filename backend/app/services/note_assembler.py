@@ -45,9 +45,14 @@ def build_frontmatter(item: WorkspaceItem, workspace_id: str) -> Dict[str, Any]:
         img_path = results.get("image_path", "")
         media["images"] = [img_path] if img_path else []
     elif item_type == "video":
+        video_url = results.get("video_file") or results.get("video_url") or ""
         duration = results.get("duration")
-        if duration is not None:
-            media["video"] = {"duration": duration}
+        if video_url or duration is not None:
+            media["video"] = {}
+            if video_url:
+                media["video"]["url"] = video_url
+            if duration is not None:
+                media["video"]["duration"] = duration
         frames = results.get("frames", [])
         if frames:
             media["frames"] = [
@@ -173,9 +178,13 @@ def build_source_md(item: WorkspaceItem) -> str:
 
 
 def build_note_md(item: WorkspaceItem, frontmatter: Dict[str, Any]) -> str:
-    """生成 note.md = YAML frontmatter + 正文。"""
+    """生成 note.md = YAML frontmatter + 正文（含 LLM 摘要）。"""
     fm_yaml = yaml.dump(frontmatter, allow_unicode=True, default_flow_style=False, sort_keys=False)
     body = _build_body(item)
+    # 如有 LLM 摘要，插入正文开头
+    summary = (item.results or {}).get("llm_summary", "")
+    if summary and isinstance(summary, str) and summary.strip():
+        body = f"## 摘要\n\n{summary.strip()}\n\n---\n\n{body}"
     return f"---\n{fm_yaml}---\n\n{body}"
 
 

@@ -19,7 +19,7 @@ def _call_llm(prompt: str, api_key: str, *, max_tokens: int = 4000, temperature:
     profile = registry.resolve_default_profile(settings, "chat")
     provider = registry.build(profile)
     chat_model = str(
-        getattr(profile.default_models, "chat", None) or ""
+        (profile.default_models or {}).get("chat") or ""
     ).strip()
     if not chat_model:
         raise RuntimeError("未配置 chat model")

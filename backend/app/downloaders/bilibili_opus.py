@@ -48,6 +48,7 @@ def fetch_bilibili_opus(url: str) -> Dict[str, Any]:
     if not opus_id:
         return {"ok": False, "error": f"无法从 URL 提取 opus_id: {url}"}
 
+    # 先尝试移动端 __INITIAL_STATE__
     try:
         html = _fetch_mobile_page(opus_id)
     except requests.RequestException as e:
@@ -57,7 +58,19 @@ def fetch_bilibili_opus(url: str) -> Dict[str, Any]:
     if not state:
         return {"ok": False, "error": "未找到 window.__INITIAL_STATE__，页面结构可能已变"}
 
-    return _parse_opus_state(state)
+    result = _parse_opus_state(state)
+    # fallback：移动端 __INITIAL_STATE__ 中 detail 为 None 时，尝试桌面端
+    if not result.get("ok") and "opus.detail" in (result.get("error") or ""):
+        try:
+            html2 = _fetch_desktop_page(opus_id)
+            state2 = _extract_initial_state(html2)
+            if state2:
+                result2 = _parse_opus_state(state2)
+                if result2.get("ok"):
+                    return result2
+        except Exception:
+            pass
+    return result
 
 
 def download_opus_images(
@@ -115,6 +128,20 @@ def _fetch_mobile_page(opus_id: str) -> str:
     session = requests.Session()
     session.headers.update({
         "User-Agent": _MOBILE_UA,
+        "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9",
+    })
+    resp = session.get(url, timeout=_SESSION_TIMEOUT)
+    resp.raise_for_status()
+    return resp.text
+
+
+def _fetch_desktop_page(opus_id: str) -> str:
+    """请求 www.bilibili.com 桌面端页面，返回 HTML（fallback）。"""
+    url = f"https://www.bilibili.com/opus/{opus_id}"
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
         "Accept-Language": "zh-CN,zh;q=0.9",
     })

@@ -1707,11 +1707,26 @@ def generate_note(workspace_id: str, req: GenerateNoteRequest) -> Dict[str, Any]
         raise HTTPException(status_code=404, detail=str(err)) from err
 
     # 3. 创建 note task（复用 handle_note_task 统一流程）
+    #    注入 LLM 配置（从 provider store 获取活跃 chat provider 的 key + model）
+    _task_payload: dict = {"url": url, "workspace_id": workspace_id}
+    try:
+        _s = load_settings()
+        for _p in _s.providers:
+            if not _p.enabled or not _p.api_key.strip():
+                continue
+            if "chat" in _p.capabilities:
+                _task_payload["api_key"] = _p.api_key
+                if hasattr(_p, "default_models") and _p.default_models:
+                    _task_payload["text_model"] = _p.default_models.get("chat", "")
+                break
+    except Exception:
+        pass  # provider 配置缺失不影响 note 任务创建
+
     try:
         task_rec = _pipeline_runner.create_task(
             "default_project",
             "note",
-            {"url": url, "workspace_id": workspace_id},
+            _task_payload,
         )
     except ValueError as err:
         raise HTTPException(status_code=409, detail=str(err)) from err
