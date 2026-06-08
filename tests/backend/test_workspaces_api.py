@@ -287,6 +287,23 @@ def test_bridge_audio_accepts_ip9_boolean_task_ids() -> None:
     assert payload["prompt_generation"] is True
 
 
+def test_bridge_video_url_routes_to_note_task() -> None:
+    """视频 URL 重新触发时应走 note task，避免 download 成功回调再创建 analyze task。"""
+    workspace = WorkspaceRecord(workspace_id="ws-video", name="video")
+    item = WorkspaceItem(
+        item_id="video-1",
+        type="video",
+        source="url",
+        source_value="https://example.com/video.mp4",
+    )
+
+    task_type, payload = ws_module._bridge_to_pipeline_payload(item, workspace)
+
+    assert task_type == "note"
+    assert payload["url"] == "https://example.com/video.mp4"
+    assert payload["workspace_id"] == "ws-video"
+
+
 def test_download_success_inherits_video_summary_preflight(tmp_path: Path) -> None:
     """URL video download -> analyze should carry IP.9 summary path settings."""
     isolated_store = WorkspaceStore(root=tmp_path / "workspaces")

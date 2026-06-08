@@ -1571,8 +1571,13 @@ def _bridge_to_pipeline_payload(
         )
 
     if item.source == "url":
-        # download 任务最小 payload：url 必填，其余从 preflight 透传可选项
-        payload: Dict[str, Any] = {"url": item.source_value}
+        # Track K: 视频 URL 重新触发也统一走 note task。
+        # 旧 download -> success callback -> analyze 链会产生第二个任务；
+        # note task 内部自行执行 download/transcribe/analyze/note。
+        payload: Dict[str, Any] = {
+            "url": item.source_value,
+            "workspace_id": workspace.workspace_id,
+        }
         # TODO: quality 等高级参数目前 _resolve_download_kwargs 不消费，
         # 等 download handler 支持 format_selector 映射后再启用。
         bg = item.preflight.background_overrides or {}
@@ -1587,7 +1592,7 @@ def _bridge_to_pipeline_payload(
                 payload["intent"] = _preflight["intent"]
             if _preflight.get("background_for_recognition"):
                 payload["background_for_recognition"] = _preflight["background_for_recognition"]
-        return "download", payload
+        return "note", payload
 
     # local：直接走 analyze
     # analyze 需要：api_key（后端从 settings 拿）、vision_model、text_model、
