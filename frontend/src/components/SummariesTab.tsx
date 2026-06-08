@@ -121,7 +121,8 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<ItemSummary | null>(null)
   const [showModal, setShowModal] = useState(false)
-  const [creating, setCreating] = useState(false)
+  /** null = 没在生成；string = 正在生成的模板 id（列表里显示进度条） */
+  const [creatingTemplate, setCreatingTemplate] = useState<string | null>(null)
 
   // 对比模式
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -167,12 +168,14 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
       }
     }
 
-    setCreating(true)
+    // 立刻关弹窗，列表里显示生成进度
+    setShowModal(false)
+    setCreatingTemplate(template)
+
     try {
       const s = await createSummary(workspaceId, itemId, template, background)
       setCachedSummary(workspaceId, itemId, s)
       toast.success(`${templateLabel(s.template)} v${s.version} 生成完成`)
-      setShowModal(false)
       await refresh()
       setSelected(s)
     } catch (err: unknown) {
@@ -186,7 +189,7 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
         toast.error(msg)
       }
     } finally {
-      setCreating(false)
+      setCreatingTemplate(null)
     }
   }, [workspaceId, itemId, refresh, summaries, navigate])
 
@@ -283,7 +286,7 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
   }
 
   // ── 空态：居中引导 ────────────────────────────────────
-  if (summaries.length === 0) {
+  if (summaries.length === 0 && !creatingTemplate) {
     return (
       <div className="sm-empty-guide">
         <h2 className="sm-empty-title">生成一份内容总结</h2>
@@ -293,7 +296,7 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
         </button>
         {showModal && (
           <NewSummaryModal
-            creating={creating}
+            creating={false}
             onSubmit={handleCreate}
             onClose={() => setShowModal(false)}
           />
@@ -329,6 +332,19 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
             </button>
           </div>
         </div>
+
+        {/* 生成中进度项（列表顶部） */}
+        {creatingTemplate && (
+          <div className="sm-version-item sm-creating">
+            <div className="sm-version-info">
+              <span className="sm-version-label">{templateLabel(creatingTemplate)}</span>
+              <span className="sm-version-preview" style={{ color: 'var(--accent-pink)' }}>
+                正在生成…
+              </span>
+            </div>
+            <div className="sm-creating-spinner" />
+          </div>
+        )}
 
         {/* 扁平版列表：每条 = 模板名·v{n} 或自定义名 */}
         {summaries.map((s) => {
@@ -493,7 +509,7 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
       {/* 新建弹窗 */}
       {showModal && (
         <NewSummaryModal
-          creating={creating}
+          creating={creatingTemplate !== null}
           onSubmit={handleCreate}
           onClose={() => setShowModal(false)}
         />
