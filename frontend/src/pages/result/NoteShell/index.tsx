@@ -1017,7 +1017,7 @@ export default function NoteShell() {
               )}
             </div>
             {/* 正文（TOC 改为浮动面板，不再占固定宽度） */}
-            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0 }}>
+            <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
               {noteContent}
               {tocFloating}
             </div>
@@ -1072,7 +1072,7 @@ export default function NoteShell() {
       ) : (
         /* ── 通用布局（文字/图片/音频）：左正文 + 右伴随 ── */
         <>
-          <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minHeight: 0 }}>
+          <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
             {noteContent}
             {tocFloating}
             {/* 目录浮动按钮（阅读态 + 有目录时，非视频布局用） */}
