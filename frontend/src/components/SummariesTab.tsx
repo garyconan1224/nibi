@@ -113,13 +113,23 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
 
   /* ── 创建（从弹窗回调） ─────────────────────────────── */
 
-  const handleCreate = useCallback(async (template: string, background: string) => {
+  const handleCreate = useCallback(async (opts: {
+    template: string
+    background: string
+    providerId: string
+    model: string
+    searchWeb: boolean
+  }) => {
     // 立刻关弹窗，列表里显示生成进度
     setShowModal(false)
-    setCreatingTemplate(template)
+    setCreatingTemplate(opts.template)
 
     try {
-      const s = await createSummary(workspaceId, itemId, template, background)
+      const s = await createSummary(workspaceId, itemId, opts.template, opts.background, {
+        provider_id: opts.providerId,
+        model: opts.model,
+        search_web: opts.searchWeb,
+      })
       toast.success(`${templateLabel(s.template)} v${s.version} 生成完成`)
       await refresh()
       setSelected(s)
