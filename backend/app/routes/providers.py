@@ -119,10 +119,14 @@ def update_tavily_key(req: TavilyKeyRequest) -> Dict[str, Any]:
 
 
 @router.post("/tavily/test")
-def test_tavily_key() -> Dict[str, Any]:
-    """用已保存的 Tavily Key 发一次真实搜索，验证连通性。"""
+def test_tavily_key(req: TavilyKeyRequest | None = None) -> Dict[str, Any]:
+    """测试 Tavily Key 连通性。
+
+    body 有 api_key 时用传入的 key 测试（前端草稿里还没保存的 key）；
+    body 为空时用已保存的 key 测试。
+    """
     settings = load_settings()
-    api_key = settings.tavily_api_key.strip()
+    api_key = (req.api_key.strip() if req and req.api_key else "") or settings.tavily_api_key.strip()
     if not api_key:
         raise HTTPException(status_code=400, detail="Tavily API Key 未配置")
     try:

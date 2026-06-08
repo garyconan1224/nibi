@@ -240,7 +240,9 @@ const NetworkSettingsPage = () => {
               setTavilyTestResult(null)
               try {
                 const { http } = await import('@/services/client')
-                const res = await http.post('/providers/tavily/test')
+                const res = await http.post('/providers/tavily/test', {
+                  api_key: draft.tavilyApiKey.trim(),
+                })
                 setTavilyTestResult(res.data)
               } catch (err: unknown) {
                 const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '请求失败'
