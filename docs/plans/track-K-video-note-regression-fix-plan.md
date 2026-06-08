@@ -313,6 +313,11 @@ relates:
 - 后端接口已存在：`PATCH .../transcript/segments/{idx}`（[workspaces.py:2937](backend/app/routes/workspaces.py:2937)），写 `edited_text` 进 `results["transcript_segments"]`。
 - 前端交互已存在：[AudioResultPage](frontend/src/pages/result/AudioResultPage.tsx) 已实现「双击某行→编辑→保存 `n`(edited_text)」，service `editTranscriptSegment`([workspaces.ts:513](frontend/src/services/workspaces.ts:513))。
 - **要做**：① 前端把这套双击编辑搬到视频笔记左侧 [LNTranscriptPanel](frontend/src/pages/results/LearningNotesPage/LNTranscriptPanel.tsx)（双击行→inline 输入→调 editTranscriptSegment→刷新该行显示 edited_text）。② 后端扩展 `update_transcript_segment`：写完 results 后**额外两步**——(a) 同步更新 note 目录 `transcript.json`（把该行改后的文字落盘，扛重启，对应 8.3）；(b) **重建 source.md**（用 edited_text 优先，调 `build_source_md`/`assemble_item_note`），让「源md 内容也跟着调整」。
+- **⚠️ edited_text 必须三处一致生效**（否则改了白改）：
+  1. **字幕轴显示**：`normalize_transcript`([note_assembler.py](backend/app/services/note_assembler.py)) 输出的 `text` 改为 `edited_text or text`（**这是允许的加法改动**，不破坏 {t_sec,t_str,text} 契约）。
+  2. **source.md**：`build_source_md` 拼接转写时也 `edited_text or text`。
+  3. **transcript.json**：编辑接口落盘时带上 edited_text（或直接存改后的 text）。
+- **可行性已验证**：PATCH 接口存在（[workspaces.py:2937](backend/app/routes/workspaces.py:2937)）、AudioResultPage 双击编辑存在（[onDoubleClick:548](frontend/src/pages/result/AudioResultPage.tsx:548)）、`result["description"]`@1559 是**帧 VLM 描述**与点4 无关（点4 仍需 plumb 视频简介/作者）。
 
 **点4 source.md 更详细**：
 - plumb 元数据：[pipeline_tasks.py](backend/app/services/pipeline_tasks.py) 下载回调现在只把 `video_title`/`cover_thumbnail` 写进 result（:517/:520）；补上 `description`/`author`/`upload_date`（B站 [bilibili_nocookie.py:189](backend/app/downloaders/bilibili_nocookie.py:189) 的 VideoMeta 已有这些字段）。
