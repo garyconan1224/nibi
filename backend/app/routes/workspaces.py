@@ -2959,51 +2959,62 @@ def update_transcript_segment(
     segment_idx: int,
     req: TranscriptSegmentEditRequest,
 ) -> Dict[str, Any]:
-    """编辑单段转录文本（A-1：字幕在线编辑）。"""
+    """编辑单段转录文本（A-1：字幕在线编辑）。
+
+    字幕的「显示真相」= _note_transcript（内存 results 优先，重启后回退 transcript.json），
+    所以编辑必须按同一份「显示列表」的下标定位，并把改动同时落到三处：
+      ① 内存 results（本会话即时生效）② transcript.json（扛重启）③ source.md（源md 同步）。
+    旧实现只认内存 results，重启后 results 空 → out of range → 「保存失败，请重试」。
+    """
     rec = _store.get(workspace_id)
     if rec is None:
         raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
     item = _find_item(rec, item_id)
-    results = dict(item.results or {})
-    segs = list(results.get("transcript_segments") or [])
-    if segment_idx < 0 or segment_idx >= len(segs):
-        raise HTTPException(status_code=400, detail=f"segment_idx {segment_idx} out of range (0-{len(segs) - 1})")
-    seg = dict(segs[segment_idx])
-    seg["edited_text"] = req.edited_text if req.edited_text.strip() else None
-    segs[segment_idx] = seg
-    results["transcript_segments"] = segs
-    _store.update_item(workspace_id, item_id, results=results)
+    nd = note_dir(workspace_id, item_id)
 
-    # R2：同步更新 note 目录 transcript.json（扛重启）+ 重建 source.md
-    try:
-        import json as _json
-        nd = note_dir(workspace_id, item_id)
-        # 落盘 transcript.json：每段用 edited_text 覆盖 text
-        persisted = []
-        for s in segs:
-            entry = dict(s)
-            edited = entry.get("edited_text")
-            if edited:
-                entry["text"] = edited
-            entry.pop("edited_text", None)
-            # 确保 t_str 存在
-            if "t_sec" in entry and "t_str" not in entry:
-                t_sec_val = float(entry.get("t_sec") or 0)
-                entry["t_str"] = f"{int(t_sec_val) // 60}:{int(t_sec_val) % 60:02d}"
-            persisted.append(entry)
-        (nd / "transcript.json").write_text(
-            _json.dumps(persisted, ensure_ascii=False), encoding="utf-8"
+    # 显示列表（与前端字幕轴完全一致）——按它的下标做边界校验，不再只认内存 results
+    lines = _note_transcript(item.results or {}, nd)
+    if segment_idx < 0 or segment_idx >= len(lines):
+        raise HTTPException(
+            status_code=400,
+            detail=f"segment_idx {segment_idx} out of range (0-{len(lines) - 1})",
         )
-        # 重建 source.md：重新取 item（results 已更新）
-        rec2 = _store.get(workspace_id)
-        if rec2:
-            item2 = _find_item(rec2, item_id)
-            source_md = build_source_md(item2)
-            (nd / "source.md").write_text(source_md, encoding="utf-8")
-    except Exception:
-        logger.warning("update_transcript_segment: 同步 note 文件失败（best-effort）", exc_info=True)
 
-    return {"segment_idx": segment_idx, "edited_text": seg["edited_text"]}
+    new_text = req.edited_text.strip()
+
+    # ① 内存 results：写到「第 idx 个非空段」（与 normalize 跳空段逻辑对齐，避免下标错位）
+    results = dict(item.results or {})
+    raw_segs = list(results.get("transcript_segments") or [])
+    if raw_segs:
+        cnt = -1
+        for ri, rseg in enumerate(raw_segs):
+            if not isinstance(rseg, dict):
+                continue
+            if not str(rseg.get("edited_text") or rseg.get("text", "")).strip():
+                continue
+            cnt += 1
+            if cnt == segment_idx:
+                raw_segs[ri] = {**rseg, "edited_text": new_text or None}
+                break
+        results["transcript_segments"] = raw_segs
+        _store.update_item(workspace_id, item_id, results=results)
+
+    # ② transcript.json（扛重启）+ ③ source.md（源md 同步）
+    try:
+        tp = nd / "transcript.json"
+        disk = json.loads(tp.read_text(encoding="utf-8")) if tp.exists() else None
+        if not (isinstance(disk, list) and 0 <= segment_idx < len(disk) and isinstance(disk[segment_idx], dict)):
+            disk = [dict(x) for x in lines]  # 兜底：用显示列表重建一份
+        # 空字符串 = 恢复原文（保留显示列表里的原 text）
+        disk[segment_idx]["text"] = new_text or str(lines[segment_idx].get("text", ""))
+        disk[segment_idx].pop("edited_text", None)
+        nd.mkdir(parents=True, exist_ok=True)
+        tp.write_text(json.dumps(disk, ensure_ascii=False), encoding="utf-8")
+        _rebuild_source_md_transcript(nd, [dict(x) for x in disk])
+    except Exception:
+        logger.warning("update_transcript_segment: 同步 transcript.json / source.md 失败（best-effort）", exc_info=True)
+
+    return {"segment_idx": segment_idx, "edited_text": new_text or None}
 
 
 # ── 总结 CRUD ──────────────────────────────────────────────────
@@ -3168,6 +3179,33 @@ def _note_transcript(results: Dict[str, Any], nd: Path) -> List[Dict[str, Any]]:
         except Exception:
             return []
     return []
+
+
+def _rebuild_source_md_transcript(nd: Path, lines: List[Dict[str, Any]]) -> None:
+    """用规范化字幕行重建 source.md 的「转写正文」，保留已有「视频信息」头。
+
+    字幕编辑后调用，让 source.md 跟着改。**只重建转写正文段**，
+    保留 build_source_md 写的「## 视频信息」头（重启后 results 已空，
+    不能用 build_source_md 整体重建，否则会把头和正文一起清掉）。
+    """
+    body_parts: List[str] = []
+    for ln in lines:
+        text = str(ln.get("text") or "")
+        if not text:
+            continue
+        ts = str(ln.get("t_str") or "")
+        body_parts.append(f"**[{ts}]** {text}" if ts else text)
+    body = "\n\n".join(body_parts)
+
+    sp = nd / "source.md"
+    marker = "## 转写正文"
+    if sp.exists():
+        existing = sp.read_text(encoding="utf-8")
+        if marker in existing:
+            header = existing.split(marker)[0]
+            sp.write_text(f"{header}{marker}\n\n{body}\n", encoding="utf-8")
+            return
+    sp.write_text(body + "\n", encoding="utf-8")
 
 
 @router.get("/{workspace_id}/items/{item_id}/note")
