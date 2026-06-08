@@ -17,7 +17,7 @@ import type { ReactElement, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowLeft, BookOpenCheck, ChevronDown, ChevronRight, Download, FileText, List, MessageCircle } from 'lucide-react'
+import { ArrowLeft, BookOpenCheck, ChevronDown, ChevronRight, Download, FileCode, FileText, List, MessageCircle, RefreshCw } from 'lucide-react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
@@ -30,6 +30,10 @@ import type { ItemSummary } from '@/services/summaries'
 import { Badge } from '@/components/ui/badge'
 import { SYSTEM_TAG_DIMENSIONS } from '@/constants/tagDimensions'
 import NoteMediaCompanion, { type NoteMediaCompanionHandle } from './NoteMediaCompanion'
+// 7.3: 视频笔记三列布局 — 直接使用 ln 组件（不经过 NoteMediaCompanion 包装）
+import LNVideoPanel, { type LNVideoPanelHandle } from '@/pages/results/LearningNotesPage/LNVideoPanel'
+import LNTranscriptPanel from '@/pages/results/LearningNotesPage/LNTranscriptPanel'
+import '@/pages/results/LearningNotesPage/learning-notes.css'
 import { SummariesTab } from '@/components/SummariesTab'
 import NoteChatDrawer from '@/components/NoteChatDrawer'
 import { useLnEditorStore } from '@/store/lnEditorStore'
@@ -402,18 +406,23 @@ function TagChips({ tags }: TagChipsProps) {
 
 interface SourcePanelProps {
   sourceMd: string
+  /** 外部受控开关（可选）；不传则内部自管 */
+  open?: boolean
+  onToggle?: () => void
 }
 
 /** source.md 只读区（可折叠）。 */
-function SourcePanel({ sourceMd }: SourcePanelProps) {
-  const [open, setOpen] = useState(false)
+function SourcePanel({ sourceMd, open: controlledOpen, onToggle }: SourcePanelProps) {
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = controlledOpen ?? internalOpen
+  const toggle = onToggle ?? (() => setInternalOpen((v) => !v))
 
   if (!sourceMd) return null
 
   return (
     <div style={{ borderTop: '1px solid var(--border)' }}>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={toggle}
         style={{
           display: 'flex', alignItems: 'center', gap: 6,
           width: '100%', padding: '10px 20px',
@@ -441,16 +450,21 @@ interface SummariesPanelProps {
   workspaceId: string
   itemId: string
   onApplyToNote: (summary: ItemSummary) => void
+  /** 外部受控开关（可选）；不传则内部自管 */
+  open?: boolean
+  onToggle?: () => void
 }
 
 /** 总结风格面板（可折叠），内嵌 SummariesTab。 */
-function SummariesPanel({ workspaceId, itemId, onApplyToNote }: SummariesPanelProps) {
-  const [open, setOpen] = useState(false)
+function SummariesPanel({ workspaceId, itemId, onApplyToNote, open: controlledOpen, onToggle }: SummariesPanelProps) {
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = controlledOpen ?? internalOpen
+  const toggle = onToggle ?? (() => setInternalOpen((v) => !v))
 
   return (
     <div style={{ borderTop: '1px solid var(--border)', flexShrink: 0 }}>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={toggle}
         style={{
           display: 'flex', alignItems: 'center', gap: 6,
           width: '100%', padding: '10px 20px',
@@ -514,6 +528,17 @@ export default function NoteShell() {
   const mediaCompanionRef = useRef<NoteMediaCompanionHandle>(null)
   // 标记是否从「应用到主笔记」触发的刷新，避免 debounce 冲突
   const applyingRef = useRef(false)
+
+  // 7.3: 视频笔记三列布局 — 播放器 + 转录轴联动
+  const videoRef = useRef<LNVideoPanelHandle>(null)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [summariesOpen, setSummariesOpen] = useState(false)
+  const [sourceOpen, setSourceOpen] = useState(false)
+  const handleTimeUpdate = useCallback((t: number) => setCurrentTime(t), [])
+  const handleSeek = useCallback((sec: number) => {
+    videoRef.current?.seekTo(sec)
+    mediaCompanionRef.current?.seekTo(sec)
+  }, [])
 
   const fetchNote = useCallback(async () => {
     setLoading(true)
@@ -607,6 +632,8 @@ export default function NoteShell() {
   }, [])
 
   const handleMarkdownSeek = useCallback((sec: number) => {
+    // 7.3: 视频布局直接用 videoRef，通用布局用 mediaCompanionRef
+    videoRef.current?.seekTo(sec)
     mediaCompanionRef.current?.seekTo(sec)
   }, [])
 
@@ -663,6 +690,92 @@ export default function NoteShell() {
   const itemType = String(fm.type ?? 'text')
   const tags = (fm.tags ?? {}) as Record<string, unknown>
   const hasTags = tags && Object.keys(tags).length > 0
+
+  // 7.3: 视频笔记三列布局标志
+  const isVideoNote = itemType === 'video' && !!note.media?.video?.url
+
+  // ── 提取正文 JSX（视频 / 非视频布局复用）──
+  const noteContent = (
+    <div style={{ flex: 1, minWidth: 0, padding: viewMode === 'compare' ? 0 : '20px 24px', overflowY: viewMode === 'compare' ? 'hidden' : 'auto' }}>
+      {viewMode === 'read' ? (
+        <div style={{ fontSize: 14, lineHeight: 1.8, color: 'var(--ink-2)' }}>
+          <ReactMarkdown
+            remarkPlugins={remarkPlugins}
+            components={{
+              h2: ({ children, ...props }) => {
+                const text = String(children)
+                return <h2 id={headingId(text, toc)} {...props}>{children}</h2>
+              },
+              h3: ({ children, ...props }) => {
+                const text = String(children)
+                return <h3 id={headingId(text, toc)} {...props}>{children}</h3>
+              },
+              p: ({ children, ...props }) => (
+                <p {...props}>{renderNoteTimestampChildren(children, handleMarkdownSeek)}</p>
+              ),
+              li: ({ children, ...props }) => (
+                <li {...props}>{renderNoteTimestampChildren(children, handleMarkdownSeek)}</li>
+              ),
+              img: ({ src, alt, ...props }) => (
+                <img
+                  src={src}
+                  alt={alt || ''}
+                  style={{ maxWidth: '100%', borderRadius: 6, margin: '8px 0' }}
+                  loading="lazy"
+                  {...props}
+                />
+              ),
+            }}
+          >
+            {noteBody}
+          </ReactMarkdown>
+        </div>
+      ) : viewMode === 'compare' ? (
+        <CompareView markdown={editingBody} onMarkdownChange={handleEditorChange} sourceMd={note.source_md} />
+      ) : (
+        <NoteEditor markdown={editingBody} onMarkdownChange={handleEditorChange} />
+      )}
+    </div>
+  )
+
+  const tocAside = viewMode === 'read' && toc.length > 0 ? (
+    <aside
+      style={{
+        width: 220,
+        flexShrink: 0,
+        borderLeft: '1px solid var(--border)',
+        padding: '16px 14px',
+        overflowY: 'auto',
+        background: 'var(--bg)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 12, fontWeight: 700, color: 'var(--ink-2)' }}>
+        <List size={14} /> 目录
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {toc.map((entry) => (
+          <button
+            key={entry.id}
+            onClick={() => handleTocJump(entry.id)}
+            style={{
+              width: '100%',
+              padding: entry.level === 3 ? '5px 8px 5px 18px' : '5px 8px',
+              border: 'none',
+              borderRadius: 4,
+              background: 'transparent',
+              color: 'var(--ink-3)',
+              cursor: 'pointer',
+              fontSize: 12,
+              lineHeight: 1.4,
+              textAlign: 'left',
+            }}
+          >
+            {entry.text}
+          </button>
+        ))}
+      </div>
+    </aside>
+  ) : null
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -795,126 +908,120 @@ export default function NoteShell() {
         </div>
       )}
 
-      {/* ════════ 正文区（阅读态 / Markdown 编辑态 / 对照态）════════ */}
-      <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex' }}>
-        <div style={{ flex: 1, minWidth: 0, padding: viewMode === 'compare' ? 0 : '20px 24px', overflowY: viewMode === 'compare' ? 'hidden' : 'auto' }}>
-        {viewMode === 'read' ? (
-          <div style={{ fontSize: 14, lineHeight: 1.8, color: 'var(--ink-2)' }}>
-            <ReactMarkdown
-              remarkPlugins={remarkPlugins}
-              components={{
-                h2: ({ children, ...props }) => {
-                  const text = String(children)
-                  return <h2 id={headingId(text, toc)} {...props}>{children}</h2>
-                },
-                h3: ({ children, ...props }) => {
-                  const text = String(children)
-                  return <h3 id={headingId(text, toc)} {...props}>{children}</h3>
-                },
-                p: ({ children, ...props }) => (
-                  <p {...props}>{renderNoteTimestampChildren(children, handleMarkdownSeek)}</p>
-                ),
-                li: ({ children, ...props }) => (
-                  <li {...props}>{renderNoteTimestampChildren(children, handleMarkdownSeek)}</li>
-                ),
-                img: ({ src, alt, ...props }) => (
-                  <img
-                    src={src}
-                    alt={alt || ''}
-                    style={{ maxWidth: '100%', borderRadius: 6, margin: '8px 0' }}
-                    loading="lazy"
-                    {...props}
-                  />
-                ),
-              }}
-            >
-              {noteBody}
-            </ReactMarkdown>
+      {/* ════════ 主内容区（视频笔记 = 三列布局，其余 = 通用布局）════════ */}
+      {isVideoNote ? (
+        /* ── 7.3 视频笔记三列布局（蓝图 §3.5）：左播放器+字幕 / 中正文 / 右操作 ── */
+        <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex' }}>
+          {/* 左列：视频播放器 + 实时字幕 */}
+          <div className="vm-ln-scope" style={{ width: '30%', minWidth: 280, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border)', overflow: 'hidden' }}>
+            <div style={{ flex: '0 0 auto', maxHeight: '55%', overflow: 'hidden' }}>
+              <LNVideoPanel
+                ref={videoRef}
+                src={note.media!.video!.url}
+                title=""
+                workspaceId={workspaceId}
+                onTimeUpdate={handleTimeUpdate}
+              />
+            </div>
+            {Array.isArray(note.transcript) && note.transcript.length > 0 && (
+              <div style={{ flex: 1, overflowY: 'auto', borderTop: '1px solid var(--border)' }}>
+                <LNTranscriptPanel
+                  transcript={note.transcript as never}
+                  currentTime={currentTime}
+                  onSeek={handleSeek}
+                />
+              </div>
+            )}
           </div>
-        ) : viewMode === 'compare' ? (
-          <CompareView markdown={editingBody} onMarkdownChange={handleEditorChange} sourceMd={note.source_md} />
-        ) : (
-          <NoteEditor markdown={editingBody} onMarkdownChange={handleEditorChange} />
-        )}
-        </div>
-        {viewMode === 'read' && toc.length > 0 && (
-          <aside
-            style={{
-              width: 220,
-              flexShrink: 0,
-              borderLeft: '1px solid var(--border)',
-              padding: '16px 14px',
-              overflowY: 'auto',
-              background: 'var(--bg)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 12, fontWeight: 700, color: 'var(--ink-2)' }}>
-              <List size={14} /> 目录
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {toc.map((entry) => (
-                <button
-                  key={entry.id}
-                  onClick={() => handleTocJump(entry.id)}
-                  style={{
-                    width: '100%',
-                    padding: entry.level === 3 ? '5px 8px 5px 18px' : '5px 8px',
-                    border: 'none',
-                    borderRadius: 4,
-                    background: 'transparent',
-                    color: 'var(--ink-3)',
-                    cursor: 'pointer',
-                    fontSize: 12,
-                    lineHeight: 1.4,
-                    textAlign: 'left',
-                  }}
-                >
-                  {entry.text}
-                </button>
-              ))}
-            </div>
-          </aside>
-        )}
-      </div>
 
-      {/* ════════ 伴随区 ════════ */}
-      <div style={{ flexShrink: 0, maxHeight: '40%', overflowY: 'auto' }}>
-        {chatOpen && (
-          <div style={{ height: 320, borderTop: '1px solid var(--border)', display: 'flex', overflow: 'hidden' }}>
-            <NoteChatDrawer
+          {/* 中列：正文（阅读/编辑/对照）+ TOC + 可折叠面板 */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+              {noteContent}
+              {tocAside}
+            </div>
+            <SummariesPanel
               workspaceId={workspaceId}
-              systemPrompt={chatSystemPrompt}
-              scopeHint="仅基于当前 note.md 与转录上下文回答"
-              mode="inline"
+              itemId={itemId}
+              onApplyToNote={handleApplyToNote}
+              open={summariesOpen}
+              onToggle={() => setSummariesOpen((v) => !v)}
             />
+            <SourcePanel sourceMd={note.source_md} open={sourceOpen} onToggle={() => setSourceOpen((v) => !v)} />
           </div>
-        )}
-        {/* R3.2/R3.3: video/audio companion — 播放器 + 转录轴 */}
-        {(itemType === 'video' && note.media?.video?.url) && (
-          <NoteMediaCompanion
-            ref={mediaCompanionRef}
-            media={note.media}
-            transcript={Array.isArray(note.transcript) ? note.transcript as never : []}
-            workspaceId={workspaceId}
-          />
-        )}
-        {(itemType === 'audio' && note.media?.audio) && (
-          <NoteMediaCompanion
-            ref={mediaCompanionRef}
-            media={note.media}
-            transcript={Array.isArray(note.transcript) ? note.transcript as never : []}
-            workspaceId={workspaceId}
-          />
-        )}
-        {/* 总结风格面板 */}
-        <SummariesPanel
-          workspaceId={workspaceId}
-          itemId={itemId}
-          onApplyToNote={handleApplyToNote}
-        />
-        {/* source.md */}
-        <SourcePanel sourceMd={note.source_md} />
-      </div>
+
+          {/* 右列：操作区（源md / 换总结 / AI问答 / 导出） */}
+          <div style={{ width: 48, flexShrink: 0, borderLeft: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px 0', gap: 8, background: 'var(--bg)' }}>
+            <button
+              className="btn-ghost"
+              onClick={() => setSummariesOpen((v) => !v)}
+              style={{ width: 36, height: 36, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              title="选择其他总结方式"
+            >
+              <RefreshCw size={14} />
+            </button>
+            <button
+              className="btn-ghost"
+              onClick={() => setSourceOpen((v) => !v)}
+              style={{ width: 36, height: 36, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              title="查看源 md"
+            >
+              <FileCode size={14} />
+            </button>
+            <button
+              className="btn-ghost"
+              onClick={() => void handleExportObsidian()}
+              style={{ width: 36, height: 36, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              title="导出 Obsidian 包"
+            >
+              <BookOpenCheck size={14} />
+            </button>
+            <div style={{ flex: 1 }} />
+            <button
+              className="btn-ghost"
+              onClick={() => setChatOpen((v) => !v)}
+              style={{ width: 36, height: 36, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: chatOpen ? 'var(--accent)' : undefined, color: chatOpen ? '#fff' : undefined }}
+              title="基于笔记问 AI"
+            >
+              <MessageCircle size={14} />
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* ── 通用布局（文字/图片/音频）：左正文 + 右伴随 ── */
+        <>
+          <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex' }}>
+            {noteContent}
+            {tocAside}
+          </div>
+          <div style={{ flexShrink: 0, maxHeight: '40%', overflowY: 'auto' }}>
+            {chatOpen && (
+              <div style={{ height: 320, borderTop: '1px solid var(--border)', display: 'flex', overflow: 'hidden' }}>
+                <NoteChatDrawer
+                  workspaceId={workspaceId}
+                  systemPrompt={chatSystemPrompt}
+                  scopeHint="仅基于当前 note.md 与转录上下文回答"
+                  mode="inline"
+                />
+              </div>
+            )}
+            {(itemType === 'audio' && note.media?.audio) && (
+              <NoteMediaCompanion
+                ref={mediaCompanionRef}
+                media={note.media}
+                transcript={Array.isArray(note.transcript) ? note.transcript as never : []}
+                workspaceId={workspaceId}
+              />
+            )}
+            <SummariesPanel
+              workspaceId={workspaceId}
+              itemId={itemId}
+              onApplyToNote={handleApplyToNote}
+            />
+            <SourcePanel sourceMd={note.source_md} />
+          </div>
+        </>
+      )}
     </div>
   )
 }
