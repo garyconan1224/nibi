@@ -3172,8 +3172,20 @@ def get_item_note(workspace_id: str, item_id: str) -> Dict[str, Any]:
             fp = f.get("frame_image_path") or f.get("image_path") or ""
             sec = f.get("sec", 0)
             media["frames"].append({"sec": sec, "url": fp if fp.startswith("/static/") else to_static_url(fp)})
-        # transcript
-        transcript = results.get("transcript") or []
+        # transcript（优先 segments 带时间码，降级为纯文本规范化）
+        raw_transcript = results.get("transcript_segments") or results.get("transcript") or []
+        if isinstance(raw_transcript, list) and raw_transcript and isinstance(raw_transcript[0], dict) and "t_sec" in raw_transcript[0]:
+            transcript = raw_transcript
+        elif isinstance(raw_transcript, str):
+            transcript = (
+                [{"t_sec": 0, "t_str": "00:00", "text": raw_transcript.strip()}]
+                if raw_transcript.strip()
+                else []
+            )
+        elif isinstance(raw_transcript, list):
+            transcript = raw_transcript
+        else:
+            transcript = []
 
     elif item_type == "audio":
         # 音频文件：results.audio.filename 存在 workspace/<id>/audio/ 下

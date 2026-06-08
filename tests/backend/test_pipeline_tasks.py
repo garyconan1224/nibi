@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -17,6 +17,22 @@ from backend.app.models.tasks import TERMINAL_STATUS_VALUES, TaskRecord, TaskSta
 from backend.app.services.task_runner import TaskRunner
 from backend.app.services.task_store import TaskStore
 from shared.audio_analyzer import VadResult
+
+
+def _whisper_side_effect(text: str):
+    """返回 transcribe_file_with_fast_whisper 的 side_effect，兼容 return_segments 参数。
+
+    return_segments=True → (text, segments, duration)
+    return_segments=False → text
+    """
+    segments = [{"t_sec": 0.0, "t_str": "00:00", "text": text}]
+
+    def _fn(*args, **kwargs):
+        if kwargs.get("return_segments"):
+            return text, segments, 10.0
+        return text
+
+    return _fn
 
 
 # ── 公共辅助 ──────────────────────────────────────────────────────────────
@@ -195,7 +211,7 @@ class TestScenarioB:
             patch("backend.app.services.asr_fast_whisper.is_fast_whisper_available",
                   return_value=True),
             patch("backend.app.services.asr_fast_whisper.transcribe_file_with_fast_whisper",
-                  return_value="这是转录文本"),
+                  side_effect=_whisper_side_effect("这是转录文本")),
         ):
             runner, rec = _make_runner(tmp_path, steps=["download", "transcribe"])
             done = _wait_for_terminal(runner.store, rec.task_id)
@@ -239,7 +255,7 @@ class TestScenarioC:
             patch("backend.app.services.asr_fast_whisper.is_fast_whisper_available",
                   return_value=True),
             patch("backend.app.services.asr_fast_whisper.transcribe_file_with_fast_whisper",
-                  return_value="转录文本内容"),
+                  side_effect=_whisper_side_effect("转录文本内容")),
             patch("backend.app.services.pipeline_tasks.find_videos",
                   return_value=[fake_video]),
             patch("backend.app.services.pipeline_tasks.run_batch_analysis",
@@ -288,7 +304,7 @@ class TestScenarioC:
             patch("backend.app.services.asr_fast_whisper.is_fast_whisper_available",
                   return_value=True),
             patch("backend.app.services.asr_fast_whisper.transcribe_file_with_fast_whisper",
-                  return_value="降级转录内容"),
+                  side_effect=_whisper_side_effect("降级转录内容")),
             patch("backend.app.services.pipeline_tasks.find_videos",
                   return_value=[fake_video]),
             patch("backend.app.services.pipeline_tasks.run_batch_analysis",
@@ -404,7 +420,7 @@ def test_user_cancel_during_frames_keeps_real_progress_and_writes_no_note(
         patch("backend.app.services.asr_fast_whisper.is_fast_whisper_available",
               return_value=True),
         patch("backend.app.services.asr_fast_whisper.transcribe_file_with_fast_whisper",
-              return_value="fake transcript"),
+              side_effect=_whisper_side_effect("fake transcript")),
         patch("backend.app.services.pipeline_tasks.find_videos",
               return_value=[fake_video]),
         patch("backend.app.services.pipeline_tasks.run_batch_analysis",

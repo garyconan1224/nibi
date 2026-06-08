@@ -1738,6 +1738,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
 
     # 中间产出容器
     transcript_text = ""
+    transcript_segments: List[Dict[str, Any]] = []  # 7.4: 带时间码的分段
     analysis_text = ""
     markdown = ""
     download_save_path = ""
@@ -1961,7 +1962,8 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 def _on_log(msg: str) -> None:
                     runner.append_log(task_id, f"[转录] {msg}")
 
-                return transcribe_file_with_fast_whisper(
+                # 7.4: return_segments=True 获取带时间码的分段，供实时字幕面板使用
+                _text, _segments, _dur = transcribe_file_with_fast_whisper(
                     video_file,
                     model_name=tcfg.whisper_model_size or "base",
                     device=tcfg.device or "cpu",
@@ -1969,7 +1971,9 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                     initial_prompt=tcfg.initial_prompt or "",
                     log_callback=_on_log,
                     progress_callback=_on_progress,
+                    return_segments=True,
                 )
+                return _text, _segments
 
             futures["transcribe"] = _pool.submit(_run_transcribe)
 
@@ -2051,7 +2055,12 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                     for key, f in futures.items():
                         if f is future:
                             if key == "transcribe":
-                                transcript_text = result
+                                # 7.4: (text, segments) tuple from return_segments=True
+                                if isinstance(result, tuple) and len(result) == 2:
+                                    transcript_text, transcript_segments = result
+                                else:
+                                    transcript_text = result
+                                    transcript_segments = []
                             elif key == "analyze":
                                 analysis_text = result
                             completed_steps.append(key)
@@ -2142,6 +2151,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
 
     result: Dict[str, Any] = {
         "transcript":            transcript_text,
+        "transcript_segments":   transcript_segments,  # 7.4: 带时间码分段，供前端实时字幕
         "analysis":              analysis_text,
         "markdown":              markdown,
         "llm_summary":           llm_summary,
