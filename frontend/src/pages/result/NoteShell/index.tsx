@@ -253,10 +253,12 @@ const viewModeLabels: Record<ViewMode, string> = {
   edit: 'Markdown',
   compare: '对照',
 }
-/** 8.0: 视频笔记视图标签（对齐蓝图 §3.5 语义） */
+/** 视频笔记视图标签：中列只展示「标准总结」，两种格式（蓝图 §3.5）。
+ *  富文本 = 渲染态（ReactMarkdown）；md格式 = 源码态（CodeMirror，可编辑）。
+ *  源 md（转写+截帧原始内容）在右侧操作区，不是中列标签。 */
 const videoViewModeLabels: Record<ViewMode, string> = {
-  read: '标准总结',
-  edit: '富文本',
+  read: '富文本',
+  edit: 'md格式',
   compare: '源md对照',
 }
 
@@ -564,6 +566,17 @@ export default function NoteShell() {
 
   useEffect(() => { fetchNote() }, [fetchNote])
 
+  // 视频笔记没有 compare（源md对照）档，localStorage 残留 compare 时归位到 read
+  useEffect(() => {
+    if (!note) return
+    const fmType = String(((note.frontmatter ?? {}) as Record<string, unknown>).type ?? '')
+    const isVid = fmType === 'video' && !!note.media?.video?.url
+    if (isVid && viewMode === 'compare') {
+      setViewMode('read')
+      localStorage.setItem(VIEW_MODE_KEY, 'read')
+    }
+  }, [note, viewMode])
+
   // ─── debounce 自动保存 ───
   const doSave = useCallback(async (body: string) => {
     setSaveStatus('saving')
@@ -809,10 +822,10 @@ export default function NoteShell() {
           {TYPE_LABEL[itemType] ?? itemType.toUpperCase()}
         </span>
 
-        {/* 视图切换 */}
+        {/* 视图切换（视频笔记只有 富文本/md格式 两档，源md在右侧操作区） */}
         <div style={{ display: 'flex', marginLeft: 12, borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--line)' }}>
           {(['read', 'edit', 'compare'] as ViewMode[])
-            .filter((m) => isWide || m !== 'compare')
+            .filter((m) => (isVideoNote ? m !== 'compare' : (isWide || m !== 'compare')))
             .map((m) => (
               <button
                 key={m}
@@ -953,7 +966,6 @@ export default function NoteShell() {
                 title=""
                 workspaceId={workspaceId}
                 onTimeUpdate={handleTimeUpdate}
-                onBeforeScreenshot={() => { if (viewMode !== 'edit') switchView('edit') }}
               />
             </div>
             {/* 字幕区 — 独立挂载，不受中列 re-render 影响 */}
@@ -978,100 +990,113 @@ export default function NoteShell() {
             {tocAside}
           </div>
 
-          {/* ── 右列：操作区 ── */}
+          {/* ── 右列：操作区 / 问AI（互斥；问AI 占满右列、加宽，绝不盖住中列 md）── */}
           <div style={{
-            width: 220, flexShrink: 0,
+            width: chatOpen ? 380 : 220, flexShrink: 0,
             borderLeft: '1px solid var(--line)',
             display: 'flex', flexDirection: 'column',
             overflow: 'hidden',
             background: 'var(--bg-elev)',
+            transition: 'width .2s var(--ease, ease)',
           }}>
-            {/* 操作区顶部标题栏 */}
-            <div style={{ padding: '10px 14px 8px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-2)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--mono)' }}>操作区</span>
-            </div>
-
-            {/* 可滚动内容区 */}
-            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
-
-              {/* 源 md */}
-              <button
-                className="btn-ghost"
-                onClick={() => setSourceOpen((v) => !v)}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-start', height: 36, padding: '0 14px', fontSize: 12, borderRadius: 0, borderBottom: '1px solid var(--line)', flexShrink: 0, color: sourceOpen ? 'var(--accent-2)' : undefined }}
-              >
-                <FileCode size={13} /> 源 md
-              </button>
-              {sourceOpen && note.source_md && (
-                <div style={{ padding: '8px 12px', fontSize: 11, lineHeight: 1.6, color: 'var(--ink-3)', borderBottom: '1px solid var(--line)', maxHeight: 220, overflowY: 'auto', background: 'var(--bg-sunken)' }}>
-                  <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'var(--mono)', margin: 0 }}>{note.source_md}</pre>
+            {chatOpen ? (
+              /* 问 AI 面板：占满右列，关闭回到操作区 */
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px 8px 14px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--accent-2)' }}>
+                    <MessageCircle size={13} /> 问 AI
+                  </span>
+                  <button className="btn-ghost" onClick={() => setChatOpen(false)} style={{ height: 26, padding: '0 8px', fontSize: 11 }}>
+                    <ChevronRight size={13} /> 收起
+                  </button>
                 </div>
-              )}
-
-              {/* 换总结 */}
-              <button
-                className="btn-ghost"
-                onClick={() => setSummariesOpen((v) => !v)}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-start', height: 36, padding: '0 14px', fontSize: 12, borderRadius: 0, borderBottom: '1px solid var(--line)', flexShrink: 0, color: summariesOpen ? 'var(--accent-2)' : undefined }}
-              >
-                <RefreshCw size={13} /> 换总结
-              </button>
-              {summariesOpen && (
-                <div style={{ borderBottom: '1px solid var(--line)', maxHeight: 300, overflowY: 'auto' }}>
-                  <SummariesTab
+                <div style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
+                  <NoteChatDrawer
                     workspaceId={workspaceId}
-                    itemId={itemId}
-                    onApplyToNote={(s) => { handleApplyToNote(s); setSummariesOpen(false) }}
+                    systemPrompt={chatSystemPrompt}
+                    scopeHint="仅基于当前 note.md 与转录上下文回答"
+                    mode="inline"
                   />
                 </div>
-              )}
+              </>
+            ) : (
+              <>
+                {/* 操作区顶部标题栏 */}
+                <div style={{ padding: '10px 14px 8px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-2)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--mono)' }}>操作区</span>
+                </div>
 
-              <div style={{ flex: 1, minHeight: 16 }} />
+                {/* 可滚动内容区 */}
+                <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
 
-              {/* AI 问答 */}
-              <button
-                className="btn-ghost"
-                onClick={() => setChatOpen((v) => !v)}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-start', height: 36, padding: '0 14px', fontSize: 12, borderRadius: 0, borderTop: '1px solid var(--line)', flexShrink: 0, background: chatOpen ? 'var(--accent-2)' : undefined, color: chatOpen ? '#fff' : undefined }}
-              >
-                <MessageCircle size={13} /> 问 AI
-              </button>
+                  {/* 源 md */}
+                  <button
+                    className="btn-ghost"
+                    onClick={() => setSourceOpen((v) => !v)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-start', height: 36, padding: '0 14px', fontSize: 12, borderRadius: 0, borderBottom: '1px solid var(--line)', flexShrink: 0, color: sourceOpen ? 'var(--accent-2)' : undefined }}
+                  >
+                    <FileCode size={13} /> 源 md
+                  </button>
+                  {sourceOpen && note.source_md && (
+                    <div style={{ padding: '8px 12px', fontSize: 11, lineHeight: 1.6, color: 'var(--ink-3)', borderBottom: '1px solid var(--line)', maxHeight: 220, overflowY: 'auto', background: 'var(--bg-sunken)' }}>
+                      <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'var(--mono)', margin: 0 }}>{note.source_md}</pre>
+                    </div>
+                  )}
 
-              {/* 导出 */}
-              <div style={{ position: 'relative', flexShrink: 0 }}>
-                <button
-                  className="btn-ghost"
-                  onClick={() => setExportOpen((v) => !v)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-start', height: 36, padding: '0 14px', fontSize: 12, borderRadius: 0, borderTop: '1px solid var(--line)', color: exportOpen ? 'var(--accent-2)' : undefined }}
-                >
-                  <Download size={13} /> 导出
-                </button>
-                {exportOpen && (
-                  <div style={{ position: 'absolute', right: 0, bottom: 36, zIndex: 20, minWidth: 140, padding: 4, border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-elev)', boxShadow: 'var(--shadow-md)' }}>
-                    <button className="btn-ghost" onClick={() => { handleExportMarkdown(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}>
-                      <FileText size={13} /> Markdown
+                  {/* 换总结 */}
+                  <button
+                    className="btn-ghost"
+                    onClick={() => setSummariesOpen((v) => !v)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-start', height: 36, padding: '0 14px', fontSize: 12, borderRadius: 0, borderBottom: '1px solid var(--line)', flexShrink: 0, color: summariesOpen ? 'var(--accent-2)' : undefined }}
+                  >
+                    <RefreshCw size={13} /> 换总结
+                  </button>
+                  {summariesOpen && (
+                    <div style={{ borderBottom: '1px solid var(--line)', maxHeight: 300, overflowY: 'auto' }}>
+                      <SummariesTab
+                        workspaceId={workspaceId}
+                        itemId={itemId}
+                        onApplyToNote={(s) => { handleApplyToNote(s); setSummariesOpen(false) }}
+                      />
+                    </div>
+                  )}
+
+                  <div style={{ flex: 1, minHeight: 16 }} />
+
+                  {/* AI 问答 */}
+                  <button
+                    className="btn-ghost"
+                    onClick={() => setChatOpen(true)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-start', height: 36, padding: '0 14px', fontSize: 12, borderRadius: 0, borderTop: '1px solid var(--line)', flexShrink: 0 }}
+                  >
+                    <MessageCircle size={13} /> 问 AI
+                  </button>
+
+                  {/* 导出 */}
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <button
+                      className="btn-ghost"
+                      onClick={() => setExportOpen((v) => !v)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-start', height: 36, padding: '0 14px', fontSize: 12, borderRadius: 0, borderTop: '1px solid var(--line)', color: exportOpen ? 'var(--accent-2)' : undefined }}
+                    >
+                      <Download size={13} /> 导出
                     </button>
-                    <button className="btn-ghost" onClick={() => { void handleExportObsidian(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}>
-                      <BookOpenCheck size={13} /> Obsidian
-                    </button>
+                    {exportOpen && (
+                      <div style={{ position: 'absolute', right: 0, bottom: 36, zIndex: 20, minWidth: 140, padding: 4, border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)', background: 'var(--bg-elev)', boxShadow: 'var(--shadow-md)' }}>
+                        <button className="btn-ghost" onClick={() => { handleExportMarkdown(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}>
+                          <FileText size={13} /> Markdown
+                        </button>
+                        <button className="btn-ghost" onClick={() => { void handleExportObsidian(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}>
+                          <BookOpenCheck size={13} /> Obsidian
+                        </button>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
-            </div>
+                </div>
+              </>
+            )}
           </div>
-
-          {/* AI 对话抽屉（中列底部浮层） */}
-          {chatOpen && (
-            <div style={{ position: 'absolute', bottom: 0, left: '30%', right: 220, height: 280, borderTop: '1px solid var(--line)', background: 'var(--bg-elev)', zIndex: 10, display: 'flex', overflow: 'hidden', borderRadius: 'var(--radius) var(--radius) 0 0', boxShadow: 'var(--shadow-lg)' }}>
-              <NoteChatDrawer
-                workspaceId={workspaceId}
-                systemPrompt={chatSystemPrompt}
-                scopeHint="仅基于当前 note.md 与转录上下文回答"
-                mode="inline"
-              />
-            </div>
-          )}
         </div>
       ) : (
         /* ── 通用布局（文字/图片/音频）：左正文 + 右伴随 ── */

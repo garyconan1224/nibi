@@ -11,8 +11,6 @@ interface LNVideoPanelProps {
   title: string
   workspaceId?: string
   onTimeUpdate?: (currentTime: number) => void
-  /** 截图前回调，可用于外部切换到编辑模式确保编辑器已注册 */
-  onBeforeScreenshot?: () => void
 }
 
 export interface LNVideoPanelHandle {
@@ -26,7 +24,7 @@ function formatTs(sec: number): string {
 }
 
 const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
-  ({ src, externalUrl, title, workspaceId, onTimeUpdate, onBeforeScreenshot }, ref) => {
+  ({ src, externalUrl, title, workspaceId, onTimeUpdate }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null)
     const [shooting, setShooting] = useState(false)
     const insertAtCursor = useLnEditorStore((s) => s.insertAtCursor)
@@ -81,9 +79,6 @@ const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
         return
       }
 
-      // 截图前先确保外部已切到编辑模式（编辑器才能接收插入）
-      onBeforeScreenshot?.()
-
       setShooting(true)
       try {
         if (!video.paused) video.pause()
@@ -126,7 +121,7 @@ const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
       } finally {
         setShooting(false)
       }
-    }, [workspaceId, insertAtCursor, onBeforeScreenshot])
+    }, [workspaceId, insertAtCursor])
 
     if (!src) {
       return (
