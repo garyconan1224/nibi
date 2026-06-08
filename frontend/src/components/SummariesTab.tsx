@@ -59,51 +59,6 @@ function versionLabel(s: ItemSummary): string {
   return `${templateLabel(s.template)} · v${s.version}`
 }
 
-/* ── localStorage 缓存 ──────────────────────────────────── */
-
-const CACHE_PREFIX = 'nibi_summary_cache_'
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 小时
-
-interface CachedSummary {
-  summary_id: string
-  content_md: string
-  template: string
-  version: number
-  cached_at: number
-}
-
-function getCachedSummary(workspaceId: string, itemId: string, template: string): CachedSummary | null {
-  try {
-    const key = `${CACHE_PREFIX}${workspaceId}_${itemId}_${template}`
-    const raw = localStorage.getItem(key)
-    if (!raw) return null
-    const cached = JSON.parse(raw) as CachedSummary
-    if (Date.now() - cached.cached_at > CACHE_TTL_MS) {
-      localStorage.removeItem(key)
-      return null
-    }
-    return cached
-  } catch {
-    return null
-  }
-}
-
-function setCachedSummary(workspaceId: string, itemId: string, summary: ItemSummary): void {
-  try {
-    const key = `${CACHE_PREFIX}${workspaceId}_${itemId}_${summary.template}`
-    const cached: CachedSummary = {
-      summary_id: summary.summary_id,
-      content_md: summary.content_md,
-      template: summary.template,
-      version: summary.version,
-      cached_at: Date.now(),
-    }
-    localStorage.setItem(key, JSON.stringify(cached))
-  } catch {
-    // localStorage 满或不可用时静默失败
-  }
-}
-
 /* ── Props ─────────────────────────────────────────────── */
 
 interface SummariesTabProps {
@@ -127,6 +82,9 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
   // 对比模式
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isCompareMode, setIsCompareMode] = useState(false)
+
+  // 排序：'newest' = 最新在前（默认），'oldest' = 最早在前
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest')
 
   // 改名
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -156,25 +114,12 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
   /* ── 创建（从弹窗回调） ─────────────────────────────── */
 
   const handleCreate = useCallback(async (template: string, background: string) => {
-    // 检查 localStorage 缓存
-    const cached = getCachedSummary(workspaceId, itemId, template)
-    if (cached && !background) {
-      const cachedSummary = summaries.find((s) => s.summary_id === cached.summary_id)
-      if (cachedSummary) {
-        toast.success(`使用缓存的 ${templateLabel(template)}`)
-        setShowModal(false)
-        setSelected(cachedSummary)
-        return
-      }
-    }
-
     // 立刻关弹窗，列表里显示生成进度
     setShowModal(false)
     setCreatingTemplate(template)
 
     try {
       const s = await createSummary(workspaceId, itemId, template, background)
-      setCachedSummary(workspaceId, itemId, s)
       toast.success(`${templateLabel(s.template)} v${s.version} 生成完成`)
       await refresh()
       setSelected(s)
@@ -279,6 +224,17 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
     [summaries, selectedIds],
   )
 
+  /** 按时间排序后的列表 */
+  const sortedSummaries = useMemo(() => {
+    const arr = [...summaries]
+    arr.sort((a, b) => {
+      const ta = new Date(a.created_at).getTime()
+      const tb = new Date(b.created_at).getTime()
+      return sortOrder === 'newest' ? tb - ta : ta - tb
+    })
+    return arr
+  }, [summaries, sortOrder])
+
   /* ── 渲染 ────────────────────────────────────────────── */
 
   if (loading) {
@@ -324,6 +280,13 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
               </button>
             )}
             <button
+              className="sm-btn-sort"
+              onClick={() => setSortOrder((v) => (v === 'newest' ? 'oldest' : 'newest'))}
+              title={sortOrder === 'newest' ? '最新在前' : '最早在前'}
+            >
+              {sortOrder === 'newest' ? '↓新' : '↑旧'}
+            </button>
+            <button
               className="sm-btn-new"
               onClick={() => setShowModal(true)}
               title="新建总结"
@@ -346,8 +309,8 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
           </div>
         )}
 
-        {/* 扁平版列表：每条 = 模板名·v{n} 或自定义名 */}
-        {summaries.map((s) => {
+        {/* 扁平版列表：每条 = 模板名·v{n} 或自定义名 + 时间 */}
+        {sortedSummaries.map((s) => {
           const isActive = activeSummaryId === s.summary_id || selected?.summary_id === s.summary_id
           const isEditing = editingId === s.summary_id
           return (
@@ -394,7 +357,17 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
                   />
                 ) : (
                   <>
-                    <span className="sm-version-label">{versionLabel(s)}</span>
+                    <div className="sm-version-label-row">
+                      <span className="sm-version-label">{versionLabel(s)}</span>
+                      <span className="sm-version-time">
+                        {new Date(s.created_at).toLocaleString('zh-CN', {
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
                     <span className="sm-version-preview">
                       {s.content_md.replace(/[#*_>\-\n]/g, ' ').trim().slice(0, 30)}
                       {s.content_md.length > 30 ? '…' : ''}
