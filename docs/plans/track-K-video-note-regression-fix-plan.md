@@ -131,3 +131,35 @@ relates:
 2. `av_synthesis` 后端导出是否被 NoteShell 复用——grep 确认再决定删留。
 3. 删除跨多文件，**严格走删除安全协议**（grep 引用 → tsc/pytest → 分步 commit），任何"删了怕影响别处"的，停下问用户。
 4. `replica` 复刻向、④图片/图文独立类型 = 本轮**不动**。
+
+---
+
+# 7. 第二轮补充修复（A–E 实测后 · 2026-06-08）
+
+**A–E 已达成**：单入口 ✅ / 单任务 ✅ / 视频走完整流程(download→transcribe→analyze→note) ✅ / 能播放 ✅ / 保留项到位（PDF·docx·obsidian builder + ln 组件都在）✅。剩 4 类问题（用户 B站/抖音/小红书三平台实测）：
+
+## 7.1 删除清理（残留）
+`av_synthesis`/`av_combined` 仍残留：`types/workspace.ts`、`lib/featuresToSteps.ts`、`pages/result/ProcessingPage/StepProgress.tsx`、`pages/WorkbenchPage/PreflightDrawer.tsx`、`pages/WorkbenchPage/preflightTasks.ts`。
+- mimo：逐个 `grep` 确认是死代码还是仍被引用；属已删手动模式的 → 删，类型/步骤定义里确实还需要的 → 留并注释。
+- 验证：`grep` 无悬空引用；`npx tsc --noEmit` 通过。
+
+## 7.2 标题全链路（最高优先，用户 3 条都指它）
+**根因**：note task 真实标题只进 `result["video_title"]` + 改 workspace 名，**未回写 `item.name`**；note 端点 `title=item.name`（[workspaces.py:2104](backend/app/routes/workspaces.py:2104)/2138/2212）→ NoteShell 顶部显示 ID/BV 号。
+- **修复 A（结果页标题，全平台）**：note task 完成后**回写 `item.name` = 真实标题**（B站 `video_title` / 抖音·小红书 `metadata.title`），仅当 name 仍是 URL/ID 占位时覆盖。→ 三平台结果页标题都对，B站"完成后变不对"也解决。
+- **修复 B（处理中标题，抖音/小红书）**：适配器已解析到 title（小红书实测「亲测3个设计skills…」），确保传入任务、ProcessingPage 用真实标题而非域名。
+- 验证：B站/抖音/小红书，处理中 + 结果页标题都是真实标题。
+
+## 7.3 视频笔记布局（对齐蓝图 §3.5 + 用户设计图）
+**现状**：视频笔记是通用「对照视图(左正文+右 source)+底部 companion」，未按蓝图。
+**目标**（蓝图 §3.5）：左「视频播放 + 实时字幕」并列 → 右「标准总结 MD ↔ 富文本切换」→ md 时间码点击跳画面 → 右侧操作区（源md/换总结/AI问答/导出）。播放器+字幕在**显眼主区**，不是底部附属。
+- mimo：按蓝图 §3.5 重排视频笔记布局（companion 现在 [index.tsx:892](frontend/src/pages/result/NoteShell/index.tsx:892)）。**改前可先发用户一版布局示意确认**。
+- 验证：逐条对照蓝图 §3.5 + 用户设计图。
+
+## 7.4 实时字幕（没看到，没法测）
+转录轴 `LNTranscriptPanel` 没显示/不明显。
+- mimo：确认 NoteMediaCompanion 转录轴在视频笔记可见，播放时字幕跟随高亮（数据 `note.transcript` 已出，检查渲染/折叠）。
+- 验证：播放视频，字幕区可见且随播放滚动。
+
+## 7.5 执行顺序 + 总验证
+顺序：**7.1 清理 → 7.2 标题 → 7.3 布局 → 7.4 字幕**，每步 commit + 验证。
+三平台回归：单入口 / 单任务 / 标题对 / 能播放 / 字幕可见跟随 / 布局对齐 §3.5。布局这步较大、且涉及视觉，**mimo 改前发用户确认布局方案**。
