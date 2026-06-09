@@ -6,6 +6,7 @@ import json as _json
 import logging
 import re
 import uuid
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -67,11 +68,16 @@ def build_prompt(
         user_prompt = f"{meta}\n{user_prompt}"
 
     # R3.2: standard 模板注入关键帧清单（若有截帧数据）
-    # R3.11: embed_frames=False 时跳过；max_embed_frames>0 时限制帧数
+    # R3.11: embed_frames=False 时跳过
+    # R3.16: max_embed_frames=0 不再表示「无限」（那会把所有帧塞进 prompt → 图太多），
+    #        改为按时长自适应封顶；_collect_frames 已过价值闸门+去重，再按 cap 均匀采样。
     if template_id == "standard" and embed_frames:
-        frames = _collect_frames(item)
-        if max_embed_frames > 0:
-            frames = frames[:max_embed_frames]
+        frames = _collect_frames(item)  # 已过价值闸门 + 去重，idx 连续
+        cap = max_embed_frames if max_embed_frames > 0 else _adaptive_frame_cap(
+            duration_sec, len(frames)
+        )
+        if cap > 0 and len(frames) > cap:
+            frames = _evenly_sample_frames(frames, cap)
         if frames:
             lines = []
             for f in frames:
@@ -81,9 +87,11 @@ def build_prompt(
             frame_list = "\n".join(lines)
             user_prompt = (
                 f"{user_prompt}\n\n"
-                f"【关键帧清单】\n"
-                f"以下是从视频中截取的关键帧及画面描述。在讲到对应内容处用 [[图N]] 插入配图"
-                f"（N=帧号），只在画面确实支撑该处讲解时插，不硬塞。\n\n"
+                f"【关键帧清单】（已剔除过渡/重复画面，共 {len(frames)} 张候选）\n"
+                f"以下是从视频中精选的画面。**宁缺毋滥**：仅当画面能为该处讲解提供实质"
+                f"信息（演示、图表、界面、数据、关键步骤等）时，才用 [[图N]] 插入配图"
+                f"（N=帧号）；纯口播、与正文重复、无信息的画面不要配图，整篇可只配几张"
+                f"甚至不配。\n\n"
                 f"{frame_list}"
             )
 
@@ -93,8 +101,81 @@ def build_prompt(
     return tpl.system_prompt, user_prompt
 
 
+# ── 智能配图：价值闸门 + 去重 + 自适应限量（治「图太多 / 不够智能」）──────
+# 低信息画面描述（价值闸门）：这些帧对理解无帮助，不进配图候选。
+_LOW_VALUE_FRAME_DESCS = {
+    "纯色过渡帧", "纯色画面", "过渡帧", "黑屏", "黑场", "纯黑画面",
+    "白屏", "白场", "无画面内容", "无内容", "画面模糊", "模糊画面",
+}
+
+
+def _is_low_value_frame(desc: str) -> bool:
+    """价值闸门：描述极短 / 属于过渡·纯色等无信息画面 → 不配图。"""
+    d = (desc or "").strip()
+    if len(d) <= 2:
+        return True
+    return d in _LOW_VALUE_FRAME_DESCS
+
+
+def _frames_too_similar(a: str, b: str, threshold: float = 0.86) -> bool:
+    """相邻帧画面描述高度相似 → 视为重复画面，去重。"""
+    a, b = (a or "").strip(), (b or "").strip()
+    if not a or not b:
+        return False
+    return SequenceMatcher(None, a, b).ratio() >= threshold
+
+
+def _filter_and_dedup_frames(
+    frames: List[Dict[str, object]],
+) -> List[Dict[str, object]]:
+    """价值闸门 + 相邻去重 + 重编号 idx。
+
+    重编号保证 idx 与列表位置一致，使 build_prompt 的 [[图N]] 与
+    _postprocess_frames 的 frames[N] 始终指向同一帧（采样只取子集、保留 idx）。
+    """
+    cleaned: List[Dict[str, object]] = []
+    for fr in frames:
+        desc = str(fr.get("desc") or "")
+        if _is_low_value_frame(desc):
+            continue
+        if cleaned and _frames_too_similar(desc, str(cleaned[-1].get("desc") or "")):
+            continue
+        cleaned.append(fr)
+    for n, fr in enumerate(cleaned):
+        fr["idx"] = n
+    return cleaned
+
+
+def _adaptive_frame_cap(duration_sec: float, n_candidates: int, hard_max: int = 8) -> int:
+    """配图「候选清单长度」上限：候选已过价值闸门+去重，这里仅封顶防「图太多」。
+
+    替代旧的 max_embed_frames=0「不限制」语义（那会把所有帧塞进 prompt → 图太多）。
+    短视频候选少 → 全给；候选多 → 封顶 hard_max，让 LLM 在精选里按需插（宁缺毋滥）。
+    超长视频（>12min）按每 5min +1 微放宽，仍封顶 12。
+    """
+    cap = hard_max
+    if duration_sec and duration_sec > 720:
+        cap = min(12, hard_max + round((duration_sec - 720) / 300))
+    return min(cap, n_candidates) if n_candidates else 0
+
+
+def _evenly_sample_frames(
+    frames: List[Dict[str, object]], cap: int,
+) -> List[Dict[str, object]]:
+    """按时间顺序均匀采样到 cap 张，保留每帧原 idx（与 _postprocess 全集对齐）。"""
+    if cap <= 0:
+        return []
+    if len(frames) <= cap:
+        return frames
+    step = len(frames) / cap
+    return [frames[min(len(frames) - 1, int(i * step))] for i in range(cap)]
+
+
 def _collect_frames(item: WorkspaceItem) -> List[Dict[str, object]]:
-    """收集关键帧信息：优先从 results["frames"]，兜底从 json_outputs 文件。"""
+    """收集关键帧信息：优先从 results["frames"]，兜底从 json_outputs 文件。
+
+    返回前统一过价值闸门 + 去重（_filter_and_dedup_frames）。
+    """
     results = item.results or {}
 
     # 优先：已物化的 frames（路由层 _materialize_video_results_from_analyze 产出）
@@ -109,7 +190,7 @@ def _collect_frames(item: WorkspaceItem) -> List[Dict[str, object]]:
             sec = float(fr.get("sec") or 0)
             out.append({"idx": i, "sec": sec, "desc": desc[:200], "image_path": img})
         if out:
-            return out
+            return _filter_and_dedup_frames(out)
 
     # 兜底：从 json_outputs 文件读取（handle_note_task 存的路径）
     json_paths = results.get("json_outputs") or []
@@ -130,7 +211,7 @@ def _collect_frames(item: WorkspaceItem) -> List[Dict[str, object]]:
             # 尝试从 frames/ 目录找对应图片
             img = _find_frame_image(jp, i)
             out.append({"idx": len(out), "sec": sec, "desc": desc[:200], "image_path": img})
-    return out
+    return _filter_and_dedup_frames(out)
 
 
 def _ts_to_sec(ts: str) -> float:

@@ -2210,6 +2210,8 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     # R3.11: 读取嵌图配置
     _preflight = payload.get("preflight") or {}
     _embed_frames = bool(_preflight.get("embed_frames", True))
+    # R3.16: max_embed_frames=0 表示「按视频时长自适应封顶」（见 summary_generator
+    # ._adaptive_frame_cap），不再是「无限」；generate-note 入口未传 preflight 时即走此默认。
     _max_embed = int(_preflight.get("max_embed_frames", 0) or 0)
 
     # 先算标题（standard prompt 需要）
