@@ -2268,6 +2268,19 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         "json_output_basenames": [p.name for p in json_paths],
         "json_output_dir":       str(project_json_dir.resolve()),
     }
+    # R3.13 fix: 继承 download 阶段写入 task.result 的展示字段（封面/时长/作者等）。
+    # handle_note_task 最终 return 的 result 会整体覆盖 task.result；若不继承，分析
+    # 完成瞬间 cover_thumbnail/video_thumbnail_url 丢失 → ProcessingPage 露黑底「● LIVE」
+    # （截图2 处理中有封面、截图3 完成后封面消失即此因）。这些字段由下载阶段 yt-dlp
+    # 实时回调 _apply_ytdlp_metadata_to_task 写入 task.result。
+    _prev_rec = runner.store.get(task_id)
+    _prev_result = (_prev_rec.result or {}) if _prev_rec else {}
+    for _k in (
+        "cover_thumbnail", "video_thumbnail_url", "video_duration",
+        "video_uploader", "video_upload_date", "video_description",
+    ):
+        if _prev_result.get(_k) and not result.get(_k):
+            result[_k] = _prev_result[_k]
     # 7.2 标题全链路：把下载阶段解析到的真实标题写入 result，
     # 供 success callback 回写 item.name（解决 NoteShell 显示 ID/BV 号的问题）
     if _source_title:
