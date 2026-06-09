@@ -41,6 +41,28 @@ def build_prompt(
 
     user_prompt = tpl.user_prompt.format(transcript=transcript)
 
+    # R3.6: standard 模板注入「内容画像」元数据（转写字数 + 视频时长）
+    if template_id == "standard":
+        char_count = len(transcript)
+        # 从 transcript_segments 最后一段的 t_sec 推算视频大致时长
+        duration_sec = 0
+        raw_seg = (item.results or {}).get("transcript_segments", [])
+        if isinstance(raw_seg, list) and raw_seg:
+            last_seg = raw_seg[-1]
+            if isinstance(last_seg, dict):
+                duration_sec = float(last_seg.get("t_sec") or last_seg.get("start") or 0)
+        if duration_sec > 0:
+            mm, ss = divmod(int(duration_sec), 60)
+            duration_str = f"{mm}分{ss}秒" if mm else f"{ss}秒"
+        else:
+            duration_str = "未知"
+        meta = (
+            f"【内容画像参考】\n"
+            f"- 转写字数：约 {char_count} 字\n"
+            f"- 视频时长：约 {duration_str}\n"
+        )
+        user_prompt = f"{meta}\n{user_prompt}"
+
     # R3.2: standard 模板注入关键帧清单（若有截帧数据）
     if template_id == "standard":
         frames = _collect_frames(item)

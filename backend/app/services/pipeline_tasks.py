@@ -2169,12 +2169,53 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     else:
         json_paths = sorted(project_json_dir.glob("*_视觉数据.json"))
 
+    # ── 6.8. R3.5: 自动生成 standard 总结，作为 note.md 默认正文 ──────
+    # 先算标题（standard prompt 需要）
+    _source_title = ""
+    if "download" in steps:
+        _source_title = str((dl_result or {}).get("title") or "").strip()
+    if not _source_title:
+        _source_title = str((probe.get("source_title") if "download" in steps else "") or "").strip()
+
+    note_body = ""
+    if "note" in steps and api_key and transcript_text and len(transcript_text) > 50:
+        try:
+            from backend.app.models.workspace import WorkspaceItem
+            from backend.app.services.summary_generator import generate_summary
+
+            runner.append_log(task_id, "📖 生成标准总结（standard）...")
+            runner.set_progress(task_id, 0.92, "生成标准总结...")
+
+            # 构造临时 WorkspaceItem，填入 generate_summary 所需字段
+            _tmp_item = WorkspaceItem(
+                item_id="pipeline_tmp",
+                type="video",
+                source="url",
+                source_value="",
+                results={
+                    "transcript": transcript_text,
+                    "transcript_segments": transcript_segments,
+                    "json_outputs": [str(p.resolve()) for p in json_paths],
+                    "video_title": _source_title or "",
+                },
+            )
+            _std_summary = generate_summary(_tmp_item, "standard")
+            if _std_summary and _std_summary.content_md:
+                note_body = _std_summary.content_md
+                runner.append_log(task_id, f"📖 标准总结生成完成（{len(note_body)} 字）")
+            else:
+                runner.append_log(task_id, "⚠️ 标准总结返回为空，回退到默认摘要")
+        except Exception as e:
+            runner.append_log(task_id, f"⚠️ 标准总结生成失败（不影响主流程，回退到默认摘要）: {e}")
+            note_body = ""
+
     result: Dict[str, Any] = {
         "transcript":            transcript_text,
         "transcript_segments":   transcript_segments,  # 7.4: 带时间码分段，供前端实时字幕
         "analysis":              analysis_text,
         "markdown":              markdown,
         "llm_summary":           llm_summary,
+        "note_body":             note_body,  # R3.5: standard 总结作为 note.md 默认正文
         "completed_steps":       completed_steps,
         "video_file":            download_save_path,
         "json_outputs":          [str(p.resolve()) for p in json_paths],
@@ -2183,11 +2224,6 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     }
     # 7.2 标题全链路：把下载阶段解析到的真实标题写入 result，
     # 供 success callback 回写 item.name（解决 NoteShell 显示 ID/BV 号的问题）
-    _source_title = ""
-    if "download" in steps:
-        _source_title = str((dl_result or {}).get("title") or "").strip()
-    if not _source_title:
-        _source_title = str((probe.get("source_title") if "download" in steps else "") or "").strip()
     if _source_title:
         result["video_title"] = _source_title
     # M7: 附加 PROBE 识别结果

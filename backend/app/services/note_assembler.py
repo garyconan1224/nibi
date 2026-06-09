@@ -271,10 +271,20 @@ def build_source_md(item: WorkspaceItem) -> str:
 
 
 def build_note_md(item: WorkspaceItem, frontmatter: Dict[str, Any]) -> str:
-    """生成 note.md = YAML frontmatter + 正文（含 LLM 摘要）。"""
+    """生成 note.md = YAML frontmatter + 正文（含 LLM 摘要）。
+
+    R3.5: 若 results 含 note_body（pipeline 自动生成的 standard 总结），
+    直接用作全文正文；否则走旧逻辑（摘要 + 转写）。
+    """
     fm_yaml = yaml.dump(frontmatter, allow_unicode=True, default_flow_style=False, sort_keys=False)
+
+    # R3.5 优先：note_body = pipeline 自动生成的 standard 总结
+    note_body = (item.results or {}).get("note_body", "")
+    if note_body and isinstance(note_body, str) and note_body.strip():
+        return f"---\n{fm_yaml}---\n\n{note_body.strip()}"
+
+    # 兜底：旧逻辑（摘要 + 转写正文）
     body = _build_body(item)
-    # 如有 LLM 摘要，插入正文开头
     summary = (item.results or {}).get("llm_summary", "")
     if summary and isinstance(summary, str) and summary.strip():
         body = f"## 摘要\n\n{summary.strip()}\n\n---\n\n{body}"
