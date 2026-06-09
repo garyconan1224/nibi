@@ -792,16 +792,53 @@ def _collect_frame_descriptions(json_paths: list) -> str:
     return "\n".join(lines)
 
 
+def _extract_bvid(filename: str) -> str:
+    """从文件名提取 B 站 BV 号（BV + 数字字母），无则返回空串。"""
+    m = re.search(r"(BV[0-9A-Za-z]+)", filename)
+    return m.group(1) if m else ""
+
+
 def _find_visual_json_paths_for_videos(project_json_dir: Path, videos: List[Path]) -> List[Path]:
-    """只返回当前 videos 对应的 VLM JSON，避免复用同工作区里其它视频的视觉数据。"""
-    expected_names = {f"{get_safe_name(video)}_视觉数据.json" for video in videos}
-    if not expected_names:
+    """只返回当前 videos 对应的 VLM JSON，避免复用同工作区里其它视频的视觉数据。
+
+    匹配策略（R3.7 修复中文标点/连字符导致 safe-name 不一致）：
+    1. 优先 BV 号匹配：从视频文件名提 BV 号，在视觉 JSON 文件名里找含同一 BV 号者。
+    2. 回退 safe-name：无 BV 号（非 B 站/本地文件）时用 get_safe_name 精确匹配。
+    """
+    if not videos:
         return []
-    return sorted(
-        path
-        for path in project_json_dir.glob("*_视觉数据.json")
-        if path.name in expected_names
-    )
+
+    all_jsons = list(project_json_dir.glob("*_视觉数据.json"))
+    if not all_jsons:
+        return []
+
+    matched: set[Path] = set()
+
+    # ── 1. BV 号匹配（优先） ──
+    bvid_to_video: dict[str, Path] = {}
+    videos_without_bvid: list[Path] = []
+    for video in videos:
+        bvid = _extract_bvid(video.name)
+        if bvid:
+            bvid_to_video[bvid] = video
+        else:
+            videos_without_bvid.append(video)
+
+    if bvid_to_video:
+        for json_path in all_jsons:
+            for bvid in bvid_to_video:
+                if bvid in json_path.name:
+                    matched.add(json_path)
+                    break
+
+    # ── 2. safe-name 回退（无 BV 号的视频） ──
+    if videos_without_bvid:
+        fallback_names = {f"{get_safe_name(v)}_视觉数据.json" for v in videos_without_bvid}
+        for json_path in all_jsons:
+            if json_path not in matched and json_path.name in fallback_names:
+                matched.add(json_path)
+
+    return sorted(matched)
 
 
 def _generate_combined_summary(
