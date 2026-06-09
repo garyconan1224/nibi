@@ -392,6 +392,8 @@ relates:
 
 **R3.2 验收**：勾了截帧的视频笔记，standard 正文按内容嵌入对应关键帧图，图文并茂。
 
+> 📎 **R3.1/R3.2 实测后续（2026-06-09）→ 独立执行卡**：[`docs/plans/track-K-R3-followup-plan.md`](track-K-R3-followup-plan.md)。用户实测反馈两点拆为 **R3.3**（standard 纯文字「太啰嗦」→ 自适应简略，先做）+ **R3.4**（嵌图实测 0 图 → 修帧串台/无描述链路，后做）。富文本无图段落重复渲染 bug 已修于 `946474d`。
+
 ## 10.5 红线 + 通用要求
 
 - 每阶段：`cd frontend && npx tsc --noEmit && vite build` + `.venv/bin/python -m pytest`（动后端就跑 note/summary 套件）过了再 commit；commit `feat(k-10.Rx): …`。
