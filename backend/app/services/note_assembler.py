@@ -268,7 +268,16 @@ def build_source_md(item: WorkspaceItem) -> str:
         header_lines.extend(["", "## 转写正文", ""])
         body = "\n".join(header_lines) + body
 
-        # R3.9: 画面分析段追加在转写正文之后（视频信息 → 转写正文 → 画面分析）
+        # R3.9/R3.18: 画面分析段追加在转写正文之后（视频信息 → 转写正文 → 画面分析）。
+        # R3.18: 图文化 — 逐帧加截图 ![]() + 价值闸门 + 相邻去重 + 上限保护，让
+        #        source.md 成为「图文并列的画面库」（对齐用户「文字带图片」诉求）。
+        #        复用 summary_generator 的找图/闸门/去重逻辑，保持与富文本配图一致。
+        from backend.app.services.summary_generator import (
+            _find_frame_image,
+            _frames_too_similar,
+            _is_low_value_frame,
+            _to_static_url,
+        )
         json_outputs = results.get("json_outputs", []) or []
         visual_parts: list[str] = []
         for jp_str in json_outputs:
@@ -278,8 +287,8 @@ def build_source_md(item: WorkspaceItem) -> str:
                     continue
                 vdata = json.loads(jp.read_text(encoding="utf-8"))
                 gvs = str(vdata.get("global_visual_summary") or "").strip()
-                frames = vdata.get("frames") or []
-                if not gvs and not frames:
+                raw_frames = vdata.get("frames") or []
+                if not gvs and not raw_frames:
                     continue
                 visual_parts.append("## 画面分析")
                 visual_parts.append("")
@@ -288,16 +297,32 @@ def build_source_md(item: WorkspaceItem) -> str:
                     visual_parts.append("")
                     visual_parts.append(gvs)
                     visual_parts.append("")
-                if frames:
+                if raw_frames:
                     visual_parts.append("### 逐帧画面")
                     visual_parts.append("")
-                    for fr in frames:
+                    prev_desc = ""
+                    shown = 0
+                    for i, fr in enumerate(raw_frames):
+                        if shown >= 60:  # 上限保护（视频可能数百帧）
+                            break
                         ts = str(fr.get("timestamp") or "")
-                        content = str(fr.get("content_zh") or fr.get("description_zh") or "").strip()
-                        if not content or content == "纯色过渡帧":
+                        content = str(
+                            fr.get("content_zh") or fr.get("description_zh") or ""
+                        ).strip()
+                        # 价值闸门：滤纯色过渡/黑屏/极短描述
+                        if not content or _is_low_value_frame(content):
                             continue
+                        # 相邻去重：连续相似画面只留一张
+                        if prev_desc and _frames_too_similar(content, prev_desc):
+                            continue
+                        prev_desc = content
                         visual_parts.append(f"**[{ts}]** {content}")
                         visual_parts.append("")
+                        img_url = _to_static_url(_find_frame_image(str(jp), i))
+                        if img_url:
+                            visual_parts.append(f"![{content[:60]}]({img_url})")
+                            visual_parts.append("")
+                        shown += 1
             except Exception:
                 continue
         if visual_parts:
