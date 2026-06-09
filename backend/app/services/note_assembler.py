@@ -266,8 +266,9 @@ def build_source_md(item: WorkspaceItem) -> str:
                 desc_short += "…"
             header_lines.append(f"> {desc_short}")
         header_lines.extend(["", "## 转写正文", ""])
+        body = "\n".join(header_lines) + body
 
-        # R3.9: 画面分析段（从视觉 JSON 读取 content_zh）
+        # R3.9: 画面分析段追加在转写正文之后（视频信息 → 转写正文 → 画面分析）
         json_outputs = results.get("json_outputs", []) or []
         visual_parts: list[str] = []
         for jp_str in json_outputs:
@@ -300,9 +301,8 @@ def build_source_md(item: WorkspaceItem) -> str:
             except Exception:
                 continue
         if visual_parts:
-            header_lines.extend(visual_parts)
+            body += "\n\n" + "\n".join(visual_parts)
 
-        body = "\n".join(header_lines) + body
     return body
 
 
