@@ -53,11 +53,21 @@ export function useGlobalEta(): number {
 
     // 单调递减：新 ETA 只能 ≤ 当前值（防来回跳）
     const newEta = Math.max(0, Math.round(totalEta))
-    const clamped = active.length === 0
-      ? 0
-      : Math.min(newEta, lastEtaRef.current || Infinity)
-    lastEtaRef.current = clamped
-    setEta(clamped)
+    if (active.length === 0) {
+      // 没有活跃任务：清零
+      lastEtaRef.current = 0
+      setEta(0)
+    } else if (newEta > 0) {
+      // 有有效估算：首次（lastEta 仍为 0）直接采用，之后才单调递减。
+      // ⚠️ 不能无条件 Math.min(newEta, lastEta || Infinity)：首次进来还没建立
+      //    速率样本 → newEta=0 → 会把 lastEta 锁死成 0，导致 ETA 永远「——」。
+      const clamped = lastEtaRef.current > 0
+        ? Math.min(newEta, lastEtaRef.current)
+        : newEta
+      lastEtaRef.current = clamped
+      setEta(clamped)
+    }
+    // newEta === 0 且仍有活跃任务（速率样本未建立）：保持当前 eta，不锁死
   }, [tasks])
 
   // 每秒递减
