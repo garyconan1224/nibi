@@ -449,6 +449,9 @@ class GenerateNoteRequest(BaseModel):
     """NI.1: 「生成笔记」统一入口请求体。"""
     url: str = Field(description="粘贴的链接（小红书/视频/网页等）")
     name: str = Field(default="", description="可选显示名")
+    embed_frames: bool = Field(
+        default=True, description="视频笔记是否智能嵌入关键画面配图（关闭则纯文字）"
+    )
 
 
 class PreflightSaveRequest(BaseModel):
@@ -1776,6 +1779,9 @@ def generate_note(workspace_id: str, req: GenerateNoteRequest) -> Dict[str, Any]
     # 3. 创建 note task（复用 handle_note_task 统一流程）
     #    注入 LLM 配置（从 provider store 获取活跃 chat provider 的 key + model）
     _task_payload: dict = {"url": url, "workspace_id": workspace_id}
+    # R3.16: 透传嵌图开关 → note task；embed_frames=False 时 standard 总结不配图。
+    # max_embed_frames 不传，由 summary_generator 按候选数自适应封顶（智能按需）。
+    _task_payload["preflight"] = {"embed_frames": req.embed_frames}
     try:
         _s = load_settings()
         for _p in _s.providers:

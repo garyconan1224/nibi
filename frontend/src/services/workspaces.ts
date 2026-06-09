@@ -227,10 +227,11 @@ export async function generateNote(
   workspaceId: string,
   url: string,
   name?: string,
+  embedFrames: boolean = true,
 ): Promise<GenerateNoteResponse> {
   const res = await http.post<GenerateNoteResponse>(
     `${BASE}/${workspaceId}/items/generate-note`,
-    { url, name },
+    { url, name, embed_frames: embedFrames },
   )
   return res.data
 }

@@ -9,6 +9,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Switch } from '@/components/ui/switch'
 import type { SniffResult } from '@/services/workspaces'
 import {
   autoCreateWorkspace,
@@ -76,6 +77,7 @@ export function AddMaterialModal({
   const [internalUrl, setInternalUrl] = useState('')
   const [internalSniff, setInternalSniff] = useState<SniffResult | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [embedFrames, setEmbedFrames] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const sniffTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
@@ -108,6 +110,7 @@ export function AddMaterialModal({
     setInternalSniff(null)
     setError(null)
     setSubmitting(false)
+    setEmbedFrames(true)
   }, [open, urlValue])
 
   useEffect(() => {
@@ -140,7 +143,7 @@ export function AddMaterialModal({
         toast.info(`已自动创建工作空间「${ws.name}」`)
       }
 
-      const result = await generateNote(wsId, effectiveUrl, effectiveSniff?.title ?? undefined)
+      const result = await generateNote(wsId, effectiveUrl, effectiveSniff?.title ?? undefined, embedFrames)
       toast.success('笔记生成中', { description: `${result.item_type} · ${effectiveUrl}` })
 
       onAdded?.()
@@ -236,6 +239,22 @@ export function AddMaterialModal({
             <div className="mono" style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.7 }}>
               系统会自动识别素材类型，并创建一个 note task 完成下载、转写、画面分析和笔记整理。
             </div>
+            <label
+              htmlFor="add-material-embed"
+              style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14, cursor: 'pointer' }}
+            >
+              <Switch
+                id="add-material-embed"
+                checked={embedFrames}
+                onCheckedChange={setEmbedFrames}
+              />
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span className="mono" style={{ fontSize: 12 }}>智能嵌入关键画面配图</span>
+                <span className="kw" style={{ fontSize: 11 }}>
+                  视频笔记按需配图（自动去重、只放有信息的画面）；关闭则纯文字
+                </span>
+              </span>
+            </label>
           </div>
         </div>
 
