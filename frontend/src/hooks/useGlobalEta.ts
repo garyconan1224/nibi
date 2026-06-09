@@ -3,8 +3,8 @@ import { useTaskStore } from '@/store/taskStore'
 import { isTaskTerminal } from '@/types/task'
 
 /**
- * 全局 ETA：所有活跃任务的剩余时间之和，每秒递减。
- * 收到 SSE / 轮询新进度时 reset。
+ * 全局 ETA：所有活跃任务的剩余时间之和，单调递减。
+ * 收到 SSE / 轮询新进度时用 EMA 平滑速率，避免批量更新导致 ETA 来回跳。
  */
 export function useGlobalEta(): number {
   const tasks = useTaskStore((s) => s.tasks)
@@ -12,8 +12,9 @@ export function useGlobalEta(): number {
   const lastProgressRef = useRef<Map<string, number>>(new Map())
   const progressRateRef = useRef<Map<string, number>>(new Map())
   const lastTickRef = useRef(Date.now())
+  const lastEtaRef = useRef(0)
 
-  // 计算各活跃任务的 ETA 之和
+  // 计算各活跃任务的 ETA 之和（EMA 平滑 + 单调递减）
   useEffect(() => {
     const active = tasks.filter(
       (t) => !isTaskTerminal(t.status) && t.progress > 0 && t.progress < 1,
@@ -26,12 +27,16 @@ export function useGlobalEta(): number {
       const prev = lastProgressRef.current.get(t.task_id)
       const elapsed = now - lastTickRef.current
 
-      // 估算速率：用最近的 progress 变化 / 经过时间
+      // EMA 平滑速率：新样本权重 0.3，旧速率权重 0.7
       if (prev !== undefined && elapsed > 0) {
         const dp = t.progress - prev
         if (dp > 0) {
-          const rate = dp / (elapsed / 1000) // progress/sec
-          progressRateRef.current.set(t.task_id, rate)
+          const instantRate = dp / (elapsed / 1000) // progress/sec
+          const oldRate = progressRateRef.current.get(t.task_id) || 0
+          const emaRate = oldRate > 0
+            ? oldRate * 0.7 + instantRate * 0.3
+            : instantRate
+          progressRateRef.current.set(t.task_id, emaRate)
         }
       }
 
@@ -45,13 +50,24 @@ export function useGlobalEta(): number {
     }
 
     lastTickRef.current = now
-    setEta(Math.max(0, Math.round(totalEta)))
+
+    // 单调递减：新 ETA 只能 ≤ 当前值（防来回跳）
+    const newEta = Math.max(0, Math.round(totalEta))
+    const clamped = active.length === 0
+      ? 0
+      : Math.min(newEta, lastEtaRef.current || Infinity)
+    lastEtaRef.current = clamped
+    setEta(clamped)
   }, [tasks])
 
   // 每秒递减
   useEffect(() => {
     const timer = setInterval(() => {
-      setEta((prev) => Math.max(0, prev - 1))
+      setEta((prev) => {
+        const next = Math.max(0, prev - 1)
+        lastEtaRef.current = next
+        return next
+      })
     }, 1000)
     return () => clearInterval(timer)
   }, [])

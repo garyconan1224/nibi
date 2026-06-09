@@ -52,6 +52,10 @@ function getTaskTitle(task: TaskRecord): string {
   const rTitle = result?.title as string | undefined
   if (rTitle?.trim()) return rTitle.trim()
 
+  // R3.12 C1: note task result 存的是 video_title（非 title），优先取
+  const rvTitle = result?.video_title as string | undefined
+  if (rvTitle?.trim()) return rvTitle.trim()
+
   // analyze 任务 payload 带 video_title（download 阶段 yt-dlp 抽取），优先用它保证
   // download→analyze 切换后标题不退化成 task_id hash
   const vTitle = payload?.video_title as string | undefined
