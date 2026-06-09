@@ -17,7 +17,7 @@ import type { ReactElement, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowLeft, BookOpenCheck, ChevronDown, ChevronRight, Download, FileCode, FileText, List, MessageCircle, RefreshCw } from 'lucide-react'
+import { ArrowLeft, BookOpenCheck, ChevronDown, ChevronRight, Download, FileCode, FileText, List, RefreshCw } from 'lucide-react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
@@ -250,11 +250,6 @@ function useMediaQuery(query: string): boolean {
   )
 }
 
-const viewModeLabels: Record<ViewMode, string> = {
-  read: '阅读',
-  edit: 'Markdown',
-  compare: '对照',
-}
 /** 视频笔记视图标签：中列只展示「标准总结」，两种格式（蓝图 §3.5）。
  *  富文本 = 渲染态（ReactMarkdown）；md格式 = 源码态（CodeMirror，可编辑）。
  *  源 md（转写+截帧原始内容）在右侧操作区，不是中列标签。 */
@@ -511,7 +506,7 @@ export default function NoteShell() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [tagsOpen, setTagsOpen] = useState(true)
-  const [chatOpen, setChatOpen] = useState(false)
+  const [chatOpen] = useState(false)
   const [tocOpen, setTocOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
 

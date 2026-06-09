@@ -171,7 +171,7 @@ export function applyCascades(
   raw: TaskState,
   materialCount = 1,
   scope?: AnalysisScope,
-  features?: Record<string, boolean>,
+  _features?: Record<string, boolean>,
 ): CascadeResult {
   const s = structuredClone(raw)
   const locks: Record<string, string> = {}
