@@ -26,6 +26,7 @@ interface NoteMediaCompanionProps {
   media: NoteMedia
   transcript: TranscriptLine[]
   workspaceId?: string
+  itemId?: string
 }
 
 export interface NoteMediaCompanionHandle {
@@ -33,7 +34,7 @@ export interface NoteMediaCompanionHandle {
 }
 
 const NoteMediaCompanion = forwardRef<NoteMediaCompanionHandle, NoteMediaCompanionProps>(function NoteMediaCompanion(
-  { media, transcript, workspaceId },
+  { media, transcript, workspaceId, itemId },
   ref,
 ) {
   const [currentTime, setCurrentTime] = useState(0)
@@ -76,6 +77,8 @@ const NoteMediaCompanion = forwardRef<NoteMediaCompanionHandle, NoteMediaCompani
               transcript={transcript}
               currentTime={currentTime}
               onSeek={handleSeek}
+              workspaceId={workspaceId || ''}
+              itemId={itemId || ''}
             />
           </div>
         )}
@@ -102,6 +105,8 @@ const NoteMediaCompanion = forwardRef<NoteMediaCompanionHandle, NoteMediaCompani
               transcript={transcript}
               currentTime={currentTime}
               onSeek={handleSeek}
+              workspaceId={workspaceId || ''}
+              itemId={itemId || ''}
             />
           </div>
         )}

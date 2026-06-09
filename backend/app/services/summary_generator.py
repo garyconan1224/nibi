@@ -119,21 +119,34 @@ def _ts_to_sec(ts: str) -> float:
 
 
 def _find_frame_image(json_path: str, idx: int) -> str:
-    """从 json 同级 frames/ 目录找第 idx 帧图片，返回绝对路径或空串。"""
+    """从 json 定位分析报告目录下的 frames/ 找第 idx 帧图片。
+
+    复用 _locate_analyze_report_dir 同款路径探测：
+    - json_data/<stem>_视觉数据.json → videos/<stem>_分析报告/frames/
+    - json_path.parent/<stem>_分析报告/frames/
+    - json_path.parent/frames/（旧产物）
+    """
     jp = Path(json_path)
-    frames_dir = jp.parent / "frames"
-    if not frames_dir.is_dir():
+    json_stem = jp.stem.replace("_视觉数据", "")
+    parent = jp.parent
+
+    frames_dir = None
+    for candidate_dir in [
+        parent / f"{json_stem}_分析报告" / "frames",
+        parent.parent / "videos" / f"{json_stem}_分析报告" / "frames",
+        parent / "frames",
+    ]:
+        if candidate_dir.is_dir():
+            frames_dir = candidate_dir
+            break
+    if not frames_dir:
         return ""
-    # 帧图片命名通常为 {json_stem}_frame_{idx:04d}.jpg 或类似
-    stem = jp.stem.replace("_视觉数据", "")
-    candidates = sorted(frames_dir.glob(f"*{stem}*frame*{idx:04d}*"))
-    if not candidates:
-        # 退化：按文件名排序取第 idx 个
-        all_imgs = sorted(frames_dir.glob("*.jpg")) + sorted(frames_dir.glob("*.png"))
-        if idx < len(all_imgs):
-            return str(all_imgs[idx])
-        return ""
-    return str(candidates[0])
+
+    # 按文件名排序取第 idx 个
+    all_imgs = sorted(frames_dir.glob("*.jpg")) + sorted(frames_dir.glob("*.png"))
+    if idx < len(all_imgs):
+        return str(all_imgs[idx])
+    return ""
 
 
 def _postprocess_frames(content_md: str, frames: List[Dict[str, object]]) -> str:

@@ -3076,6 +3076,10 @@ async def create_summary(
                 item.results = dict(task.result)
                 break
 
+    # R3.2: 视频素材物化 frames（标准总结嵌关键帧需要）
+    if item.type == "video" and item.results and not item.results.get("frames"):
+        item.results = dict(_materialize_video_results_from_analyze(item.results))
+
     next_ver = _store.next_version_for_template(workspace_id, item_id, req.template)
 
     def _do_generate() -> ItemSummary:

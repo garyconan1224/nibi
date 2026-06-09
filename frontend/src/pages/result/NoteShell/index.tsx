@@ -1113,6 +1113,7 @@ export default function NoteShell() {
                 media={note.media}
                 transcript={Array.isArray(note.transcript) ? note.transcript as never : []}
                 workspaceId={workspaceId}
+                itemId={itemId}
               />
             )}
             <SummariesPanel
