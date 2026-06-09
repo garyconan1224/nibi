@@ -2161,7 +2161,13 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     # segment_refiner：切细过长字幕段（在存入 results 前）
     transcript_segments = refine_segments(transcript_segments)
 
-    json_paths = sorted(project_json_dir.glob("*_视觉数据.json"))
+    # R3.4 fix: 按当前视频过滤视觉 JSON，避免同项目其他视频的帧串台
+    if download_save_path:
+        json_paths = _find_visual_json_paths_for_videos(
+            project_json_dir, [Path(download_save_path)]
+        )
+    else:
+        json_paths = sorted(project_json_dir.glob("*_视觉数据.json"))
 
     result: Dict[str, Any] = {
         "transcript":            transcript_text,

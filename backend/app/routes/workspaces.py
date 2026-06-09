@@ -3077,8 +3077,10 @@ async def create_summary(
                 break
 
     # R3.2: 视频素材物化 frames（标准总结嵌关键帧需要）
+    # R3.4 fix: 传 json_output_basenames 做 preferred 过滤，防多视频工作区帧串台
     if item.type == "video" and item.results and not item.results.get("frames"):
-        item.results = dict(_materialize_video_results_from_analyze(item.results))
+        _pb = list(item.results.get("json_output_basenames") or [])
+        item.results = dict(_materialize_video_results_from_analyze(item.results, preferred_basenames=_pb))
 
     next_ver = _store.next_version_for_template(workspace_id, item_id, req.template)
 
@@ -3594,8 +3596,10 @@ def get_suggested_inline_frames(workspace_id: str, item_id: str) -> List[Dict[st
 
     results = item.results or {}
     # av_combined 路径的 frames 在 json_outputs 里，需要物化
+    # R3.4 fix: 传 preferred_basenames 防帧串台
     if not results.get("frames") and results.get("json_outputs"):
-        results = _materialize_video_results_from_analyze(results)
+        _pb = list(results.get("json_output_basenames") or [])
+        results = _materialize_video_results_from_analyze(results, preferred_basenames=_pb)
     frames = results.get("frames") or []
     transcript = results.get("transcript") or []
 

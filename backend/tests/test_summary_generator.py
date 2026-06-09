@@ -165,3 +165,108 @@ class TestWorkspaceStoreSummaryHelpers:
     def test_delete_item_summary_not_found(self) -> None:
         store = _make_store_with_item()
         assert store.delete_item_summary("ws-1", "item-1", "nonexistent") is False
+
+
+# ── _collect_frames（R3.4 嵌图链路）─────────────────────────────
+
+
+class TestCollectFrames:
+    """_collect_frames：带描述帧/无描述帧/空/串台 的取数逻辑。"""
+
+    def test_frames_with_description(self) -> None:
+        """results["frames"] 带 description → 直接返回。"""
+        from backend.app.services.summary_generator import _collect_frames
+
+        item = _make_item(results={
+            "frames": [
+                {"sec": 10, "description": "代码编辑器界面", "image_path": "/static/a.jpg"},
+                {"sec": 30, "description": "终端输出结果", "image_path": "/static/b.jpg"},
+            ],
+        })
+        out = _collect_frames(item)
+        assert len(out) == 2
+        assert out[0]["desc"] == "代码编辑器界面"
+        assert out[0]["sec"] == 10.0
+        assert out[0]["image_path"] == "/static/a.jpg"
+
+    def test_frames_without_description_skipped(self) -> None:
+        """results["frames"] 无 description 字段 → 走 fallback，无 json_outputs 时返回空。"""
+        from backend.app.services.summary_generator import _collect_frames
+
+        item = _make_item(results={
+            "frames": [
+                {"sec": 10, "image_path": "/static/a.jpg"},  # 缺 description
+            ],
+        })
+        out = _collect_frames(item)
+        assert out == []
+
+    def test_empty_frames(self) -> None:
+        """results 无 frames 且无 json_outputs → 返回空。"""
+        from backend.app.services.summary_generator import _collect_frames
+
+        item = _make_item(results={"transcript": "文本"})
+        out = _collect_frames(item)
+        assert out == []
+
+    def test_frames_with_empty_description_skipped(self) -> None:
+        """description 为空字符串的帧被跳过。"""
+        from backend.app.services.summary_generator import _collect_frames
+
+        item = _make_item(results={
+            "frames": [
+                {"sec": 10, "description": "", "image_path": "/static/a.jpg"},
+                {"sec": 30, "description": "有效描述", "image_path": "/static/b.jpg"},
+            ],
+        })
+        out = _collect_frames(item)
+        assert len(out) == 1
+        assert out[0]["desc"] == "有效描述"
+
+
+# ── _postprocess_frames（R3.4 嵌图链路）────────────────────────
+
+
+class TestPostprocessFrames:
+    """_postprocess_frames：[[图N]]→![]() 替换 + 越界删除。"""
+
+    def test_replace_valid_tags(self) -> None:
+        """[[图0]] 和 [[图1]] 被替换为 markdown 图片。"""
+        from backend.app.services.summary_generator import _postprocess_frames
+
+        frames = [
+            {"idx": 0, "sec": 10, "desc": "界面截图", "image_path": "/static/ws/videos/frames/f0.jpg"},
+            {"idx": 1, "sec": 30, "desc": "输出结果", "image_path": "/static/ws/videos/frames/f1.jpg"},
+        ]
+        md = "前面内容\n\n[[图0]]\n\n中间内容\n\n[[图1]]\n\n后面内容"
+        result = _postprocess_frames(md, frames)
+        assert "![界面截图]" in result
+        assert "![输出结果]" in result
+        assert "[[图" not in result
+
+    def test_out_of_bound_tag_removed(self) -> None:
+        """越界的 [[图99]] 被删除，不报错。"""
+        from backend.app.services.summary_generator import _postprocess_frames
+
+        frames = [{"idx": 0, "sec": 10, "desc": "a", "image_path": "/static/x.jpg"}]
+        md = "内容[[图0]]和[[图99]]"
+        result = _postprocess_frames(md, frames)
+        assert "[[图99]]" not in result
+        assert "![a]" in result
+
+    def test_no_frames_removes_all_tags(self) -> None:
+        """frames 为空列表时，所有 [[图N]] 被清除。"""
+        from backend.app.services.summary_generator import _postprocess_frames
+
+        md = "内容[[图0]]和[[图1]]还有[[图2]]"
+        result = _postprocess_frames(md, [])
+        assert "[[图" not in result
+        assert "内容" in result
+
+    def test_no_tags_unchanged(self) -> None:
+        """无 [[图N]] 标记时原样返回。"""
+        from backend.app.services.summary_generator import _postprocess_frames
+
+        md = "# 标题\n\n正文内容"
+        result = _postprocess_frames(md, [{"idx": 0, "sec": 0, "desc": "a", "image_path": "/static/x.jpg"}])
+        assert result == md
