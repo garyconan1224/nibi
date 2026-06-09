@@ -1643,6 +1643,17 @@ def _bridge_to_pipeline_payload(
                 payload["intent"] = _preflight["intent"]
             if _preflight.get("background_for_recognition"):
                 payload["background_for_recognition"] = _preflight["background_for_recognition"]
+        # R3.11: 透传嵌图配置（embed_frames / max_embed_frames）
+        # 前端存 tasks.summary.embed_frames / tasks.summary.max_embed_frames
+        _summary_cfg = tasks.get("summary")
+        if isinstance(_summary_cfg, dict):
+            _pf: Dict[str, Any] = payload.get("preflight") or {}
+            if "embed_frames" in _summary_cfg:
+                _pf["embed_frames"] = _summary_cfg["embed_frames"]
+            if "max_embed_frames" in _summary_cfg:
+                _pf["max_embed_frames"] = _summary_cfg["max_embed_frames"]
+            if _pf:
+                payload["preflight"] = _pf
         return "note", payload
 
     # local：直接走 analyze
