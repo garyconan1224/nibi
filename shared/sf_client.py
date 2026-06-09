@@ -271,20 +271,21 @@ def analyze_video_frame(
     返回 {"description_zh": "...", "image_prompt_en": "..."}
     """
     prompt = (
-        f"你是一位资深的视频导演和画面分析师。这张图片截取自名为《{video_title}》的视频。"
-        "请深入分析这张图片，并在描述中使用该视频主题相关名称。\n\n"
+        f"你是一位资深的视频内容分析师。这张图片截取自名为《{video_title}》的视频。\n\n"
+        "请从两个角度分析这张图片：\n\n"
+        "角度一·内容理解（最重要）：这张图在讲什么？是什么界面/场景？有什么关键信息？\n"
+        "例如：标题文字、菜单列表、数据指标、代码片段、图表含义、操作步骤、关键结论。\n"
+        "目标是让没看过视频的人通过你的解读，理解这帧传达的核心信息。\n\n"
+        "角度二·画面描述：简要描述画面的视觉构成（主体、布局、配色），用于将来复刻。\n\n"
         "必须严格按照以下 JSON 格式输出，不要有任何 markdown 代码块标记，不要有多余废话：\n"
         "{\n"
-        '  "description_zh": "请从以下四个维度用中文展开详细描述，每个维度至少写2-3句话，总计不少于150字：'
-        "1) 核心画面内容：主体是什么、外观细节、材质、颜色、设计特征等；"
-        "2) 主体动作：是静态展示还是有动态元素、展示方式和姿态如何；"
-        "3) 场景与环境：背景构成、氛围营造、有无其他元素、极简还是复杂；"
-        '4) 镜头与视角：景别大小（特写/中景/全景）、拍摄角度、光影效果、构图特点。如果是纯黑或纯白无意义过渡帧，直接写「纯色过渡帧」即可。",\n'
-        '  "image_prompt_en": "请写一段详细的、可用于 AI 文生图的英文提示词，要求分为以下四个段落，每段2-4句话：'
-        "**Core Visual Content:** 详细描述画面中的主体及其视觉元素。"
-        "**Subject Action:** 描述主体的动作或展示状态。"
-        "**Scene and Environment:** 描述背景、场景设置和整体氛围。"
-        '**Camera and Lens Perspective:** 描述拍摄角度、构图、景深、光影效果。如果是纯色过渡帧，则留空。"\n'
+        '  "content_zh": "【内容理解】这张图展示的是……关键信息有……，'
+        "它在视频中的作用是……（如果是纯黑/纯白过渡帧，写「纯色过渡帧」）。"
+        ' 目标：让读者不用看视频就知道这帧在讲什么。至少写 2-3 句话。",\n'
+        '  "description_zh": "【画面描述】简要描述画面的视觉构成、布局和配色。'
+        ' 如果是纯色过渡帧，写「纯色过渡帧」。",\n'
+        '  "image_prompt_en": "英文提示词，用于 AI 复刻此画面。分 2-3 段描述核心视觉元素、'
+        '场景环境、镜头视角。如果是纯色过渡帧，则留空。"\n'
         "}"
     )
     payload = {
@@ -312,14 +313,15 @@ def analyze_video_frame(
     if match:
         try:
             parsed = json.loads(match.group())
-            if "description_zh" in parsed:
+            if "content_zh" in parsed or "description_zh" in parsed:
                 return {
+                    "content_zh": parsed.get("content_zh", ""),
                     "description_zh": parsed.get("description_zh", ""),
                     "image_prompt_en": parsed.get("image_prompt_en", ""),
                 }
         except json.JSONDecodeError:
             pass
-    return {"description_zh": raw, "image_prompt_en": ""}
+    return {"content_zh": "", "description_zh": raw, "image_prompt_en": ""}
 
 
 def analyze_video_frames_batch(
@@ -338,13 +340,17 @@ def analyze_video_frames_batch(
 
     n = len(images_b64)
     prompt = (
-        f"我按时间顺序给你 {n} 张图片，截取自视频《{video_title}》。"
+        f"我按时间顺序给你 {n} 张图片，截取自视频《{video_title}》。\n"
         f"请严格输出一个 JSON 数组，长度必须等于 {n}，第 i 个元素对应第 i 张图。\n"
         "每个元素格式：\n"
-        '{"index": i(从1开始), "description_zh": "...(至少150字)", "image_prompt_en": "..."}\n'
+        '{"index": i(从1开始), "content_zh": "...", "description_zh": "...", "image_prompt_en": "..."}\n'
         "不要 markdown 代码块，直接输出 JSON 数组。\n\n"
-        "description_zh 要求：从 4 个维度展开：1) 核心画面内容 2) 主体动作 3) 场景与环境 4) 镜头与视角，每个维度 2-3 句话。如果是纯黑或纯白无意义过渡帧，直接写「纯色过渡帧」即可。\n"
-        "image_prompt_en 要求：分 4 段写英文提示词：Core Visual Content / Subject Action / Scene and Environment / Camera and Lens Perspective，每段 2-4 句话。如果是纯色过渡帧，则留空。"
+        "content_zh（最重要）：这张图在讲什么？是什么界面/场景？有什么关键信息？"
+        "（标题/菜单/数据/代码/图表/操作步骤/关键结论）。"
+        "目标是让没看过视频的人通过你的解读理解这帧传达的核心信息。至少 2-3 句话。"
+        "如果是纯黑/纯白过渡帧，写「纯色过渡帧」。\n"
+        "description_zh：简要描述画面的视觉构成、布局和配色（用于将来复刻）。纯色过渡帧写「纯色过渡帧」。\n"
+        "image_prompt_en：英文提示词，用于 AI 复刻此画面，分 2-3 段描述。纯色过渡帧留空。"
     )
 
     # 构造 content: text + 每张图
@@ -403,6 +409,7 @@ def analyze_video_frames_batch(
     result = []
     for item in parsed:
         result.append({
+            "content_zh": item.get("content_zh", ""),
             "description_zh": item.get("description_zh", ""),
             "image_prompt_en": item.get("image_prompt_en", ""),
         })
