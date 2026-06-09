@@ -81,9 +81,21 @@ export const useTaskStore = create<TaskStoreState>()(
             }
           })
           const backendIds = new Set(visibleIncoming.map((t) => t.task_id))
-          const localOnlyActive = state.tasks.filter(
-            (t) => !backendIds.has(t.task_id) && !isTaskTerminal(t.status)
-          )
+          // 本地有、后端没有、且非终态的任务补回，避免一次空响应/SSE 抢先把刚
+          // 冒头的任务洗掉。但 PENDING 任务若后端已无、且 updated_at 久远，视为
+          // 僵尸（如历史 /tmp/test.mp3 的 persist 残留）丢弃——否则它永远 PENDING、
+          // 后端永远没有，每次合并都被复活，任务面板永远多一个。仅保留「新鲜」
+          // PENDING（覆盖刚 addTask、后端列表尚未收录的竞态窗口）。
+          const FRESH_PENDING_MS = 2 * 60 * 1000
+          const nowTs = Date.now()
+          const localOnlyActive = state.tasks.filter((t) => {
+            if (backendIds.has(t.task_id) || isTaskTerminal(t.status)) return false
+            if (t.status === 'PENDING') {
+              const ts = new Date(t.updated_at || 0).getTime()
+              return nowTs - ts < FRESH_PENDING_MS
+            }
+            return true
+          })
           return { tasks: [...mergedIncoming, ...localOnlyActive] }
         }),
 
