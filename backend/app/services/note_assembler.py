@@ -266,6 +266,42 @@ def build_source_md(item: WorkspaceItem) -> str:
                 desc_short += "…"
             header_lines.append(f"> {desc_short}")
         header_lines.extend(["", "## 转写正文", ""])
+
+        # R3.9: 画面分析段（从视觉 JSON 读取 content_zh）
+        json_outputs = results.get("json_outputs", []) or []
+        visual_parts: list[str] = []
+        for jp_str in json_outputs:
+            try:
+                jp = Path(jp_str)
+                if not jp.exists():
+                    continue
+                vdata = json.loads(jp.read_text(encoding="utf-8"))
+                gvs = str(vdata.get("global_visual_summary") or "").strip()
+                frames = vdata.get("frames") or []
+                if not gvs and not frames:
+                    continue
+                visual_parts.append("## 画面分析")
+                visual_parts.append("")
+                if gvs:
+                    visual_parts.append("### 全局概览")
+                    visual_parts.append("")
+                    visual_parts.append(gvs)
+                    visual_parts.append("")
+                if frames:
+                    visual_parts.append("### 逐帧画面")
+                    visual_parts.append("")
+                    for fr in frames:
+                        ts = str(fr.get("timestamp") or "")
+                        content = str(fr.get("content_zh") or fr.get("description_zh") or "").strip()
+                        if not content or content == "纯色过渡帧":
+                            continue
+                        visual_parts.append(f"**[{ts}]** {content}")
+                        visual_parts.append("")
+            except Exception:
+                continue
+        if visual_parts:
+            header_lines.extend(visual_parts)
+
         body = "\n".join(header_lines) + body
     return body
 
