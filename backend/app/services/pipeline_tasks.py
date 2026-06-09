@@ -2207,6 +2207,11 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         json_paths = sorted(project_json_dir.glob("*_视觉数据.json"))
 
     # ── 6.8. R3.5: 自动生成 standard 总结，作为 note.md 默认正文 ──────
+    # R3.11: 读取嵌图配置
+    _preflight = payload.get("preflight") or {}
+    _embed_frames = bool(_preflight.get("embed_frames", True))
+    _max_embed = int(_preflight.get("max_embed_frames", 0) or 0)
+
     # 先算标题（standard prompt 需要）
     _source_title = ""
     if "download" in steps:
@@ -2236,7 +2241,11 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                     "video_title": _source_title or "",
                 },
             )
-            _std_summary = generate_summary(_tmp_item, "standard")
+            _std_summary = generate_summary(
+                _tmp_item, "standard",
+                embed_frames=_embed_frames,
+                max_embed_frames=_max_embed,
+            )
             if _std_summary and _std_summary.content_md:
                 note_body = _std_summary.content_md
                 runner.append_log(task_id, f"📖 标准总结生成完成（{len(note_body)} 字）")

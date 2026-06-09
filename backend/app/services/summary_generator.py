@@ -21,11 +21,14 @@ def build_prompt(
     item: WorkspaceItem,
     template_id: str,
     background: str = "",
+    embed_frames: bool = True,
+    max_embed_frames: int = 0,
 ) -> Tuple[str, str]:
     """构造 (system_prompt, user_prompt)。
 
     背景信息拼到 user_prompt 前面作为前置上下文（零侵入模板）。
     standard 模板额外注入「关键帧清单」（若有截帧数据）。
+    embed_frames=False 时跳过帧注入；max_embed_frames>0 时限制帧数。
     """
     tpl = get_template(template_id)
     transcript = (item.results or {}).get("transcript", "")
@@ -64,8 +67,11 @@ def build_prompt(
         user_prompt = f"{meta}\n{user_prompt}"
 
     # R3.2: standard 模板注入关键帧清单（若有截帧数据）
-    if template_id == "standard":
+    # R3.11: embed_frames=False 时跳过；max_embed_frames>0 时限制帧数
+    if template_id == "standard" and embed_frames:
         frames = _collect_frames(item)
+        if max_embed_frames > 0:
+            frames = frames[:max_embed_frames]
         if frames:
             lines = []
             for f in frames:
@@ -269,6 +275,8 @@ def generate_summary(
     provider_id: str = "",
     model: str = "",
     search_web: bool = False,
+    embed_frames: bool = True,
+    max_embed_frames: int = 0,
 ) -> ItemSummary:
     """生成一份总结并返回 ItemSummary（不负责持久化）。
 
@@ -294,7 +302,10 @@ def generate_summary(
             search_results = search_web_context(query.strip(), max_results=5)
             search_context = format_search_context(search_results)
 
-    system_prompt, user_prompt = build_prompt(item, template_id, background)
+    system_prompt, user_prompt = build_prompt(
+        item, template_id, background,
+        embed_frames=embed_frames, max_embed_frames=max_embed_frames,
+    )
 
     # 搜索结果拼到 user_prompt 前面
     if search_context:
