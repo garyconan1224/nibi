@@ -63,7 +63,6 @@ const fixBrokenImagesPlugin = () => (tree: any) => {
         lastIdx = m.index + m[0].length
       }
       if (lastIdx < child.value.length) newChildren.push({ type: 'text', value: child.value.slice(lastIdx) })
-      if (!IMG_RE.test(child.value) && lastIdx === 0) newChildren.push(child)
     }
     if (newChildren.length) node.children = newChildren
   }
