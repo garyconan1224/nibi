@@ -94,7 +94,7 @@ export const useTaskStore = create<TaskStoreState>()(
               const ts = new Date(t.updated_at || 0).getTime()
               return nowTs - ts < FRESH_PENDING_MS
             }
-            return true
+            return false
           })
           return { tasks: [...mergedIncoming, ...localOnlyActive] }
         }),
