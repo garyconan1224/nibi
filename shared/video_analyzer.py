@@ -759,14 +759,18 @@ def _analyze_frames_batch_task(
     # 尝试批量调用
     batch_ok = False
     results: list[dict[str, str]] = []
-    try:
-        results = analyze_video_frames_batch(api_key, vision_model, frames_b64, product_name)
-        if len(results) == len(batch):
-            batch_ok = True
-        else:
-            logger.warning("批量帧分析计数不符(%d≠%d)，回退逐帧", len(results), len(batch))
-    except Exception as e:
-        logger.warning("批量帧分析失败(%s)，回退逐帧", e)
+    if image_mode == "ocr":
+        # OCR 模式下直接跳过批量 VLM，走下面的逐帧 OCR
+        batch_ok = False
+    else:
+        try:
+            results = analyze_video_frames_batch(api_key, vision_model, frames_b64, product_name)
+            if len(results) == len(batch):
+                batch_ok = True
+            else:
+                logger.warning("批量帧分析计数不符(%d≠%d)，回退逐帧", len(results), len(batch))
+        except Exception as e:
+            logger.warning("批量帧分析失败(%s)，回退逐帧", e)
 
     # 回退：逐帧调用
     if not batch_ok:
