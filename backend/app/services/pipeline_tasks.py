@@ -1316,7 +1316,7 @@ def _download_note_source(
         _xhs_out.mkdir(parents=True, exist_ok=True)
         _xhs = run_xiaohongshu_download(
             url_or_text=url, output_dir=str(_xhs_out), log=log,
-            progress_callback=lambda p, msg: runner.set_progress(task_id, 0.02 + p * 0.28, msg),
+            progress_callback=lambda p, msg: runner.set_progress(task_id, 0.02 + p * 0.08, msg),
         )
         _nm = _xhs.get("note_meta") or {}
         _note_type = str(_nm.get("type") or "normal")
@@ -1419,7 +1419,7 @@ def _download_note_source(
             url=url,
             output_dir=str(project_video_dir),
             log=log,
-            progress_callback=lambda p, msg: runner.set_progress(task_id, 0.02 + p * 0.28, msg),
+            progress_callback=lambda p, msg: runner.set_progress(task_id, 0.02 + p * 0.08, msg),
             speed_callback=lambda s: runner.set_download_speed(task_id, s),
             info_callback=lambda meta: _apply_ytdlp_metadata_to_task(record, runner, meta),
             **dl_kwargs,
@@ -1828,7 +1828,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
 
     # ── 3.5. PROBE 阶段（M7: 内容识别 + 步骤裁剪）─────────────
     runner.store.update(task_id, status=TaskStatus.PROBE.value)
-    runner.set_progress(task_id, 0.30, "探测内容类型...")
+    runner.set_progress(task_id, 0.10, "探测内容类型...")
 
     if "download" in steps:
         probe = _probe_note_source(dl_result, payload)
@@ -1854,7 +1854,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     # ── 3.6. 图集分析（image_text: OCR + VLM 逐图描述 + LLM 语境合成）──
     if note_kind == "image_text" and images_from_download:
         runner.store.update(task_id, status=TaskStatus.VLM.value)
-        runner.set_progress(task_id, 0.35, "图集分析中...")
+        runner.set_progress(task_id, 0.15, "图集分析中...")
 
         def _log_img(msg: str) -> None:
             runner.append_log(task_id, f"[图集] {msg}")
@@ -1865,7 +1865,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         for idx, img_path in enumerate(images_from_download):
             runner.set_progress(
                 task_id,
-                0.35 + 0.20 * (idx / len(images_from_download)),
+                0.15 + 0.15 * (idx / len(images_from_download)),
                 f"分析图片 {idx + 1}/{len(images_from_download)}...",
             )
             info = analyze_image_file(
@@ -1913,7 +1913,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
 
     # ── 4+5. transcribe + analyze 并行步骤 ──────────────────────
     # R22: 音频转录(ASR)与视频截帧(VLM)本质独立，可并行执行。
-    # 进度区间：transcribe 0.32~0.58, analyze 0.58~0.85，各自独立更新。
+    # 进度区间：transcribe 0.12~0.30, analyze 0.30~0.60，各自独立更新。
     if "transcribe" in steps or "analyze" in steps:
         from concurrent.futures import Future, as_completed
 
@@ -1978,7 +1978,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
 
         # ── 进度单调递增保护（两轨并行写进度，只前进不后退）─────
         _progress_lock = threading.Lock()
-        _max_progress = [0.30]  # PROBE 阶段结束时的进度
+        _max_progress = [0.10]  # PROBE 阶段结束时的进度
 
         def _monotonic_progress(pct: float, msg: str) -> None:
             """只在新进度大于历史最大值时才更新，避免两轨互相覆盖导致倒退。"""
@@ -1992,7 +1992,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         if "transcribe" in steps:
             def _run_transcribe() -> str:
                 runner.store.update(task_id, status=TaskStatus.ASR.value)
-                _monotonic_progress(0.32, "开始转录音频...")
+                _monotonic_progress(0.12, "开始转录音频...")
 
                 tcfg = load_settings().transcriber
                 runner.append_log(
@@ -2004,7 +2004,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 def _on_progress(ratio: float, msg: str) -> None:
                     if _cancel_event.is_set():
                         raise RuntimeError("已取消：另一轨失败")
-                    mapped = 0.32 + 0.26 * max(0.0, min(1.0, ratio))
+                    mapped = 0.12 + 0.18 * max(0.0, min(1.0, ratio))
                     _monotonic_progress(mapped, f"[转录] {msg}")
 
                 def _on_log(msg: str) -> None:
@@ -2030,7 +2030,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         if "analyze" in steps:
             def _run_analyze() -> str:
                 runner.store.update(task_id, status=TaskStatus.FRAMES.value)
-                _monotonic_progress(0.58, "开始视觉帧分析...")
+                _monotonic_progress(0.30, "开始视觉帧分析...")
 
                 frame_prompts = payload.get("frame_prompt")
                 if preflight := payload.get("preflight"):
@@ -2076,7 +2076,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                     snaps = state.snapshot()
                     if snaps:
                         avg = sum(float(s["percent"]) for s in snaps) / max(len(snaps), 1) / 100.0
-                        cur_pct = min(0.85, 0.58 + avg * 0.27)
+                        cur_pct = min(0.60, 0.30 + avg * 0.30)
                         _stall(avg)
                         _monotonic_progress(cur_pct, "[截帧] 视觉帧分析中...")
                         if cur_pct - _last_logged_pct >= 0.05 or _last_logged_pct < 0:
@@ -2145,7 +2145,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     # ── 5.5. 用户取消早退 ──────────────────────────────────────
     # 截帧轮询里检测到取消后只是 break，控制流会走到这里。若确属用户取消：
     #   · 不再构建/落盘 markdown 笔记（notes API 读 result["markdown"]，缺该键即空笔记）
-    #   · 不再推进 set_progress(0.90/0.95/0.98)，进度停在取消时刻的真实值
+    #   · 不再推进 set_progress(0.65/0.80/0.90)，进度停在取消时刻的真实值
     #   · 终态 CANCELLED 由 task_runner._run 的取消分支统一收口
     if runner.is_cancel_requested(task_id):
         runner.append_log(task_id, "⛔ 已取消：跳过笔记汇总（SUM）与归档（STORE）收尾", level="warning")
@@ -2163,7 +2163,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     llm_summary = ""
     if "note" in steps:
         runner.store.update(task_id, status=TaskStatus.SUM.value)
-        runner.set_progress(task_id, 0.90, "整理笔记内容...")
+        runner.set_progress(task_id, 0.65, "整理笔记内容...")
 
         # 数据源优先级：analyze 产出 > transcribe 文本 > 下载阶段抽取的文本 > 空字符串
         source_text = analysis_text or transcript_text or source_text_from_download or ""
@@ -2195,10 +2195,10 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     # 入库：标记进入持久化阶段。当前流水线中间产物已通过
     # _persist_intermediate 即时落盘，此处为最终一次性确认 + UI 收尾。
     runner.store.update(task_id, status=TaskStatus.STORE.value)
-    runner.set_progress(task_id, 0.95, "归档任务结果...")
+    runner.set_progress(task_id, 0.80, "归档任务结果...")
 
     # ── 7. 构建最终返回结果 ────────────────────────────────────
-    runner.set_progress(task_id, 0.98, "任务完成")
+    runner.set_progress(task_id, 0.90, "任务完成")
 
     # segment_refiner：切细过长字幕段（在存入 results 前）
     transcript_segments = refine_segments(transcript_segments)
@@ -2233,7 +2233,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             from backend.app.services.summary_generator import generate_summary
 
             runner.append_log(task_id, "📖 生成标准总结（standard）...")
-            runner.set_progress(task_id, 0.92, "生成标准总结...")
+            runner.set_progress(task_id, 0.85, "生成标准总结...")
 
             # 构造临时 WorkspaceItem，填入 generate_summary 所需字段
             _tmp_item = WorkspaceItem(

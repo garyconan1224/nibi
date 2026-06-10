@@ -2,20 +2,52 @@ import { useEffect, useRef, useState } from 'react'
 import { useTaskStore } from '@/store/taskStore'
 import { isTaskTerminal } from '@/types/task'
 
+/** 进度样本：进度值 + 时间戳（ms） */
+interface ProgressSample {
+  p: number
+  t: number
+}
+
 /**
  * 全局 ETA：所有活跃任务的剩余时间之和，单调递减。
- * 收到 SSE / 轮询新进度时用 EMA 平滑速率，避免批量更新导致 ETA 来回跳。
+ *
+ * 两个关键改进（相对旧版 EMA）：
+ * 1. **滚动窗口速率**：每个任务保留最近 5 个进度样本，用窗口首尾算速率。
+ *    阶段切换时旧样本自动淘汰，速率能快速跟上新阶段的真实速度。
+ * 2. **停顿快速修正**：停顿时 idealEta 用 0.3 权重上升（旧版 0.1），
+ *    让 ETA 在进度卡住时更快修正到合理值。
  */
+const WINDOW_SIZE = 5 // 每个任务保留的样本数
+
 export function useGlobalEta(): number {
   const tasks = useTaskStore((s) => s.tasks)
   const [eta, setEta] = useState(-1)
-  const lastProgressRef = useRef<Map<string, number>>(new Map())
-  const progressRateRef = useRef<Map<string, number>>(new Map())
-  const lastTickRef = useRef(Date.now())
+  // 每个 task 的滚动窗口
+  const samplesRef = useRef<Map<string, ProgressSample[]>>(new Map())
+  // 每个 task 上次实际进度变化的时间
+  const lastProgressTimeRef = useRef<Map<string, number>>(new Map())
+  // 缓存的速率（窗口不足 2 个样本时沿用上一次）
+  const cachedRateRef = useRef<Map<string, number>>(new Map())
   const lastEtaRef = useRef(-1)
   const hasInitializedRef = useRef(false)
 
-  // 计算各活跃任务的 ETA 之和（EMA 平滑 + 单调递减）
+  /** 用滚动窗口算速率；样本不足时返回缓存值 */
+  function calcRate(taskId: string): number {
+    const samples = samplesRef.current.get(taskId)
+    if (!samples || samples.length < 2) {
+      return cachedRateRef.current.get(taskId) ?? 0
+    }
+    const oldest = samples[0]
+    const newest = samples[samples.length - 1]
+    const dt = (newest.t - oldest.t) / 1000 // 秒
+    if (dt <= 0) return cachedRateRef.current.get(taskId) ?? 0
+    const rate = (newest.p - oldest.p) / dt
+    // 保留正速率供后续窗口不足时沿用
+    if (rate > 0) cachedRateRef.current.set(taskId, rate)
+    return rate
+  }
+
+  // 计算各活跃任务的 ETA 之和
   useEffect(() => {
     const active = tasks.filter(
       (t) => !isTaskTerminal(t.status) && t.progress > 0 && t.progress < 1,
@@ -26,43 +58,36 @@ export function useGlobalEta(): number {
     const now = Date.now()
 
     for (const t of active) {
-      const prev = lastProgressRef.current.get(t.task_id)
-      const elapsed = now - lastTickRef.current
+      const samples = samplesRef.current.get(t.task_id) ?? []
+      const lastSample = samples.length > 0 ? samples[samples.length - 1] : undefined
 
-      // EMA 平滑速率：新样本权重 0.3，旧速率权重 0.7
-      if (prev !== undefined && elapsed > 0) {
-        const dp = t.progress - prev
-        if (dp > 0) {
+      // 进度实际变化 → 推入新样本
+      if (!lastSample || t.progress !== lastSample.p) {
+        const newSamples = [...samples, { p: t.progress, t: now }]
+        // 只保留最近 WINDOW_SIZE 个
+        if (newSamples.length > WINDOW_SIZE) {
+          newSamples.splice(0, newSamples.length - WINDOW_SIZE)
+        }
+        samplesRef.current.set(t.task_id, newSamples)
+        lastProgressTimeRef.current.set(t.task_id, now)
+        if (lastSample && t.progress > lastSample.p) {
           hasFreshUpdate = true
-          const instantRate = dp / (elapsed / 1000) // progress/sec
-          const oldRate = progressRateRef.current.get(t.task_id) || 0
-          const emaRate = oldRate > 0
-            ? oldRate * 0.7 + instantRate * 0.3
-            : instantRate
-          progressRateRef.current.set(t.task_id, emaRate)
         }
       }
+      // 进度未变化：不更新，让定时器通过 (now - lastProgressTime) 算停顿补偿
 
-      const rate = progressRateRef.current.get(t.task_id)
-      if (rate && rate > 0) {
-        const remaining = (1 - t.progress) / rate
-        totalEta += remaining
+      const rate = calcRate(t.task_id)
+      if (rate > 0) {
+        totalEta += (1 - t.progress) / rate
       }
-
-      lastProgressRef.current.set(t.task_id, t.progress)
     }
 
-    lastTickRef.current = now
-
-    // 单调递减：新 ETA 只能 ≤ 当前值（防来回跳）
     const newEta = Math.max(0, Math.round(totalEta))
     if (active.length === 0) {
-      // 没有活跃任务：清零
       lastEtaRef.current = -1
       hasInitializedRef.current = false
       setEta(-1)
     } else if (newEta > 0) {
-      // 有有效估算：如果是新的进度更新，允许 ETA 重置；否则只能单调递减
       const clamped = hasInitializedRef.current && !hasFreshUpdate
         ? Math.min(newEta, lastEtaRef.current >= 0 ? lastEtaRef.current : newEta)
         : newEta
@@ -70,43 +95,39 @@ export function useGlobalEta(): number {
       hasInitializedRef.current = true
       setEta(clamped)
     }
-    // newEta === 0 且仍有活跃任务（速率样本未建立）：保持当前 eta，不锁死
   }, [tasks])
 
-  // 定时器：每秒更新剩余时间，结合真实消逝时间重估，不至于在静默期直落到 0
+  // 定时器：每秒更新，停顿时快速修正
   useEffect(() => {
     const timer = setInterval(() => {
       setEta((prev) => {
         if (prev < 0) return prev
         const now = Date.now()
-        const active = tasks.filter((t) => !isTaskTerminal(t.status) && t.progress > 0 && t.progress < 1)
+        const active = tasks.filter(
+          (t) => !isTaskTerminal(t.status) && t.progress > 0 && t.progress < 1,
+        )
         if (active.length === 0) return prev
 
         let totalEta = 0
         for (const t of active) {
-          const rate = progressRateRef.current.get(t.task_id)
-          if (rate && rate > 0) {
-            // 当前进度的理想剩余时间
+          const rate = calcRate(t.task_id)
+          if (rate > 0) {
             const baseRemaining = (1 - t.progress) / rate
-            // 距离上次收到该任务进度的流逝时间
-            const prevProgress = lastProgressRef.current.get(t.task_id)
-            let stallPenalty = 0
-            if (prevProgress === t.progress) {
-              const elapsedSinceTick = (now - lastTickRef.current) / 1000
-              // 如果进度一直没变，实际的 rate 就在下降，期望的剩余时间应该增加
-              // 为了平滑，我们简单地将流逝时间加回 baseRemaining
-              stallPenalty = Math.max(0, elapsedSinceTick)
-            }
-            totalEta += (baseRemaining + stallPenalty)
+            const lastProgressTime = lastProgressTimeRef.current.get(t.task_id) ?? now
+            const elapsedSinceProgress = (now - lastProgressTime) / 1000
+            // 停顿越久，补偿越大
+            const stallPenalty = Math.max(0, elapsedSinceProgress)
+            totalEta += baseRemaining + stallPenalty
           }
         }
-        
+
         const idealEta = Math.round(totalEta)
-        // 使用阻尼系数逼近 idealEta，而不是单纯 -1
         if (idealEta > prev) {
-           return Math.round(prev * 0.9 + idealEta * 0.1) // 缓慢上升
+          // 停顿/减速：快速上升修正（权重 0.3，旧版 0.1）
+          return Math.round(prev * 0.7 + idealEta * 0.3)
         }
-        return Math.max(1, prev - 1) // 正常下降，但不低于 1s（只要还有活跃任务）
+        // 正常推进：每秒减 1，不低于 1s
+        return Math.max(1, prev - 1)
       })
     }, 1000)
     return () => clearInterval(timer)
