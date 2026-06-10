@@ -3340,6 +3340,13 @@ def get_item_note(workspace_id: str, item_id: str) -> Dict[str, Any]:
                 if _result_video.startswith(("http://", "https://", "/static/"))
                 else to_static_url(_result_video)
             )
+        # 从 frontmatter 的 media.video.url 获取（note.md 里记录的路径）
+        if not _video_url:
+            _fm_video = str((frontmatter.get("media") or {}).get("video", {}).get("url") or "").strip()
+            if _fm_video and not _fm_video.startswith(("http://", "https://")):
+                _video_url = to_static_url(_fm_video)
+            elif _fm_video:
+                _video_url = _fm_video
         _vid_dir = DATA_DIR / "workspaces" / workspace_id / "videos"
         if not _video_url and _vid_dir.is_dir():
             _vid_files = sorted(_vid_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
@@ -3493,6 +3500,13 @@ def update_item_note(workspace_id: str, item_id: str, req: NoteUpdateRequest) ->
                 if _result_video.startswith(("http://", "https://", "/static/"))
                 else to_static_url(_result_video)
             )
+        # 从 frontmatter 的 media.video.url 获取（note.md 里记录的路径）
+        if not _video_url:
+            _fm_video = str((frontmatter.get("media") or {}).get("video", {}).get("url") or "").strip()
+            if _fm_video and not _fm_video.startswith(("http://", "https://")):
+                _video_url = to_static_url(_fm_video)
+            elif _fm_video:
+                _video_url = _fm_video
         _vid_dir = DATA_DIR / "workspaces" / workspace_id / "videos"
         if not _video_url and _vid_dir.is_dir():
             _vid_files = sorted(_vid_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)

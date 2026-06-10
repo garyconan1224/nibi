@@ -383,10 +383,11 @@ def transcribe_file_with_fast_whisper(
     )
     _emit_log(f"✅ 模型就绪 | 耗时 {time.perf_counter() - t0:.1f}s")
 
-    # 允许 initial_prompt 为空字符串时不传；language 为空字符串时让 whisper 自动检测
+    # 允许 initial_prompt 为空字符串时不传；language 为空字符串或 "auto" 时让 whisper 自动检测
     transcribe_kwargs: dict[str, Any] = {}
-    if language:
-        transcribe_kwargs["language"] = language
+    effective_lang = "" if language in ("", "auto") else language
+    if effective_lang:
+        transcribe_kwargs["language"] = effective_lang
     if initial_prompt:
         transcribe_kwargs["initial_prompt"] = initial_prompt
 
@@ -420,6 +421,19 @@ def transcribe_file_with_fast_whisper(
 
     _emit_progress(1.0, "转录完成")
     text_out = "\n".join(parts).strip()
+
+    # 繁→简后处理：Whisper 中文输出有时是繁体，统一转简体
+    if text_out and detected_lang.startswith("zh"):
+        try:
+            from opencc import OpenCC
+            _cc = OpenCC("t2s")
+            text_out = _cc.convert(text_out)
+            if return_segments:
+                for seg_d in seg_dicts:
+                    seg_d["text"] = _cc.convert(seg_d.get("text", ""))
+        except Exception:
+            pass  # opencc 不可用时静默跳过，保留原始文本
+
     if return_segments:
         return text_out, seg_dicts, total
     return text_out
@@ -430,6 +444,7 @@ def transcribe_with_fast_whisper(
     *,
     model_name: str = "base",
     device: str = "cpu",
+    language: str = "zh",
     initial_prompt: str = "",
 ) -> str:
     """兼容旧调用方：字节流版本（`transcript_service` 的 URL 转录链路使用）。
@@ -445,7 +460,7 @@ def transcribe_with_fast_whisper(
             tmp_path,
             model_name=model_name,
             device=device,
-            language="zh",
+            language=language,
             initial_prompt=initial_prompt,
         )
     finally:

@@ -42,7 +42,7 @@ class TranscriberConfig:
 
     type: TranscriberType = "fast-whisper"
     whisper_model_size: str = "medium"
-    language: str = "zh"
+    language: str = "auto"
     device: str = "cpu"
     groq_api_key: str = ""
     initial_prompt: str = ""

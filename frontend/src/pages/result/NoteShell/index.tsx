@@ -938,7 +938,8 @@ export default function NoteShell() {
             <div style={{ flex: '0 0 auto', maxHeight: '55%', overflow: 'hidden' }}>
               <LNVideoPanel
                 ref={videoRef}
-                src={note.media!.video!.url}
+                src={note.media!.video?.url?.startsWith('/static/') ? note.media!.video!.url : ''}
+                externalUrl={!note.media!.video?.url?.startsWith('/static/') ? ((note.frontmatter as Record<string, unknown>)?.source_url as string || note.media!.video?.url) : undefined}
                 title=""
                 workspaceId={workspaceId}
                 onTimeUpdate={handleTimeUpdate}
@@ -1108,6 +1109,7 @@ export default function NoteShell() {
                 transcript={Array.isArray(note.transcript) ? note.transcript as never : []}
                 workspaceId={workspaceId}
                 itemId={itemId}
+                sourceUrl={(note.frontmatter as Record<string, unknown>)?.source_url as string || ''}
               />
             )}
             <SummariesPanel

@@ -27,6 +27,8 @@ interface NoteMediaCompanionProps {
   transcript: TranscriptLine[]
   workspaceId?: string
   itemId?: string
+  /** 原始来源URL（B站/抖音等网页链接），视频文件URL无法播放时降级展示 */
+  sourceUrl?: string
 }
 
 export interface NoteMediaCompanionHandle {
@@ -34,7 +36,7 @@ export interface NoteMediaCompanionHandle {
 }
 
 const NoteMediaCompanion = forwardRef<NoteMediaCompanionHandle, NoteMediaCompanionProps>(function NoteMediaCompanion(
-  { media, transcript, workspaceId, itemId },
+  { media, transcript, workspaceId, itemId, sourceUrl },
   ref,
 ) {
   const [currentTime, setCurrentTime] = useState(0)
@@ -57,14 +59,21 @@ const NoteMediaCompanion = forwardRef<NoteMediaCompanionHandle, NoteMediaCompani
   }), [handleSeek])
 
   // video 分支
-  if (media.video?.url) {
+  if (media.video?.url || sourceUrl) {
+    // 判断 video URL 是否可播放（视频文件）还是网页链接
+    const videoUrl = media.video?.url || ''
+    const isPlayableVideo = videoUrl.startsWith('/static/') || /\.(mp4|webm|mkv|mov)(\?|$)/i.test(videoUrl)
+    const videoSrc = isPlayableVideo ? videoUrl : ''
+    const externalUrl = !isPlayableVideo ? (sourceUrl || videoUrl) : undefined
+
     return (
       <div className="vm-ln-scope" style={{ display: 'flex', flexDirection: 'column', gap: 0, borderTop: '1px solid var(--border)' }}>
         {/* 播放器 */}
         <div style={{ maxHeight: 240, overflow: 'hidden' }}>
           <LNVideoPanel
             ref={videoRef}
-            src={media.video.url}
+            src={videoSrc}
+            externalUrl={externalUrl}
             title=""
             workspaceId={workspaceId}
             onTimeUpdate={handleTimeUpdate}

@@ -88,10 +88,10 @@ def build_prompt(
             user_prompt = (
                 f"{user_prompt}\n\n"
                 f"【关键帧清单】（已剔除过渡/重复画面，共 {len(frames)} 张候选）\n"
-                f"以下是从视频中精选的画面。**宁缺毋滥**：仅当画面能为该处讲解提供实质"
-                f"信息（演示、图表、界面、数据、关键步骤等）时，才用 [[图N]] 插入配图"
-                f"（N=帧号）；纯口播、与正文重复、无信息的画面不要配图，整篇可只配几张"
-                f"甚至不配。\n\n"
+                f"以下是从视频中精选的画面。**配图原则**：\n"
+                f"- ✅ **应该配图**：演示操作、代码展示、UI界面、数据图表、关键步骤、对比示例、重要结论\n"
+                f"- ❌ **不要配图**：纯口播、过渡画面、与正文重复、无信息画面\n\n"
+                f"使用 `[[图N]]` 插入配图（N=帧号），整篇可只配几张甚至不配。\n\n"
                 f"{frame_list}"
             )
 
@@ -195,23 +195,118 @@ def _collect_frames(item: WorkspaceItem) -> List[Dict[str, object]]:
     # 兜底：从 json_outputs 文件读取（handle_note_task 存的路径）
     json_paths = results.get("json_outputs") or []
     if not json_paths:
-        return []
-    out = []
-    for jp in json_paths:
-        try:
-            data = _json.loads(Path(jp).read_text(encoding="utf-8"))
-        except Exception:
-            continue
-        for i, fr in enumerate(data.get("frames", [])):
-            desc = str(fr.get("description_zh") or fr.get("description") or "").strip()
-            if not desc:
+        out = []
+    else:
+        out = []
+        for jp in json_paths:
+            try:
+                data = _json.loads(Path(jp).read_text(encoding="utf-8"))
+            except Exception:
                 continue
-            ts = str(fr.get("timestamp") or "00:00:00")
-            sec = _ts_to_sec(ts)
-            # 尝试从 frames/ 目录找对应图片
-            img = _find_frame_image(jp, i)
-            out.append({"idx": len(out), "sec": sec, "desc": desc[:200], "image_path": img})
+            for i, fr in enumerate(data.get("frames", [])):
+                desc = str(fr.get("description_zh") or fr.get("description") or "").strip()
+                if not desc:
+                    continue
+                ts = str(fr.get("timestamp") or "00:00:00")
+                sec = _ts_to_sec(ts)
+                # 尝试从 frames/ 目录找对应图片
+                img = _find_frame_image(jp, i)
+                out.append({"idx": len(out), "sec": sec, "desc": desc[:200], "image_path": img})
+
+    # 如果还没有 frames，尝试从 default_project 的分析报告目录查找
+    if not out:
+        out = _collect_frames_from_default_project(item)
+
+    # 收集 ln-screenshots/ 手动截图（用户在视频播放器中截取的）
+    # 注意：WorkspaceItem 没有 workspace_id 属性，需要从其他地方获取
+    # 这里暂时跳过，因为需要修改 WorkspaceItem 模型
+    # ws_id = item.workspace_id or ""
+    # item_id = item.item_id or ""
+    # if ws_id:
+    #     from shared.config import get_workspace_root
+    #     ws_root = get_workspace_root(ws_id)
+    #     ln_shots_dir = ws_root / "ln-screenshots"
+    #     if ln_shots_dir.is_dir():
+    #         for shot_file in sorted(ln_shots_dir.glob("shot-*.png")):
+    #             # 文件名格式：shot-XXXXXX-HHMMSS.png，XXXXXX 是秒数
+    #             parts = shot_file.stem.split("-")
+    #             if len(parts) >= 2:
+    #                 try:
+    #                     sec = float(parts[1])
+    #                 except ValueError:
+    #                     sec = 0.0
+    #             else:
+    #                 sec = 0.0
+    #             img_url = f"/static/workspaces/{ws_id}/ln-screenshots/{shot_file.name}"
+    #             out.append({
+    #                 "idx": len(out),
+    #                 "sec": sec,
+    #                 "desc": f"用户截图 @{int(sec)//60:02d}:{int(sec)%60:02d}",
+    #                 "image_path": img_url,
+    #             })
+
     return _filter_and_dedup_frames(out)
+
+
+def _collect_frames_from_default_project(item: WorkspaceItem) -> List[Dict[str, object]]:
+    """从 default_project 的分析报告目录中收集 frames 数据。
+
+    当 item.results 没有 frames 数据时，尝试从 default_project 的 videos 目录中
+    查找对应的分析报告，读取视觉数据 JSON 中的 frames。
+    """
+    from shared.config import get_workspace_root
+
+    # 获取视频标题或 source_value
+    source_value = item.source_value or ""
+    title = item.name or ""
+
+    # 尝试从 default_project 的 videos 目录查找分析报告
+    default_ws_root = get_workspace_root("default_project")
+    videos_dir = default_ws_root / "videos"
+    if not videos_dir.is_dir():
+        return []
+
+    out = []
+    # 遍历所有分析报告目录
+    for report_dir in videos_dir.glob("*_分析报告"):
+        json_files = list(report_dir.glob("*_视觉数据.json"))
+        if not json_files:
+            continue
+
+        # 检查是否与当前 item 相关（通过标题或 BV 号匹配）
+        dir_name = report_dir.name.replace("_分析报告", "")
+        is_match = False
+        if title and dir_name in title:
+            is_match = True
+        elif source_value:
+            # 从 source_value 提取 BV 号
+            import re
+            bv_match = re.search(r"BV[0-9A-Za-z]+", source_value)
+            if bv_match and bv_match.group() in dir_name:
+                is_match = True
+
+        if not is_match:
+            continue
+
+        # 读取视觉数据 JSON
+        for json_file in json_files:
+            try:
+                data = _json.loads(json_file.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+
+            frames_data = data.get("frames", [])
+            for i, fr in enumerate(frames_data):
+                desc = str(fr.get("content_zh") or fr.get("description_zh") or "").strip()
+                if not desc:
+                    continue
+                ts = str(fr.get("timestamp") or "00:00:00")
+                sec = _ts_to_sec(ts)
+                # 从 frames/ 目录找对应图片
+                img = _find_frame_image(str(json_file), i)
+                out.append({"idx": len(out), "sec": sec, "desc": desc[:200], "image_path": img})
+
+    return out
 
 
 def _ts_to_sec(ts: str) -> float:
