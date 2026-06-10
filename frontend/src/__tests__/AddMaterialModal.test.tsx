@@ -102,7 +102,7 @@ describe('AddMaterialModal', () => {
     fireEvent.click(screen.getByRole('button', { name: /生成笔记/ }))
 
     await waitFor(() => {
-      expect(generateNoteMock).toHaveBeenCalledWith('ws-1', 'https://example.com/video', '测试视频')
+      expect(generateNoteMock).toHaveBeenCalledWith('ws-1', 'https://example.com/video', '测试视频', true)
     })
     expect(addWorkspaceItemMock).not.toHaveBeenCalled()
     expect(savePreflightMock).not.toHaveBeenCalled()
@@ -135,7 +135,7 @@ describe('AddMaterialModal', () => {
 
     await waitFor(() => {
       expect(autoCreateWorkspaceMock).toHaveBeenCalledWith({ hint_url: 'https://example.com/article' })
-      expect(generateNoteMock).toHaveBeenCalledWith('ws-new', 'https://example.com/article', undefined)
+      expect(generateNoteMock).toHaveBeenCalledWith('ws-new', 'https://example.com/article', undefined, true)
     })
   })
 
