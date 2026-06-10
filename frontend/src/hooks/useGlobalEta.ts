@@ -9,19 +9,23 @@ interface ProgressSample {
 }
 
 const WINDOW_SIZE = 5 // 每个任务保留的进度样本数
+const SMOOTHING = 0.3 // ETA 平滑系数（EMA）：越大越跟手但越抖，越小越平滑但越滞后
 
 /**
  * 计算下一个 ETA 显示值（纯函数，便于单测）。
  *
  * 规则：
- * - target<=0（速率还没估出来 / 无活跃）：已在显示中就继续每秒减 1（不低于 1），否则 -1 隐藏。
- * - 首次（prev<0）或活跃任务集合变化（changed）：校准到 target（允许跳，重新基线）。
- * - 稳定期：每秒至少减 1 且永不上跳 —— min(prev-1, target)，不低于 1（不落 0）。
+ * - target<=0（速率还没估出来 / 暂时丢失）：保持上一个显示值，没显示过则 -1（隐藏）。
+ * - 首次（prev<0）或活跃任务集合变化（changed）：直接用 target（重新基线）。
+ * - 其余：EMA 平滑跟踪 target —— display = α·target + (1-α)·prev。
+ *   既不剧烈跳变（α 把 rate 抖动 / 阶段切换压平），也不会减过头到不真实的小值
+ *   —— 显示值始终向真实 target 收敛，而不是无脑每秒减 1。
  */
 export function nextEta(prev: number, target: number, changed: boolean): number {
-  if (target <= 0) return prev > 0 ? Math.max(1, prev - 1) : -1
+  if (target <= 0) return prev > 0 ? prev : -1
   if (prev < 0 || changed) return Math.max(1, target)
-  return Math.max(1, Math.min(prev - 1, target))
+  const smoothed = SMOOTHING * target + (1 - SMOOTHING) * prev
+  return Math.max(1, Math.round(smoothed))
 }
 
 /**
@@ -31,13 +35,13 @@ export function nextEta(prev: number, target: number, changed: boolean): number 
  * - 采样 effect（依赖 tasks）：进度变化时把 (progress, 时间戳) 推入每个任务的滚动窗口，
  *   并把最新 tasks 同步到 tasksRef 供定时器读取。只采样，不改显示值。
  * - 倒计时 effect（依赖 []，整个生命周期只建一次）：每秒读 ref 算 target=Σ(剩余/速率)，
- *   用 nextEta 更新显示值。
+ *   用 nextEta（EMA 平滑）更新显示值。
  *
  * 修掉旧版三个问题：
  * 1. 旧版两个 effect 都依赖 tasks 且都 setEta → 进度更新频繁时定时器被反复重建、
  *    「每秒减1」几乎执行不到（倒计时卡顿）。本版定时器依赖 [] 只建一次。
- * 2. 旧版 hasFreshUpdate 时不做单调约束 → 阶段切换 ETA 上跳。本版 nextEta 严格单调递减。
- * 3. 去掉旧版的阻尼系数(0.7/0.3)、stallPenalty 等魔法数。
+ * 2. 旧版 hasFreshUpdate 时不做平滑 → 阶段切换 ETA 上跳。本版 nextEta 用 EMA 平滑跟踪 target。
+ * 3. 去掉旧版的阻尼系数(0.7/0.3)、stallPenalty 等魔法数（只留一个平滑系数 SMOOTHING）。
  */
 export function useGlobalEta(): number {
   const tasks = useTaskStore((s) => s.tasks)
