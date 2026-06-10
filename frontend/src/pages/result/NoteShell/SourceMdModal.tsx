@@ -1,4 +1,6 @@
 import { X, FileCode } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface SourceMdModalProps {
   open: boolean
@@ -72,20 +74,20 @@ export function SourceMdModal({ open, sourceMd, onClose }: SourceMdModalProps) {
           </button>
         </div>
 
-        {/* Body */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '14px 18px' }}>
-          <pre
-            style={{
-              whiteSpace: 'pre-wrap',
-              fontFamily: 'var(--mono)',
-              fontSize: 12,
-              lineHeight: 1.7,
-              color: 'var(--ink-2)',
-              margin: 0,
-            }}
-          >
-            {sourceMd}
-          </pre>
+        {/* Body：渲染 markdown，让 ![]() 显示成图（不再是 raw 源码）*/}
+        <div
+          className="source-md-body"
+          style={{
+            flex: 1,
+            overflow: 'auto',
+            padding: '14px 18px',
+            fontSize: 13,
+            lineHeight: 1.7,
+            color: 'var(--ink-2)',
+          }}
+        >
+          <style>{`.source-md-body img { max-width: 100%; height: auto; border-radius: 8px; display: block; margin: 8px 0; }`}</style>
+          <ReactMarkdown remarkPlugins={[remarkGfm as any]}>{sourceMd}</ReactMarkdown>
         </div>
 
         {/* Footer */}
