@@ -692,6 +692,7 @@ def _analyze_frame_task(
     safe_name: str,
     frames_dir: Path,
     cancel_event: Optional[threading.Event] = None,
+    image_mode: str = "vision",
 ) -> Optional[dict[str, Any]]:
     """并发 worker：编码帧 → 调用视觉 API → 保存图片 → 返回 frame_data。
 
@@ -703,7 +704,16 @@ def _analyze_frame_task(
     ts = format_timestamp(sec)
     img_b64 = frame_to_base64(frame_img)
     try:
-        result = analyze_video_frame(api_key, vision_model, img_b64, product_name)
+        if image_mode == "ocr":
+            from shared.ocr_service import extract_text_from_array
+            ocr_text = extract_text_from_array(frame_img)
+            result = {
+                "content_zh": ocr_text,
+                "description_zh": "[OCR提取文本] " + (ocr_text if ocr_text else "(无文字)"),
+                "image_prompt_en": ""
+            }
+        else:
+            result = analyze_video_frame(api_key, vision_model, img_b64, product_name)
     except Exception as e:
         result = {"content_zh": "", "description_zh": f"[分析失败: {e}]", "image_prompt_en": ""}
     img_filename = make_frame_filename(safe_name, ts)
@@ -725,6 +735,7 @@ def _analyze_frames_batch_task(
     safe_name: str,
     frames_dir: Path,
     cancel_event: Optional[threading.Event] = None,
+    image_mode: str = "vision",
 ) -> Optional[list[dict[str, Any]]]:
     """并发 worker（批模式）：编码 N 帧 → 调用批量 API → 保存图片 → 返回 frame_data 列表。
 
@@ -766,7 +777,16 @@ def _analyze_frames_batch_task(
             ts = format_timestamp(sec)
             img_b64 = frame_to_base64(frame_img)
             try:
-                result = analyze_video_frame(api_key, vision_model, img_b64, product_name)
+                if image_mode == "ocr":
+                    from shared.ocr_service import extract_text_from_array
+                    ocr_text = extract_text_from_array(frame_img)
+                    result = {
+                        "content_zh": ocr_text,
+                        "description_zh": "[OCR提取文本] " + (ocr_text if ocr_text else "(无文字)"),
+                        "image_prompt_en": ""
+                    }
+                else:
+                    result = analyze_video_frame(api_key, vision_model, img_b64, product_name)
             except Exception as e:
                 result = {"content_zh": "", "description_zh": f"[分析失败: {e}]", "image_prompt_en": ""}
             results.append(result)
@@ -851,6 +871,7 @@ def process_video(
     concurrency: int | None = None,
     cancel_event: Optional[threading.Event] = None,
     frames_per_call: int | None = None,
+    image_mode: str = "vision",
 ) -> Optional[Path]:
     """
     完整处理单个视频：抽帧分析 → 全局总结 → 三位一体保存（支持断点续传）。
@@ -930,7 +951,7 @@ def process_video(
                 future = executor.submit(
                     _analyze_frames_batch_task, current_batch,
                     api_key, vision_model, product_name, safe_name, frames_dir,
-                    cancel_event,
+                    cancel_event, image_mode,
                 )
                 pending[future] = [sec for sec, _ in current_batch]
                 current_batch = []
@@ -940,7 +961,7 @@ def process_video(
             future = executor.submit(
                 _analyze_frames_batch_task, current_batch,
                 api_key, vision_model, product_name, safe_name, frames_dir,
-                cancel_event,
+                cancel_event, image_mode,
             )
             pending[future] = [sec for sec, _ in current_batch]
 
@@ -1019,6 +1040,7 @@ def run_batch_analysis(
     concurrency: int | None = None,
     cancel_event: Optional[threading.Event] = None,
     frames_per_call: int | None = None,
+    image_mode: str = "vision",
 ) -> AnalysisState:
     """
     批量分析视频（在后台线程中运行）。
@@ -1054,6 +1076,7 @@ def run_batch_analysis(
                     concurrency=concurrency,
                     cancel_event=cancel_event,
                     frames_per_call=frames_per_call,
+                    image_mode=image_mode,
                 )
             except Exception as e:
                 state.update(idx, status="failed", error=str(e))

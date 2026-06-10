@@ -2048,6 +2048,10 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                         f"frames_per_shot={capture_params.frames_per_shot}"
                     )
 
+                image_mode = "vision"
+                if preflight := payload.get("preflight"):
+                    image_mode = preflight.get("image_mode") or "vision"
+
                 state = run_batch_analysis(
                     api_key=api_key,
                     video_paths=videos,
@@ -2058,6 +2062,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                     capture_params=capture_params,
                     concurrency=_tier_vlm_concurrency(),
                     cancel_event=_cancel_event,
+                    image_mode=image_mode,
                 )
 
                 _last_logged_pct = -1.0
