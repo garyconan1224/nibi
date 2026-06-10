@@ -1786,7 +1786,10 @@ def generate_note(workspace_id: str, req: GenerateNoteRequest) -> Dict[str, Any]
     _task_payload["preflight"] = {
         "embed_frames": req.embed_frames,
         "image_mode": req.image_mode,
-        "frame_interval": req.frame_interval,
+        "frame_prompt": {
+            "mode": "interval",
+            "interval_sec": req.frame_interval
+        }
     }
     try:
         _s = load_settings()

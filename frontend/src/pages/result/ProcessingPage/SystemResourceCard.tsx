@@ -125,7 +125,7 @@ export default function SystemResourceCard({ etaSec }: SystemResourceCardProps) 
             className="mono"
             style={{ fontSize: 28, fontFamily: 'var(--display)', fontWeight: 500 }}
           >
-            {etaSec > 0 ? `${etaSec}s` : '—'}
+            {etaSec > 0 ? `${etaSec}s` : runningCount > 0 ? '0s' : '—'}
           </div>
           <div className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>
             剩余时间

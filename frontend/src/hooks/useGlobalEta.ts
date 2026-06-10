@@ -8,11 +8,11 @@ import { isTaskTerminal } from '@/types/task'
  */
 export function useGlobalEta(): number {
   const tasks = useTaskStore((s) => s.tasks)
-  const [eta, setEta] = useState(0)
+  const [eta, setEta] = useState(-1)
   const lastProgressRef = useRef<Map<string, number>>(new Map())
   const progressRateRef = useRef<Map<string, number>>(new Map())
   const lastTickRef = useRef(Date.now())
-  const lastEtaRef = useRef(0)
+  const lastEtaRef = useRef(-1)
   const hasInitializedRef = useRef(false)
 
   // 计算各活跃任务的 ETA 之和（EMA 平滑 + 单调递减）
@@ -56,13 +56,13 @@ export function useGlobalEta(): number {
     const newEta = Math.max(0, Math.round(totalEta))
     if (active.length === 0) {
       // 没有活跃任务：清零
-      lastEtaRef.current = 0
+      lastEtaRef.current = -1
       hasInitializedRef.current = false
-      setEta(0)
+      setEta(-1)
     } else if (newEta > 0) {
       // 有有效估算：首次（未初始化）直接采用，之后才单调递减。
       const clamped = hasInitializedRef.current
-        ? Math.min(newEta, lastEtaRef.current)
+        ? Math.min(newEta, lastEtaRef.current >= 0 ? lastEtaRef.current : newEta)
         : newEta
       lastEtaRef.current = clamped
       hasInitializedRef.current = true
@@ -75,6 +75,7 @@ export function useGlobalEta(): number {
   useEffect(() => {
     const timer = setInterval(() => {
       setEta((prev) => {
+        if (prev < 0) return prev
         const next = Math.max(0, prev - 1)
         lastEtaRef.current = next
         return next

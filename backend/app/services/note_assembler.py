@@ -321,8 +321,8 @@ def build_source_md(item: WorkspaceItem) -> str:
                         visual_parts.append("")
                         img_url = _to_static_url(_find_frame_image(str(jp), i))
                         if img_url:
-                            safe_url = urllib.parse.quote(img_url)
-                            safe_alt = content[:60].replace("[", "\\[").replace("]", "\\]")
+                            safe_url = urllib.parse.quote(img_url, safe="/:")
+                            safe_alt = content[:60].replace("[", "\\[").replace("]", "\\]").replace("\n", " ").replace("\r", " ")
                             visual_parts.append(f"![{safe_alt}]({safe_url})")
                             visual_parts.append("")
                         shown += 1
