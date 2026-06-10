@@ -452,6 +452,8 @@ class GenerateNoteRequest(BaseModel):
     embed_frames: bool = Field(
         default=True, description="视频笔记是否智能嵌入关键画面配图（关闭则纯文字）"
     )
+    image_mode: str = Field(default="vision", description="提取模式: vision 或 ocr")
+    frame_interval: int = Field(default=5, description="截帧间隔，多少秒截一帧")
 
 
 class PreflightSaveRequest(BaseModel):
@@ -1781,7 +1783,11 @@ def generate_note(workspace_id: str, req: GenerateNoteRequest) -> Dict[str, Any]
     _task_payload: dict = {"url": url, "workspace_id": workspace_id}
     # R3.16: 透传嵌图开关 → note task；embed_frames=False 时 standard 总结不配图。
     # max_embed_frames 不传，由 summary_generator 按候选数自适应封顶（智能按需）。
-    _task_payload["preflight"] = {"embed_frames": req.embed_frames}
+    _task_payload["preflight"] = {
+        "embed_frames": req.embed_frames,
+        "image_mode": req.image_mode,
+        "frame_interval": req.frame_interval,
+    }
     try:
         _s = load_settings()
         for _p in _s.providers:

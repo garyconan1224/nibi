@@ -78,6 +78,8 @@ export function AddMaterialModal({
   const [internalSniff, setInternalSniff] = useState<SniffResult | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [embedFrames, setEmbedFrames] = useState(true)
+  const [imageMode, setImageMode] = useState('vision')
+  const [frameInterval, setFrameInterval] = useState(5)
   const [error, setError] = useState<string | null>(null)
   const sniffTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
@@ -143,7 +145,7 @@ export function AddMaterialModal({
         toast.info(`已自动创建工作空间「${ws.name}」`)
       }
 
-      const result = await generateNote(wsId, effectiveUrl, effectiveSniff?.title ?? undefined, embedFrames)
+      const result = await generateNote(wsId, effectiveUrl, effectiveSniff?.title ?? undefined, embedFrames, imageMode, frameInterval)
       toast.success('笔记生成中', { description: `${result.item_type} · ${effectiveUrl}` })
 
       onAdded?.()
@@ -255,6 +257,35 @@ export function AddMaterialModal({
                 </span>
               </span>
             </label>
+            {embedFrames && (
+              <div style={{ marginLeft: 34, marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span className="mono" style={{ fontSize: 12, minWidth: 60 }}>提取模式</span>
+                  <select
+                    value={imageMode}
+                    onChange={(e) => setImageMode(e.target.value)}
+                    style={{ fontSize: 12, padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--ink-1)' }}
+                  >
+                    <option value="vision">视觉模型 (推荐)</option>
+                    <option value="ocr">OCR (无视觉模型方案)</option>
+                  </select>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span className="mono" style={{ fontSize: 12, minWidth: 60 }}>截帧间隔</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <input
+                      type="number"
+                      min={1}
+                      max={60}
+                      value={frameInterval}
+                      onChange={(e) => setFrameInterval(Number(e.target.value) || 5)}
+                      style={{ fontSize: 12, width: 50, padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--ink-1)' }}
+                    />
+                    <span className="kw" style={{ fontSize: 11 }}>秒/帧</span>
+                  </div>
+                </label>
+              </div>
+            )}
           </div>
         </div>
 

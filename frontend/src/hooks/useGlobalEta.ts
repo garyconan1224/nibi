@@ -13,6 +13,7 @@ export function useGlobalEta(): number {
   const progressRateRef = useRef<Map<string, number>>(new Map())
   const lastTickRef = useRef(Date.now())
   const lastEtaRef = useRef(0)
+  const hasInitializedRef = useRef(false)
 
   // 计算各活跃任务的 ETA 之和（EMA 平滑 + 单调递减）
   useEffect(() => {
@@ -56,15 +57,15 @@ export function useGlobalEta(): number {
     if (active.length === 0) {
       // 没有活跃任务：清零
       lastEtaRef.current = 0
+      hasInitializedRef.current = false
       setEta(0)
     } else if (newEta > 0) {
-      // 有有效估算：首次（lastEta 仍为 0）直接采用，之后才单调递减。
-      // ⚠️ 不能无条件 Math.min(newEta, lastEta || Infinity)：首次进来还没建立
-      //    速率样本 → newEta=0 → 会把 lastEta 锁死成 0，导致 ETA 永远「——」。
-      const clamped = lastEtaRef.current > 0
+      // 有有效估算：首次（未初始化）直接采用，之后才单调递减。
+      const clamped = hasInitializedRef.current
         ? Math.min(newEta, lastEtaRef.current)
         : newEta
       lastEtaRef.current = clamped
+      hasInitializedRef.current = true
       setEta(clamped)
     }
     // newEta === 0 且仍有活跃任务（速率样本未建立）：保持当前 eta，不锁死
