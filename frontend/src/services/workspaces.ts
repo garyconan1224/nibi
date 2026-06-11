@@ -102,6 +102,11 @@ export async function sniffUrl(url: string): Promise<SniffResult> {
   return res.data
 }
 
+export async function probeDuration(url: string): Promise<{ duration_sec: number }> {
+  const res = await http.post<{ duration_sec: number }>(`${BASE}/probe-duration`, { url })
+  return res.data
+}
+
 /** POST /workspaces/{id}/items — 添加素材 */
 export async function addWorkspaceItem(
   workspaceId: string,

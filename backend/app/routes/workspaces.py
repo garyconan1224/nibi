@@ -38,6 +38,7 @@ from backend.app.models.tasks import TERMINAL_STATUS_VALUES, TaskStatus
 
 # 项目根目录（backend/app/routes/workspaces.py → routes → app → backend → root）
 _ROOT_DIR: Path = Path(__file__).resolve().parent.parent.parent.parent
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
@@ -482,6 +483,10 @@ class SniffUrlRequest(BaseModel):
     """URL 内容类型嗅探请求体。"""
 
     url: str = Field(min_length=1, description="待嗅探的 URL")
+
+
+class ProbeDurationRequest(BaseModel):
+    url: str
 
 
 class PromptVersionRequest(BaseModel):
@@ -977,6 +982,22 @@ def sniff_media_url(req: SniffUrlRequest) -> dict:
             "content_type_header": None,
             "error": "嗅探服务异常，已按「视频」降级处理",
         }
+
+
+@router.post("/probe-duration")
+def probe_video_duration(req: ProbeDurationRequest) -> dict:
+    """轻量探测视频时长（yt-dlp 只取元数据、不下载），供前端「取画面」算预估帧数。
+
+    失败一律返回 0（前端据此回退到默认间隔），不抛异常、不阻塞识别流程。
+    """
+    from shared.video_download_ytdlp import fetch_ytdlp_metadata
+
+    try:
+        meta = fetch_ytdlp_metadata(req.url)
+        return {"duration_sec": int(meta.get("duration") or 0)}
+    except Exception:
+        logger.warning("probe_video_duration failed for %s", req.url, exc_info=True)
+        return {"duration_sec": 0}
 
 
 @router.get("")
