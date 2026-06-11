@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Link2, Wand2, X } from 'lucide-react'
+import { ChevronDown, FileText, Link2, Wand2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -63,6 +63,12 @@ function getSniffTypes(sniffResult: SniffResult | null | undefined): ItemType[] 
   )
 }
 
+/** 智能截帧间隔：按时长取约 25 张画面，clamp 到 5~60 秒；拿不到时长默认 10 */
+function computeAutoInterval(durationSec?: number): number {
+  if (!durationSec || durationSec <= 0) return 10
+  return Math.min(60, Math.max(5, Math.round(durationSec / 25)))
+}
+
 export function AddMaterialModal({
   open,
   onOpenChange,
@@ -78,8 +84,9 @@ export function AddMaterialModal({
   const [internalSniff, setInternalSniff] = useState<SniffResult | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [embedFrames, setEmbedFrames] = useState(true)
-  const [imageMode, setImageMode] = useState('vision')
   const [frameInterval, setFrameInterval] = useState(5)
+  const [noteExpanded, setNoteExpanded] = useState(false)
+  const [captureMode, setCaptureMode] = useState<'auto' | 'manual'>('auto')
   const [error, setError] = useState<string | null>(null)
   const sniffTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
@@ -145,7 +152,12 @@ export function AddMaterialModal({
         toast.info(`已自动创建工作空间「${ws.name}」`)
       }
 
-      const result = await generateNote(wsId, effectiveUrl, effectiveSniff?.title ?? undefined, embedFrames, imageMode, frameInterval)
+      // SniffResult 暂无 duration 字段，智能档兜底默认 10 秒
+      const effInterval =
+        captureMode === 'auto' ? computeAutoInterval(undefined) : frameInterval
+      const result = await generateNote(
+        wsId, effectiveUrl, effectiveSniff?.title ?? undefined, embedFrames, 'vision', effInterval,
+      )
       toast.success('笔记生成中', { description: `${result.item_type} · ${effectiveUrl}` })
 
       onAdded?.()
@@ -236,57 +248,69 @@ export function AddMaterialModal({
             )}
           </div>
 
-          <div className="m-section">
-            <div className="eyebrow" style={{ marginBottom: 10 }}>② 生成笔记</div>
-            <div className="mono" style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.7 }}>
-              系统会自动识别素材类型，并创建一个 note task 完成下载、转写、画面分析和笔记整理。
-            </div>
-            <label
-              htmlFor="add-material-embed"
-              style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14, cursor: 'pointer' }}
-            >
-              <Switch
-                id="add-material-embed"
-                checked={embedFrames}
-                onCheckedChange={setEmbedFrames}
-              />
-              <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <span className="mono" style={{ fontSize: 12 }}>智能嵌入关键画面配图</span>
-                <span className="kw" style={{ fontSize: 11 }}>
-                  视频笔记按需配图（自动去重、只放有信息的画面）；关闭则纯文字
+        <div className="m-section">
+          <div className="eyebrow" style={{ marginBottom: 10 }}>② 生成笔记</div>
+
+          {/* 笔记板块卡片：点击展开配置（以后可加 复刻 / AI 导演 等板块）*/}
+          <button
+            type="button"
+            onClick={() => setNoteExpanded((v) => !v)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+              padding: '12px 14px', borderRadius: 10,
+              border: '1px solid var(--line)', background: 'var(--bg)',
+              cursor: 'pointer', textAlign: 'left',
+            }}
+          >
+            <FileText size={18} style={{ color: 'var(--accent-2)' }} />
+            <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
+              <span style={{ fontWeight: 600, fontSize: 14 }}>生成笔记</span>
+              <span className="kw" style={{ fontSize: 11 }}>下载 · 转写 · 整理成图文笔记</span>
+            </span>
+            <ChevronDown
+              size={16}
+              style={{ transform: noteExpanded ? 'rotate(180deg)' : 'none', transition: 'transform .15s', color: 'var(--ink-3)' }}
+            />
+          </button>
+
+          {/* 点开后的配置 */}
+          {noteExpanded && (
+            <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* 配图开关：关=纯文字笔记，开=带图笔记 */}
+              <label htmlFor="add-material-embed" style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                <Switch id="add-material-embed" checked={embedFrames} onCheckedChange={setEmbedFrames} />
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span className="mono" style={{ fontSize: 12 }}>笔记里配图</span>
+                  <span className="kw" style={{ fontSize: 11 }}>打开＝带图笔记（自动挑有信息的画面）；关闭＝纯文字笔记</span>
                 </span>
-              </span>
-            </label>
-            {embedFrames && (
-              <div style={{ marginLeft: 34, marginTop: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span className="mono" style={{ fontSize: 12, minWidth: 60 }}>提取模式</span>
-                  <select
-                    value={imageMode}
-                    onChange={(e) => setImageMode(e.target.value)}
-                    style={{ fontSize: 12, padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--ink-1)' }}
-                  >
-                    <option value="vision">视觉模型 (推荐)</option>
-                    <option value="ocr">OCR (无视觉模型方案)</option>
-                  </select>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span className="mono" style={{ fontSize: 12, minWidth: 60 }}>截帧间隔</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <input
-                      type="number"
-                      min={1}
-                      max={60}
-                      value={frameInterval}
-                      onChange={(e) => setFrameInterval(Number(e.target.value) || 5)}
-                      style={{ fontSize: 12, width: 50, padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--ink-1)' }}
-                    />
-                    <span className="kw" style={{ fontSize: 11 }}>秒/帧</span>
-                  </div>
-                </label>
-              </div>
-            )}
-          </div>
+              </label>
+
+              {/* 配图打开后才出现：取画面方式 */}
+              {embedFrames && (
+                <div style={{ marginLeft: 34, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <span className="mono" style={{ fontSize: 12 }}>取画面</span>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input type="radio" name="capture-mode" checked={captureMode === 'auto'} onChange={() => setCaptureMode('auto')} />
+                    <span className="kw" style={{ fontSize: 12 }}>智能（按视频时长自动）</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input type="radio" name="capture-mode" checked={captureMode === 'manual'} onChange={() => setCaptureMode('manual')} />
+                    <span className="kw" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      手动每隔
+                      <input
+                        type="number" min={1} max={60} value={frameInterval}
+                        disabled={captureMode !== 'manual'}
+                        onChange={(e) => setFrameInterval(Number(e.target.value) || 5)}
+                        style={{ fontSize: 12, width: 50, padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--ink-1)' }}
+                      />
+                      秒一张
+                    </span>
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
         </div>
 
         <div className="m-foot">

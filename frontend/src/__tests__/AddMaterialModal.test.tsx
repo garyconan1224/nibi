@@ -69,7 +69,7 @@ describe('AddMaterialModal', () => {
     )
 
     expect(screen.getByText('② 生成笔记')).toBeTruthy()
-    expect(screen.getByRole('button', { name: /生成笔记/ })).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: /生成笔记/ }).length).toBeGreaterThanOrEqual(2)
     expect(screen.queryByText(/分析范围/)).toBeNull()
     expect(screen.queryByText(/勾选分析任务/)).toBeNull()
     expect(screen.queryByText(/音视频综合/)).toBeNull()
@@ -99,10 +99,11 @@ describe('AddMaterialModal', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /生成笔记/ }))
+    const buttons = screen.getAllByRole('button', { name: /生成笔记/ })
+    fireEvent.click(buttons[buttons.length - 1])
 
     await waitFor(() => {
-      expect(generateNoteMock).toHaveBeenCalledWith('ws-1', 'https://example.com/video', '测试视频', true)
+      expect(generateNoteMock).toHaveBeenCalledWith('ws-1', 'https://example.com/video', '测试视频', true, 'vision', 10)
     })
     expect(addWorkspaceItemMock).not.toHaveBeenCalled()
     expect(savePreflightMock).not.toHaveBeenCalled()
@@ -131,11 +132,12 @@ describe('AddMaterialModal', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /生成笔记/ }))
+    const buttons = screen.getAllByRole('button', { name: /生成笔记/ })
+    fireEvent.click(buttons[buttons.length - 1])
 
     await waitFor(() => {
       expect(autoCreateWorkspaceMock).toHaveBeenCalledWith({ hint_url: 'https://example.com/article' })
-      expect(generateNoteMock).toHaveBeenCalledWith('ws-new', 'https://example.com/article', undefined, true)
+      expect(generateNoteMock).toHaveBeenCalledWith('ws-new', 'https://example.com/article', undefined, true, 'vision', 10)
     })
   })
 
