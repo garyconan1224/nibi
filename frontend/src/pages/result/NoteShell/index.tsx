@@ -17,7 +17,7 @@ import type { ReactElement, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowLeft, BookOpenCheck, ChevronDown, ChevronRight, Download, FileCode, FileText, List, MessageCircle, RefreshCw } from 'lucide-react'
+import { ArrowLeft, BookOpenCheck, ChevronDown, ChevronRight, Download, FileCode, FileText, List, RefreshCw } from 'lucide-react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
@@ -63,7 +63,6 @@ const fixBrokenImagesPlugin = () => (tree: any) => {
         lastIdx = m.index + m[0].length
       }
       if (lastIdx < child.value.length) newChildren.push({ type: 'text', value: child.value.slice(lastIdx) })
-      if (!IMG_RE.test(child.value) && lastIdx === 0) newChildren.push(child)
     }
     if (newChildren.length) node.children = newChildren
   }
@@ -250,11 +249,6 @@ function useMediaQuery(query: string): boolean {
   )
 }
 
-const viewModeLabels: Record<ViewMode, string> = {
-  read: '阅读',
-  edit: 'Markdown',
-  compare: '对照',
-}
 /** 视频笔记视图标签：中列只展示「标准总结」，两种格式（蓝图 §3.5）。
  *  富文本 = 渲染态（ReactMarkdown）；md格式 = 源码态（CodeMirror，可编辑）。
  *  源 md（转写+截帧原始内容）在右侧操作区，不是中列标签。 */
@@ -511,7 +505,8 @@ export default function NoteShell() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [tagsOpen, setTagsOpen] = useState(true)
-  const [chatOpen, setChatOpen] = useState(false)
+  const [chatOpen] = useState(false)
+  const [tocOpen, setTocOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
 
   // R1.3 + R2.1: 视图模式 + 保存状态（兼容三值 + 窄屏降级 compare → read）
@@ -568,6 +563,16 @@ export default function NoteShell() {
   }, [workspaceId, itemId])
 
   useEffect(() => { fetchNote() }, [fetchNote])
+
+  // 字幕保存成功后轻量刷新 source.md（不 setLoading、不重置正文编辑态；字幕编辑只动 source.md/transcript）
+  const refreshAfterTranscriptEdit = useCallback(async () => {
+    try {
+      const data = await getItemNote(workspaceId, itemId)
+      setNote(data)
+    } catch {
+      /* 字幕已落盘，source.md 展示刷新失败不阻塞 */
+    }
+  }, [workspaceId, itemId])
 
   // 视频笔记默认富文本（read），加载时强制归位
   const videoDefaultedRef = useRef(false)
@@ -776,28 +781,34 @@ export default function NoteShell() {
     </div>
   )
 
-  const tocAside = viewMode === 'read' && toc.length > 0 ? (
+  const tocFloating = viewMode === 'read' && toc.length > 0 && tocOpen ? (
     <aside
       style={{
+        position: 'absolute',
+        top: 8,
+        right: 8,
         width: 200,
-        flexShrink: 0,
-        borderLeft: '1px solid var(--line)',
-        padding: '16px 14px',
+        maxHeight: 'calc(100% - 16px)',
+        zIndex: 20,
+        border: '1px solid var(--line)',
+        borderRadius: 8,
+        padding: '12px 10px',
         overflowY: 'auto',
         background: 'var(--bg)',
+        boxShadow: '0 4px 16px rgba(0,0,0,.12)',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontSize: 12, fontWeight: 700, color: 'var(--ink-2)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 12, fontWeight: 700, color: 'var(--ink-2)' }}>
         <List size={14} /> 目录
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
         {toc.map((entry) => (
           <button
             key={entry.id}
-            onClick={() => handleTocJump(entry.id)}
+            onClick={() => { handleTocJump(entry.id); setTocOpen(false) }}
             style={{
               width: '100%',
-              padding: entry.level === 3 ? '5px 8px 5px 18px' : '5px 8px',
+              padding: entry.level === 3 ? '4px 8px 4px 18px' : '4px 8px',
               border: 'none',
               borderRadius: 4,
               background: 'transparent',
@@ -927,7 +938,8 @@ export default function NoteShell() {
             <div style={{ flex: '0 0 auto', maxHeight: '55%', overflow: 'hidden' }}>
               <LNVideoPanel
                 ref={videoRef}
-                src={note.media!.video!.url}
+                src={note.media!.video?.url?.startsWith('/static/') ? note.media!.video!.url : ''}
+                externalUrl={!note.media!.video?.url?.startsWith('/static/') ? ((note.frontmatter as Record<string, unknown>)?.source_url as string || note.media!.video?.url) : undefined}
                 title=""
                 workspaceId={workspaceId}
                 onTimeUpdate={handleTimeUpdate}
@@ -940,6 +952,9 @@ export default function NoteShell() {
                   transcript={note.transcript as VideoResultTranscriptLine[]}
                   currentTime={currentTime}
                   onSeek={handleSeek}
+                  workspaceId={workspaceId}
+                  itemId={itemId}
+                  onSaved={refreshAfterTranscriptEdit}
                 />
               </div>
             ) : (
@@ -976,11 +991,30 @@ export default function NoteShell() {
                   {saveStatus === 'failed' && <span style={{ color: 'var(--accent)' }}>保存失败</span>}
                 </span>
               )}
+              {/* 目录浮动按钮（阅读态 + 有目录时显示） */}
+              {viewMode === 'read' && toc.length > 0 && (
+                <button
+                  onClick={() => setTocOpen((v) => !v)}
+                  title={tocOpen ? '关闭目录' : '打开目录'}
+                  style={{
+                    marginLeft: 'auto',
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '4px 10px', fontSize: 12, border: 'none', borderRadius: 4,
+                    cursor: 'pointer',
+                    background: tocOpen ? 'var(--accent-2)' : 'transparent',
+                    color: tocOpen ? '#fff' : 'var(--ink-4)',
+                    transition: 'background .15s, color .15s',
+                  }}
+                >
+                  <List size={13} />
+                  目录
+                </button>
+              )}
             </div>
-            {/* 正文 + TOC 横排 */}
-            <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+            {/* 正文（TOC 改为浮动面板，不再占固定宽度） */}
+            <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
               {noteContent}
-              {tocAside}
+              {tocFloating}
             </div>
           </div>
 
@@ -1033,9 +1067,29 @@ export default function NoteShell() {
       ) : (
         /* ── 通用布局（文字/图片/音频）：左正文 + 右伴随 ── */
         <>
-          <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex' }}>
+          <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
             {noteContent}
-            {tocAside}
+            {tocFloating}
+            {/* 目录浮动按钮（阅读态 + 有目录时，非视频布局用） */}
+            {viewMode === 'read' && toc.length > 0 && (
+              <button
+                onClick={() => setTocOpen((v) => !v)}
+                title={tocOpen ? '关闭目录' : '打开目录'}
+                style={{
+                  position: 'absolute', top: 8, right: 8, zIndex: 21,
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '4px 10px', fontSize: 12, border: 'none', borderRadius: 4,
+                  cursor: 'pointer',
+                  background: tocOpen ? 'var(--accent-2)' : 'var(--bg)',
+                  color: tocOpen ? '#fff' : 'var(--ink-4)',
+                  boxShadow: '0 2px 8px rgba(0,0,0,.1)',
+                  transition: 'background .15s, color .15s',
+                }}
+              >
+                <List size={13} />
+                目录
+              </button>
+            )}
           </div>
           <div style={{ flexShrink: 0, maxHeight: '40%', overflowY: 'auto' }}>
             {chatOpen && (
@@ -1054,6 +1108,8 @@ export default function NoteShell() {
                 media={note.media}
                 transcript={Array.isArray(note.transcript) ? note.transcript as never : []}
                 workspaceId={workspaceId}
+                itemId={itemId}
+                sourceUrl={(note.frontmatter as Record<string, unknown>)?.source_url as string || ''}
               />
             )}
             <SummariesPanel

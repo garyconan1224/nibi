@@ -11,7 +11,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from backend.app.models.tasks import TaskLogEntry, TaskRecord
+from backend.app.models.tasks import (
+    TERMINAL_STATUS_VALUES,
+    TaskLogEntry,
+    TaskRecord,
+    TaskStatus,
+)
 from shared.config import ROOT_DIR
 
 TASK_STORE_PATH = ROOT_DIR / ".local" / "backend_tasks.json"
@@ -41,11 +46,24 @@ class TaskStore:
             return
         if not isinstance(data, list):
             return
+        dirty = False
         for item in data:
             if isinstance(item, dict):
                 rec = TaskRecord.from_dict(item)
-                if rec.task_id:
-                    self._records[rec.task_id] = rec
+                if not rec.task_id:
+                    continue
+                # 启动清理：进程重启后 executor 线程池是空的，非终态任务（PENDING /
+                # 运行中各阶段 / 等待确认）不可能继续执行，全是僵尸 → 统一标 FAILED，
+                # 根治「死任务」重启复活（前端过滤只是治标，重启照样复活）。
+                if rec.status not in TERMINAL_STATUS_VALUES:
+                    rec.status = TaskStatus.FAILED.value
+                    rec.error = rec.error or "后端重启，任务中断"
+                    rec.updated_at = _now_iso()
+                    dirty = True
+                self._records[rec.task_id] = rec
+        # 有僵尸被清理就落盘一次，让磁盘文件也变干净（下次启动不再重复清理）
+        if dirty:
+            self._save()
 
     def _save(self) -> None:
         # 原子写入：先在同目录下写入临时文件 + fsync，再 os.replace 原子替换，

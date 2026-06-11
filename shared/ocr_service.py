@@ -76,3 +76,27 @@ def extract_text(image_bytes: bytes, *, min_confidence: float = 0.5) -> str:
             lines.append(text.strip())
 
     return "\n".join(lines)
+
+def extract_text_from_array(img: "numpy.ndarray", *, min_confidence: float = 0.5) -> str:
+    """从 numpy 图片数组中提取文字。"""
+    engine = _get_engine()
+    result = engine.ocr(img, cls=True)
+
+    if not result or not result[0]:
+        return ""
+
+    lines = []
+    for line_info in result[0]:
+        if not isinstance(line_info, (list, tuple)) or len(line_info) < 2:
+            continue
+        text_part = line_info[1]
+        if isinstance(text_part, (list, tuple)) and len(text_part) >= 2:
+            text, confidence = text_part[0], text_part[1]
+        elif isinstance(text_part, str):
+            text, confidence = text_part, 1.0
+        else:
+            continue
+        if confidence >= min_confidence and text.strip():
+            lines.append(text.strip())
+
+    return "\n".join(lines)

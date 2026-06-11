@@ -18,6 +18,12 @@ export interface TranscriberConfigPayload extends Record<string, unknown> {
   groq_api_key: string
   /** ASR 初始提示词（Faster Whisper 前置 prompt） */
   initial_prompt: string
+  /** R4.8: CPU 线程数（0=自动） */
+  cpu_threads: number
+  /** R4.8: beam search 宽度 */
+  beam_size: number
+  /** R4.8: Silero VAD 静默过滤 */
+  vad_filter: boolean
 }
 
 /** 部分更新入参：字段全部可选，后端按"未提供 = 保留"语义处理 */
@@ -113,12 +119,16 @@ export async function fetchWhisperModelsStatus(): Promise<WhisperModelsStatusRes
 /**
  * 获取设备选项
  */
-export function getDeviceOptions() {
-  return [
+export function getDeviceOptions(engineType?: string) {
+  const opts = [
     { value: 'cpu', label: 'CPU' },
     { value: 'cuda', label: 'NVIDIA CUDA' },
-    { value: 'mps', label: 'Apple Metal (MPS)' },
   ]
+  // mps 仅 mlx-whisper 支持；fast-whisper (CTranslate2) 不支持 MPS
+  if (engineType === 'mlx-whisper') {
+    opts.push({ value: 'mps', label: 'Apple Metal (MPS)' })
+  }
+  return opts
 }
 
 /**

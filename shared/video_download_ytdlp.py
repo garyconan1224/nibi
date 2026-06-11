@@ -560,6 +560,8 @@ def run_ytdlp_download(
                     "duration": meta_src.get("duration") or 0,  # seconds (int/float)
                     "uploader": meta_src.get("uploader") or meta_src.get("channel") or "",
                     "thumbnail_url": meta_src.get("thumbnail") or "",
+                    "description": meta_src.get("description") or "",
+                    "upload_date": meta_src.get("upload_date") or "",
                     "error": "",
                     "error_full": "",
                     "percent": 100.0,
@@ -612,11 +614,18 @@ def fetch_ytdlp_metadata(
         "no_warnings": True,
     }
 
-    # 复用已有的 cookie 路径
     cbs = cookie_base_dirs()
-    cookie_files = _existing_cookie_files(cbs)
-    if cookie_files:
-        ydl_opts["cookiefile"] = cookie_files[0]
+    if _is_bilibili_url(url):
+        # B站反爬：extract_info 需要专用 header + B站 cookie，否则 HTTP 412（实测）。
+        # 与下载路径（_build_attempts）保持同一套配方。
+        ydl_opts.update(_bilibili_yt_dlp_extras())
+        bili_cookies = _existing_bili_cookie_files(cbs)
+        if bili_cookies:
+            ydl_opts["cookiefile"] = bili_cookies[0]
+    else:
+        cookie_files = _existing_cookie_files(cbs)
+        if cookie_files:
+            ydl_opts["cookiefile"] = cookie_files[0]
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:

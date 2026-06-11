@@ -1,13 +1,18 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Quote } from 'lucide-react'
 import { toast } from 'sonner'
 import type { VideoResultTranscriptLine } from '@/services/workspaces'
+import { updateTranscriptSegment } from '@/services/workspaces'
 import { useLnEditorStore } from '@/store/lnEditorStore'
 
 interface LNTranscriptPanelProps {
   transcript: VideoResultTranscriptLine[]
   currentTime: number
   onSeek: (sec: number) => void
+  workspaceId: string
+  itemId: string
+  /** 字幕保存成功后回调（父组件可借此刷新 source.md 展示） */
+  onSaved?: () => void
 }
 
 function activeTranscriptIdx(
@@ -25,6 +30,9 @@ export default function LNTranscriptPanel({
   transcript,
   currentTime,
   onSeek,
+  workspaceId,
+  itemId,
+  onSaved,
 }: LNTranscriptPanelProps) {
   const activeIdx = useMemo(
     () => activeTranscriptIdx(transcript, currentTime),
@@ -33,15 +41,53 @@ export default function LNTranscriptPanel({
   const activeRef = useRef<HTMLDivElement>(null)
   const insertAtCursor = useLnEditorStore((s) => s.insertAtCursor)
 
+  // ── 双击编辑状态 ──
+  const [editingIdx, setEditingIdx] = useState<number | null>(null)
+  const [editText, setEditText] = useState('')
+  // 乐观更新：保存成功后立即在面板回显新文字（key=段下标），免刷新；重进页面组件重挂即清空
+  const [localEdits, setLocalEdits] = useState<Record<number, string>>({})
+
   useEffect(() => {
     if (activeRef.current) {
       activeRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
   }, [activeIdx])
 
-  function handleQuote(line: VideoResultTranscriptLine, e: React.MouseEvent) {
+  const handleEditSave = useCallback(
+    async (idx: number) => {
+      const trimmed = editText.trim()
+      const current = localEdits[idx] ?? transcript[idx]?.text ?? ''
+      if (trimmed === current) {
+        setEditingIdx(null)
+        return
+      }
+      try {
+        await updateTranscriptSegment(workspaceId, itemId, idx, trimmed)
+        // 乐观更新：空内容 = 恢复原文（移除 override 回退到原 text），否则记下新文字
+        setLocalEdits((prev) => {
+          const next = { ...prev }
+          if (trimmed) next[idx] = trimmed
+          else delete next[idx]
+          return next
+        })
+        toast.success('字幕已保存')
+        onSaved?.()
+      } catch {
+        toast.error('保存失败，请重试')
+      }
+      setEditingIdx(null)
+    },
+    [editText, transcript, workspaceId, itemId, localEdits, onSaved],
+  )
+
+  const handleEditCancel = useCallback(() => {
+    setEditingIdx(null)
+    setEditText('')
+  }, [])
+
+  function handleQuote(line: VideoResultTranscriptLine, text: string, e: React.MouseEvent) {
     e.stopPropagation()
-    const md = `> [${line.t_str}] ${line.text}\n`
+    const md = `> [${line.t_str}] ${text}\n`
     const inserted = insertAtCursor(md)
     if (inserted) {
       toast.success('已引用字幕')
@@ -60,25 +106,49 @@ export default function LNTranscriptPanel({
 
   return (
     <div className="ln-transcript-panel">
-      {transcript.map((line, i) => (
-        <div
-          key={`${line.t_sec}-${i}`}
-          ref={i === activeIdx ? activeRef : undefined}
-          className="ln-tr-row"
-          data-active={i === activeIdx}
-          onClick={() => onSeek(line.t_sec)}
-        >
-          <span className="ln-tr-time">{line.t_str}</span>
-          <span className="ln-tr-text">{line.text}</span>
-          <button
-            className="ln-tr-quote"
-            title="引用到笔记"
-            onClick={(e) => handleQuote(line, e)}
+      {transcript.map((line, i) => {
+        const isEditing = editingIdx === i
+        const displayText = localEdits[i] ?? line.text
+        return (
+          <div
+            key={`${line.t_sec}-${i}`}
+            ref={i === activeIdx ? activeRef : undefined}
+            className="ln-tr-row"
+            data-active={i === activeIdx}
+            onClick={() => !isEditing && onSeek(line.t_sec)}
+            onDoubleClick={(e) => {
+              e.stopPropagation()
+              setEditingIdx(i)
+              setEditText(displayText)
+            }}
           >
-            <Quote size={12} />
-          </button>
-        </div>
-      ))}
+            <span className="ln-tr-time">{line.t_str}</span>
+            {isEditing ? (
+              <input
+                className="ln-tr-edit-input"
+                autoFocus
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleEditSave(i)
+                  if (e.key === 'Escape') handleEditCancel()
+                }}
+                onBlur={() => handleEditSave(i)}
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <span className="ln-tr-text">{displayText}</span>
+            )}
+            <button
+              className="ln-tr-quote"
+              title="引用到笔记"
+              onClick={(e) => handleQuote(line, displayText, e)}
+            >
+              <Quote size={12} />
+            </button>
+          </div>
+        )
+      })}
     </div>
   )
 }

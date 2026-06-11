@@ -74,6 +74,8 @@ export const TASK_GROUPS: Record<MediaKind, TaskGroup[]> = {
       children: [
         { id: 'summary_path', label: '总结路径', type: 'radio', options: ['只看画面', '只听字幕/音频转写', '音视频综合'], default: '音视频综合' },
         { id: 'summary_depth', label: '总结深度', type: 'radio', options: ['简洁', '详细', '带画面引用'], default: '详细', whenParent: 'summary_path', whenValue: '音视频综合' },
+        { id: 'embed_frames', label: '嵌入关键帧图片', type: 'check', default: true, hint: '在标准总结中插入截帧配图' },
+        { id: 'max_embed_frames', label: '最多嵌入帧数', type: 'number', default: 12, unit: '张', whenParent: 'embed_frames', whenValue: true },
       ],
     },
     { id: 'music', label: '音乐分析', sub: 'BPM / 调性 / 乐器 / 提示词', default: false,
@@ -171,7 +173,7 @@ export function applyCascades(
   raw: TaskState,
   materialCount = 1,
   scope?: AnalysisScope,
-  features?: Record<string, boolean>,
+  _features?: Record<string, boolean>,
 ): CascadeResult {
   const s = structuredClone(raw)
   const locks: Record<string, string> = {}

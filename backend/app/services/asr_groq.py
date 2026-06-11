@@ -30,6 +30,15 @@ def transcribe_with_groq(audio_bytes: bytes, *, api_key: str, model: str = "whis
                 detail = resp.text
             raise RuntimeError(f"Groq ASR failed: HTTP {resp.status_code} {detail}")
         payload = resp.json()
-        return str(payload.get("text") or "").strip()
+        text = str(payload.get("text") or "").strip()
+        # 繁→简后处理：远程 ASR 有时返回繁体
+        if text:
+            try:
+                from opencc import OpenCC
+                _cc = OpenCC("t2s")
+                text = _cc.convert(text)
+            except Exception:
+                pass
+        return text
     finally:
         tmp_path.unlink(missing_ok=True)

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import urllib.parse
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -47,7 +48,8 @@ def normalize_transcript(raw: Any) -> List[Dict[str, Any]]:
     for seg in raw:
         if not isinstance(seg, dict):
             continue
-        text = str(seg.get("text", "")).strip()
+        # edited_text 优先（R2：字幕编辑后三处一致生效的显示层）
+        text = str(seg.get("edited_text") or seg.get("text", "")).strip()
         if not text:
             continue
         if "t_sec" in seg:
@@ -101,7 +103,7 @@ def build_frontmatter(item: WorkspaceItem, workspace_id: str) -> Dict[str, Any]:
         frames = results.get("frames", [])
         if frames:
             media["frames"] = [
-                {"sec": f.get("sec", 0), "path": f.get("frame_path", "")}
+                {"sec": f.get("sec", 0), "path": f.get("image_path") or f.get("frame_image_path") or ""}
                 for f in frames
                 if isinstance(f, dict)
             ]
@@ -162,16 +164,31 @@ def _build_body(item: WorkspaceItem) -> str:
         return results.get("markdown") or results.get("content", "") or results.get("summary", "")
 
     if item_type in ("audio", "video"):
-        # 优先用 transcript（str 或 list），再兜底 transcript_segments，最后 summary
+        # 优先用 transcript_segments（含 edited_text 优先，R2 字幕编辑同步），
+        # 再兜底 transcript（str 或 list），最后 summary
+        segments = results.get("transcript_segments")
+        if isinstance(segments, list) and segments:
+            lines = []
+            for seg in segments:
+                if isinstance(seg, dict):
+                    start = seg.get("start", "")
+                    text = str(seg.get("edited_text") or seg.get("text", ""))
+                    if start != "":
+                        lines.append(f"**[{start}s]** {text}")
+                    else:
+                        lines.append(text)
+            joined = "\n\n".join(lines)
+            if joined.strip():
+                return joined
+        # 兜底：transcript（str 或 list）
         transcript = results.get("transcript")
         if isinstance(transcript, str) and transcript.strip():
             return transcript
         if isinstance(transcript, list) and transcript:
-            # transcript 可能是 list of dicts（video 的 display lines）或 list of str
             lines = []
             for seg in transcript:
                 if isinstance(seg, dict):
-                    text = seg.get("text", "")
+                    text = str(seg.get("edited_text") or seg.get("text", ""))
                     start = seg.get("start", "")
                     if start != "":
                         lines.append(f"**[{start}s]** {text}")
@@ -182,18 +199,6 @@ def _build_body(item: WorkspaceItem) -> str:
             joined = "\n\n".join(lines)
             if joined.strip():
                 return joined
-        # 兜底：transcript_segments（音频 handler 常见字段）
-        segments = results.get("transcript_segments")
-        if isinstance(segments, list) and segments:
-            lines = []
-            for seg in segments:
-                if isinstance(seg, dict):
-                    start = seg.get("start", "")
-                    text = seg.get("text", "")
-                    if start != "":
-                        lines.append(f"**[{start}s]** {text}")
-                    else:
-                        lines.append(text)
             joined = "\n\n".join(lines)
             if joined.strip():
                 return joined
@@ -219,14 +224,131 @@ def _build_body(item: WorkspaceItem) -> str:
 
 def build_source_md(item: WorkspaceItem) -> str:
     """生成 source.md 内容（原始依据）。"""
-    return _build_body(item)
+    body = _build_body(item)
+    # R2：视频类型加「视频信息」头（链接/标题/作者/时长/发布日 + 简介）
+    if item.type == "video":
+        results = item.results or {}
+        source_url = item.source_value or ""
+        title = results.get("video_title", "")
+        author = results.get("video_uploader", "")
+        duration = results.get("video_duration", "")
+        upload_date = results.get("video_upload_date", "")
+        description = results.get("video_description", "")
+        # 格式化时长（秒 → mm:ss 或 hh:mm:ss）
+        duration_str = ""
+        if duration:
+            try:
+                secs = int(float(duration))
+                if secs >= 3600:
+                    duration_str = f"{secs // 3600}:{(secs % 3600) // 60:02d}:{secs % 60:02d}"
+                else:
+                    duration_str = f"{secs // 60}:{secs % 60:02d}"
+            except (ValueError, TypeError):
+                duration_str = str(duration)
+        header_lines = ["## 视频信息", ""]
+        if source_url:
+            header_lines.append(f"- 链接：{source_url}")
+        if title:
+            header_lines.append(f"- 标题：{title}")
+        if author:
+            header_lines.append(f"- 作者：{author}")
+        time_parts = []
+        if duration_str:
+            time_parts.append(f"时长：{duration_str}")
+        if upload_date:
+            time_parts.append(f"发布：{upload_date}")
+        if time_parts:
+            header_lines.append(f"- {' / '.join(time_parts)}")
+        if description:
+            header_lines.append("")
+            # 截断过长简介
+            desc_short = description[:500]
+            if len(description) > 500:
+                desc_short += "…"
+            header_lines.append(f"> {desc_short}")
+        header_lines.extend(["", "## 转写正文", ""])
+        body = "\n".join(header_lines) + body
+
+        # R3.9/R3.18: 画面分析段追加在转写正文之后（视频信息 → 转写正文 → 画面分析）。
+        # R3.18: 图文化 — 逐帧加截图 ![]() + 价值闸门 + 相邻去重 + 上限保护，让
+        #        source.md 成为「图文并列的画面库」（对齐用户「文字带图片」诉求）。
+        #        复用 summary_generator 的找图/闸门/去重逻辑，保持与富文本配图一致。
+        from backend.app.services.summary_generator import (
+            _find_frame_image,
+            _frames_too_similar,
+            _is_low_value_frame,
+            _to_static_url,
+        )
+        json_outputs = results.get("json_outputs", []) or []
+        visual_parts: list[str] = []
+        for jp_str in json_outputs:
+            try:
+                jp = Path(jp_str)
+                if not jp.exists():
+                    continue
+                vdata = json.loads(jp.read_text(encoding="utf-8"))
+                gvs = str(vdata.get("global_visual_summary") or "").strip()
+                raw_frames = vdata.get("frames") or []
+                if not gvs and not raw_frames:
+                    continue
+                visual_parts.append("## 画面分析")
+                visual_parts.append("")
+                if gvs:
+                    visual_parts.append("### 全局概览")
+                    visual_parts.append("")
+                    visual_parts.append(gvs)
+                    visual_parts.append("")
+                if raw_frames:
+                    visual_parts.append("### 逐帧画面")
+                    visual_parts.append("")
+                    prev_desc = ""
+                    shown = 0
+                    for i, fr in enumerate(raw_frames):
+                        if shown >= 60:  # 上限保护（视频可能数百帧）
+                            break
+                        ts = str(fr.get("timestamp") or "")
+                        content = str(
+                            fr.get("content_zh") or fr.get("description_zh") or ""
+                        ).strip()
+                        # 价值闸门：滤纯色过渡/黑屏/极短描述
+                        if not content or _is_low_value_frame(content):
+                            continue
+                        # 相邻去重：连续相似画面只留一张
+                        if prev_desc and _frames_too_similar(content, prev_desc):
+                            continue
+                        prev_desc = content
+                        visual_parts.append(f"**[{ts}]** {content}")
+                        visual_parts.append("")
+                        img_url = _to_static_url(_find_frame_image(str(jp), i))
+                        if img_url:
+                            safe_url = urllib.parse.quote(img_url, safe="/:")
+                            safe_alt = content[:60].replace("[", "\\[").replace("]", "\\]").replace("\n", " ").replace("\r", " ")
+                            visual_parts.append(f"![{safe_alt}]({safe_url})")
+                            visual_parts.append("")
+                        shown += 1
+            except Exception:
+                continue
+        if visual_parts:
+            body += "\n\n" + "\n".join(visual_parts)
+
+    return body
 
 
 def build_note_md(item: WorkspaceItem, frontmatter: Dict[str, Any]) -> str:
-    """生成 note.md = YAML frontmatter + 正文（含 LLM 摘要）。"""
+    """生成 note.md = YAML frontmatter + 正文（含 LLM 摘要）。
+
+    R3.5: 若 results 含 note_body（pipeline 自动生成的 standard 总结），
+    直接用作全文正文；否则走旧逻辑（摘要 + 转写）。
+    """
     fm_yaml = yaml.dump(frontmatter, allow_unicode=True, default_flow_style=False, sort_keys=False)
+
+    # R3.5 优先：note_body = pipeline 自动生成的 standard 总结
+    note_body = (item.results or {}).get("note_body", "")
+    if note_body and isinstance(note_body, str) and note_body.strip():
+        return f"---\n{fm_yaml}---\n\n{note_body.strip()}"
+
+    # 兜底：旧逻辑（摘要 + 转写正文）
     body = _build_body(item)
-    # 如有 LLM 摘要，插入正文开头
     summary = (item.results or {}).get("llm_summary", "")
     if summary and isinstance(summary, str) and summary.strip():
         body = f"## 摘要\n\n{summary.strip()}\n\n---\n\n{body}"

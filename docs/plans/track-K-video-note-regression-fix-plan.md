@@ -1,8 +1,9 @@
 ---
 title: Track K · 视频笔记「入口收敛 + 回归修复」计划（交付 mimo v2.5 pro 执行）
-status: ready
+status: done
 owner: mimo（执行）/ 用户（拍板）
 created: 2026-06-08
+completed_date: 2026-06-11
 strategy: 用户 2026-06-08 已定 —— **不重写、不新建项目**；在现有项目（后端 1.7w 行 / 前端 3.5w 行 / 884 提交）做**彻底删除式收敛**：保留所有底层能力，删掉多余创建入口与旧路径，只留「生成笔记 → note task → NoteShell」一套。再对齐 B 站流程修回归。
 relates:
   - docs/plans/track-K-note-flow-blueprint.md（蓝图：内容处理 §2 + 视频 UI §3.5 + 差距清单附录 D）
@@ -113,15 +114,15 @@ relates:
 
 # 4. 总验证清单（全做完后，B站 + 小红书各跑一遍）
 
-- [ ] 加链接只有「生成笔记」一个入口
-- [ ] **一个视频 = 一个任务**（无 /tmp/test.mp3）
-- [ ] 步骤完整走 download→transcribe→analyze→note
-- [ ] 标题是真实标题
-- [ ] 视频**能播放**
-- [ ] **截图插入**能写进 md
-- [ ] 字幕/转录轴点击跳播放器；正文时间码点击跳画面
-- [ ] 小红书图文、B站 opus **图文笔记没被改坏**
-- [ ] `npx tsc --noEmit` + `pytest` 全绿
+- [x] 加链接只有「生成笔记」一个入口
+- [x] **一个视频 = 一个任务**（无 /tmp/test.mp3）
+- [x] 步骤完整走 download→transcribe→analyze→note
+- [x] 标题是真实标题
+- [x] 视频**能播放**
+- [x] **截图插入**能写进 md
+- [x] 字幕/转录轴点击跳播放器；正文时间码点击跳画面
+- [x] 小红书图文、B站 opus **图文笔记没被改坏**
+- [x] `npx tsc --noEmit` + `pytest` 全绿
 
 ---
 
@@ -275,6 +276,8 @@ relates:
 
 9.x 布局做完后，用户提 5 点，集中在「内容质量 + 编辑能力」，**大量动后端**。本章拆 3 个独立子阶段，**每阶段单独 commit + 验收再下一个**。
 
+> 📎 **R2 实测后续 · 问题 2（字幕一段 20 秒太长）已拆为独立执行卡**：[`docs/plans/track-K-segment-refiner-plan.md`](track-K-segment-refiner-plan.md)（引擎无关字幕切分层 `segment_refiner`，不引入新 ASR 库）。问题 1（双击保存失败）已修于 commit `1aa619e`；问题 3（source.md 视频元数据）非新视频 bug，元数据已在 [pipeline_tasks.py:520](../../backend/app/services/pipeline_tasks.py:520) 接好，仅旧数据无。
+
 ## 10.0 已确认决策（开工前提）
 
 1. **点1 总结面板**：右侧列表**只管「看 + 切」**，「新建总结」收进弹窗。
@@ -337,29 +340,60 @@ relates:
 
 **R2 验收**：视频笔记双击字幕能改字；改完源md 里那句也变；重启后改动还在；source.md 顶部有链接/作者/简介。
 
-## 10.4 阶段 R3 · 标准总结·嵌关键帧（点5）
+## 10.4 阶段 R3 · 标准总结（2026-06-08 实测后拆分：R3.1 纯文字 / R3.2 嵌帧后置）
 
-**新增「标准总结」模板**（[summary_templates.py](backend/app/services/summary_templates.py) `TEMPLATES` 加一项 `standard`）。system_prompt（草案，开工时按需微调）：
+> ⚠️ **拆分原因（用户 2026-06-08 拍板）**：原计划「standard 模板 + 嵌关键帧」一锅做，但实测发现**嵌关键帧的前置根本不成立**，且帧字段契约四方断裂（见 R3.2）。故拆开：先交付纯文字版（数据齐全、立即可用），嵌图单列后置。
 
-```
-你是一名优秀的讲解型笔记作者。把下面这段视频转写重写成一篇结构化中文学习笔记——
-不是按字幕时间堆砌，而是重组成有教学逻辑的讲解。要求：
-1. 用 markdown，## 分节、### 分小节。
-2. 开头一段「背景/动机」：这视频解决什么问题、为什么值得看。
-3. 每个主题按「是什么→为什么→怎么做→例子→小结」展开，过渡自然，不要流水账。
-4. 关键信号用引用块：> 💡 **要点**（必记核心）/ > 📎 **背景**（前置知识）/ > ⚠️ **注意**（易错点）。
-5. 公式/代码先用大白话讲意图再给出。
-6. 结尾 ## 总结与延伸：作者收尾 + 你提炼的核心要点 + 可行动 takeaway。
-7. 跳过寒暄/广告/一键三连。
-8. 若给了「关键帧清单」，在讲到对应内容处用 [[图N]] 插入配图（N=帧号），图文并茂；
-   只在画面确实支撑该处讲解时插，不硬塞。
-```
+### R3.1 · 纯文字「标准总结」模板（status: ready，可立即执行）
 
-**生成器改造**（[summary_generator.py](backend/app/services/summary_generator.py)）：仅对 `standard` 模板——
-- user_prompt 注入「关键帧清单」：遍历 `item.results["frames"]`，每帧一行 `[图{i} @{mm:ss}] {description_zh}`（复用 [_collect_frame_descriptions](backend/app/services/pipeline_tasks.py:766) 同款字段 `description_zh`/`sec`）。
-- 生成后 **post-process**：正则把 `[[图N]]` → `![{该帧description}]({该帧 frame_url})`，frame_url 取 `frames[N]` 的 image path（转 /static）。越界的 `[[图N]]` 删掉不报错。
+**只新增一个教学化模板，不嵌图、不改生成器**——数据源是现成的 `transcript`，走 R1 已有的 `generate_summary` 流程。
 
-**R3 验收**：标准总结是结构化教学笔记（有背景/分节/要点框/末尾综合）；正文按内容嵌入了对应关键帧图；中间默认展示它。
+1. **后端**：[summary_templates.py](backend/app/services/summary_templates.py) `TEMPLATES` 加 `standard`（`SummaryTemplate(system_prompt, user_prompt, output_format="markdown")`）。`user_prompt` 复用其它模板同款 `{transcript}` 注入即可。**不动 [summary_generator.py](backend/app/services/summary_generator.py)**（纯文字模板和现有 14 个走同一条路；后端 `list_template_ids()` 自动收录，`_ensure_valid_template` 自动放行）。
+
+   system_prompt（对齐 wdkns `bilibili-render-pdf` 教学结构：motivation→core→mechanism→example→takeaway + 三类高亮框 + 本章小结）：
+
+   ```
+   你是一名优秀的讲解型笔记作者。把下面这段视频转写重写成一篇结构化中文学习笔记——
+   不是按字幕时间堆砌，而是重组成有教学逻辑的讲解。要求：
+   1. 用 markdown，## 分节、### 分小节。
+   2. 开头一段「背景/动机」：这视频解决什么问题、为什么值得看。
+   3. 每个主题按「动机→核心思想→机制/原理→例子或证据→小结」展开，过渡自然，不要流水账。
+      不要照抄字幕顺序，按教学逻辑重组（有意图、有对比、有递进）。
+   4. 关键信号用引用块（对齐 wdkns 教学三框，一节可放多个、不限一框）：
+      > 💡 **要点** — 必记核心：定义、中心论点、关键机制小结、算法关键步骤。
+      > 📎 **背景** — 前置/旁支知识：前置提醒、术语对比、设计权衡、建立直觉的类比。
+      > ⚠️ **注意** — 易错点/常见误解：隐藏假设、误导直觉、实现陷阱、把错误直觉与正确做法对照。
+   5. 公式/代码先用大白话讲意图，再给出。
+   6. 每个主要章节结尾加一行「**本章小结**」浓缩该节。
+   7. 结尾 ## 总结与延伸：作者收尾 + 你提炼的核心要点 + 可行动 takeaway。
+   8. 跳过寒暄/广告/一键三连。
+   ```
+
+2. **前端**：在 R1 的「新建总结」弹窗模板清单里加一项「标准总结」（label + 一句描述，`template=standard`）。定位执行时 `rg` 模板选项定义处；后端动态放行，前端只需补展示项。
+
+3. **R3.1 验收**：新建 `standard` 总结 → 结构化教学笔记（有背景/动机、分节、💡📎⚠️ 三框、每节本章小结、末尾总结与延伸）；中列默认展示；可在总结面板与其它模板切换。
+
+### R3.2 · 标准总结·嵌关键帧（status: blocked，依赖前置，R3.1 验收后再展开）
+
+**实测发现的偏差（2026-06-08，勿照原计划开工）**：
+
+| 原假设 | 现实 |
+|---|---|
+| `results["frames"]` 是可嵌的关键帧 | 只存每视频**第一帧**缩略图，字段 `{frame_image, frame_image_path}`，无描述无时间 |
+| 帧有 `description_zh`/`sec` | 带描述的帧在 `*_视觉数据.json`，字段是 `description_zh`/**`timestamp`**/image |
+| `note_assembler` 已支持帧 | 它读 `{sec, frame_path}`，与 pipeline 写入字段对不上 → `media.frames` 是坏数据 |
+| 视频笔记有帧可嵌 | 实测该 B 站笔记：**无 frames 目录、无视觉 JSON、`media.frames=[]`** |
+
+**根因**：截帧(`FRAMES`)+视觉分析(`VLM`)是 preflight 可选分析任务（[tasks.py:20](backend/app/models/tasks.py:20)），视频笔记未默认启用 → 零关键帧。
+
+**R3.2 必做的前置（按序）**：
+- **前置①**：打通「视频笔记 → 截帧+VLM → note 带关键帧」——确认 note pipeline 是否跑 analyze step、preflight 默认是否勾 FRAMES/VLM（涉及速度/成本，**改默认前问用户**）。
+- **前置②**：统一关键帧字段契约一份（建议 `{sec, desc, image_path}`），对齐 pipeline 写入（[pipeline_tasks.py:1113](backend/app/services/pipeline_tasks.py:1113)）↔ note_assembler 读取（[note_assembler.py:104](backend/app/services/note_assembler.py:104)）↔ 视觉 JSON（`description_zh`/`timestamp`）。**这是修一个已存在的链路 bug，独立成 commit**。
+- **本体**：standard 加嵌图变体——`generate_summary` 对 standard 注入「关键帧清单」（数据源 = 视觉 JSON，**不是** `results["frames"]`）+ 生成后把 `[[图N]]` post-process 成 `![desc](/static…)`，越界帧号删掉。
+
+**R3.2 验收**：勾了截帧的视频笔记，standard 正文按内容嵌入对应关键帧图，图文并茂。
+
+> 📎 **R3.1/R3.2 实测后续（2026-06-09）→ 独立执行卡**：[`docs/plans/track-K-R3-followup-plan.md`](track-K-R3-followup-plan.md)。用户实测反馈两点拆为 **R3.3**（standard 纯文字「太啰嗦」→ 自适应简略，先做）+ **R3.4**（嵌图实测 0 图 → 修帧串台/无描述链路，后做）。富文本无图段落重复渲染 bug 已修于 `946474d`。
 
 ## 10.5 红线 + 通用要求
 

@@ -42,6 +42,7 @@ from shared.video_analyzer import (
     run_batch_analysis,
 )
 from shared.video_download_ytdlp import fetch_ytdlp_metadata, is_platform_url, run_ytdlp_download
+from shared.segment_refiner import refine_segments
 from shared.xiaohongshu_share import is_xiaohongshu_url_or_text, run_xiaohongshu_download
 from src.vidmirror.core.providers import ChatRequest
 from src.vidmirror.core.providers.registry import create_default_registry
@@ -105,6 +106,30 @@ _VIDEO_TEMPLATE_PROMPTS: Dict[str, str] = {
         "2. 产品核心卖点（编号列表）\n"
         "3. 优缺点分析\n"
         "4. 适合人群与购买建议\n"
+    ),
+    "学术": (
+        "这是一段学术/知识类视频的转写文本。请按以下结构输出总结：\n"
+        "1. 核心论点（一句话）\n"
+        "2. 研究背景与动机\n"
+        "3. 方法论与论证逻辑\n"
+        "4. 关键发现与结论\n"
+        "5. 局限性与未来方向\n"
+    ),
+    "会议纪要": (
+        "这是一段会议/讨论类视频的转写文本。请按以下结构输出总结：\n"
+        "1. 会议主题（一句话）\n"
+        "2. 参会人员与角色\n"
+        "3. 讨论要点（编号列表）\n"
+        "4. 决议与行动项\n"
+        "5. 待解决问题\n"
+    ),
+    "商业报告": (
+        "这是一段商业/财经类视频的转写文本。请按以下结构输出总结：\n"
+        "1. 核心观点（一句话）\n"
+        "2. 市场背景与趋势\n"
+        "3. 关键数据与指标\n"
+        "4. 策略建议\n"
+        "5. 风险提示\n"
     ),
     "其它": (
         "请将以下视频转写文本总结为结构化输出：\n"
@@ -288,6 +313,9 @@ def _run_video_model_path(
 
     transcript_text = "\n".join(line["text"] for line in all_transcript_lines)
     combined_summary = "\n\n".join(summaries) if summaries else ""
+
+    # R2 segment_refiner：切细过长字幕段（在存入 results 前）
+    all_transcript_segments = refine_segments(all_transcript_segments)
 
     final_result: Dict[str, Any] = {
         "json_outputs": [],
@@ -524,6 +552,10 @@ def handle_download_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, An
         result["video_uploader"] = out["uploader"]
     if out.get("thumbnail_url"):
         result["video_thumbnail_url"] = out["thumbnail_url"]
+    if out.get("description"):
+        result["video_description"] = out["description"]
+    if out.get("upload_date"):
+        result["video_upload_date"] = out["upload_date"]
     return result
 
 
@@ -542,7 +574,7 @@ def _apply_ytdlp_metadata_to_task(
     - 调用 workspaces._maybe_rename_workspace_from_video_title 触发 workspace 改名（如适用）
     """
     meta: Dict[str, Any] = {}
-    for key in ("title", "duration", "uploader", "thumbnail_url"):
+    for key in ("title", "duration", "uploader", "thumbnail_url", "description", "upload_date"):
         val = dl_result.get(key)
         if not val:
             continue
@@ -747,6 +779,9 @@ def _run_subtitle_summary(
     except Exception:
         pass
 
+    # segment_refiner：切细过长字幕段（在存入 results 前）
+    transcript_segments = refine_segments(transcript_segments)
+
     # 规范化 transcript 为数组格式（前端 VideoResult.transcript 期望 VideoResultTranscriptLine[]）
     transcript_lines = _build_display_transcript_lines(transcript_text, transcript_segments)
 
@@ -781,16 +816,53 @@ def _collect_frame_descriptions(json_paths: list) -> str:
     return "\n".join(lines)
 
 
+def _extract_bvid(filename: str) -> str:
+    """从文件名提取 B 站 BV 号（BV + 数字字母），无则返回空串。"""
+    m = re.search(r"(BV[0-9A-Za-z]+)", filename)
+    return m.group(1) if m else ""
+
+
 def _find_visual_json_paths_for_videos(project_json_dir: Path, videos: List[Path]) -> List[Path]:
-    """只返回当前 videos 对应的 VLM JSON，避免复用同工作区里其它视频的视觉数据。"""
-    expected_names = {f"{get_safe_name(video)}_视觉数据.json" for video in videos}
-    if not expected_names:
+    """只返回当前 videos 对应的 VLM JSON，避免复用同工作区里其它视频的视觉数据。
+
+    匹配策略（R3.7 修复中文标点/连字符导致 safe-name 不一致）：
+    1. 优先 BV 号匹配：从视频文件名提 BV 号，在视觉 JSON 文件名里找含同一 BV 号者。
+    2. 回退 safe-name：无 BV 号（非 B 站/本地文件）时用 get_safe_name 精确匹配。
+    """
+    if not videos:
         return []
-    return sorted(
-        path
-        for path in project_json_dir.glob("*_视觉数据.json")
-        if path.name in expected_names
-    )
+
+    all_jsons = list(project_json_dir.glob("*_视觉数据.json"))
+    if not all_jsons:
+        return []
+
+    matched: set[Path] = set()
+
+    # ── 1. BV 号匹配（优先） ──
+    bvid_to_video: dict[str, Path] = {}
+    videos_without_bvid: list[Path] = []
+    for video in videos:
+        bvid = _extract_bvid(video.name)
+        if bvid:
+            bvid_to_video[bvid] = video
+        else:
+            videos_without_bvid.append(video)
+
+    if bvid_to_video:
+        for json_path in all_jsons:
+            for bvid in bvid_to_video:
+                if bvid in json_path.name:
+                    matched.add(json_path)
+                    break
+
+    # ── 2. safe-name 回退（无 BV 号的视频） ──
+    if videos_without_bvid:
+        fallback_names = {f"{get_safe_name(v)}_视觉数据.json" for v in videos_without_bvid}
+        for json_path in all_jsons:
+            if json_path not in matched and json_path.name in fallback_names:
+                matched.add(json_path)
+
+    return sorted(matched)
 
 
 def _generate_combined_summary(
@@ -1268,7 +1340,7 @@ def _download_note_source(
         _xhs_out.mkdir(parents=True, exist_ok=True)
         _xhs = run_xiaohongshu_download(
             url_or_text=url, output_dir=str(_xhs_out), log=log,
-            progress_callback=lambda p, msg: runner.set_progress(task_id, 0.02 + p * 0.28, msg),
+            progress_callback=lambda p, msg: runner.set_progress(task_id, 0.02 + p * 0.08, msg),
         )
         _nm = _xhs.get("note_meta") or {}
         _note_type = str(_nm.get("type") or "normal")
@@ -1371,7 +1443,7 @@ def _download_note_source(
             url=url,
             output_dir=str(project_video_dir),
             log=log,
-            progress_callback=lambda p, msg: runner.set_progress(task_id, 0.02 + p * 0.28, msg),
+            progress_callback=lambda p, msg: runner.set_progress(task_id, 0.02 + p * 0.08, msg),
             speed_callback=lambda s: runner.set_download_speed(task_id, s),
             info_callback=lambda meta: _apply_ytdlp_metadata_to_task(record, runner, meta),
             **dl_kwargs,
@@ -1780,7 +1852,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
 
     # ── 3.5. PROBE 阶段（M7: 内容识别 + 步骤裁剪）─────────────
     runner.store.update(task_id, status=TaskStatus.PROBE.value)
-    runner.set_progress(task_id, 0.30, "探测内容类型...")
+    runner.set_progress(task_id, 0.10, "探测内容类型...")
 
     if "download" in steps:
         probe = _probe_note_source(dl_result, payload)
@@ -1789,6 +1861,12 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         images_from_download = probe["images"] or images_from_download
         background_context = probe["background_context"]
         steps = probe["steps"]
+
+        # R4.7: 配图关闭时跳过截帧+VLM（省掉重 API 调用），笔记只用转写文本
+        _pf = payload.get("preflight") or {}
+        if not _pf.get("embed_frames", True) and "analyze" in steps:
+            steps = [s for s in steps if s != "analyze"]
+            runner.append_log(task_id, "⏭️ embed_frames=False → 跳过截帧分析")
 
         runner.append_log(
             task_id,
@@ -1806,7 +1884,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     # ── 3.6. 图集分析（image_text: OCR + VLM 逐图描述 + LLM 语境合成）──
     if note_kind == "image_text" and images_from_download:
         runner.store.update(task_id, status=TaskStatus.VLM.value)
-        runner.set_progress(task_id, 0.35, "图集分析中...")
+        runner.set_progress(task_id, 0.15, "图集分析中...")
 
         def _log_img(msg: str) -> None:
             runner.append_log(task_id, f"[图集] {msg}")
@@ -1817,7 +1895,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         for idx, img_path in enumerate(images_from_download):
             runner.set_progress(
                 task_id,
-                0.35 + 0.20 * (idx / len(images_from_download)),
+                0.15 + 0.15 * (idx / len(images_from_download)),
                 f"分析图片 {idx + 1}/{len(images_from_download)}...",
             )
             info = analyze_image_file(
@@ -1865,7 +1943,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
 
     # ── 4+5. transcribe + analyze 并行步骤 ──────────────────────
     # R22: 音频转录(ASR)与视频截帧(VLM)本质独立，可并行执行。
-    # 进度区间：transcribe 0.32~0.58, analyze 0.58~0.85，各自独立更新。
+    # 进度区间：transcribe 0.12~0.30, analyze 0.30~0.60，各自独立更新。
     if "transcribe" in steps or "analyze" in steps:
         from concurrent.futures import Future, as_completed
 
@@ -1930,7 +2008,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
 
         # ── 进度单调递增保护（两轨并行写进度，只前进不后退）─────
         _progress_lock = threading.Lock()
-        _max_progress = [0.30]  # PROBE 阶段结束时的进度
+        _max_progress = [0.10]  # PROBE 阶段结束时的进度
 
         def _monotonic_progress(pct: float, msg: str) -> None:
             """只在新进度大于历史最大值时才更新，避免两轨互相覆盖导致倒退。"""
@@ -1944,19 +2022,21 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         if "transcribe" in steps:
             def _run_transcribe() -> str:
                 runner.store.update(task_id, status=TaskStatus.ASR.value)
-                _monotonic_progress(0.32, "开始转录音频...")
+                _monotonic_progress(0.12, "开始转录音频...")
 
                 tcfg = load_settings().transcriber
+                # 兜底：fast-whisper 不支持 mps
+                _device = tcfg.device if tcfg.device != "mps" else "cpu"
                 runner.append_log(
                     task_id,
                     f"📄 本地转录 | 文件={Path(video_file).name} "
-                    f"model={tcfg.whisper_model_size} device={tcfg.device} language={tcfg.language or 'auto'}",
+                    f"model={tcfg.whisper_model_size} device={_device} language={tcfg.language or 'auto'}",
                 )
 
                 def _on_progress(ratio: float, msg: str) -> None:
                     if _cancel_event.is_set():
                         raise RuntimeError("已取消：另一轨失败")
-                    mapped = 0.32 + 0.26 * max(0.0, min(1.0, ratio))
+                    mapped = 0.12 + 0.18 * max(0.0, min(1.0, ratio))
                     _monotonic_progress(mapped, f"[转录] {msg}")
 
                 def _on_log(msg: str) -> None:
@@ -1966,12 +2046,15 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 _text, _segments, _dur = transcribe_file_with_fast_whisper(
                     video_file,
                     model_name=tcfg.whisper_model_size or "base",
-                    device=tcfg.device or "cpu",
+                    device=_device,
                     language=tcfg.language or "",
                     initial_prompt=tcfg.initial_prompt or "",
                     log_callback=_on_log,
                     progress_callback=_on_progress,
                     return_segments=True,
+                    cpu_threads=tcfg.cpu_threads,
+                    beam_size=tcfg.beam_size,
+                    vad_filter=tcfg.vad_filter,
                 )
                 return _text, _segments
 
@@ -1982,7 +2065,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         if "analyze" in steps:
             def _run_analyze() -> str:
                 runner.store.update(task_id, status=TaskStatus.FRAMES.value)
-                _monotonic_progress(0.58, "开始视觉帧分析...")
+                _monotonic_progress(0.30, "开始视觉帧分析...")
 
                 frame_prompts = payload.get("frame_prompt")
                 if preflight := payload.get("preflight"):
@@ -2000,6 +2083,10 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                         f"frames_per_shot={capture_params.frames_per_shot}"
                     )
 
+                image_mode = "vision"
+                if preflight := payload.get("preflight"):
+                    image_mode = preflight.get("image_mode") or "vision"
+
                 state = run_batch_analysis(
                     api_key=api_key,
                     video_paths=videos,
@@ -2010,6 +2097,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                     capture_params=capture_params,
                     concurrency=_tier_vlm_concurrency(),
                     cancel_event=_cancel_event,
+                    image_mode=image_mode,
                 )
 
                 _last_logged_pct = -1.0
@@ -2023,7 +2111,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                     snaps = state.snapshot()
                     if snaps:
                         avg = sum(float(s["percent"]) for s in snaps) / max(len(snaps), 1) / 100.0
-                        cur_pct = min(0.85, 0.58 + avg * 0.27)
+                        cur_pct = min(0.60, 0.30 + avg * 0.30)
                         _stall(avg)
                         _monotonic_progress(cur_pct, "[截帧] 视觉帧分析中...")
                         if cur_pct - _last_logged_pct >= 0.05 or _last_logged_pct < 0:
@@ -2092,7 +2180,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     # ── 5.5. 用户取消早退 ──────────────────────────────────────
     # 截帧轮询里检测到取消后只是 break，控制流会走到这里。若确属用户取消：
     #   · 不再构建/落盘 markdown 笔记（notes API 读 result["markdown"]，缺该键即空笔记）
-    #   · 不再推进 set_progress(0.90/0.95/0.98)，进度停在取消时刻的真实值
+    #   · 不再推进 set_progress(0.65/0.80/0.90)，进度停在取消时刻的真实值
     #   · 终态 CANCELLED 由 task_runner._run 的取消分支统一收口
     if runner.is_cancel_requested(task_id):
         runner.append_log(task_id, "⛔ 已取消：跳过笔记汇总（SUM）与归档（STORE）收尾", level="warning")
@@ -2110,7 +2198,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     llm_summary = ""
     if "note" in steps:
         runner.store.update(task_id, status=TaskStatus.SUM.value)
-        runner.set_progress(task_id, 0.90, "整理笔记内容...")
+        runner.set_progress(task_id, 0.65, "整理笔记内容...")
 
         # 数据源优先级：analyze 产出 > transcribe 文本 > 下载阶段抽取的文本 > 空字符串
         source_text = analysis_text or transcript_text or source_text_from_download or ""
@@ -2142,12 +2230,72 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     # 入库：标记进入持久化阶段。当前流水线中间产物已通过
     # _persist_intermediate 即时落盘，此处为最终一次性确认 + UI 收尾。
     runner.store.update(task_id, status=TaskStatus.STORE.value)
-    runner.set_progress(task_id, 0.95, "归档任务结果...")
+    runner.set_progress(task_id, 0.80, "归档任务结果...")
 
     # ── 7. 构建最终返回结果 ────────────────────────────────────
-    runner.set_progress(task_id, 0.98, "任务完成")
+    runner.set_progress(task_id, 0.90, "任务完成")
 
-    json_paths = sorted(project_json_dir.glob("*_视觉数据.json"))
+    # segment_refiner：切细过长字幕段（在存入 results 前）
+    transcript_segments = refine_segments(transcript_segments)
+
+    # R3.4 fix: 按当前视频过滤视觉 JSON，避免同项目其他视频的帧串台
+    if download_save_path:
+        json_paths = _find_visual_json_paths_for_videos(
+            project_json_dir, [Path(download_save_path)]
+        )
+    else:
+        json_paths = sorted(project_json_dir.glob("*_视觉数据.json"))
+
+    # ── 6.8. R3.5: 自动生成 standard 总结，作为 note.md 默认正文 ──────
+    # R3.11: 读取嵌图配置
+    _preflight = payload.get("preflight") or {}
+    _embed_frames = bool(_preflight.get("embed_frames", True))
+    # R3.16: max_embed_frames=0 表示「按视频时长自适应封顶」（见 summary_generator
+    # ._adaptive_frame_cap），不再是「无限」；generate-note 入口未传 preflight 时即走此默认。
+    _max_embed = int(_preflight.get("max_embed_frames", 0) or 0)
+
+    # 先算标题（standard prompt 需要）
+    _source_title = ""
+    if "download" in steps:
+        _source_title = str((dl_result or {}).get("title") or "").strip()
+    if not _source_title:
+        _source_title = str((probe.get("source_title") if "download" in steps else "") or "").strip()
+
+    note_body = ""
+    if "note" in steps and api_key and transcript_text and len(transcript_text) > 50:
+        try:
+            from backend.app.models.workspace import WorkspaceItem
+            from backend.app.services.summary_generator import generate_summary
+
+            runner.append_log(task_id, "📖 生成标准总结（standard）...")
+            runner.set_progress(task_id, 0.85, "生成标准总结...")
+
+            # 构造临时 WorkspaceItem，填入 generate_summary 所需字段
+            _tmp_item = WorkspaceItem(
+                item_id="pipeline_tmp",
+                type="video",
+                source="url",
+                source_value="",
+                results={
+                    "transcript": transcript_text,
+                    "transcript_segments": transcript_segments,
+                    "json_outputs": [str(p.resolve()) for p in json_paths],
+                    "video_title": _source_title or "",
+                },
+            )
+            _std_summary = generate_summary(
+                _tmp_item, "standard",
+                embed_frames=_embed_frames,
+                max_embed_frames=_max_embed,
+            )
+            if _std_summary and _std_summary.content_md:
+                note_body = _std_summary.content_md
+                runner.append_log(task_id, f"📖 标准总结生成完成（{len(note_body)} 字）")
+            else:
+                runner.append_log(task_id, "⚠️ 标准总结返回为空，回退到默认摘要")
+        except Exception as e:
+            runner.append_log(task_id, f"⚠️ 标准总结生成失败（不影响主流程，回退到默认摘要）: {e}")
+            note_body = ""
 
     result: Dict[str, Any] = {
         "transcript":            transcript_text,
@@ -2155,19 +2303,28 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         "analysis":              analysis_text,
         "markdown":              markdown,
         "llm_summary":           llm_summary,
+        "note_body":             note_body,  # R3.5: standard 总结作为 note.md 默认正文
         "completed_steps":       completed_steps,
         "video_file":            download_save_path,
         "json_outputs":          [str(p.resolve()) for p in json_paths],
         "json_output_basenames": [p.name for p in json_paths],
         "json_output_dir":       str(project_json_dir.resolve()),
     }
+    # R3.13 fix: 继承 download 阶段写入 task.result 的展示字段（封面/时长/作者等）。
+    # handle_note_task 最终 return 的 result 会整体覆盖 task.result；若不继承，分析
+    # 完成瞬间 cover_thumbnail/video_thumbnail_url 丢失 → ProcessingPage 露黑底「● LIVE」
+    # （截图2 处理中有封面、截图3 完成后封面消失即此因）。这些字段由下载阶段 yt-dlp
+    # 实时回调 _apply_ytdlp_metadata_to_task 写入 task.result。
+    _prev_rec = runner.store.get(task_id)
+    _prev_result = (_prev_rec.result or {}) if _prev_rec else {}
+    for _k in (
+        "cover_thumbnail", "video_thumbnail_url", "video_duration",
+        "video_uploader", "video_upload_date", "video_description",
+    ):
+        if _prev_result.get(_k) and not result.get(_k):
+            result[_k] = _prev_result[_k]
     # 7.2 标题全链路：把下载阶段解析到的真实标题写入 result，
     # 供 success callback 回写 item.name（解决 NoteShell 显示 ID/BV 号的问题）
-    _source_title = ""
-    if "download" in steps:
-        _source_title = str((dl_result or {}).get("title") or "").strip()
-    if not _source_title:
-        _source_title = str((probe.get("source_title") if "download" in steps else "") or "").strip()
     if _source_title:
         result["video_title"] = _source_title
     # M7: 附加 PROBE 识别结果
@@ -3542,6 +3699,9 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     if audio_duration_sec <= 0:
         audio_duration_sec = float(vad_result.total_duration or 0)
     audio_title = str(yt_dlp_meta.get("video_title") or audio_filename)
+
+    # segment_refiner：切细过长字幕段（在存入 results 前）
+    transcript_segments = refine_segments(transcript_segments)
 
     result: Dict[str, Any] = {
         "task_id": task_id,

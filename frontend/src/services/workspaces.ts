@@ -102,6 +102,11 @@ export async function sniffUrl(url: string): Promise<SniffResult> {
   return res.data
 }
 
+export async function probeDuration(url: string): Promise<{ duration_sec: number }> {
+  const res = await http.post<{ duration_sec: number }>(`${BASE}/probe-duration`, { url })
+  return res.data
+}
+
 /** POST /workspaces/{id}/items — 添加素材 */
 export async function addWorkspaceItem(
   workspaceId: string,
@@ -227,10 +232,14 @@ export async function generateNote(
   workspaceId: string,
   url: string,
   name?: string,
+  embedFrames: boolean = true,
+  imageMode: string = 'vision',
+  frameInterval: number = 5,
+  visionModel: string = '',
 ): Promise<GenerateNoteResponse> {
   const res = await http.post<GenerateNoteResponse>(
     `${BASE}/${workspaceId}/items/generate-note`,
-    { url, name },
+    { url, name, embed_frames: embedFrames, image_mode: imageMode, frame_interval: frameInterval, vision_model: visionModel },
   )
   return res.data
 }

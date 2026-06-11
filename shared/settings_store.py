@@ -42,10 +42,14 @@ class TranscriberConfig:
 
     type: TranscriberType = "fast-whisper"
     whisper_model_size: str = "medium"
-    language: str = "zh"
+    language: str = "auto"
     device: str = "cpu"
     groq_api_key: str = ""
     initial_prompt: str = ""
+    # R4.8: ASR 加速参数
+    cpu_threads: int = 0       # 0=自动（按 os.cpu_count()，上限 8）
+    beam_size: int = 5         # Whisper beam search 宽度（1=贪心，5=默认）
+    vad_filter: bool = True    # Silero VAD 预过滤静默段（默认开）
 
     @classmethod
     def from_dict(cls, data: Any) -> "TranscriberConfig":
@@ -60,6 +64,9 @@ class TranscriberConfig:
             device=str(data.get("device") or "cpu"),
             groq_api_key=str(data.get("groq_api_key") or ""),
             initial_prompt=str(data.get("initial_prompt") or ""),
+            cpu_threads=int(data.get("cpu_threads") or 0),
+            beam_size=int(data.get("beam_size") or 5),
+            vad_filter=bool(data.get("vad_filter", True)),
         )
 
 

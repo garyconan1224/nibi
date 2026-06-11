@@ -87,13 +87,15 @@ class AnalysisState:
             p = (frames_dir / img).resolve()
             if p.is_file():
                 path_str = str(p)
-        desc = str(frame_data.get("description_zh") or "")
+        desc = str(frame_data.get("content_zh") or frame_data.get("description_zh") or "")
         snap: dict[str, Any] = {
             "video_name": video_name,
             "timestamp": frame_data.get("timestamp"),
+            "content_zh": str(frame_data.get("content_zh") or "")[:500],
             "description_zh": desc[:500],
             "frame_json": {
                 "timestamp": frame_data.get("timestamp"),
+                "content_zh": str(frame_data.get("content_zh") or "")[:280],
                 "description_zh": desc[:280],
                 "image_prompt_en": (str(frame_data.get("image_prompt_en") or ""))[:200],
             },
@@ -457,6 +459,7 @@ def save_results(
     json_frames = [
         {
             "timestamp": fr["timestamp"],
+            "content_zh": fr.get("content_zh", ""),
             "description_zh": fr["description_zh"],
             "image_prompt_en": fr["image_prompt_en"],
         }
@@ -492,6 +495,8 @@ def _save_markdown(
         f.write("## 逐帧拆解\n\n")
         for fr in frames:
             f.write(f"### [{fr['timestamp']}]\n\n")
+            if fr.get("content_zh"):
+                f.write(f"- **内容**：{fr['content_zh']}\n")
             f.write(f"- **描述**：{fr['description_zh']}\n")
             if fr["image_prompt_en"]:
                 f.write(f"- **提示词**：{fr['image_prompt_en']}\n")
@@ -687,6 +692,7 @@ def _analyze_frame_task(
     safe_name: str,
     frames_dir: Path,
     cancel_event: Optional[threading.Event] = None,
+    image_mode: str = "vision",
 ) -> Optional[dict[str, Any]]:
     """并发 worker：编码帧 → 调用视觉 API → 保存图片 → 返回 frame_data。
 
@@ -698,13 +704,23 @@ def _analyze_frame_task(
     ts = format_timestamp(sec)
     img_b64 = frame_to_base64(frame_img)
     try:
-        result = analyze_video_frame(api_key, vision_model, img_b64, product_name)
+        if image_mode == "ocr":
+            from shared.ocr_service import extract_text_from_array
+            ocr_text = extract_text_from_array(frame_img)
+            result = {
+                "content_zh": ocr_text,
+                "description_zh": "[OCR提取文本] " + (ocr_text if ocr_text else "(无文字)"),
+                "image_prompt_en": ""
+            }
+        else:
+            result = analyze_video_frame(api_key, vision_model, img_b64, product_name)
     except Exception as e:
-        result = {"description_zh": f"[分析失败: {e}]", "image_prompt_en": ""}
+        result = {"content_zh": "", "description_zh": f"[分析失败: {e}]", "image_prompt_en": ""}
     img_filename = make_frame_filename(safe_name, ts)
     save_frame_to_disk(frame_img, frames_dir / img_filename)
     return {
         "timestamp": ts,
+        "content_zh": result.get("content_zh", ""),
         "description_zh": result["description_zh"],
         "image_prompt_en": result["image_prompt_en"],
         "frame_image": img_filename,
@@ -719,6 +735,7 @@ def _analyze_frames_batch_task(
     safe_name: str,
     frames_dir: Path,
     cancel_event: Optional[threading.Event] = None,
+    image_mode: str = "vision",
 ) -> Optional[list[dict[str, Any]]]:
     """并发 worker（批模式）：编码 N 帧 → 调用批量 API → 保存图片 → 返回 frame_data 列表。
 
@@ -742,14 +759,18 @@ def _analyze_frames_batch_task(
     # 尝试批量调用
     batch_ok = False
     results: list[dict[str, str]] = []
-    try:
-        results = analyze_video_frames_batch(api_key, vision_model, frames_b64, product_name)
-        if len(results) == len(batch):
-            batch_ok = True
-        else:
-            logger.warning("批量帧分析计数不符(%d≠%d)，回退逐帧", len(results), len(batch))
-    except Exception as e:
-        logger.warning("批量帧分析失败(%s)，回退逐帧", e)
+    if image_mode == "ocr":
+        # OCR 模式下直接跳过批量 VLM，走下面的逐帧 OCR
+        batch_ok = False
+    else:
+        try:
+            results = analyze_video_frames_batch(api_key, vision_model, frames_b64, product_name)
+            if len(results) == len(batch):
+                batch_ok = True
+            else:
+                logger.warning("批量帧分析计数不符(%d≠%d)，回退逐帧", len(results), len(batch))
+        except Exception as e:
+            logger.warning("批量帧分析失败(%s)，回退逐帧", e)
 
     # 回退：逐帧调用
     if not batch_ok:
@@ -760,9 +781,18 @@ def _analyze_frames_batch_task(
             ts = format_timestamp(sec)
             img_b64 = frame_to_base64(frame_img)
             try:
-                result = analyze_video_frame(api_key, vision_model, img_b64, product_name)
+                if image_mode == "ocr":
+                    from shared.ocr_service import extract_text_from_array
+                    ocr_text = extract_text_from_array(frame_img)
+                    result = {
+                        "content_zh": ocr_text,
+                        "description_zh": "[OCR提取文本] " + (ocr_text if ocr_text else "(无文字)"),
+                        "image_prompt_en": ""
+                    }
+                else:
+                    result = analyze_video_frame(api_key, vision_model, img_b64, product_name)
             except Exception as e:
-                result = {"description_zh": f"[分析失败: {e}]", "image_prompt_en": ""}
+                result = {"content_zh": "", "description_zh": f"[分析失败: {e}]", "image_prompt_en": ""}
             results.append(result)
 
     # 组装 frame_data 并保存图片
@@ -772,6 +802,7 @@ def _analyze_frames_batch_task(
         save_frame_to_disk(frame_img, frames_dir / img_filename)
         frame_data_list.append({
             "timestamp": ts,
+            "content_zh": results[i].get("content_zh", ""),
             "description_zh": results[i]["description_zh"],
             "image_prompt_en": results[i]["image_prompt_en"],
             "frame_image": img_filename,
@@ -844,6 +875,7 @@ def process_video(
     concurrency: int | None = None,
     cancel_event: Optional[threading.Event] = None,
     frames_per_call: int | None = None,
+    image_mode: str = "vision",
 ) -> Optional[Path]:
     """
     完整处理单个视频：抽帧分析 → 全局总结 → 三位一体保存（支持断点续传）。
@@ -923,7 +955,7 @@ def process_video(
                 future = executor.submit(
                     _analyze_frames_batch_task, current_batch,
                     api_key, vision_model, product_name, safe_name, frames_dir,
-                    cancel_event,
+                    cancel_event, image_mode,
                 )
                 pending[future] = [sec for sec, _ in current_batch]
                 current_batch = []
@@ -933,7 +965,7 @@ def process_video(
             future = executor.submit(
                 _analyze_frames_batch_task, current_batch,
                 api_key, vision_model, product_name, safe_name, frames_dir,
-                cancel_event,
+                cancel_event, image_mode,
             )
             pending[future] = [sec for sec, _ in current_batch]
 
@@ -1012,6 +1044,7 @@ def run_batch_analysis(
     concurrency: int | None = None,
     cancel_event: Optional[threading.Event] = None,
     frames_per_call: int | None = None,
+    image_mode: str = "vision",
 ) -> AnalysisState:
     """
     批量分析视频（在后台线程中运行）。
@@ -1047,6 +1080,7 @@ def run_batch_analysis(
                     concurrency=concurrency,
                     cancel_event=cancel_event,
                     frames_per_call=frames_per_call,
+                    image_mode=image_mode,
                 )
             except Exception as e:
                 state.update(idx, status="failed", error=str(e))

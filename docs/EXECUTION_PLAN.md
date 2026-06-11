@@ -4,9 +4,9 @@
 >
 > **维护规则见 CLAUDE.md「项目执行计划维护流程」一节**。
 >
-> Last updated: 2026-06-08（Track K 视频笔记入口收敛 + 回归修复计划，交付 mimo）
+> Last updated: 2026-06-11（Track K 视频笔记入口收敛 + 回归修复计划 **全部完工**，feat/k-10-R2-subtitle-source merge 回 main）
 >
-> ⚠️ **2026-06-08 Track K 覆盖说明（最新）**：当前临时主线 = **视频笔记「入口收敛 + 回归修复」**，执行计划 [`docs/plans/track-K-video-note-regression-fix-plan.md`](plans/track-K-video-note-regression-fix-plan.md)（交 mimo），设计基准 [`docs/plans/track-K-note-flow-blueprint.md`](plans/track-K-note-flow-blueprint.md)。**战略：不重写，删除式收敛**——只留「生成笔记 → note task → NoteShell」一套。R1~R4 已合 main，旧「只定设计不动代码」**已废止**。下方历史长表仅存档。
+> ⚠️ **2026-06-11 Track K 完工说明（最新）**：视频笔记「入口收敛 + 回归修复」计划**已全部完成**（阶段 A–E + R1–R4 + 9.x 布局 + segment_refiner + R3 标准总结），代码合入 main。执行计划 [`docs/plans/track-K-video-note-regression-fix-plan.md`](plans/track-K-video-note-regression-fix-plan.md) status: done。下方历史长表仅存档。
 
 ---
 
@@ -230,22 +230,19 @@
 - R21.P2 / P2.v3 模型选择挪到主界面 + capability 过滤 ✅
 - R21.P3.S1 / S2 / S3 添加素材拆参数 / 多版本总结 SummariesTab / 对比 + 学习视频补图 ✅
 
-**当前 HEAD**：分支 `fix/r21-p3-s3-followup`，R21.P3.S3 followup（preflight 顶层 intent 链路修复 + av_combined 补图入口）已 `status: done`，**待 merge 进 main**。
+**当前 HEAD**：main（`feat/k-10-R2-subtitle-source` 已 merge，2026-06-11）
 
-**当前下一步方向（用户 2026-05-29 决议）**：先把**音频 + 视频两条线从输入链接 → 任务 → 落地页完整端到端打通**，确保音视频闭环到位，再做文字 / 图片深化。性能优化（R22/R23）、AI 导演 [C]、开源 [D] 往后排。
+**Track K 视频笔记「入口收敛 + 回归修复」全部完工**（2026-06-08 ~ 2026-06-11）：
+- 阶段 A–E（入口收敛 + 路径收敛 + 旧入口下线 + 对齐B站 + NoteShell补齐）✅
+- R1–R4（总结面板 + 字幕编辑 + 标准总结 + 完整设置·取画面迭代·ASR加速）✅
+- 9.x NoteShell 布局细化（七点全部落地）✅
+- segment_refiner 字幕切分（25 测试全过，4 条 ASR 路径已集成）✅
 
-短期任务池（按依赖排序）：
-1. 🥇 **followup 分支 merge 进 main**（5min）—— R21.P3.S3 收尾收口
-2. 🥇 **音视频端到端冒烟回归**（用户跑，~30min）—— 粘真实 B站/油管 URL，走完 download→ASR→frames→VLM→落地页，记录断点
-3. 🥈 **N7b 路径3 视频大模型直接分析后端**（8-12h，Opus）—— UI 已就绪，**卡在 API 选型**（Gemini / GPT-4o / Qwen-VL，待用户拍板）
-4. 🥈 **N8b 音频 librosa 6 维度切分后端**（6-8h，Sonnet）—— UI 已就绪
-5. 🥉 **R20 笔记 PDF / Word / Obsidian 导出**（R19 押后项）
-
-延后（音视频闭环后再做）：
-- **T 文字深化 / I 图片深化**（EXIF / 批量 / 风格 DNA）
-- **R22** 并行调度（issue 6）/ **R23** 性能档位（issue 9）—— 体验优化
-- **[C] AI 导演模块**（需先补设计稿，后续用 Claude Design 更新）
-- **[D] 安全 + 开源准备**
+**当前下一步方向（ROADMAP §11 推荐顺序）**：
+1. 🥇 **真实跑测验证** — B站 + 小红书端到端冒烟，确认 Track K 产出无回归
+2. 🥇 **F3 错误体验** — 失败任务的用户可见反馈优化
+3. 🥈 **[C] 复刻·AI 导演**（需先补设计稿）
+4. 🥈 **[D] 安全 + 开源准备**
 
 ---
 
@@ -310,7 +307,7 @@
 - [x] **K·R4.4** R4 全线回归 + 收口：四类型路由 ✓ / Library 入口 ✓ / NoteShell 功能 ✓ / 旧链接不 404 ✓ / tsc ✓ / pytest 53 passed ✓
 - [x] **K·8** NoteShell 视频笔记布局重构（对齐蓝图 §3.5）+ 字幕格式统一 + 时间码持久化 — `19a3bad` `ae2b628` `cc6ba8a` `4c84b88`
 - [x] **K·9** NoteShell 视频笔记布局/交互细化 7 点：导出回顶栏 + 视图切换移中列 + 视频默认富文本 + 问AI悬浮泡泡 + 源md弹层 + 总结点选替换+版本高亮 — `b78a409` `e2f681b` `308c317`
-- [ ] **K·蓝图对照**（2026-06-07）用户手绘流程/UI 图 → 一比一蓝图 [`docs/plans/track-K-note-flow-blueprint.md`](plans/track-K-note-flow-blueprint.md)（疑点①②③⑤已确认；④图片/图文暂缓）。**下一步：以蓝图对照 R1~R4 已落地代码，列「如何修改/增加」差距清单（只读不改，动手前问用户）**
+- [x] **K·蓝图对照**（2026-06-07）用户手绘流程/UI 图 → 一比一蓝图 [`docs/plans/track-K-note-flow-blueprint.md`](plans/track-K-note-flow-blueprint.md)（疑点①②③⑤已确认；④图片/图文暂缓）。**2026-06-11 代码调查确认：阶段 A–E + R1–R4 + 9.x 布局 + segment_refiner + R3 全部已落地，差距清单清零。**
 
 ---
 

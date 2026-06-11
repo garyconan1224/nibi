@@ -38,6 +38,7 @@ from backend.app.models.tasks import TERMINAL_STATUS_VALUES, TaskStatus
 
 # 项目根目录（backend/app/routes/workspaces.py → routes → app → backend → root）
 _ROOT_DIR: Path = Path(__file__).resolve().parent.parent.parent.parent
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
@@ -57,6 +58,7 @@ from backend.app.models.workspace import (
 from backend.app.services.audio_result_demo import build_demo_audio_result
 from backend.app.services.note_assembler import (
     assemble_item_note,
+    build_source_md,
     extract_transcript_from_results,
     normalize_transcript,
     note_dir,
@@ -448,6 +450,12 @@ class GenerateNoteRequest(BaseModel):
     """NI.1: 「生成笔记」统一入口请求体。"""
     url: str = Field(description="粘贴的链接（小红书/视频/网页等）")
     name: str = Field(default="", description="可选显示名")
+    embed_frames: bool = Field(
+        default=True, description="视频笔记是否智能嵌入关键画面配图（关闭则纯文字）"
+    )
+    image_mode: str = Field(default="vision", description="提取模式: vision 或 ocr")
+    frame_interval: int = Field(default=5, description="截帧间隔，多少秒截一帧")
+    vision_model: str = Field(default="", description="视觉模型 ID（空=用系统默认）")
 
 
 class PreflightSaveRequest(BaseModel):
@@ -476,6 +484,10 @@ class SniffUrlRequest(BaseModel):
     """URL 内容类型嗅探请求体。"""
 
     url: str = Field(min_length=1, description="待嗅探的 URL")
+
+
+class ProbeDurationRequest(BaseModel):
+    url: str
 
 
 class PromptVersionRequest(BaseModel):
@@ -777,6 +789,16 @@ def _sync_item_with_tasks(item: WorkspaceItem) -> Optional[Dict[str, Any]]:
     if latest_success is not None and latest_success.result:
         merged = dict(item.results or {})
         merged.update(latest_success.result)
+        # 保留 item.results 中 transcript_segments 的 edited_text（用户在字幕轴的编辑）
+        # task result 不含 edited_text，直接 update 会覆盖掉用户的编辑
+        _item_segs = (item.results or {}).get("transcript_segments") or []
+        _task_segs = merged.get("transcript_segments") or []
+        if _item_segs and _task_segs:
+            for i in range(min(len(_item_segs), len(_task_segs))):
+                _et = _item_segs[i].get("edited_text")
+                if _et:
+                    _task_segs[i] = {**_task_segs[i], "edited_text": _et}
+            merged["transcript_segments"] = _task_segs
         # 若最新 task 没提供 cover_thumbnail，从更早的 SUCCESS task 补（下载封面优先）
         if not merged.get("cover_thumbnail"):
             for tid in item.related_task_ids:
@@ -961,6 +983,22 @@ def sniff_media_url(req: SniffUrlRequest) -> dict:
             "content_type_header": None,
             "error": "嗅探服务异常，已按「视频」降级处理",
         }
+
+
+@router.post("/probe-duration")
+def probe_video_duration(req: ProbeDurationRequest) -> dict:
+    """轻量探测视频时长（yt-dlp 只取元数据、不下载），供前端「取画面」算预估帧数。
+
+    失败一律返回 0（前端据此回退到默认间隔），不抛异常、不阻塞识别流程。
+    """
+    from shared.video_download_ytdlp import fetch_ytdlp_metadata
+
+    try:
+        meta = fetch_ytdlp_metadata(req.url)
+        return {"duration_sec": int(meta.get("duration") or 0)}
+    except Exception:
+        logger.warning("probe_video_duration failed for %s", req.url, exc_info=True)
+        return {"duration_sec": 0}
 
 
 @router.get("")
@@ -1632,6 +1670,17 @@ def _bridge_to_pipeline_payload(
                 payload["intent"] = _preflight["intent"]
             if _preflight.get("background_for_recognition"):
                 payload["background_for_recognition"] = _preflight["background_for_recognition"]
+        # R3.11: 透传嵌图配置（embed_frames / max_embed_frames）
+        # 前端存 tasks.summary.embed_frames / tasks.summary.max_embed_frames
+        _summary_cfg = tasks.get("summary")
+        if isinstance(_summary_cfg, dict):
+            _pf: Dict[str, Any] = payload.get("preflight") or {}
+            if "embed_frames" in _summary_cfg:
+                _pf["embed_frames"] = _summary_cfg["embed_frames"]
+            if "max_embed_frames" in _summary_cfg:
+                _pf["max_embed_frames"] = _summary_cfg["max_embed_frames"]
+            if _pf:
+                payload["preflight"] = _pf
         return "note", payload
 
     # local：直接走 analyze
@@ -1754,6 +1803,19 @@ def generate_note(workspace_id: str, req: GenerateNoteRequest) -> Dict[str, Any]
     # 3. 创建 note task（复用 handle_note_task 统一流程）
     #    注入 LLM 配置（从 provider store 获取活跃 chat provider 的 key + model）
     _task_payload: dict = {"url": url, "workspace_id": workspace_id}
+    # R3.16: 透传嵌图开关 → note task；embed_frames=False 时 standard 总结不配图。
+    # max_embed_frames 不传，由 summary_generator 按候选数自适应封顶（智能按需）。
+    _task_payload["preflight"] = {
+        "embed_frames": req.embed_frames,
+        "image_mode": req.image_mode,
+        "frame_prompt": {
+            "mode": "interval",
+            "interval_sec": req.frame_interval
+        }
+    }
+    # R4.7: 透传用户选择的视觉模型（空=用系统默认）
+    if req.vision_model.strip():
+        _task_payload["vision_model"] = req.vision_model.strip()
     try:
         _s = load_settings()
         for _p in _s.providers:
@@ -2084,8 +2146,13 @@ def get_item_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
             if 0 <= _idx < len(v_results["frames"]):
                 v_results["frames"][_idx]["title"] = _new_title
 
-    # N7b / av_combined：规范化 transcript 为数组（前端 VideoResult.transcript 期望 array）
-    if v_results.get("summary_path") in ("subtitle", "av_combined"):
+    # 规范化 transcript 为数组（前端 VideoResult.transcript 期望 array）
+    # 优先从 transcript_segments 构建（含 edited_text 优先 + 时间码），
+    # 兜底从 transcript 字段（字符串或数组）。
+    _segments = v_results.get("transcript_segments") or []
+    if _segments:
+        v_results["transcript"] = normalize_transcript(_segments)
+    else:
         raw_transcript = v_results.get("transcript")
         if isinstance(raw_transcript, str):
             v_results["transcript"] = (
@@ -2093,9 +2160,11 @@ def get_item_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
                 if raw_transcript.strip()
                 else []
             )
+        elif isinstance(raw_transcript, list) and raw_transcript:
+            # list of dicts（可能是 start/end/text 或 t_sec/t_str/text）
+            v_results["transcript"] = normalize_transcript(raw_transcript)
         elif not isinstance(raw_transcript, list):
             v_results["transcript"] = []
-        v_results.setdefault("frames", [])
     # visual_only：确保 transcript 为空数组，frames 从 json_outputs 物化
     if v_results.get("summary_path") == "visual_only":
         v_results.setdefault("transcript", [])
@@ -2941,21 +3010,62 @@ def update_transcript_segment(
     segment_idx: int,
     req: TranscriptSegmentEditRequest,
 ) -> Dict[str, Any]:
-    """编辑单段转录文本（A-1：字幕在线编辑）。"""
+    """编辑单段转录文本（A-1：字幕在线编辑）。
+
+    字幕的「显示真相」= _note_transcript（内存 results 优先，重启后回退 transcript.json），
+    所以编辑必须按同一份「显示列表」的下标定位，并把改动同时落到三处：
+      ① 内存 results（本会话即时生效）② transcript.json（扛重启）③ source.md（源md 同步）。
+    旧实现只认内存 results，重启后 results 空 → out of range → 「保存失败，请重试」。
+    """
     rec = _store.get(workspace_id)
     if rec is None:
         raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
     item = _find_item(rec, item_id)
+    nd = note_dir(workspace_id, item_id)
+
+    # 显示列表（与前端字幕轴完全一致）——按它的下标做边界校验，不再只认内存 results
+    lines = _note_transcript(item.results or {}, nd)
+    if segment_idx < 0 or segment_idx >= len(lines):
+        raise HTTPException(
+            status_code=400,
+            detail=f"segment_idx {segment_idx} out of range (0-{len(lines) - 1})",
+        )
+
+    new_text = req.edited_text.strip()
+
+    # ① 内存 results：写到「第 idx 个非空段」（与 normalize 跳空段逻辑对齐，避免下标错位）
     results = dict(item.results or {})
-    segs = list(results.get("transcript_segments") or [])
-    if segment_idx < 0 or segment_idx >= len(segs):
-        raise HTTPException(status_code=400, detail=f"segment_idx {segment_idx} out of range (0-{len(segs) - 1})")
-    seg = dict(segs[segment_idx])
-    seg["edited_text"] = req.edited_text if req.edited_text.strip() else None
-    segs[segment_idx] = seg
-    results["transcript_segments"] = segs
-    _store.update_item(workspace_id, item_id, results=results)
-    return {"segment_idx": segment_idx, "edited_text": seg["edited_text"]}
+    raw_segs = list(results.get("transcript_segments") or [])
+    if raw_segs:
+        cnt = -1
+        for ri, rseg in enumerate(raw_segs):
+            if not isinstance(rseg, dict):
+                continue
+            if not str(rseg.get("edited_text") or rseg.get("text", "")).strip():
+                continue
+            cnt += 1
+            if cnt == segment_idx:
+                raw_segs[ri] = {**rseg, "edited_text": new_text or None}
+                break
+        results["transcript_segments"] = raw_segs
+        _store.update_item(workspace_id, item_id, results=results)
+
+    # ② transcript.json（扛重启）+ ③ source.md（源md 同步）
+    try:
+        tp = nd / "transcript.json"
+        disk = json.loads(tp.read_text(encoding="utf-8")) if tp.exists() else None
+        if not (isinstance(disk, list) and 0 <= segment_idx < len(disk) and isinstance(disk[segment_idx], dict)):
+            disk = [dict(x) for x in lines]  # 兜底：用显示列表重建一份
+        # 空字符串 = 恢复原文（保留显示列表里的原 text）
+        disk[segment_idx]["text"] = new_text or str(lines[segment_idx].get("text", ""))
+        disk[segment_idx].pop("edited_text", None)
+        nd.mkdir(parents=True, exist_ok=True)
+        tp.write_text(json.dumps(disk, ensure_ascii=False), encoding="utf-8")
+        _rebuild_source_md_transcript(nd, [dict(x) for x in disk])
+    except Exception:
+        logger.warning("update_transcript_segment: 同步 transcript.json / source.md 失败（best-effort）", exc_info=True)
+
+    return {"segment_idx": segment_idx, "edited_text": new_text or None}
 
 
 # ── 总结 CRUD ──────────────────────────────────────────────────
@@ -3016,6 +3126,12 @@ async def create_summary(
             ):
                 item.results = dict(task.result)
                 break
+
+    # R3.2: 视频素材物化 frames（标准总结嵌关键帧需要）
+    # R3.4 fix: 传 json_output_basenames 做 preferred 过滤，防多视频工作区帧串台
+    if item.type == "video" and item.results and not item.results.get("frames"):
+        _pb = list(item.results.get("json_output_basenames") or [])
+        item.results = dict(_materialize_video_results_from_analyze(item.results, preferred_basenames=_pb))
 
     next_ver = _store.next_version_for_template(workspace_id, item_id, req.template)
 
@@ -3122,6 +3238,33 @@ def _note_transcript(results: Dict[str, Any], nd: Path) -> List[Dict[str, Any]]:
     return []
 
 
+def _rebuild_source_md_transcript(nd: Path, lines: List[Dict[str, Any]]) -> None:
+    """用规范化字幕行重建 source.md 的「转写正文」，保留已有「视频信息」头。
+
+    字幕编辑后调用，让 source.md 跟着改。**只重建转写正文段**，
+    保留 build_source_md 写的「## 视频信息」头（重启后 results 已空，
+    不能用 build_source_md 整体重建，否则会把头和正文一起清掉）。
+    """
+    body_parts: List[str] = []
+    for ln in lines:
+        text = str(ln.get("text") or "")
+        if not text:
+            continue
+        ts = str(ln.get("t_str") or "")
+        body_parts.append(f"**[{ts}]** {text}" if ts else text)
+    body = "\n\n".join(body_parts)
+
+    sp = nd / "source.md"
+    marker = "## 转写正文"
+    if sp.exists():
+        existing = sp.read_text(encoding="utf-8")
+        if marker in existing:
+            header = existing.split(marker)[0]
+            sp.write_text(f"{header}{marker}\n\n{body}\n", encoding="utf-8")
+            return
+    sp.write_text(body + "\n", encoding="utf-8")
+
+
 @router.get("/{workspace_id}/items/{item_id}/note")
 def get_item_note(workspace_id: str, item_id: str) -> Dict[str, Any]:
     """读取 item 的 note 目录（source.md + note.md + summaries/*）。
@@ -3222,6 +3365,13 @@ def get_item_note(workspace_id: str, item_id: str) -> Dict[str, Any]:
                 if _result_video.startswith(("http://", "https://", "/static/"))
                 else to_static_url(_result_video)
             )
+        # 从 frontmatter 的 media.video.url 获取（note.md 里记录的路径）
+        if not _video_url:
+            _fm_video = str((frontmatter.get("media") or {}).get("video", {}).get("url") or "").strip()
+            if _fm_video and not _fm_video.startswith(("http://", "https://")):
+                _video_url = to_static_url(_fm_video)
+            elif _fm_video:
+                _video_url = _fm_video
         _vid_dir = DATA_DIR / "workspaces" / workspace_id / "videos"
         if not _video_url and _vid_dir.is_dir():
             _vid_files = sorted(_vid_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
@@ -3375,6 +3525,13 @@ def update_item_note(workspace_id: str, item_id: str, req: NoteUpdateRequest) ->
                 if _result_video.startswith(("http://", "https://", "/static/"))
                 else to_static_url(_result_video)
             )
+        # 从 frontmatter 的 media.video.url 获取（note.md 里记录的路径）
+        if not _video_url:
+            _fm_video = str((frontmatter.get("media") or {}).get("video", {}).get("url") or "").strip()
+            if _fm_video and not _fm_video.startswith(("http://", "https://")):
+                _video_url = to_static_url(_fm_video)
+            elif _fm_video:
+                _video_url = _fm_video
         _vid_dir = DATA_DIR / "workspaces" / workspace_id / "videos"
         if not _video_url and _vid_dir.is_dir():
             _vid_files = sorted(_vid_dir.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
@@ -3504,8 +3661,10 @@ def get_suggested_inline_frames(workspace_id: str, item_id: str) -> List[Dict[st
 
     results = item.results or {}
     # av_combined 路径的 frames 在 json_outputs 里，需要物化
+    # R3.4 fix: 传 preferred_basenames 防帧串台
     if not results.get("frames") and results.get("json_outputs"):
-        results = _materialize_video_results_from_analyze(results)
+        _pb = list(results.get("json_output_basenames") or [])
+        results = _materialize_video_results_from_analyze(results, preferred_basenames=_pb)
     frames = results.get("frames") or []
     transcript = results.get("transcript") or []
 
