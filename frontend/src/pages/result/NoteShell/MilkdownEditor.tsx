@@ -1,0 +1,105 @@
+/**
+ * MilkdownEditor — WYSIWYG 可编辑 Milkdown 编辑器
+ *
+ * 封装 TestEditorPage 验证通过的配置（commonmark+gfm+prism+listener+nord）。
+ * Props: { markdown, onMarkdownChange }
+ *
+ * re-seed 策略：由外部 key={noteId+seedVersion} 控制重挂，
+ * 内部不自动重设 defaultValue（防光标跳动 + 保存死循环）。
+ * 首帧 markdownUpdated 不触发保存（skipFirstRef 守卫）。
+ */
+import { useRef } from 'react'
+import { Editor, rootCtx, defaultValueCtx } from '@milkdown/core'
+import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react'
+import { commonmark } from '@milkdown/preset-commonmark'
+import { gfm } from '@milkdown/preset-gfm'
+import { listener, listenerCtx } from '@milkdown/plugin-listener'
+import { prism } from '@milkdown/plugin-prism'
+import { nord } from '@milkdown/theme-nord'
+import '@milkdown/theme-nord/style.css'
+
+interface MilkdownEditorProps {
+  markdown: string
+  onMarkdownChange: (md: string) => void
+}
+
+function MilkdownEditorInner({
+  markdown,
+  onMarkdownChange,
+}: MilkdownEditorProps) {
+  const skipFirstRef = useRef(true)
+
+  useEditor(
+    (root) => {
+      const editor = Editor.make()
+        .config((ctx: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+          ctx.set(rootCtx, root)
+          ctx.set(defaultValueCtx, markdown)
+          ctx.get(listenerCtx).markdownUpdated((_ctx: any, md: string) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+            if (skipFirstRef.current) {
+              skipFirstRef.current = false
+              return
+            }
+            onMarkdownChange(md)
+          })
+        })
+      // @ts-expect-error Milkdown 7.x TS overload 不精确，TestEditorPage 同款写法，运行时正常
+      return editor.use(nord).use(commonmark).use(gfm).use(prism).use(listener)
+    },
+    [],
+  )
+
+  return <Milkdown />
+}
+
+export default function MilkdownEditor({
+  markdown,
+  onMarkdownChange,
+}: MilkdownEditorProps) {
+  return (
+    <div className="note-milkdown">
+      <style>{`
+        /* Task list checkbox — scope inside .note-milkdown */
+        .note-milkdown .milkdown-theme-nord li[data-item-type="task"] {
+          list-style: none;
+        }
+        .note-milkdown .milkdown-theme-nord li[data-item-type="task"]::before {
+          content: "";
+          display: inline-block;
+          width: 1em;
+          height: 1em;
+          margin-right: 0.4em;
+          border: 1.5px solid currentColor;
+          border-radius: 3px;
+          vertical-align: -2px;
+        }
+        .note-milkdown .milkdown-theme-nord li[data-item-type="task"][data-checked="true"]::before {
+          content: "✓";
+          text-align: center;
+          line-height: 1em;
+          font-size: 0.85em;
+        }
+        /* Code block syntax highlighting — scope inside .note-milkdown */
+        .note-milkdown .milkdown pre .token.keyword    { color: #ff7b72; }
+        .note-milkdown .milkdown pre .token.string,
+        .note-milkdown .milkdown pre .token.template-string.string { color: #a5d6ff; }
+        .note-milkdown .milkdown pre .token.function   { color: #d2a8ff; }
+        .note-milkdown .milkdown pre .token.number,
+        .note-milkdown .milkdown pre .token.boolean    { color: #79c0ff; }
+        .note-milkdown .milkdown pre .token.operator   { color: #ff7b72; }
+        .note-milkdown .milkdown pre .token.punctuation { color: #8b949e; }
+        .note-milkdown .milkdown pre .token.comment    { color: #6a737d; font-style: italic; }
+        .note-milkdown .milkdown pre .token.builtin,
+        .note-milkdown .milkdown pre .token.class-name { color: #ffa657; }
+        .note-milkdown .milkdown pre .token.template-punctuation { color: #a5d6ff; }
+        .note-milkdown .milkdown pre .token.interpolation { color: #c9d1d9; }
+      `}</style>
+      <MilkdownProvider>
+        <MilkdownEditorInner
+          markdown={markdown}
+          onMarkdownChange={onMarkdownChange}
+        />
+      </MilkdownProvider>
+    </div>
+  )
+}

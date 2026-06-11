@@ -31,6 +31,7 @@ import type { ItemSummary } from '@/services/summaries'
 import { Badge } from '@/components/ui/badge'
 import { SYSTEM_TAG_DIMENSIONS } from '@/constants/tagDimensions'
 import NoteMediaCompanion, { type NoteMediaCompanionHandle } from './NoteMediaCompanion'
+import MilkdownEditor from './MilkdownEditor'
 import LNVideoPanel, { type LNVideoPanelHandle } from '@/pages/results/LearningNotesPage/LNVideoPanel'
 import LNTranscriptPanel from '@/pages/results/LearningNotesPage/LNTranscriptPanel'
 import '@/pages/results/LearningNotesPage/learning-notes.css'
@@ -92,7 +93,7 @@ const TYPE_LABEL: Record<string, string> = {
 
 const VIEW_MODE_KEY = 'nibi-note-view-mode'
 
-type ViewMode = 'read' | 'edit' | 'compare'
+type ViewMode = 'read' | 'edit' | 'compare' | 'wysiwyg'
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed'
 
 interface TocEntry {
@@ -256,6 +257,7 @@ const videoViewModeLabels: Record<ViewMode, string> = {
   read: '富文本',
   edit: 'md格式',
   compare: '源md对照',
+  wysiwyg: '所见即所得',
 }
 
 /* ────────────────── NoteEditor ────────────────── */
@@ -513,7 +515,7 @@ export default function NoteShell() {
   const isWide = useMediaQuery('(min-width: 1024px)')
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = localStorage.getItem(VIEW_MODE_KEY)
-    const valid = saved === 'read' || saved === 'edit' || saved === 'compare'
+    const valid = saved === 'read' || saved === 'edit' || saved === 'compare' || saved === 'wysiwyg'
     if (saved === 'compare' && !window.matchMedia('(min-width: 1024px)').matches) return 'read'
     return valid ? (saved as ViewMode) : 'read'
   })
@@ -533,6 +535,18 @@ export default function NoteShell() {
   const mediaCompanionRef = useRef<NoteMediaCompanionHandle>(null)
   // 标记是否从「应用到主笔记」触发的刷新，避免 debounce 冲突
   const applyingRef = useRef(false)
+
+  // Milkdown 重挂 key：noteId 变化 或 note.md 被外部更新时重挂编辑器
+  const prevNoteMdRef = useRef<string | undefined>(undefined)
+  const milkdownKey = useMemo(() => {
+    const noteId = `${workspaceId}/${itemId}`
+    const noteMd = note?.note_md
+    if (noteMd !== undefined && noteMd !== prevNoteMdRef.current) {
+      prevNoteMdRef.current = noteMd
+      return `${noteId}-${Date.now()}`
+    }
+    return noteId
+  }, [workspaceId, itemId, note?.note_md])
 
   // 7.3: 视频笔记三列布局 — 播放器 + 转录轴联动
   const videoRef = useRef<LNVideoPanelHandle>(null)
@@ -775,6 +789,8 @@ export default function NoteShell() {
         )
       ) : viewMode === 'compare' ? (
         <CompareView markdown={editingBody} onMarkdownChange={handleEditorChange} sourceMd={note.source_md} />
+      ) : viewMode === 'wysiwyg' ? (
+        <MilkdownEditor key={milkdownKey} markdown={editingBody} onMarkdownChange={handleEditorChange} />
       ) : (
         <NoteEditor markdown={editingBody} onMarkdownChange={handleEditorChange} />
       )}
@@ -968,7 +984,7 @@ export default function NoteShell() {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
             {/* 视图切换 tab（点1：移到中列内容正上方） */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 0, padding: '0 24px', flexShrink: 0, borderBottom: '1px solid var(--line)', height: 36 }}>
-              {(['read', 'edit'] as ViewMode[]).map((m) => (
+              {(['read', 'edit', 'wysiwyg'] as ViewMode[]).map((m) => (
                 <button
                   key={m}
                   onClick={() => switchView(m)}
@@ -983,8 +999,8 @@ export default function NoteShell() {
                   {videoViewModeLabels[m]}
                 </button>
               ))}
-              {/* 保存状态（编辑态才显示） */}
-              {viewMode === 'edit' && (
+              {/* 保存状态（编辑态 + 所见即所得态才显示） */}
+              {(viewMode === 'edit' || viewMode === 'wysiwyg') && (
                 <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-4)' }}>
                   {saveStatus === 'saving' && '保存中…'}
                   {saveStatus === 'saved' && `已保存 ${savedAt}`}
