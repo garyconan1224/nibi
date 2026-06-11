@@ -3,7 +3,7 @@ import { Schema } from '@milkdown/prose/model'
 import { EditorState } from '@milkdown/prose/state'
 
 import { TS_RE, parseTs } from '@/pages/results/LearningNotesPage/HtmlView'
-import { buildTimestampDecorations } from '@/pages/result/NoteShell/milkdownTimestamp'
+import { buildTimestampDecorations, unescapeNoteTimestamps } from '@/pages/result/NoteShell/milkdownTimestamp'
 
 /* ── 辅助：构造最小 ProseMirror state ────────────────────────── */
 
@@ -99,5 +99,24 @@ describe('buildTimestampDecorations', () => {
     const ds = buildTimestampDecorations(state)
     const found = ds.find(0, state.doc.content.size)
     expect(found).toHaveLength(0)
+  })
+})
+
+/* ── unescapeNoteTimestamps ──────────────────────────────────── */
+
+describe('unescapeNoteTimestamps', () => {
+  it('反转义 \\[05:00] → [05:00]', () => {
+    expect(unescapeNoteTimestamps('### \\[05:00]多层级要点总结')).toBe('### [05:00]多层级要点总结')
+  })
+  it('反转义范围 \\[01:30~02:00] → [01:30~02:00]', () => {
+    expect(unescapeNoteTimestamps('\\[01:30~02:00] 看这段')).toBe('[01:30~02:00] 看这段')
+  })
+  it('已是裸时间码 [05:00] 保持不变', () => {
+    const input = '### [05:00]多层级要点总结'
+    expect(unescapeNoteTimestamps(input)).toBe(input)
+  })
+  it('非时间码的转义方括号（如 \\[note]）不被还原', () => {
+    const input = '参考 \\[note] 这里'
+    expect(unescapeNoteTimestamps(input)).toBe(input)
   })
 })

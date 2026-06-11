@@ -17,7 +17,7 @@ import { listener, listenerCtx } from '@milkdown/plugin-listener'
 import { prism } from '@milkdown/plugin-prism'
 import { nord } from '@milkdown/theme-nord'
 import '@milkdown/theme-nord/style.css'
-import { timestampPlugin } from './milkdownTimestamp'
+import { timestampPlugin, unescapeNoteTimestamps } from './milkdownTimestamp'
 
 interface MilkdownEditorProps {
   markdown: string
@@ -44,9 +44,12 @@ function MilkdownEditorInner({
           ctx.set(rootCtx, root)
           ctx.set(defaultValueCtx, markdown)
           ctx.get(listenerCtx).markdownUpdated((_ctx: any, md: string) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+            // 先反转义时间码方括号（Milkdown commonmark 序列化器会把 [ 转义成 \[），
+            // 保证 seed 比较和落盘都用裸文本。
+            const normalized = unescapeNoteTimestamps(md)
             // seed 初值不触发保存；内容变化才保存（trim 抵消 Milkdown 规范化的首尾空白差异）
-            if (md.trim() === initialMdRef.current.trim()) return
-            onMarkdownChange(md)
+            if (normalized.trim() === initialMdRef.current.trim()) return
+            onMarkdownChange(normalized)
           })
           // 注册时间码 decoration 插件
           // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -13,6 +13,18 @@ import type { Node } from '@milkdown/prose/model'
 import { TS_RE, parseTs } from '@/pages/results/LearningNotesPage/HtmlView'
 
 /**
+ * 反转义 Milkdown commonmark 序列化器对时间码方括号的转义。
+ * 把 \[mm:ss] / \[mm:ss~mm:ss]（左右括号任一被转义）还原成裸 [mm:ss]。
+ * 非时间码的转义方括号（如 \[note]）不受影响。
+ */
+export function unescapeNoteTimestamps(md: string): string {
+  return md.replace(
+    /\\?\[(\d{1,2}:\d{2}(?::\d{2})?(?:~\d{1,2}:\d{2}(?::\d{2})?)?)\\?\]/g,
+    '[$1]',
+  )
+}
+
+/**
  * 扫描 state.doc，返回所有命中的 timestamp inline decorations。
  * 跳过 code_block 和 inlineCode。
  */
