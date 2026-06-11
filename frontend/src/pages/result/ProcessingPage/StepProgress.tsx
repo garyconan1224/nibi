@@ -41,6 +41,7 @@ interface StepProgressProps {
   progress: number
   taskType: string
   taskLogs: Array<{ ts: string; level: string; message: string }>
+  embedFrames?: boolean // R4.7: false 时跳过截帧+VLM 步骤显示
 }
 
 type StepState = 'queued' | 'running' | 'done'
@@ -56,8 +57,12 @@ interface StepWithState {
 // 覆盖全 pipeline 的终端任务类型（SUCCESS = 整条流水线完成）
 const TERMINAL_TASK_TYPES = new Set(['analyze', 'note'])
 
-export function deriveSteps(currentStatus: string, progress: number, taskType: string): StepWithState[] {
-  const stages = visibleStages(taskType)
+export function deriveSteps(currentStatus: string, progress: number, taskType: string, embedFrames: boolean = true): StepWithState[] {
+  const baseSkip = SKIP_STAGES_BY_TYPE[taskType] ?? []
+  // R4.7: 配图关闭时，视频笔记跳过截帧+VLM
+  const extraSkip = (!embedFrames && taskType === 'note') ? ['FRAMES', 'VLM'] : []
+  const skip = new Set([...baseSkip, ...extraSkip])
+  const stages = PROCESSING_STAGES.filter((s) => !skip.has(s.id))
   const stageIds = stages.map((s) => s.id)
   const currentIdx = stageIds.indexOf(currentStatus as TaskStatus)
 
@@ -180,8 +185,8 @@ function extractDownloadProgress(
   return null
 }
 
-export function StepProgress({ currentStatus, progress, taskType, taskLogs }: StepProgressProps) {
-  const steps = deriveSteps(currentStatus, progress, taskType)
+export function StepProgress({ currentStatus, progress, taskType, taskLogs, embedFrames = true }: StepProgressProps) {
+  const steps = deriveSteps(currentStatus, progress, taskType, embedFrames)
 
   return (
     <div className="step-stream">

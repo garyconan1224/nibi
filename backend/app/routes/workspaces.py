@@ -455,6 +455,7 @@ class GenerateNoteRequest(BaseModel):
     )
     image_mode: str = Field(default="vision", description="提取模式: vision 或 ocr")
     frame_interval: int = Field(default=5, description="截帧间隔，多少秒截一帧")
+    vision_model: str = Field(default="", description="视觉模型 ID（空=用系统默认）")
 
 
 class PreflightSaveRequest(BaseModel):
@@ -1812,6 +1813,9 @@ def generate_note(workspace_id: str, req: GenerateNoteRequest) -> Dict[str, Any]
             "interval_sec": req.frame_interval
         }
     }
+    # R4.7: 透传用户选择的视觉模型（空=用系统默认）
+    if req.vision_model.strip():
+        _task_payload["vision_model"] = req.vision_model.strip()
     try:
         _s = load_settings()
         for _p in _s.providers:

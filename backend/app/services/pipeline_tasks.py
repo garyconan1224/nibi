@@ -1862,6 +1862,12 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         background_context = probe["background_context"]
         steps = probe["steps"]
 
+        # R4.7: 配图关闭时跳过截帧+VLM（省掉重 API 调用），笔记只用转写文本
+        _pf = payload.get("preflight") or {}
+        if not _pf.get("embed_frames", True) and "analyze" in steps:
+            steps = [s for s in steps if s != "analyze"]
+            runner.append_log(task_id, "⏭️ embed_frames=False → 跳过截帧分析")
+
         runner.append_log(
             task_id,
             f"🔍 PROBE | note_kind={note_kind} | steps={steps} | "

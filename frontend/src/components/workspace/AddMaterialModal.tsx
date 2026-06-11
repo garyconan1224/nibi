@@ -9,7 +9,15 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { useProviderStore } from '@/store/providerStore'
 import type { SniffResult } from '@/services/workspaces'
 import {
   autoCreateWorkspace,
@@ -95,16 +103,42 @@ export function AddMaterialModal({
 }: AddMaterialModalProps) {
   void onFineTune
   const navigate = useNavigate()
+  const { providers, providerModels, fetchProviders } = useProviderStore()
   const [internalUrl, setInternalUrl] = useState('')
   const [internalSniff, setInternalSniff] = useState<SniffResult | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [embedFrames, setEmbedFrames] = useState(true)
+  const [embedFrames, setEmbedFrames] = useState(false) // R4.7: 默认关，检测到视觉模型后自动开
+  const [selectedVisionModel, setSelectedVisionModel] = useState('') // 空=用系统默认
   const [frameInterval, setFrameInterval] = useState(5)
   const [noteExpanded, setNoteExpanded] = useState(false)
   const [captureMode, setCaptureMode] = useState<'auto' | 'manual'>('auto')
   const [videoDuration, setVideoDuration] = useState(0) // 探测到的视频时长（秒），0=未知
   const [error, setError] = useState<string | null>(null)
   const sniffTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  // R4.7: 收集所有可用视觉模型（provider 有 vision 能力 + 模型有 vision 标签）
+  const visionModels = providers
+    .filter(p => p.enabled && p.capabilities?.includes('vision'))
+    .flatMap(p => (providerModels[p.id] ?? [])
+      .filter(m => !m.capabilities || m.capabilities.includes('vision'))
+      .map(m => ({ providerId: p.id, providerName: p.name, modelId: m.id, modelName: m.name }))
+    )
+  const hasVisionModel = visionModels.length > 0
+
+  // 首次打开弹窗时：拉最新 providers；有视觉模型则默认开配图
+  useEffect(() => {
+    if (open) {
+      fetchProviders()
+    }
+  }, [open, fetchProviders])
+
+  // providers 加载完成后，若用户还没手动改过开关，自动设置默认值
+  const userToggledRef = useRef(false)
+  useEffect(() => {
+    if (!userToggledRef.current && hasVisionModel) {
+      setEmbedFrames(true)
+    }
+  }, [hasVisionModel])
 
   const effectiveUrl = (urlValue ?? internalUrl).trim()
   const effectiveSniff = sniffResult ?? internalSniff
@@ -184,8 +218,9 @@ export function AddMaterialModal({
       // SniffResult 暂无 duration 字段，智能档兜底默认 10 秒
       const effInterval =
         captureMode === 'auto' ? computeAutoInterval(videoDuration) : frameInterval
+      const effVisionModel = selectedVisionModel === '__default__' ? '' : selectedVisionModel
       const result = await generateNote(
-        wsId, effectiveUrl, effectiveSniff?.title ?? undefined, embedFrames, 'vision', effInterval,
+        wsId, effectiveUrl, effectiveSniff?.title ?? undefined, embedFrames, 'vision', effInterval, effVisionModel,
       )
       toast.success('笔记生成中', { description: `${result.item_type} · ${effectiveUrl}` })
 
@@ -303,14 +338,39 @@ export function AddMaterialModal({
             {noteExpanded && (
               <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <label htmlFor="add-material-embed" style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                  <Switch id="add-material-embed" checked={embedFrames} onCheckedChange={setEmbedFrames} />
+                  <Switch id="add-material-embed" checked={embedFrames} onCheckedChange={(v) => { userToggledRef.current = true; setEmbedFrames(v) }} />
                   <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <span className="mono" style={{ fontSize: 12 }}>笔记里配图</span>
                     <span className="kw" style={{ fontSize: 11 }}>打开＝带图笔记（自动挑有信息的画面）；关闭＝纯文字笔记</span>
                   </span>
                 </label>
 
-                {embedFrames && (() => {
+                {/* R4.7: 视觉模型选择（配图开启时显示） */}
+                {embedFrames && visionModels.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span className="mono" style={{ fontSize: 12 }}>视觉模型</span>
+                    <Select value={selectedVisionModel} onValueChange={setSelectedVisionModel}>
+                      <SelectTrigger style={{ fontSize: 13 }}>
+                        <SelectValue placeholder="系统默认" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__default__">系统默认</SelectItem>
+                        {visionModels.map(vm => (
+                          <SelectItem key={vm.modelId} value={vm.modelId}>
+                            {vm.providerName} · {vm.modelName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {embedFrames && !hasVisionModel && (
+                  <span className="kw" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                    未检测到视觉模型，将使用纯文字总结。可在「设置 → 模型」中添加。
+                  </span>
+                )}
+
+                {embedFrames && hasVisionModel && (() => {
                   const autoInterval = computeAutoInterval(videoDuration)
                   const autoFrames = estimateFrames(videoDuration, autoInterval)
                   const manualFrames = estimateFrames(videoDuration, frameInterval)

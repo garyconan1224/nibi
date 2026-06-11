@@ -186,6 +186,9 @@ export default function ProcessingPage() {
   const payload = task?.payload ?? {} as Record<string, unknown>
   const taskType: string = task?.task_type ?? ''
   const isAudioTask = taskType === 'audio'
+  // R4.7: 从 payload 读取配图开关（note task 专属）
+  const preflight = (payload.preflight ?? {}) as Record<string, unknown>
+  const embedFrames: boolean = preflight.embed_frames !== false // 默认 true
   // R13.2/R18.1 标题/封面/时长来源优先级：result（直接来源）→ payload（从 download 继承）→ fallback
   const resultAudio = result.audio as Record<string, unknown> | undefined
   const url =
@@ -403,6 +406,7 @@ export default function ProcessingPage() {
               progress={progress}
               taskType={taskType}
               taskLogs={logs}
+              embedFrames={embedFrames}
             />
           )}
         </div>
