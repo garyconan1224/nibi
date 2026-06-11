@@ -38,6 +38,7 @@ const ProcessingPage = lazy(() => import('@/pages/result/ProcessingPage/index'))
 const StoryboardPage = lazy(() => import('@/pages/StoryboardPage/index'))
 const LibraryPage = lazy(() => import('@/pages/LibraryPage/index'))
 const NoteShell = lazy(() => import('@/pages/result/NoteShell/index'))
+const TestEditorPage = lazy(() => import('@/pages/TestEditorPage'))
 
 // 懒加载 fallback：保持极简，避免把额外依赖拉进主 chunk
 const RouteFallback = () => (
@@ -85,6 +86,10 @@ export const router = createBrowserRouter([
       {
         path: 'workspaces/:workspaceId/items/:itemId/note',
         element: withSuspense(<NoteShell />),
+      },
+      {
+        path: 'test-editor',
+        element: withSuspense(<TestEditorPage />),
       },
       // 旧路由兼容（保留一个 release，loader redirect 到新路径）
       {
