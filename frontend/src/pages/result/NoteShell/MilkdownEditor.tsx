@@ -27,7 +27,9 @@ function MilkdownEditorInner({
   markdown,
   onMarkdownChange,
 }: MilkdownEditorProps) {
-  const skipFirstRef = useRef(true)
+  // 记住挂载时的初始内容：seed 触发的 markdownUpdated（md 等于初值）跳过，
+  // 用户真实编辑（md 已变）才上抛保存。避免「首次编辑被吞」（旧 skipFirstRef 的坑）。
+  const initialMdRef = useRef(markdown)
 
   useEditor(
     (root) => {
@@ -36,10 +38,8 @@ function MilkdownEditorInner({
           ctx.set(rootCtx, root)
           ctx.set(defaultValueCtx, markdown)
           ctx.get(listenerCtx).markdownUpdated((_ctx: any, md: string) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-            if (skipFirstRef.current) {
-              skipFirstRef.current = false
-              return
-            }
+            // seed 初值不触发保存；内容变化才保存（trim 抵消 Milkdown 规范化的首尾空白差异）
+            if (md.trim() === initialMdRef.current.trim()) return
             onMarkdownChange(md)
           })
         })
