@@ -783,7 +783,7 @@ export default function NoteShell() {
       ) : viewMode === 'compare' ? (
         <CompareView markdown={editingBody} onMarkdownChange={handleEditorChange} sourceMd={note.source_md} />
       ) : viewMode === 'wysiwyg' ? (
-        <MilkdownEditor key={milkdownKey} markdown={editingBody} onMarkdownChange={handleEditorChange} />
+        <MilkdownEditor key={milkdownKey} markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
       ) : (
         <NoteEditor markdown={editingBody} onMarkdownChange={handleEditorChange} />
       )}

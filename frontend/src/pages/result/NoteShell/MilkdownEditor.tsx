@@ -9,7 +9,7 @@
  * 首帧 markdownUpdated 不触发保存（skipFirstRef 守卫）。
  */
 import { useRef } from 'react'
-import { Editor, rootCtx, defaultValueCtx } from '@milkdown/core'
+import { Editor, rootCtx, defaultValueCtx, prosePluginsCtx } from '@milkdown/core'
 import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react'
 import { commonmark } from '@milkdown/preset-commonmark'
 import { gfm } from '@milkdown/preset-gfm'
@@ -17,19 +17,25 @@ import { listener, listenerCtx } from '@milkdown/plugin-listener'
 import { prism } from '@milkdown/plugin-prism'
 import { nord } from '@milkdown/theme-nord'
 import '@milkdown/theme-nord/style.css'
+import { timestampPlugin } from './milkdownTimestamp'
 
 interface MilkdownEditorProps {
   markdown: string
   onMarkdownChange: (md: string) => void
+  onSeek?: (sec: number) => void
 }
 
 function MilkdownEditorInner({
   markdown,
   onMarkdownChange,
+  onSeek,
 }: MilkdownEditorProps) {
   // 记住挂载时的初始内容：seed 触发的 markdownUpdated（md 等于初值）跳过，
   // 用户真实编辑（md 已变）才上抛保存。避免「首次编辑被吞」（旧 skipFirstRef 的坑）。
   const initialMdRef = useRef(markdown)
+  // 避免 timestampPlugin 闭包捕获旧 onSeek
+  const onSeekRef = useRef(onSeek)
+  onSeekRef.current = onSeek
 
   useEditor(
     (root) => {
@@ -42,6 +48,12 @@ function MilkdownEditorInner({
             if (md.trim() === initialMdRef.current.trim()) return
             onMarkdownChange(md)
           })
+          // 注册时间码 decoration 插件
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ctx.update(prosePluginsCtx, (ps: any) => [
+            ...ps,
+            timestampPlugin(() => onSeekRef.current ?? (() => {})),
+          ])
         })
       // @ts-expect-error Milkdown 7.x TS overload 不精确，TestEditorPage 同款写法，运行时正常
       return editor.use(nord).use(commonmark).use(gfm).use(prism).use(listener)
@@ -55,6 +67,7 @@ function MilkdownEditorInner({
 export default function MilkdownEditor({
   markdown,
   onMarkdownChange,
+  onSeek,
 }: MilkdownEditorProps) {
   return (
     <div className="note-milkdown">
@@ -93,11 +106,27 @@ export default function MilkdownEditor({
         .note-milkdown .milkdown pre .token.class-name { color: #ffa657; }
         .note-milkdown .milkdown pre .token.template-punctuation { color: #a5d6ff; }
         .note-milkdown .milkdown pre .token.interpolation { color: #c9d1d9; }
+        /* Timestamp chip — inline decoration */
+        .note-milkdown .note-ts-chip {
+          display: inline;
+          padding: 1px 5px;
+          border-radius: 4px;
+          background: rgba(99, 179, 237, 0.15);
+          color: #63b3ed;
+          font-size: 0.9em;
+          font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+          cursor: pointer;
+          user-select: none;
+        }
+        .note-milkdown .note-ts-chip:hover {
+          background: rgba(99, 179, 237, 0.3);
+        }
       `}</style>
       <MilkdownProvider>
         <MilkdownEditorInner
           markdown={markdown}
           onMarkdownChange={onMarkdownChange}
+          onSeek={onSeek}
         />
       </MilkdownProvider>
     </div>
