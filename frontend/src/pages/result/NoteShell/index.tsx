@@ -17,7 +17,7 @@ import type { ReactElement, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowLeft, BookOpenCheck, ChevronDown, ChevronRight, Download, FileCode, FileText, List, RefreshCw } from 'lucide-react'
+import { ArrowLeft, BookOpenCheck, ChevronDown, ChevronRight, Download, FileCode, FileText, RefreshCw } from 'lucide-react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
@@ -93,37 +93,12 @@ const TYPE_LABEL: Record<string, string> = {
 
 const VIEW_MODE_KEY = 'nibi-note-view-mode'
 
-type ViewMode = 'read' | 'edit' | 'compare' | 'wysiwyg'
+type ViewMode = 'edit' | 'compare' | 'wysiwyg'
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed'
-
-interface TocEntry {
-  id: string
-  text: string
-  level: number
-}
 
 /** 格式化 HH:mm */
 function formatTime(d: Date): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-}
-
-/** 从 markdown 正文提取 h2/h3 生成 TOC。 */
-function extractToc(md: string): TocEntry[] {
-  const entries: TocEntry[] = []
-  for (const line of md.split('\n')) {
-    const match = line.match(/^(#{2,3})\s+(.+)$/)
-    if (!match) continue
-    entries.push({
-      id: `note-heading-${entries.length}`,
-      text: match[2].trim(),
-      level: match[1].length,
-    })
-  }
-  return entries
-}
-
-function headingId(text: string, toc: TocEntry[]): string | undefined {
-  return toc.find((entry) => entry.text === text)?.id
 }
 
 function safeFilename(name: string): string {
@@ -254,7 +229,6 @@ function useMediaQuery(query: string): boolean {
  *  富文本 = 渲染态（ReactMarkdown）；md格式 = 源码态（CodeMirror，可编辑）。
  *  源 md（转写+截帧原始内容）在右侧操作区，不是中列标签。 */
 const videoViewModeLabels: Record<ViewMode, string> = {
-  read: '富文本',
   edit: 'md格式',
   compare: '源md对照',
   wysiwyg: '所见即所得',
@@ -508,22 +482,23 @@ export default function NoteShell() {
   const [error, setError] = useState<string | null>(null)
   const [tagsOpen, setTagsOpen] = useState(true)
   const [chatOpen] = useState(false)
-  const [tocOpen, setTocOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
 
-  // R1.3 + R2.1: 视图模式 + 保存状态（兼容三值 + 窄屏降级 compare → read）
+  // R1.3 + R2.1: 视图模式 + 保存状态（兼容三值 + 窄屏降级 compare → wysiwyg）
   const isWide = useMediaQuery('(min-width: 1024px)')
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = localStorage.getItem(VIEW_MODE_KEY)
-    const valid = saved === 'read' || saved === 'edit' || saved === 'compare' || saved === 'wysiwyg'
-    if (saved === 'compare' && !window.matchMedia('(min-width: 1024px)').matches) return 'read'
-    return valid ? (saved as ViewMode) : 'read'
+    // 旧版 'read' 回退到 wysiwyg（阶段三移除富文本只读模式）
+    if (saved === 'read') return 'wysiwyg'
+    const valid = saved === 'edit' || saved === 'compare' || saved === 'wysiwyg'
+    if (saved === 'compare' && !window.matchMedia('(min-width: 1024px)').matches) return 'wysiwyg'
+    return valid ? (saved as ViewMode) : 'wysiwyg'
   })
-  // R2.1 窄屏运行时降级：已在对照态时缩窗到 <1024px → 自动切回阅读态
+  // R2.1 窄屏运行时降级：已在对照态时缩窗到 <1024px → 自动切回所见即所得
   useEffect(() => {
     if (!isWide && viewMode === 'compare') {
-      setViewMode('read')
-      localStorage.setItem(VIEW_MODE_KEY, 'read')
+      setViewMode('wysiwyg')
+      localStorage.setItem(VIEW_MODE_KEY, 'wysiwyg')
     }
   }, [isWide, viewMode])
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
@@ -588,8 +563,8 @@ export default function NoteShell() {
     const isVid = fmType === 'video' && !!note.media?.video?.url
     if (isVid) {
       videoDefaultedRef.current = true
-      setViewMode('read')
-      localStorage.setItem(VIEW_MODE_KEY, 'read')
+      setViewMode('wysiwyg')
+      localStorage.setItem(VIEW_MODE_KEY, 'wysiwyg')
     }
   }, [note])
 
@@ -650,29 +625,17 @@ export default function NoteShell() {
   const switchView = useCallback((mode: ViewMode) => {
     setViewMode(mode)
     localStorage.setItem(VIEW_MODE_KEY, mode)
-    // 切到编辑/对照态时，同步 editingBody（以防阅读态下 note 被外部更新）
-    if (mode !== 'read' && note) {
+    // 切换模式时同步 editingBody（以防内容被外部更新）
+    if (note) {
       setEditingBody(extractBody(note.note_md))
     }
   }, [note])
 
-  const noteBody = note ? extractBody(note.note_md) : ''
-  const currentBody = viewMode === 'read' ? noteBody : editingBody
-  const toc = useMemo(() => extractToc(currentBody), [currentBody])
+  const currentBody = editingBody
   const chatSystemPrompt = useMemo(
     () => buildChatSystemPrompt(currentBody, note?.transcript),
     [currentBody, note?.transcript],
   )
-
-  const handleTocJump = useCallback((id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }, [])
-
-  const handleMarkdownSeek = useCallback((sec: number) => {
-    // 7.3: 视频布局直接用 videoRef，通用布局用 mediaCompanionRef
-    videoRef.current?.seekTo(sec)
-    mediaCompanionRef.current?.seekTo(sec)
-  }, [])
 
   const handleExportMarkdown = useCallback(() => {
     if (!note) return
@@ -740,47 +703,7 @@ export default function NoteShell() {
       // compare 模式需要 100% 高度让 CompareView 能正确 flex 撑满
       height: viewMode === 'compare' ? '100%' : undefined,
     }}>
-      {viewMode === 'read' ? (
-        noteBody ? (
-          <div style={{ fontSize: 14, lineHeight: 1.8, color: 'var(--ink-2)' }}>
-            <ReactMarkdown
-              remarkPlugins={remarkPlugins}
-              components={{
-                h2: ({ children, ...props }) => {
-                  const text = String(children)
-                  return <h2 id={headingId(text, toc)} {...props}>{children}</h2>
-                },
-                h3: ({ children, ...props }) => {
-                  const text = String(children)
-                  return <h3 id={headingId(text, toc)} {...props}>{children}</h3>
-                },
-                p: ({ children, ...props }) => (
-                  <p {...props}>{renderNoteTimestampChildren(children, handleMarkdownSeek)}</p>
-                ),
-                li: ({ children, ...props }) => (
-                  <li {...props}>{renderNoteTimestampChildren(children, handleMarkdownSeek)}</li>
-                ),
-                img: ({ src, alt, ...props }) => (
-                  <img
-                    src={src}
-                    alt={alt || ''}
-                    style={{ maxWidth: '100%', borderRadius: 6, margin: '8px 0' }}
-                    loading="lazy"
-                    {...props}
-                  />
-                ),
-              }}
-            >
-              {noteBody}
-            </ReactMarkdown>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60%', gap: 8, color: 'var(--ink-4)', fontSize: 13 }}>
-            <span>笔记尚未生成</span>
-            <span style={{ fontSize: 11 }}>完成视频分析后将自动出现</span>
-          </div>
-        )
-      ) : viewMode === 'compare' ? (
+      {viewMode === 'compare' ? (
         <CompareView markdown={editingBody} onMarkdownChange={handleEditorChange} sourceMd={note.source_md} />
       ) : viewMode === 'wysiwyg' ? (
         <MilkdownEditor key={milkdownKey} markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
@@ -789,51 +712,6 @@ export default function NoteShell() {
       )}
     </div>
   )
-
-  const tocFloating = viewMode === 'read' && toc.length > 0 && tocOpen ? (
-    <aside
-      style={{
-        position: 'absolute',
-        top: 8,
-        right: 8,
-        width: 200,
-        maxHeight: 'calc(100% - 16px)',
-        zIndex: 20,
-        border: '1px solid var(--line)',
-        borderRadius: 8,
-        padding: '12px 10px',
-        overflowY: 'auto',
-        background: 'var(--bg)',
-        boxShadow: '0 4px 16px rgba(0,0,0,.12)',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 12, fontWeight: 700, color: 'var(--ink-2)' }}>
-        <List size={14} /> 目录
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        {toc.map((entry) => (
-          <button
-            key={entry.id}
-            onClick={() => { handleTocJump(entry.id); setTocOpen(false) }}
-            style={{
-              width: '100%',
-              padding: entry.level === 3 ? '4px 8px 4px 18px' : '4px 8px',
-              border: 'none',
-              borderRadius: 4,
-              background: 'transparent',
-              color: 'var(--ink-3)',
-              cursor: 'pointer',
-              fontSize: 12,
-              lineHeight: 1.4,
-              textAlign: 'left',
-            }}
-          >
-            {entry.text}
-          </button>
-        ))}
-      </div>
-    </aside>
-  ) : null
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -977,7 +855,7 @@ export default function NoteShell() {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
             {/* 视图切换 tab（点1：移到中列内容正上方） */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 0, padding: '0 24px', flexShrink: 0, borderBottom: '1px solid var(--line)', height: 36 }}>
-              {(['read', 'edit', 'wysiwyg'] as ViewMode[]).map((m) => (
+              {(['wysiwyg', 'edit'] as ViewMode[]).map((m) => (
                 <button
                   key={m}
                   onClick={() => switchView(m)}
@@ -1000,30 +878,10 @@ export default function NoteShell() {
                   {saveStatus === 'failed' && <span style={{ color: 'var(--accent)' }}>保存失败</span>}
                 </span>
               )}
-              {/* 目录浮动按钮（阅读态 + 有目录时显示） */}
-              {viewMode === 'read' && toc.length > 0 && (
-                <button
-                  onClick={() => setTocOpen((v) => !v)}
-                  title={tocOpen ? '关闭目录' : '打开目录'}
-                  style={{
-                    marginLeft: 'auto',
-                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                    padding: '4px 10px', fontSize: 12, border: 'none', borderRadius: 4,
-                    cursor: 'pointer',
-                    background: tocOpen ? 'var(--accent-2)' : 'transparent',
-                    color: tocOpen ? '#fff' : 'var(--ink-4)',
-                    transition: 'background .15s, color .15s',
-                  }}
-                >
-                  <List size={13} />
-                  目录
-                </button>
-              )}
             </div>
-            {/* 正文（TOC 改为浮动面板，不再占固定宽度） */}
+            {/* 正文 */}
             <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
               {noteContent}
-              {tocFloating}
             </div>
           </div>
 
@@ -1078,27 +936,6 @@ export default function NoteShell() {
         <>
           <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
             {noteContent}
-            {tocFloating}
-            {/* 目录浮动按钮（阅读态 + 有目录时，非视频布局用） */}
-            {viewMode === 'read' && toc.length > 0 && (
-              <button
-                onClick={() => setTocOpen((v) => !v)}
-                title={tocOpen ? '关闭目录' : '打开目录'}
-                style={{
-                  position: 'absolute', top: 8, right: 8, zIndex: 21,
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  padding: '4px 10px', fontSize: 12, border: 'none', borderRadius: 4,
-                  cursor: 'pointer',
-                  background: tocOpen ? 'var(--accent-2)' : 'var(--bg)',
-                  color: tocOpen ? '#fff' : 'var(--ink-4)',
-                  boxShadow: '0 2px 8px rgba(0,0,0,.1)',
-                  transition: 'background .15s, color .15s',
-                }}
-              >
-                <List size={13} />
-                目录
-              </button>
-            )}
           </div>
           <div style={{ flexShrink: 0, maxHeight: '40%', overflowY: 'auto' }}>
             {chatOpen && (
