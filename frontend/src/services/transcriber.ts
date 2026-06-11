@@ -119,12 +119,16 @@ export async function fetchWhisperModelsStatus(): Promise<WhisperModelsStatusRes
 /**
  * 获取设备选项
  */
-export function getDeviceOptions() {
-  return [
+export function getDeviceOptions(engineType?: string) {
+  const opts = [
     { value: 'cpu', label: 'CPU' },
     { value: 'cuda', label: 'NVIDIA CUDA' },
-    { value: 'mps', label: 'Apple Metal (MPS)' },
   ]
+  // mps 仅 mlx-whisper 支持；fast-whisper (CTranslate2) 不支持 MPS
+  if (engineType === 'mlx-whisper') {
+    opts.push({ value: 'mps', label: 'Apple Metal (MPS)' })
+  }
+  return opts
 }
 
 /**

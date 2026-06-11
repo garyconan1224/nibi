@@ -240,7 +240,11 @@ const TranscriberPage = () => {
       toast.warning(t('transcriber.mlxNotAvailable'))
       patch({ type: 'fast-whisper' })
     }
-  }, [isMac, draft.type, t, patch])
+    // fast-whisper 不支持 mps，自动回退到 cpu
+    if (draft.type === 'fast-whisper' && draft.device === 'mps') {
+      patch({ device: 'cpu' })
+    }
+  }, [isMac, draft.type, draft.device, t, patch])
 
   return (
     <div className="mx-auto max-w-3xl space-y-8 p-6">
@@ -427,7 +431,7 @@ const TranscriberPage = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {getDeviceOptions().map((opt) => (
+                {getDeviceOptions(draft.type).map((opt) => (
                   <SelectItem key={opt.value} value={opt.value}>
                     {opt.label}
                   </SelectItem>

@@ -111,6 +111,10 @@ def update_transcriber_config(req: TranscriberConfigUpdateRequest) -> Dict[str, 
         vad_filter=req.vad_filter if req.vad_filter is not None else current.vad_filter,
     )
 
+    # 兜底：fast-whisper (CTranslate2) 不支持 mps，自动回退 cpu
+    if new_cfg.type in ("fast-whisper",) and new_cfg.device == "mps":
+        new_cfg = replace(new_cfg, device="cpu")
+
     save_settings(replace(settings, transcriber=new_cfg))
     return _serialize(new_cfg)
 
