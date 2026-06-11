@@ -1,8 +1,9 @@
 ---
 title: Track K · 视频笔记「入口收敛 + 回归修复」计划（交付 mimo v2.5 pro 执行）
-status: ready
+status: done
 owner: mimo（执行）/ 用户（拍板）
 created: 2026-06-08
+completed_date: 2026-06-11
 strategy: 用户 2026-06-08 已定 —— **不重写、不新建项目**；在现有项目（后端 1.7w 行 / 前端 3.5w 行 / 884 提交）做**彻底删除式收敛**：保留所有底层能力，删掉多余创建入口与旧路径，只留「生成笔记 → note task → NoteShell」一套。再对齐 B 站流程修回归。
 relates:
   - docs/plans/track-K-note-flow-blueprint.md（蓝图：内容处理 §2 + 视频 UI §3.5 + 差距清单附录 D）
@@ -113,15 +114,15 @@ relates:
 
 # 4. 总验证清单（全做完后，B站 + 小红书各跑一遍）
 
-- [ ] 加链接只有「生成笔记」一个入口
-- [ ] **一个视频 = 一个任务**（无 /tmp/test.mp3）
-- [ ] 步骤完整走 download→transcribe→analyze→note
-- [ ] 标题是真实标题
-- [ ] 视频**能播放**
-- [ ] **截图插入**能写进 md
-- [ ] 字幕/转录轴点击跳播放器；正文时间码点击跳画面
-- [ ] 小红书图文、B站 opus **图文笔记没被改坏**
-- [ ] `npx tsc --noEmit` + `pytest` 全绿
+- [x] 加链接只有「生成笔记」一个入口
+- [x] **一个视频 = 一个任务**（无 /tmp/test.mp3）
+- [x] 步骤完整走 download→transcribe→analyze→note
+- [x] 标题是真实标题
+- [x] 视频**能播放**
+- [x] **截图插入**能写进 md
+- [x] 字幕/转录轴点击跳播放器；正文时间码点击跳画面
+- [x] 小红书图文、B站 opus **图文笔记没被改坏**
+- [x] `npx tsc --noEmit` + `pytest` 全绿
 
 ---
 

@@ -48,7 +48,7 @@ git log --oneline -10
 
 **总体节奏**：F → V → A → T → I → R（先打通整体路径，再逐个深化分支，最后 R 收官）
 
-> ⚠️ **2026-06-05 临时主线注记**：当前插入 **Track K · 单素材统一笔记页（NoteShell）架构收口**（调研定稿中，只定设计不动代码，依据 [`plans/track-K-M7-result-pages-redesign.md`](plans/track-K-M7-result-pages-redesign.md)）。下方 F→V→A→T→I→R 节奏与「F3→[C]→[D]」推荐顺序**暂缓**；复刻[C] / AI 导演 / 开源[D] 仍后置。
+> ~~⚠️ **2026-06-05 临时主线注记**~~ → ✅ **2026-06-11 Track K 完工**：视频笔记「入口收敛 + 回归修复」计划全部完成（阶段 A–E + R1–R4 + 9.x 布局 + segment_refiner + R3 标准总结），代码合入 main。执行计划 `status: done`。下方 F→V→A→T→I→R 节奏与「F3→[C]→[D]」推荐顺序**恢复生效**。
 
 > ✅ **2026-06-02 对账**：Phase IR + R14~R25 + 音视频闭环（N8b 音频后端 / R20 PDF·Word·Obsidian 导出 / av_synthesis）+ 文字 T1~T3 + 图片 I1·I2 + RP1 三页深化均已合入 main（以 git log 为准）。**当前真正未做**：F3 错误体验 → [C] 复刻·AI 导演（需补设计稿）→ [D] 开源准备；N7b 路径3 卡付费 Gemini API 搁置。**I3 风格 DNA 决议后置**（与 Track R·R3 重叠/重算法，并入 R 阶段，见 `docs/plans/i-image-mimo-prompt.md`）。
 
