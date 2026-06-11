@@ -48,6 +48,12 @@ export interface TranscriberConfig {
   groqApiKey: string
   /** ASR 初始提示词（Faster Whisper 前置 prompt，用于引导识别）*/
   initialPrompt: string
+  /** R4.8: CPU 线程数（0=自动） */
+  cpuThreads: number
+  /** R4.8: beam search 宽度（1=贪心，5=默认） */
+  beamSize: number
+  /** R4.8: Silero VAD 静默过滤（默认开） */
+  vadFilter: boolean
 }
 
 /**
@@ -221,6 +227,9 @@ const DEFAULT_CONFIG: Omit<ConfigState, ConfigStateActionKey> = {
     device: 'cpu',
     groqApiKey: '',
     initialPrompt: '',
+    cpuThreads: 0,
+    beamSize: 5,
+    vadFilter: true,
   },
 
   // 截图配置（默认 6 秒间隔，3x3 网格，85% 质量，嵌入笔记）

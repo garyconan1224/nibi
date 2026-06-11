@@ -65,6 +65,10 @@ class TranscriberConfigUpdateRequest(BaseModel):
     device: Optional[str] = None
     groq_api_key: Optional[str] = None
     initial_prompt: Optional[str] = None
+    # R4.8: ASR 加速参数
+    cpu_threads: Optional[int] = None
+    beam_size: Optional[int] = None
+    vad_filter: Optional[bool] = None
 
 
 def _serialize(cfg: TranscriberConfig) -> Dict[str, Any]:
@@ -102,6 +106,9 @@ def update_transcriber_config(req: TranscriberConfigUpdateRequest) -> Dict[str, 
         device=req.device if req.device is not None else current.device,
         groq_api_key=req.groq_api_key if req.groq_api_key is not None else current.groq_api_key,
         initial_prompt=req.initial_prompt if req.initial_prompt is not None else current.initial_prompt,
+        cpu_threads=req.cpu_threads if req.cpu_threads is not None else current.cpu_threads,
+        beam_size=req.beam_size if req.beam_size is not None else current.beam_size,
+        vad_filter=req.vad_filter if req.vad_filter is not None else current.vad_filter,
     )
 
     save_settings(replace(settings, transcriber=new_cfg))

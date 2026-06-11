@@ -2050,6 +2050,9 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                     log_callback=_on_log,
                     progress_callback=_on_progress,
                     return_segments=True,
+                    cpu_threads=tcfg.cpu_threads,
+                    beam_size=tcfg.beam_size,
+                    vad_filter=tcfg.vad_filter,
                 )
                 return _text, _segments
 
