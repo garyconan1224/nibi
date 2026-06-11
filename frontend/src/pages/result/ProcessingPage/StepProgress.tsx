@@ -20,11 +20,6 @@ const SKIP_STAGES_BY_TYPE: Record<string, string[]> = {
   note: ['PROBE', 'STORE'],
 }
 
-function visibleStages(taskType: string): typeof PROCESSING_STAGES {
-  const skip = new Set(SKIP_STAGES_BY_TYPE[taskType] ?? [])
-  return PROCESSING_STAGES.filter((s) => !skip.has(s.id))
-}
-
 // R12.3 各阶段简短描述（对齐 design/components/processing.jsx LOGS_BY 旁的 desc）
 const STAGE_DESC: Record<string, string> = {
   DOWNLOAD: 'yt-dlp · 平台 dash · 仅链接来源。',

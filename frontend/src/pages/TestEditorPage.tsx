@@ -98,6 +98,7 @@ function TestEditorContent() {
           console.log('[Milkdown] doc length:', md.length)
         })
       })
+      // @ts-expect-error Milkdown 7.x TS overload 不精确，运行时正常
       .use(nord)
       .use(commonmark)
       .use(gfm)

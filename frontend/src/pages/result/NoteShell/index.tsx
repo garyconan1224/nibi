@@ -536,17 +536,9 @@ export default function NoteShell() {
   // 标记是否从「应用到主笔记」触发的刷新，避免 debounce 冲突
   const applyingRef = useRef(false)
 
-  // Milkdown 重挂 key：noteId 变化 或 note.md 被外部更新时重挂编辑器
-  const prevNoteMdRef = useRef<string | undefined>(undefined)
-  const milkdownKey = useMemo(() => {
-    const noteId = `${workspaceId}/${itemId}`
-    const noteMd = note?.note_md
-    if (noteMd !== undefined && noteMd !== prevNoteMdRef.current) {
-      prevNoteMdRef.current = noteMd
-      return `${noteId}-${Date.now()}`
-    }
-    return noteId
-  }, [workspaceId, itemId, note?.note_md])
+  // Milkdown 重挂 key：noteId 变化（自然由 workspaceId/itemId 驱动）或 seedVersion 递增时重挂
+  const [seedVersion, setSeedVersion] = useState(0)
+  const milkdownKey = `${workspaceId}/${itemId}-${seedVersion}`
 
   // 7.3: 视频笔记三列布局 — 播放器 + 转录轴联动
   const videoRef = useRef<LNVideoPanelHandle>(null)
@@ -645,6 +637,7 @@ export default function NoteShell() {
       const updated = await putItemNote(workspaceId, itemId, summary.content_md)
       setNote(updated)
       setEditingBody(summary.content_md)
+      setSeedVersion(v => v + 1) // 触发 Milkdown 重挂，显示新 summary 内容
       setActiveSummaryId(summary.summary_id)
       setSaveStatus('saved')
       setSavedAt(formatTime(new Date()))
