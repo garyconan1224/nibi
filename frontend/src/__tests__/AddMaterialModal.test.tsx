@@ -5,6 +5,7 @@ import { AddMaterialModal } from '@/components/workspace/AddMaterialModal'
 const {
   navigateMock,
   sniffUrlMock,
+  probeDurationMock,
   autoCreateWorkspaceMock,
   generateNoteMock,
   addWorkspaceItemMock,
@@ -13,6 +14,7 @@ const {
 } = vi.hoisted(() => ({
   navigateMock: vi.fn(),
   sniffUrlMock: vi.fn(),
+  probeDurationMock: vi.fn(),
   autoCreateWorkspaceMock: vi.fn(),
   generateNoteMock: vi.fn(),
   addWorkspaceItemMock: vi.fn(),
@@ -26,6 +28,7 @@ vi.mock('react-router-dom', () => ({
 
 vi.mock('@/services/workspaces', () => ({
   sniffUrl: sniffUrlMock,
+  probeDuration: probeDurationMock,
   autoCreateWorkspace: autoCreateWorkspaceMock,
   addWorkspaceItem: addWorkspaceItemMock,
   savePreflight: savePreflightMock,
@@ -37,11 +40,13 @@ describe('AddMaterialModal', () => {
   beforeEach(() => {
     navigateMock.mockClear()
     sniffUrlMock.mockReset()
+    probeDurationMock.mockReset()
     autoCreateWorkspaceMock.mockReset()
     generateNoteMock.mockReset()
     addWorkspaceItemMock.mockReset()
     savePreflightMock.mockReset()
     startItemPipelineMock.mockReset()
+    probeDurationMock.mockResolvedValue({ duration_sec: 0 })
     generateNoteMock.mockResolvedValue({
       task_id: 'task-note-1',
       task_type: 'note',

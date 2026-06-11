@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, FileText, Link2, Wand2, X } from 'lucide-react'
+import { ChevronDown, FileText, Link2, Settings2, Wand2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -14,6 +14,7 @@ import type { SniffResult } from '@/services/workspaces'
 import {
   autoCreateWorkspace,
   generateNote,
+  probeDuration,
   sniffUrl,
 } from '@/services/workspaces'
 import type {
@@ -69,6 +70,20 @@ function computeAutoInterval(durationSec?: number): number {
   return Math.min(60, Math.max(5, Math.round(durationSec / 25)))
 }
 
+/** 预估帧数：时长 ÷ 间隔，四舍五入、至少 1；拿不到时长返回 0（UI 显示「识别后显示」）*/
+function estimateFrames(durationSec: number, intervalSec: number): number {
+  if (durationSec <= 0 || intervalSec <= 0) return 0
+  return Math.max(1, Math.round(durationSec / intervalSec))
+}
+
+/** 秒数 → M:SS */
+function formatDuration(sec: number): string {
+  if (sec <= 0) return ''
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
 export function AddMaterialModal({
   open,
   onOpenChange,
@@ -87,6 +102,7 @@ export function AddMaterialModal({
   const [frameInterval, setFrameInterval] = useState(5)
   const [noteExpanded, setNoteExpanded] = useState(false)
   const [captureMode, setCaptureMode] = useState<'auto' | 'manual'>('auto')
+  const [videoDuration, setVideoDuration] = useState(0) // 探测到的视频时长（秒），0=未知
   const [error, setError] = useState<string | null>(null)
   const sniffTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
@@ -136,6 +152,19 @@ export function AddMaterialModal({
     return () => clearTimeout(sniffTimer.current)
   }, [open, internalUrl, urlValue, doSniff])
 
+  // 识别为视频后，轻量探测时长（供「取画面」算预估帧数）；非视频/拿不到 → 0
+  useEffect(() => {
+    if (!open || !effectiveUrl || effectiveSniff?.primary_type !== 'video') {
+      setVideoDuration(0)
+      return
+    }
+    let cancelled = false
+    probeDuration(effectiveUrl)
+      .then((r) => { if (!cancelled) setVideoDuration(r.duration_sec || 0) })
+      .catch(() => { if (!cancelled) setVideoDuration(0) })
+    return () => { cancelled = true }
+  }, [open, effectiveUrl, effectiveSniff?.primary_type])
+
   const handleGenerateNote = async () => {
     if (!effectiveUrl) {
       setError('请先输入素材链接')
@@ -154,7 +183,7 @@ export function AddMaterialModal({
 
       // SniffResult 暂无 duration 字段，智能档兜底默认 10 秒
       const effInterval =
-        captureMode === 'auto' ? computeAutoInterval(undefined) : frameInterval
+        captureMode === 'auto' ? computeAutoInterval(videoDuration) : frameInterval
       const result = await generateNote(
         wsId, effectiveUrl, effectiveSniff?.title ?? undefined, embedFrames, 'vision', effInterval,
       )
@@ -285,29 +314,62 @@ export function AddMaterialModal({
                 </span>
               </label>
 
-              {/* 配图打开后才出现：取画面方式 */}
-              {embedFrames && (
-                <div style={{ marginLeft: 34, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <span className="mono" style={{ fontSize: 12 }}>取画面</span>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                    <input type="radio" name="capture-mode" checked={captureMode === 'auto'} onChange={() => setCaptureMode('auto')} />
-                    <span className="kw" style={{ fontSize: 12 }}>智能（按视频时长自动）</span>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                    <input type="radio" name="capture-mode" checked={captureMode === 'manual'} onChange={() => setCaptureMode('manual')} />
-                    <span className="kw" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      手动每隔
-                      <input
-                        type="number" min={1} max={60} value={frameInterval}
-                        disabled={captureMode !== 'manual'}
-                        onChange={(e) => setFrameInterval(Number(e.target.value) || 5)}
-                        style={{ fontSize: 12, width: 50, padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--ink-1)' }}
-                      />
-                      秒一张
-                    </span>
-                  </label>
-                </div>
-              )}
+              {/* 配图打开后才出现：取画面方式（两张卡片）*/}
+              {embedFrames && (() => {
+                const autoInterval = computeAutoInterval(videoDuration)
+                const autoFrames = estimateFrames(videoDuration, autoInterval)
+                const manualFrames = estimateFrames(videoDuration, frameInterval)
+                const cardBase = {
+                  textAlign: 'left' as const, padding: '12px 14px', borderRadius: 10,
+                  cursor: 'pointer', background: 'var(--bg)',
+                }
+                const sel = (on: boolean) => ({
+                  ...cardBase,
+                  border: on ? '2px solid var(--accent-warm)' : '1px solid var(--line)',
+                  background: on ? 'rgba(255,184,76,0.08)' : 'var(--bg)',
+                })
+                return (
+                  <div style={{ marginLeft: 34, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <span className="mono" style={{ fontSize: 12 }}>取画面</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      <div onClick={() => setCaptureMode('auto')} style={sel(captureMode === 'auto')}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                          <Wand2 size={15} style={{ color: 'var(--accent-warm)' }} />
+                          <span style={{ fontSize: 13, fontWeight: 600 }}>智能</span>
+                        </div>
+                        <div className="kw" style={{ fontSize: 11 }}>按时长自动</div>
+                        <div className="kw" style={{ fontSize: 11, marginTop: 4 }}>
+                          {videoDuration > 0 ? `每 ${autoInterval} 秒 · 约 ${autoFrames} 张` : '识别后显示'}
+                        </div>
+                      </div>
+                      <div onClick={() => setCaptureMode('manual')} style={sel(captureMode === 'manual')}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                          <Settings2 size={15} style={{ color: captureMode === 'manual' ? 'var(--accent-warm)' : 'var(--ink-3)' }} />
+                          <span style={{ fontSize: 13, fontWeight: 600 }}>手动</span>
+                        </div>
+                        <div className="kw" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          每隔
+                          <input
+                            type="number" min={1} max={60} value={frameInterval}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => setFrameInterval(Number(e.target.value) || 5)}
+                            style={{ fontSize: 11, width: 42, padding: '1px 4px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--ink-1)' }}
+                          />
+                          秒
+                        </div>
+                        <div className="kw" style={{ fontSize: 11, marginTop: 4 }}>
+                          {videoDuration > 0 ? `约 ${manualFrames} 张` : '识别后显示'}
+                        </div>
+                      </div>
+                    </div>
+                    {videoDuration > 0 && (
+                      <div className="kw" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                        视频时长 {formatDuration(videoDuration)} · 识别时获取
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
           )}
         </div>
