@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle, AudioLines, Cpu } from 'lucide-react'
+import { AlertCircle, AudioLines, ChevronDown, Cpu, Zap } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfigStore } from '@/store/configStore'
 import { useSettingsShellStore } from '@/store/settingsShellStore'
@@ -28,6 +28,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Switch } from '@/components/ui/switch'
 import type { TranscriberType } from '@/store/configStore'
 
 /**
@@ -98,12 +99,16 @@ const TranscriberPage = () => {
       device: transcriber.device as 'cpu' | 'cuda' | 'mps',
       groq_api_key: transcriber.groqApiKey,
       initial_prompt: transcriber.initialPrompt,
+      cpu_threads: transcriber.cpuThreads,
+      beam_size: transcriber.beamSize,
+      vad_filter: transcriber.vadFilter,
     }
   }, [transcriber])
 
   // 草稿状态（本地 form state）
   const [draft, setDraft] = useState<TranscriberConfigPayload>(baseline)
   const [isSaving, setIsSaving] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false) // R4.8: 高级设置折叠
 
   // Whisper 模型缓存状态（从 /transcriber_config/models 拉取）。
   // 任一模型处于 pending_mb > 0 的下载中状态时，自动 3s 轮询刷新。
@@ -168,6 +173,9 @@ const TranscriberPage = () => {
         device: draft.device as 'cpu' | 'cuda' | 'mps',
         groq_api_key: draft.groq_api_key,
         initial_prompt: draft.initial_prompt,
+        cpu_threads: draft.cpu_threads,
+        beam_size: draft.beam_size,
+        vad_filter: draft.vad_filter,
       })
 
       // 更新前端 store（转换回 camelCase）
@@ -179,6 +187,9 @@ const TranscriberPage = () => {
           device: draft.device,
           groqApiKey: draft.groq_api_key,
           initialPrompt: draft.initial_prompt,
+          cpuThreads: draft.cpu_threads,
+          beamSize: draft.beam_size,
+          vadFilter: draft.vad_filter,
         },
       })
 
@@ -229,7 +240,11 @@ const TranscriberPage = () => {
       toast.warning(t('transcriber.mlxNotAvailable'))
       patch({ type: 'fast-whisper' })
     }
-  }, [isMac, draft.type, t, patch])
+    // fast-whisper 不支持 mps，自动回退到 cpu
+    if (draft.type === 'fast-whisper' && draft.device === 'mps') {
+      patch({ device: 'cpu' })
+    }
+  }, [isMac, draft.type, draft.device, t, patch])
 
   return (
     <div className="mx-auto max-w-3xl space-y-8 p-6">
@@ -416,7 +431,7 @@ const TranscriberPage = () => {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {getDeviceOptions().map((opt) => (
+                {getDeviceOptions(draft.type).map((opt) => (
                   <SelectItem key={opt.value} value={opt.value}>
                     {opt.label}
                   </SelectItem>
@@ -426,6 +441,93 @@ const TranscriberPage = () => {
           </FieldRow>
         </div>
       </Section>
+
+      {/* ── Section · 转录加速（R4.8）── */}
+      {draft.type === 'fast-whisper' && (
+        <Section
+          icon={<Zap className="size-4" />}
+          title="转录加速"
+          description="调整转录引擎性能参数，提速 30-50%"
+        >
+          <div className="space-y-6">
+            {/* VAD 静默跳过 */}
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-sm font-medium">VAD 静默跳过</span>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  自动检测并跳过无人声片段，省 10-30% 耗时
+                </p>
+              </div>
+              <Switch
+                checked={draft.vad_filter}
+                onCheckedChange={(v) => patch({ vad_filter: v })}
+              />
+            </div>
+
+            {/* CPU 线程数 */}
+            <FieldRow
+              htmlFor="cpu-threads"
+              label="CPU 线程数"
+              hint="更多线程 = 更快计算，但会占用更多 CPU 资源"
+              dirty={dirty.cpu_threads}
+            >
+              <Select
+                value={String(draft.cpu_threads)}
+                onValueChange={(v) => patch({ cpu_threads: Number(v) })}
+              >
+                <SelectTrigger id="cpu-threads">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">自动</SelectItem>
+                  <SelectItem value="2">2 线程</SelectItem>
+                  <SelectItem value="4">4 线程</SelectItem>
+                  <SelectItem value="6">6 线程</SelectItem>
+                  <SelectItem value="8">8 线程</SelectItem>
+                </SelectContent>
+              </Select>
+            </FieldRow>
+
+            {/* 高级设置折叠 */}
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((v) => !v)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ChevronDown
+                size={14}
+                style={{ transform: showAdvanced ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}
+              />
+              高级设置
+            </button>
+
+            {showAdvanced && (
+              <FieldRow
+                htmlFor="beam-size"
+                label="Beam 宽度"
+                hint="越低越快。3 以上质量几乎无差别"
+                dirty={dirty.beam_size}
+              >
+                <Select
+                  value={String(draft.beam_size)}
+                  onValueChange={(v) => patch({ beam_size: Number(v) })}
+                >
+                  <SelectTrigger id="beam-size">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1（最快·贪心）</SelectItem>
+                    <SelectItem value="2">2</SelectItem>
+                    <SelectItem value="3">3（推荐）</SelectItem>
+                    <SelectItem value="4">4</SelectItem>
+                    <SelectItem value="5">5（默认·最准）</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FieldRow>
+            )}
+          </div>
+        </Section>
+      )}
     </div>
   )
 }

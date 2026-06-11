@@ -16,7 +16,7 @@ from typing import Any, Callable, List, Optional, Tuple
 _last_probe_error: Optional[Tuple[str, str, str]] = None
 
 # 进程内 WhisperModel 缓存，按 (model_name, device, compute_type) 复用；避免多次触发 HF 下载 / 模型再初始化
-_MODEL_CACHE: dict[tuple[str, str, str], Any] = {}
+_MODEL_CACHE: dict[tuple[str, str, str, str], Any] = {}
 _MODEL_LOCK = threading.Lock()
 
 # HuggingFace hub 缓存根目录；用于下载期间扫描 .incomplete 文件估算进度
@@ -183,10 +183,11 @@ def _load_model(
     device: str,
     compute_type: str,
     *,
+    cpu_threads: int = 0,
     log_callback: Optional[Callable[[str], None]] = None,
     progress_callback: Optional[Callable[[float, str], None]] = None,
 ) -> Any:
-    """按 (model_name, device, compute_type) 加载并缓存 WhisperModel。
+    """按 (model_name, device, compute_type, cpu_threads) 加载并缓存 WhisperModel。
 
     首次加载会触发 HuggingFace 权重下载（base≈140MB / medium≈1.5GB / large≈3GB）。
     为了避免"无反馈静默"假死体验（HF 下载本身不透出 tqdm 到我们的回调链），
@@ -202,7 +203,7 @@ def _load_model(
             f"本地语音识别引擎加载失败：{err}\n\n{_install_hint_for_current_interpreter()}"
         ) from err
 
-    key = (model_name, device, compute_type)
+    key = (model_name, device, compute_type, str(cpu_threads))
 
     # 命中缓存直接返回；避免在持锁路径中启动无意义的看门狗
     cached = _MODEL_CACHE.get(key)
@@ -310,7 +311,8 @@ def _load_model(
         watcher = threading.Thread(target=_watcher, name="whisper-load-watcher", daemon=True)
         watcher.start()
         try:
-            model = WhisperModel(model_name, device=device, compute_type=compute_type)
+            effective_threads = cpu_threads if cpu_threads > 0 else min(os.cpu_count() or 4, 8)
+            model = WhisperModel(model_name, device=device, compute_type=compute_type, cpu_threads=effective_threads)
         finally:
             stop_evt.set()
             watcher.join(timeout=1.0)
@@ -337,6 +339,10 @@ def transcribe_file_with_fast_whisper(
     log_callback: Optional[Callable[[str], None]] = None,
     progress_callback: Optional[Callable[[float, str], None]] = None,
     return_segments: bool = False,
+    # R4.8: ASR 加速参数
+    cpu_threads: int = 0,
+    beam_size: int = 5,
+    vad_filter: bool = True,
 ) -> "str | tuple[str, list[dict[str, Any]], float]":
     """转录本地音/视频文件（直接交给 ffmpeg 解码，免去读整段二进制进内存）。
 
@@ -349,6 +355,9 @@ def transcribe_file_with_fast_whisper(
         initial_prompt：转录前置提示词，提升专有名词识别率
         log_callback：可选日志回调，会在模型加载/首段落/每 5 秒进度点回推 message
         progress_callback：可选进度回调 (ratio, message)，ratio ∈ [0, 1]
+        cpu_threads：CPU 线程数（0=自动，按 os.cpu_count() 上限 8）
+        beam_size：beam search 宽度（1=贪心最快，5=默认最准）
+        vad_filter：是否启用 Silero VAD 预过滤静默段（默认开）
 
     返回：拼接后的转录文本（段落以 \\n 连接）；return_segments=True 时返回 (text, segments, duration_sec)
     """
@@ -371,13 +380,18 @@ def transcribe_file_with_fast_whisper(
     if not path.is_file():
         raise FileNotFoundError(f"转录文件不存在: {path}")
 
-    _emit_log(f"🧠 加载 Whisper 模型 | size={model_name} device={device} compute_type={ct}")
+    effective_threads = cpu_threads if cpu_threads > 0 else min(os.cpu_count() or 4, 8)
+    _emit_log(
+        f"🧠 加载 Whisper 模型 | size={model_name} device={device} compute_type={ct} "
+        f"cpu_threads={effective_threads} beam_size={beam_size} vad={'ON' if vad_filter else 'OFF'}"
+    )
     t0 = time.perf_counter()
     # 把 log/progress 回调下推到 _load_model：HF 首次下载期间会由看门狗线程回推 .incomplete 大小 + 心跳
     model = _load_model(
         model_name,
         device,
         ct,
+        cpu_threads=cpu_threads,
         log_callback=log_callback,
         progress_callback=progress_callback,
     )
@@ -391,7 +405,29 @@ def transcribe_file_with_fast_whisper(
     if initial_prompt:
         transcribe_kwargs["initial_prompt"] = initial_prompt
 
-    segments, info = model.transcribe(str(path), **transcribe_kwargs)
+    # R4.8: beam search 宽度
+    transcribe_kwargs["beam_size"] = beam_size
+
+    # R4.8: Silero VAD 预过滤静默段
+    if vad_filter:
+        transcribe_kwargs["vad_filter"] = True
+        transcribe_kwargs["vad_parameters"] = {
+            "min_silence_duration_ms": 2000,
+            "speech_pad_ms": 400,
+        }
+
+    # R4.8: GPU 自动走 BatchedInferencePipeline（并行处理多窗口，2-4x 提速）
+    if device.startswith("cuda") or device == "gpu":
+        try:
+            from faster_whisper import BatchedInferencePipeline
+            _batched = BatchedInferencePipeline(model=model)
+            segments, info = _batched.transcribe(str(path), batch_size=16, **transcribe_kwargs)
+            _emit_log("⚡ GPU batch 模式 | batch_size=16")
+        except Exception:
+            # batch 模式不可用时回退到普通模式
+            segments, info = model.transcribe(str(path), **transcribe_kwargs)
+    else:
+        segments, info = model.transcribe(str(path), **transcribe_kwargs)
 
     total = float(getattr(info, "duration", 0.0) or 0.0)
     detected_lang = getattr(info, "language", "") or ""

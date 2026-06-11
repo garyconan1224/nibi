@@ -2025,10 +2025,12 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 _monotonic_progress(0.12, "开始转录音频...")
 
                 tcfg = load_settings().transcriber
+                # 兜底：fast-whisper 不支持 mps
+                _device = tcfg.device if tcfg.device != "mps" else "cpu"
                 runner.append_log(
                     task_id,
                     f"📄 本地转录 | 文件={Path(video_file).name} "
-                    f"model={tcfg.whisper_model_size} device={tcfg.device} language={tcfg.language or 'auto'}",
+                    f"model={tcfg.whisper_model_size} device={_device} language={tcfg.language or 'auto'}",
                 )
 
                 def _on_progress(ratio: float, msg: str) -> None:
@@ -2044,12 +2046,15 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 _text, _segments, _dur = transcribe_file_with_fast_whisper(
                     video_file,
                     model_name=tcfg.whisper_model_size or "base",
-                    device=tcfg.device or "cpu",
+                    device=_device,
                     language=tcfg.language or "",
                     initial_prompt=tcfg.initial_prompt or "",
                     log_callback=_on_log,
                     progress_callback=_on_progress,
                     return_segments=True,
+                    cpu_threads=tcfg.cpu_threads,
+                    beam_size=tcfg.beam_size,
+                    vad_filter=tcfg.vad_filter,
                 )
                 return _text, _segments
 
