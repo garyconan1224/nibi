@@ -15,29 +15,33 @@ import './new-summary-modal.css'
 
 /* ── 模板选项 ────────────────────────────────────────────── */
 
-const TEMPLATE_OPTIONS: { value: string; label: string }[] = [
-  { value: 'concise', label: '简洁摘要' },
-  { value: 'detailed', label: '详细要点' },
-  { value: 'quotes', label: '金句提取' },
-  { value: 'meeting', label: '会议纪要' },
-  { value: 'xhs', label: '小红书风格' },
-  { value: 'longform', label: '公众号长文' },
-  { value: 'lecture', label: '教学笔记' },
-  { value: 'interview', label: '访谈整理' },
-  { value: 'shownotes', label: '播客 shownotes' },
-  { value: 'oral', label: '口播稿' },
-  { value: 'steps', label: '步骤教程' },
-  { value: 'outline', label: '大纲' },
-  { value: 'qa', label: '问答卡(Anki)' },
-  { value: 'actions', label: '行动清单' },
-  { value: 'standard', label: '标准总结' },
+const QUICK_CARDS: { value: string; label: string; desc: string }[] = [
+  { value: 'standard', label: '标准总结', desc: '图文学习笔记，章节带时间戳可跳转' },
+  { value: 'concise', label: '精简摘要', desc: '几句话概括核心内容' },
+  { value: 'steps', label: '步骤教程', desc: '有序步骤清单，可照着做' },
+  { value: 'meeting', label: '会议纪要', desc: '议题 / 决议 / 待办 / 参会人' },
+  { value: 'xhs', label: '小红书风格', desc: '标题党 + emoji + 话题标签' },
+  { value: 'quotes', label: '金句提取', desc: '5-10 条金句，适合转发' },
 ]
 
-const QUICK_CARDS: { value: string; label: string; desc: string }[] = [
-  { value: 'concise', label: '精简摘要', desc: '几句话概括核心内容' },
-  { value: 'lecture', label: '教学笔记', desc: '知识点 + 例子 + 重点' },
-  { value: 'oral', label: '口播稿', desc: '可直接念的口语化文案' },
-  { value: 'steps', label: '步骤教程', desc: '有序步骤清单，可照着做' },
+const MORE_GROUPS: { label: string; items: { value: string; label: string }[] }[] = [
+  { label: '学习笔记', items: [
+    { value: 'lecture', label: '教学笔记' },
+    { value: 'detailed', label: '详细要点' },
+    { value: 'outline', label: '大纲' },
+    { value: 'qa', label: '问答卡(Anki)' },
+  ]},
+  { label: '创作改写', items: [
+    { value: 'longform', label: '公众号长文' },
+    { value: 'oral', label: '口播稿' },
+  ]},
+  { label: '对话记录', items: [
+    { value: 'interview', label: '访谈整理' },
+    { value: 'shownotes', label: '播客 shownotes' },
+  ]},
+  { label: '行动规划', items: [
+    { value: 'actions', label: '行动清单' },
+  ]},
 ]
 
 const QUICK_VALUES = new Set(QUICK_CARDS.map((c) => c.value))
@@ -61,7 +65,7 @@ export function NewSummaryModal({
   onSubmit,
   onClose,
 }: NewSummaryModalProps) {
-  const [template, setTemplate] = useState('concise')
+  const [template, setTemplate] = useState('standard')
   const [background, setBackground] = useState('')
   const [searchWeb, setSearchWeb] = useState(false)
 
@@ -90,6 +94,8 @@ export function NewSummaryModal({
 
   // 当前 provider 的模型列表
   const models: Model[] = providerId ? providerModels[providerId] ?? [] : []
+  // 只保留能做文字总结的模型：capabilities 含 'chat'；无标签的旧数据放行
+  const textModels = models.filter((m) => !m.capabilities || m.capabilities.includes('chat'))
   const isLoading = providerId ? !!modelsLoading[providerId] : false
 
   // 切换 provider 时清空 model
@@ -146,8 +152,12 @@ export function NewSummaryModal({
                 className="nsm-select"
               >
                 <option value="" disabled>选择其他模板</option>
-                {TEMPLATE_OPTIONS.filter((o) => !QUICK_VALUES.has(o.value)).map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                {MORE_GROUPS.map((g) => (
+                  <optgroup key={g.label} label={g.label}>
+                    {g.items.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </div>
@@ -174,9 +184,9 @@ export function NewSummaryModal({
                 className="nsm-select"
               >
                 <option value="">
-                  {isLoading ? '加载中…' : models.length === 0 && providerId ? '无可用模型' : '默认模型'}
+                  {isLoading ? '加载中…' : textModels.length === 0 && providerId ? '无可用模型' : '默认模型'}
                 </option>
-                {models.map((m) => (
+                {textModels.map((m) => (
                   <option key={m.id} value={m.id}>{m.name || m.id}</option>
                 ))}
               </select>

@@ -19,7 +19,7 @@ class SummaryTemplate:
 TEMPLATES: dict[str, SummaryTemplate] = {
     "concise": SummaryTemplate(
         id="concise",
-        label="简洁摘要",
+        label="精简摘要",
         desc="100-200 字一段",
         use_case="快速浏览",
         system_prompt="你是一个简洁的内容摘要专家。请用 100-200 字概括核心内容，突出最重要的信息。",
