@@ -2271,13 +2271,18 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             runner.set_progress(task_id, 0.85, "生成标准总结...")
 
             # 构造临时 WorkspaceItem，填入 generate_summary 所需字段
+            # 把转写规范成带时间戳的分段 list（{t_sec,t_str,text}），standard 总结才能
+            # 在 ## 章节标题后标注真实 [mm:ss]；无 segments 时兜底回纯文本（与旧行为一致）。
+            _tmp_transcript = _build_display_transcript_lines(
+                transcript_text, transcript_segments
+            ) or transcript_text
             _tmp_item = WorkspaceItem(
                 item_id="pipeline_tmp",
                 type="video",
                 source="url",
                 source_value="",
                 results={
-                    "transcript": transcript_text,
+                    "transcript": _tmp_transcript,
                     "transcript_segments": transcript_segments,
                     "json_outputs": [str(p.resolve()) for p in json_paths],
                     "video_title": _source_title or "",
