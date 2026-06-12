@@ -32,22 +32,44 @@ def build_prompt(
     embed_frames=False 时跳过帧注入；max_embed_frames>0 时限制帧数。
     """
     tpl = get_template(template_id)
-    transcript = (item.results or {}).get("transcript", "")
-    # video/audio 的 transcript 是 list[{t_sec, t_str, text}]，拼成纯文本
-    if isinstance(transcript, list):
-        transcript = " ".join(
-            seg.get("text", "") for seg in transcript if isinstance(seg, dict)
+    raw_transcript = (item.results or {}).get("transcript", "")
+    seg_list = raw_transcript if isinstance(raw_transcript, list) else None
+    # 纯文本版本：用于字数统计、非 standard 模板，以及无分段时的兜底
+    if seg_list is not None:
+        plain_text = " ".join(
+            seg.get("text", "") for seg in seg_list if isinstance(seg, dict)
         )
-    if not transcript.strip():
-        transcript = (item.results or {}).get("content", "")
-    if not transcript.strip():
-        transcript = (item.results or {}).get("summary", "")
+    else:
+        plain_text = raw_transcript
+    if not plain_text.strip():
+        plain_text = (item.results or {}).get("content", "")
+    if not plain_text.strip():
+        plain_text = (item.results or {}).get("summary", "")
+
+    # standard 额外用「[mm:ss] 文字」分段版本喂 LLM，使其能在 ## 章节标题后标注
+    # 真实时间戳；其他模板维持纯文本，零影响。
+    if template_id == "standard" and seg_list:
+        parts = []
+        for seg in seg_list:
+            if not isinstance(seg, dict):
+                continue
+            text = str(seg.get("text", "")).strip()
+            if not text:
+                continue
+            ts = str(seg.get("t_str") or "").strip()
+            if not ts:
+                sec = int(float(seg.get("t_sec", 0) or 0))
+                ts = f"{sec // 60:02d}:{sec % 60:02d}"
+            parts.append(f"[{ts}] {text}")
+        transcript = "\n".join(parts) or plain_text
+    else:
+        transcript = plain_text
 
     user_prompt = tpl.user_prompt.format(transcript=transcript)
 
     # R3.6: standard 模板注入「内容画像」元数据（转写字数 + 视频时长）
     if template_id == "standard":
-        char_count = len(transcript)
+        char_count = len(plain_text)
         # 从 transcript_segments 最后一段的 t_sec 推算视频大致时长
         duration_sec = 0
         raw_seg = (item.results or {}).get("transcript_segments", [])

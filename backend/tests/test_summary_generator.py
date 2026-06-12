@@ -75,6 +75,33 @@ class TestBuildPrompt:
             assert sys_p  # 非空
             assert usr_p  # 非空
 
+    def test_standard_embeds_segment_timestamps(self) -> None:
+        """standard：分段 [mm:ss] 拼进 user_prompt，供 LLM 标注章节锚点。"""
+        item = _make_item(results={"transcript": [
+            {"t_sec": 0, "t_str": "00:00", "text": "开场介绍"},
+            {"t_sec": 42, "t_str": "00:42", "text": "外观对比"},
+        ]})
+        _, usr_p = build_prompt(item, "standard", embed_frames=False)
+        assert "[00:00] 开场介绍" in usr_p
+        assert "[00:42] 外观对比" in usr_p
+
+    def test_standard_char_count_excludes_timestamps(self) -> None:
+        """standard：内容画像字数基于纯文本，不被时间戳字符污染。"""
+        item = _make_item(results={"transcript": [
+            {"t_sec": 42, "t_str": "00:42", "text": "外观对比四代机型"},
+        ]})
+        _, usr_p = build_prompt(item, "standard", embed_frames=False)
+        assert "约 8 字" in usr_p  # "外观对比四代机型"=8 字，不含 [00:42]
+
+    def test_non_standard_keeps_plain_transcript(self) -> None:
+        """非 standard 模板维持纯文本拼接，不带时间戳。"""
+        item = _make_item(results={"transcript": [
+            {"t_sec": 42, "t_str": "00:42", "text": "外观对比"},
+        ]})
+        _, usr_p = build_prompt(item, "concise")
+        assert "[00:42]" not in usr_p
+        assert "外观对比" in usr_p
+
 
 # ── generate_summary（mock LLM）────────────────────────────────
 
