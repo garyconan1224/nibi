@@ -19,7 +19,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { ArrowLeft, BookOpenCheck, ChevronDown, ChevronRight, Download, FileCode, FileText, RefreshCw } from 'lucide-react'
 import { EditorState } from '@codemirror/state'
-import { EditorView, keymap, lineNumbers } from '@codemirror/view'
+import { EditorView, keymap, lineNumbers, Decoration, ViewPlugin, MatchDecorator, type ViewUpdate } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown as cmMarkdown } from '@codemirror/lang-markdown'
 import { toast } from 'sonner'
@@ -28,6 +28,7 @@ import { exportItemNoteObsidian, getItemNote, putItemNote } from '@/services/wor
 import type { VideoResultTranscriptLine } from '@/services/workspaces'
 import type { ItemNote } from '@/types/workspace'
 import type { ItemSummary } from '@/services/summaries'
+import { TS_RE, parseTs } from '@/pages/results/LearningNotesPage/HtmlView'
 import { Badge } from '@/components/ui/badge'
 import { SYSTEM_TAG_DIMENSIONS } from '@/constants/tagDimensions'
 import NoteMediaCompanion, { type NoteMediaCompanionHandle } from './NoteMediaCompanion'
@@ -40,7 +41,6 @@ import NoteChatDrawer from '@/components/NoteChatDrawer'
 import { SourceMdModal } from './SourceMdModal'
 import { FloatingAskAi } from './FloatingAskAi'
 import { useLnEditorStore } from '@/store/lnEditorStore'
-import { parseTs, TS_RE } from '@/pages/results/LearningNotesPage/HtmlView'
 
 // remarkGfm 类型与 react-markdown 不完全兼容
 
@@ -236,18 +236,50 @@ const videoViewModeLabels: Record<ViewMode, string> = {
 
 /* ────────────────── NoteEditor ────────────────── */
 
+/** CodeMirror 时间戳跳转扩展：给裸 [mm:ss] 加 note-ts-chip，点击调 onSeek。 */
+function makeTimestampExtension(getOnSeek: () => ((sec: number) => void) | undefined) {
+  const matcher = new MatchDecorator({
+    regexp: new RegExp(TS_RE.source, 'g'),
+    decoration: (m) =>
+      Decoration.mark({ class: 'note-ts-chip', attributes: { 'data-sec': String(parseTs(m[1])) } }),
+  })
+  return ViewPlugin.fromClass(
+    class {
+      decorations
+      constructor(view: EditorView) { this.decorations = matcher.createDeco(view) }
+      update(u: ViewUpdate) { this.decorations = matcher.updateDeco(u, this.decorations) }
+    },
+    {
+      decorations: (v) => v.decorations,
+      eventHandlers: {
+        mousedown(e) {
+          const t = e.target as HTMLElement
+          if (t?.classList?.contains('note-ts-chip')) {
+            const sec = Number(t.getAttribute('data-sec'))
+            if (!Number.isNaN(sec)) { getOnSeek()?.(sec); e.preventDefault(); return true }
+          }
+          return false
+        },
+      },
+    },
+  )
+}
+
 interface NoteEditorProps {
   markdown: string
   onMarkdownChange: (md: string) => void
+  onSeek?: (sec: number) => void
 }
 
 /** 轻量 CodeMirror 编辑器（复用 lnEditorStore 让截图按钮插入到当前光标）。 */
-function NoteEditor({ markdown: md, onMarkdownChange }: NoteEditorProps) {
+function NoteEditor({ markdown: md, onMarkdownChange, onSeek }: NoteEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   // 用 ref 追踪最新回调，避免 EditorView updateListener 闭包捕获旧回调
   const cbRef = useRef(onMarkdownChange)
   cbRef.current = onMarkdownChange
+  const seekRef = useRef(onSeek)
+  seekRef.current = onSeek
 
   useEffect(() => {
     if (!hostRef.current) return
@@ -258,6 +290,7 @@ function NoteEditor({ markdown: md, onMarkdownChange }: NoteEditorProps) {
         history(),
         cmMarkdown(),
         EditorView.lineWrapping,
+        makeTimestampExtension(() => seekRef.current),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.updateListener.of((u) => {
           if (u.docChanged) {
@@ -299,17 +332,18 @@ interface CompareViewProps {
   markdown: string
   onMarkdownChange: (md: string) => void
   sourceMd?: string
+  onSeek?: (sec: number) => void
 }
 
 /** 左 CodeMirror 编辑 + 右 ReactMarkdown 实时预览，各占 50%。右栏可切 source 原文。 */
-function CompareView({ markdown, onMarkdownChange, sourceMd }: CompareViewProps) {
+function CompareView({ markdown, onMarkdownChange, sourceMd, onSeek }: CompareViewProps) {
   const [rightMode, setRightMode] = useState<'preview' | 'source'>('preview')
   const hasSource = !!sourceMd
 
   return (
     <div style={{ display: 'flex', height: '100%', minHeight: 0, gap: 1, background: 'var(--line)' }}>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)' }}>
-        <NoteEditor markdown={markdown} onMarkdownChange={onMarkdownChange} />
+        <NoteEditor markdown={markdown} onMarkdownChange={onMarkdownChange} onSeek={onSeek} />
       </div>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
         {/* 右栏顶栏：预览 / source 切换 */}
@@ -704,11 +738,11 @@ export default function NoteShell() {
       height: viewMode === 'compare' ? '100%' : undefined,
     }}>
       {viewMode === 'compare' ? (
-        <CompareView markdown={editingBody} onMarkdownChange={handleEditorChange} sourceMd={note.source_md} />
+        <CompareView markdown={editingBody} onMarkdownChange={handleEditorChange} sourceMd={note.source_md} onSeek={handleSeek} />
       ) : viewMode === 'wysiwyg' ? (
         <MilkdownEditor key={milkdownKey} markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
       ) : (
-        <NoteEditor markdown={editingBody} onMarkdownChange={handleEditorChange} />
+        <NoteEditor markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
       )}
     </div>
   )
