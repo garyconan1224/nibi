@@ -217,7 +217,7 @@ class TestBuildMd:
         src = build_source_md(item)
         assert "大家好" in src
         assert "神经网络" in src
-        assert "[0.0s]" in src
+        assert "[00:00]" in src
 
     def test_audio_transcript_string(self) -> None:
         item = _audio_item()
@@ -238,7 +238,7 @@ class TestBuildMd:
         src = build_source_md(item)
         assert "第一段转录" in src
         assert "第二段转录" in src
-        assert "[0.0s]" in src
+        assert "[00:00]" in src
 
     def test_video_transcript_segments_fallback(self) -> None:
         """视频 transcript 为空 list 时，应从 transcript_segments 拼出正文。"""

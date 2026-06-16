@@ -174,7 +174,7 @@ def _build_body(item: WorkspaceItem) -> str:
                     start = seg.get("start", "")
                     text = str(seg.get("edited_text") or seg.get("text", ""))
                     if start != "":
-                        lines.append(f"**[{start}s]** {text}")
+                        lines.append(f"**[{_fmt_ts_short(float(start))}]** {text}")
                     else:
                         lines.append(text)
             joined = "\n\n".join(lines)
@@ -191,7 +191,7 @@ def _build_body(item: WorkspaceItem) -> str:
                     text = str(seg.get("edited_text") or seg.get("text", ""))
                     start = seg.get("start", "")
                     if start != "":
-                        lines.append(f"**[{start}s]** {text}")
+                        lines.append(f"**[{_fmt_ts_short(float(start))}]** {text}")
                     else:
                         lines.append(text)
                 elif isinstance(seg, str):
