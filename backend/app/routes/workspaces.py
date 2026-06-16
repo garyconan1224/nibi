@@ -100,14 +100,14 @@ def to_static_url(path: str | Path) -> str:
     try:
         p = Path(s).resolve()
         if (data_resolved in p.parents or p == data_resolved) and p.exists():
-            return "/static/" + p.relative_to(data_resolved).as_posix()
+            return "/static/" + quote(p.relative_to(data_resolved).as_posix())
     except (ValueError, OSError):
         pass
     # 相对路径兜底：当作相对于 DATA_DIR
     candidate = data_resolved / s
     try:
         if candidate.exists():
-            return "/static/" + candidate.resolve().relative_to(data_resolved).as_posix()
+            return "/static/" + quote(candidate.resolve().relative_to(data_resolved).as_posix())
     except (ValueError, OSError):
         pass
     return ""
@@ -1973,7 +1973,10 @@ def _convert_absolute_to_static_url(abs_path: str, data_root: Path) -> str:
     try:
         from pathlib import Path as _Path
         p = _Path(abs_path).resolve()
-        return "/static/" + str(p.relative_to(data_root)).replace("\\", "/")
+        rel = str(p.relative_to(data_root)).replace("\\", "/")
+        # quote 编码 # 空格等特殊字符（safe='/' 保留分隔符）；否则文件名含 #
+        # 时浏览器会把 # 当 fragment 截断请求 → static 404（抖音/小红书标题带 hashtag 高频命中）
+        return "/static/" + quote(rel)
     except (ValueError, OSError):
         return abs_path
 
