@@ -23,7 +23,7 @@ export function FloatingAskAi({ workspaceId, systemPrompt, scopeHint }: Floating
         <button
           onClick={() => setOpen(true)}
           style={{
-            position: 'fixed', right: 24, bottom: 24, zIndex: 38,
+            position: 'fixed', right: 24, bottom: 80, zIndex: 38,
             display: 'flex', alignItems: 'center', gap: 8,
             padding: '10px 16px',
             background: 'var(--accent-2)', color: '#fff',
@@ -44,7 +44,7 @@ export function FloatingAskAi({ workspaceId, systemPrompt, scopeHint }: Floating
       {open && (
         <div
           style={{
-            position: 'fixed', right: 24, bottom: 24, zIndex: 38,
+            position: 'fixed', right: 24, bottom: 80, zIndex: 38,
             width: 400, height: '60vh',
             background: 'var(--bg-elev)', border: '1px solid var(--line)',
             borderRadius: 16, boxShadow: 'var(--shadow-lg)',
