@@ -23,7 +23,7 @@ def test_unknown_id_fallback_concise():
     """未知 id 回退到 concise。"""
     tpl = get_template("nonexistent_template")
     assert tpl.id == "concise"
-    assert tpl.label == "简洁摘要"
+    assert tpl.label == "精简摘要"
 
 
 def test_template_user_prompt_has_transcript_placeholder():
