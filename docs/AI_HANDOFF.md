@@ -1,16 +1,34 @@
 # AI Handoff
 
-> ✅ **2026-06-11（最新）**：**Track K 视频笔记「入口收敛 + 回归修复」全部完工并合入 main**。阶段 A–E + R1–R4 + 9.x 布局 + segment_refiner + R3 标准总结，代码全部到位。执行计划 `status: done`。
->
-> ~~2026-06-08 覆盖~~：~~当前主线 = 视频笔记「入口收敛 + 回归修复」~~ → 已完成。
-> ~~2026-06-07 覆盖~~：~~一比一蓝图~~ → 蓝图对照已确认，差距清单清零。
-> ~~2026-06-05 覆盖~~：~~NoteShell 架构调研~~ → 架构收口已完成。
->
-> **下一步看 `docs/ROADMAP.md` §2 + §11**：F3 错误体验 → [C] 复刻·AI 导演 → [D] 开源准备。
+Last updated: 2026-06-16（**当前指针，给所有 AI 工具优先读取**）
 
-Last updated: 2026-06-11（**Track K 全部完工，main 分支，工作区干净。下一步看 ROADMAP §2+§11**）
+## 当前事实
+
+- **Track K「E2E 收口 + 总结时间戳锚点」已合入 main（2026-06-16，`e6a76e2`→`5643a55`）**：Milkdown 集成后又做两批——①k-summary 标准总结在 `##`/`###` 标题嵌真实 `[mm:ss]` 跳转锚点（修全 00:00、6 模板精简、md源码视图也可点击跳转）；②E2E 测试测出的 7 个收口修复（转写时间戳 `[Xs]→[mm:ss]`、静态URL `quote` 编码修 hashtag 文件名 404、截图插入在 Milkdown 模式可用、问AI钮避让、gitignore 截图产物、补 `a4b8359` 漏改的测试断言）。后端 pytest 全绿 + 前端 build 通过。收口卡 `docs/plans/track-K-commit-e2e-fixes.md`。
+- **Milkdown 所见即所得编辑器三阶段集成已合入 main（2026-06-12，`ec4f574`→`e7dfe66`）**：视频笔记 NoteShell 从「富文本只读 + CodeMirror 源码」升级为 Milkdown WYSIWYG 直接编辑；保留 md格式/源md对照/导出/自动保存，时间码 `[mm:ss]` 可点击跳转视频且落盘裸文本。过程修复光标跳走、首次编辑不保存、时间码转义、dead code 阻塞 build 四个边界 bug，build + 128 测试 + playwright 全验过。计划见 `docs/plans/track-K-milkdown-integration.md`。
+- **Track K 视频笔记「入口收敛 + 回归修复」已合入 main**：阶段 A-E + R1-R4 + 9.x 布局 + segment_refiner + R3 标准总结已完成。
+- **协作分工已调整**：Claude 桌面版 Code 做计划/调查/写小米执行提示词；Claude Code 终端 + 小米 v2.5pro 做实际代码、测试、commit；Codex 做验收审查。
+- **用户最新产品判断**：结果页目前只有视频完整；音频/图片/文本结果页仍可视为后续功能完成项。内容多走 RAG，内容少走 search；`av_synthesis` 与 `music_teaching` 和当前笔记能力重复，暂不继续。
+- **现场状态以 git 为准**：新会话先跑 `git status --short --branch && git log --oneline -5`。如果有未提交改动，先判断是否属于本次任务，不要擅自覆盖。
+
+## 下一步候选（三步序列，按顺序推进）
+
+1. **Step 1 ✅ 已完成**：E2E 4 修复收口（`38ebe5a`→`5643a55`，含 A.5 补 `a4b8359` 漏改的测试断言）。收口卡 `docs/plans/track-K-commit-e2e-fixes.md`。
+2. **Step 2（当前推荐下一步）：E2E 全流程回归**。卡已 ready：`docs/plans/track-K-e2e-fullflow-test.md`（多平台）/ `docs/plans/track-K-e2e-douyin-run.md`（先验抖音一个平台）。**只测不改**，强制走 `.claude/skills/e2e-fullflow-test` skill、禁止猜 API/编数据（小米跑 Haiku 必须强约束）。
+3. **Step 3：补非视频结果页（音频/图片/文本）**。原 #1 大方向，范围大、需让音频/图片/文本结果页从占位走向可用，**待 Claude 桌面调查三页现状再拆最小子任务**，不要放养开。
+
+## 当前禁止事项
+
+- 不要默认全项目体检、通读全部代码、并行调研或开多个 subagent。
+- 不要只看本文件下面的历史日志决定下一步。
+- 不要把 `docs/ROADMAP.md` / `docs/EXECUTION_PLAN.md` 当启动必读全文；需要时按关键词片段读取。
+- Claude 桌面做完计划后，必须给出可直接复制给小米 v2.5pro 的执行提示词；小米完成后，必须给出可直接复制给 Codex 的审查提示词。
 
 ---
+
+## 历史日志（归档，不作为当前下一步依据）
+
+以下内容仅保留历史记录。判断当前任务时，优先看上方“当前事实 / 下一步候选 / 当前禁止事项”。
 
 ## 🟢 当前状态（2026-06-02）
 

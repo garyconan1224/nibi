@@ -13,9 +13,9 @@
 - **用户特征**：编程新手，**需要每一步都解释清楚在做什么**
 
 **当前主线**：FastAPI 后端 + React/Vite 前端。Streamlit 旧入口已于 Phase 1J 移除，当前纯 FastAPI 后端 + React/Vite 前端。
-**当前阶段**：F1（IP.9 流程缺口补齐）。H1~H5 + IP.1~IP.8 已合 main。具体 track 看 `docs/ROADMAP.md`。
+**当前状态**：Track K 视频笔记「入口收敛 + 回归修复」已于 2026-06-11 合入 main。下一步以 `docs/AI_HANDOFF.md` 顶部“当前指针”为准，不从历史长表推断。
 
-> ⚠️ **2026-06-08 临时主线覆盖（最新）**：当前在做 **Track K · 视频笔记「入口收敛 + 回归修复」**——执行计划 [`docs/plans/track-K-video-note-regression-fix-plan.md`](docs/plans/track-K-video-note-regression-fix-plan.md)（交付 mimo 执行），设计基准 [`docs/plans/track-K-note-flow-blueprint.md`](docs/plans/track-K-note-flow-blueprint.md)。**战略：不重写，现有项目删除式收敛**——只留「生成笔记 → note task → NoteShell」一套（删手动模式/音视频综合/课程笔记入口，删前先抢救可复用能力）。**注意**：R1~R4 NoteShell 代码早已合入 main，旧「只定设计、不动代码」说法**已废止**；**勿**按旧 M7 kickoff / redesign.md / F3·[C]·[D] 开工；复刻 / AI 导演仍后置。
+> ⚠️ **三角色协作（最新）**：Claude 桌面版 Code 负责计划/调查/写给小米的执行提示词；Claude Code 终端 + 小米 v2.5pro 负责实际改代码、测试、commit；Codex 负责审查是否通过。详细规则见 [`docs/rules/agent-roles.md`](docs/rules/agent-roles.md)。
 
 ---
 
@@ -34,30 +34,31 @@
 ```bash
 cd /Users/conan/Desktop/nibi
 git status --short --branch
-git log --oneline -20            # 对账铁律：phase 文档不是事实来源，git log 才是
+git log --oneline -5             # 对账铁律：phase 文档不是事实来源，git log 才是
 ```
 
-按号码读，**不要整文件 Read 大文件**（细则见 [`docs/rules/context-budget.md`](docs/rules/context-budget.md)）：
+默认只读以下小片段，**不要整文件 Read 大文件**（细则见 [`docs/rules/context-budget.md`](docs/rules/context-budget.md)）：
 
-1. `CLAUDE.md`（本文件）
-2. `~/.claude/projects/-Users-conan-Desktop-nibi/memory/MEMORY.md`（深度记忆索引 + 用户反馈历史）
-3. `docs/WORKFLOW.md`（主工作流总图）
-4. `docs/SPEC.md`（产品需求入口索引；细节按模块读 `docs/spec/*.md`）
-5. **`docs/ROADMAP.md`（长期升级路线图——§2 6-track 全景表 + §11 推荐顺序是"下一步做什么"的决策依据）**
-6. `docs/AI_HANDOFF.md`（上次会话留下的开工笔记）
-7. `docs/EXECUTION_PLAN.md`（短期 phase 进度对照——配合 git log 对账用）
-8. `docs/OUTSTANDING_TASKS.md`（散落 TODO 速查）
-9. `AGENTS.md`（如适用，给其他 AI 工具的协议）
+1. `CLAUDE.md` 本文件顶部规则。
+2. `docs/AI_HANDOFF.md` 前 80 行（当前指针）。
+3. 用户明确提到的 `docs/plans/<file>.md` 或相关代码文件。
+4. 需要切换工具/写提示词时，读 `docs/rules/agent-roles.md`。
 
-> ⚠️ **不要只看 AI_HANDOFF.md 拍脑袋给"下一步建议"**——它是局部视角。任何"做什么 / 选哪个路线"的判断必须先打开 ROADMAP.md §2 + §11。
+只有用户明确问“长期路线 / 大方向 / R5 规划 / 全项目梳理”，或当前指针与 git 明显冲突时，才片段读取 `docs/ROADMAP.md`、`docs/EXECUTION_PLAN.md`、`docs/SPEC.md`。读取时先 `rg -n "^##|关键词"` 定位，再 `sed -n` 读相关段落。
+
+> ⚠️ **不要为了回答“下一步做什么”默认全项目对账**。先基于 `AI_HANDOFF.md` 顶部当前指针给 1-3 个候选任务；需要扩展调查时先说明原因和范围。
 
 ### 启动强制对账（铁律，违反过一次就出过事故）
 
-读完启动必读后，**必须立刻跑 `git log --oneline -20`**，把 `AI_HANDOFF.md` / `OUTSTANDING_TASKS.md` 里写的「下一步 Phase X」与 git 实际合并状态对照一次：
+读完启动必读后，**必须立刻跑 `git log --oneline -5`**，把 `AI_HANDOFF.md` 顶部当前指针与 git 实际合并状态对照一次：
 
-- 若 git 显示某 phase 已有 commit 合入 main，而文档仍把它列为「下一步 / 待办」——**先停下来更新这两份文档，再向用户确认真正的下一步**，绝不能直接按文档动手。
+- 若 git 显示某 phase 已有 commit 合入 main，而当前指针仍把它列为「下一步 / 待办」——**先停下来报告漂移并请求确认**，不要直接按旧文档动手。
 - 若 git log 与文档一致，再开工。
 - **phase 文档不是事实来源，git log 才是。** 这条规则的存在原因：2026-05-17 曾发生 AI 让用户重做已合并的 Phase 2C.1 的事故。
+
+### 禁止默认 subagent / 全项目体检
+
+除非用户明确包含“全项目体检 / 全量梳理 / 通读全部代码 / 并行调研 / 开多个 agent”，否则不得开 subagent，不得通读全项目。即使命中，也默认最多 1 个 subagent；需要 2 个以上必须先问用户。
 
 ---
 
@@ -139,6 +140,7 @@ git log --oneline -20            # 对账铁律：phase 文档不是事实来源
 | 模型选择四档决策树（Opus / Sonnet / xiaomi mimo 2.5pro / 桌面 Haiku） | [`docs/rules/model-strategy.md`](docs/rules/model-strategy.md) | 判断当前任务该用哪档模型时（一般用户决定，AI 仅在被问时查） |
 | 项目架构 / 后端 router / 前端路由 / 共享层 / 端口 / CodeGraph MCP / 常用命令 | [`docs/rules/project-map.md`](docs/rules/project-map.md) | 新人入门、改路由、找模块入口 |
 | **mimo 执行加速协议（CC 终端默认执行者必读）** | [`docs/rules/mimo-onboarding.md`](docs/rules/mimo-onboarding.md) | **mimo 每次新会话先读**：启动 60s 协议、低 token 读取、codegraph 用法、不确定 fallback、红线 |
+| **三角色协作与接力提示词** | [`docs/rules/agent-roles.md`](docs/rules/agent-roles.md) | Claude 桌面制定计划、小米执行、Codex 审查之间接力时 |
 
 > 💡 **AI 使用方法**：每个文件顶部都有目录章节锚点。AI 应用 `rg -n "^#" docs/rules/<file>.md` 查目录，再 `sed -n` 读对应段落。**禁止整文件读取大文件（ROADMAP.md / 设计稿等）；SPEC 先读 `docs/SPEC.md` 索引，再读相关 `docs/spec/*.md` 模块。**
 

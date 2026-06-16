@@ -10,16 +10,16 @@
 
 用户同时使用：
 
-- **桌面 Claude Code**（按额度计费的 Opus / Sonnet / Haiku）
-- **Claude Code + ccswitch 接 xiaomi mimo 2.5pro**（mimo，比 Claude 便宜，2026-05-29 起取代原 DeepSeek 通道）
+- **Claude 桌面版 Code / Claude Desktop**：用于计划、调查、拆任务。用户通常选择 Opus，Effort 用 Medium 或 Low。
+- **Claude Code 终端 + ccswitch 接 xiaomi mimo 2.5pro**：用于实际执行代码、测试、commit。终端界面可能显示 Opus / Sonnet / max effort，但底层经 ccswitch 路由到小米模型，不等同于桌面付费 Opus。
 
-**ccswitch 是透明中转代理**：在 Claude Code 里选 Sonnet / Opus 角色 → ccswitch 自动路由到 `xiaomi-mimo-2.5pro`。**mimo 当前没有 flash 等小档**——单行 typo / 极简兜底回退到桌面 Haiku 4.5。
+**ccswitch 是透明中转代理**：在 Claude Code 终端里选 Sonnet / Opus 角色 → ccswitch 自动路由到 `xiaomi-mimo-2.5pro`。因此不要只根据终端 UI 的 Opus/max 字样判断成本；真正需要控制的是任务范围、读取量、subagent 数量和输出长度。**mimo 当前没有 flash 等小档**——单行 typo / 极简兜底回退到桌面 Haiku 4.5。
 
 **按以下顺序判断，命中即停**：
 
 ---
 
-## 档 1 — Opus 4.7（桌面，付费）：复杂阶段 + 升级触发
+## 档 1 — Claude 桌面版 Opus（付费）：复杂计划 + 升级触发
 
 **任一命中即用**：
 
@@ -41,9 +41,9 @@
 
 ---
 
-## 档 3 — xiaomi mimo 2.5pro（Claude Code + ccswitch，⭐便宜优先）：日常默认
+## 档 3 — xiaomi mimo 2.5pro（Claude Code 终端 + ccswitch，便宜优先）：日常执行默认
 
-**这一档是日常默认**。在 Claude Code 里选 Sonnet 或 Opus 角色，ccswitch 自动路由到 `xiaomi-mimo-2.5pro`。**能用就用，不要因为"mimo 可能不够强"而升到桌面 Sonnet 浪费 Claude 付费额度**。
+**这一档是日常执行默认**。在 Claude Code 终端里选 Sonnet 或 Opus 角色，ccswitch 自动路由到 `xiaomi-mimo-2.5pro`。**能用就用，不要因为"mimo 可能不够强"而升到桌面 Sonnet/Opus 浪费 Claude 付费额度**。
 
 **适用场景**：
 
@@ -83,8 +83,8 @@
 
 - **当前阶段（2026-05-29）**：R21.P3.S3 followup 已 merge 进 main；下一步**音频 + 视频端到端闭环打通**（用户 5/29 决议）。
 - **可选下一步**：N7b 路径3 视频大模型（Gemini，待 API）/ N8b librosa 后端 / R20 笔记多格式导出 / R22 并行 / R23 性能档位 / [C] AI 导演 / [D] 开源。
-- **简单阶段**（纯前后端 CRUD / 文档 / 模板代码）：⭐ mimo 2.5pro（Claude Code + ccswitch），**不开 worktree**。
-- **复杂阶段**（[C] AI 导演 / 跨状态机 SSE / 加密鉴权 / RAG）：**Opus 4.7 + 新 worktree**（`feat/phase<编号>-<短名>` 分支）。
+- **简单阶段**（纯前后端 CRUD / 文档 / 模板代码）：mimo 2.5pro（Claude Code 终端 + ccswitch），**不开 worktree**。
+- **复杂阶段**（[C] AI 导演 / 跨状态机 SSE / 加密鉴权 / RAG）：先由 Claude 桌面版 Opus 做计划；若小米执行失败两轮或风险过高，再升级执行者。
 
 ### 决策速查表
 

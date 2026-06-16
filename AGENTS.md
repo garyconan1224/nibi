@@ -5,20 +5,20 @@
 
 ---
 
-## Required Reading Order (Same as Claude)
+## Required Reading Order
 
-Follow [`CLAUDE.md` §3 Startup Reading](CLAUDE.md#3-启动必读顺序每次新会话第一件事). Specifically:
+Follow [`CLAUDE.md` §3 Startup Reading](CLAUDE.md#3-启动必读顺序每次新会话第一件事). Codex is the reviewer, so keep startup narrow:
 
-1. `CLAUDE.md` — Project rules, model strategy, git behavior
-2. `docs/WORKFLOW.md` — Master workflow + current phase
-3. `docs/SPEC.md` — Product specification index; read the relevant `docs/spec/*.md` module
-4. `docs/ROADMAP.md` — Long-term roadmap (§2 6-track table + §11 recommended order)
-5. `docs/AI_HANDOFF.md` — Last session handoff notes
-6. `docs/EXECUTION_PLAN.md` — Phase progress (cross-check with `git log`)
+1. `CLAUDE.md` top rules — role boundaries and startup policy
+2. `docs/AI_HANDOFF.md` first 80 lines — current pointer
+3. `docs/rules/agent-roles.md` — Claude / mimo / Codex handoff contract
+4. The specific commit, plan file, or paths named by the user
 
 **Deprecated, do not read for current decisions**: `docs/archive/*`, `docs/conversation-inputs/*`.
 
-**Startup Reconciliation (Iron Rule)**: After reading the above, **immediately run `git log --oneline -20`** and reconcile with `AI_HANDOFF.md` / `OUTSTANDING_TASKS.md`. `git log` is the only source of absolute truth — phase docs lag behind. See [`CLAUDE.md` §3](CLAUDE.md#3-启动必读顺序每次新会话第一件事).
+Do not read `docs/ROADMAP.md`, `docs/SPEC.md`, or the full `docs/EXECUTION_PLAN.md` unless the user explicitly asks for long-term planning or the current pointer conflicts with git.
+
+**Startup Reconciliation (Iron Rule)**: Run `git status --short --branch` and `git log --oneline -5`, then reconcile with the top of `AI_HANDOFF.md`. `git log` is the source of truth; historical docs can lag. See [`CLAUDE.md` §3](CLAUDE.md#3-启动必读顺序每次新会话第一件事).
 
 ---
 
@@ -51,7 +51,6 @@ Follow [`CLAUDE.md` §3 Startup Reading](CLAUDE.md#3-启动必读顺序每次新
 ### Startup Check (Run Every Session)
 
 ```bash
-git fetch --all --prune
 git status --short --branch
 git log --oneline -5
 git branch --show-current

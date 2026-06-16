@@ -1,27 +1,41 @@
 # 项目执行计划总索引
 
-> **本文件作用**：项目级共享执行计划。任何 AI 工具（Claude / 小米 / Codex / Cursor）开新会话只要读这一份就能知道：① 整个项目要做什么、② 当前到哪一步、③ 下一步去读哪个详细计划文件、④ 如何对账避免重做。
+> **本文件作用**：项目级共享执行计划索引。当前接力事实以 [`docs/AI_HANDOFF.md`](AI_HANDOFF.md) 顶部为准；本文件保留长期阶段、历史计划和计划入口。
 >
 > **维护规则见 CLAUDE.md「项目执行计划维护流程」一节**。
 >
-> Last updated: 2026-06-11（Track K 视频笔记入口收敛 + 回归修复计划 **全部完工**，feat/k-10-R2-subtitle-source merge 回 main）
+> Last updated: 2026-06-11（协作规则调整：Claude 桌面计划 / 小米终端执行 / Codex 审查）
 >
-> ⚠️ **2026-06-11 Track K 完工说明（最新）**：视频笔记「入口收敛 + 回归修复」计划**已全部完成**（阶段 A–E + R1–R4 + 9.x 布局 + segment_refiner + R3 标准总结），代码合入 main。执行计划 [`docs/plans/track-K-video-note-regression-fix-plan.md`](plans/track-K-video-note-regression-fix-plan.md) status: done。下方历史长表仅存档。
+> ⚠️ **2026-06-11 Track K 完工说明**：视频笔记「入口收敛 + 回归修复」计划**已全部完成**（阶段 A-E + R1-R4 + 9.x 布局 + segment_refiner + R3 标准总结），代码合入 main。执行计划 [`docs/plans/track-K-video-note-regression-fix-plan.md`](plans/track-K-video-note-regression-fix-plan.md) status: done。下方历史长表仅存档。
 
 ---
 
-## 使用方法（每个新会话开始时跑一遍）
+## 当前执行入口（2026-06-11）
 
-1. 读本文件，找到第一个未打勾的子任务
-2. 如果是 N1~N11 阶段，先读 `docs/SPEC.md` 索引，再读 `docs/spec/` 对应模块理解产品需求
-3. 如果该子任务有对应的 `docs/plans/<file>.md` 详细计划：
+1. 新会话默认先读 `docs/AI_HANDOFF.md` 前 80 行，不要整读本文件。
+2. 如果用户问“接下来做什么”，先按 `AI_HANDOFF.md` 的候选项回答；不要从下面历史长表自动找第一个未打勾任务。
+3. 如果要进入某个具体计划，再读对应 `docs/plans/<file>.md`：
    - 若 `status: pending` 且操作步骤段是 `TODO` → 停下问用户「要先展开这个 phase 的具体执行计划吗？」
    - 若 `status: ready` 或 `in_progress` 且已有操作步骤 → 按里面的步骤执行
-4. 每完成一个子任务，在本文件勾上对应方框，并按"流程"更新 `docs/COMPLETED_WORK.md`
+4. 每完成一个子任务，按实际需要更新本文件索引或对应 plan；完成记录优先写入当前计划文件和 `AI_HANDOFF.md` 顶部。
+
+## 当前优先方向
+
+1. **功能完成优先**：补齐音频/图片/文本结果页从占位到可用的最小闭环。
+2. **体验修复备选**：F3 错误体验。
+3. **后置**：[C] 复刻·AI 导演、[D] 安全 + 开源准备。
+
+## 协作接力
+
+- Claude 桌面版 Code：拆最小任务，输出给小米的执行提示词。
+- Claude Code 终端 + 小米 v2.5pro：执行代码、跑相关测试、commit，输出给 Codex 的审查提示词。
+- Codex：验收审查，结论第一行写通过/不通过/需要补充验证。
+
+详细规则见 [`docs/rules/agent-roles.md`](rules/agent-roles.md)。
 
 ---
 
-## 当前执行入口（2026-05-29 对账更新 · followup 已 merge）
+## 历史执行入口（2026-05-29 对账更新 · followup 已 merge）
 
 > 真实状态以 git log 为准。R21.P3.S3 followup 已 merge（`6740a3a`）。下一步 = **音视频端到端闭环**，先修 S0 数据基线 bug（用户 2026-05-29 决议：先修当前问题 → 搭架构 → 按使用流程逐链路优化）。
 > - 合并视图（先读）：[`docs/PROJECT_STATUS.md`](PROJECT_STATUS.md)

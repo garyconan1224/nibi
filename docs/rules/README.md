@@ -14,6 +14,7 @@
 | [`model-strategy.md`](model-strategy.md) | 模型选择四档决策树（Opus / Sonnet / xiaomi mimo 2.5pro / 桌面 Haiku） | 判断当前任务用哪档模型时（用户决定，AI 仅在被问时查） |
 | [`project-map.md`](project-map.md) | 项目架构（后端 router / 前端路由 / shared）+ 常用命令 + 端口 + CodeGraph MCP | 新人入门、改路由、找模块入口 |
 | [`mimo-onboarding.md`](mimo-onboarding.md) | **mimo 执行加速协议**：启动 60s + 低 token 读取 + codegraph + fallback + 红线 | mimo（CC 终端默认）每次新会话先读 |
+| [`agent-roles.md`](agent-roles.md) | **三角色协作**：Claude 桌面计划 / 小米终端执行 / Codex 审查 + 接力提示词模板 | 切换工具、写提示词、判断是否升级给 Claude/Codex 执行 |
 
 ## AI 使用方法（重要）
 
