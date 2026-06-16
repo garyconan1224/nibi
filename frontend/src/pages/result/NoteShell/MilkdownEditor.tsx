@@ -8,9 +8,9 @@
  * 内部不自动重设 defaultValue（防光标跳动 + 保存死循环）。
  * 首帧 markdownUpdated 不触发保存（skipFirstRef 守卫）。
  */
-import { useRef } from 'react'
-import { Editor, rootCtx, defaultValueCtx, prosePluginsCtx } from '@milkdown/core'
-import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react'
+import { useEffect, useRef } from 'react'
+import { Editor, rootCtx, defaultValueCtx, prosePluginsCtx, editorViewCtx } from '@milkdown/core'
+import { Milkdown, MilkdownProvider, useEditor, useInstance } from '@milkdown/react'
 import { commonmark } from '@milkdown/preset-commonmark'
 import { gfm } from '@milkdown/preset-gfm'
 import { listener, listenerCtx } from '@milkdown/plugin-listener'
@@ -18,6 +18,7 @@ import { prism } from '@milkdown/plugin-prism'
 import { nord } from '@milkdown/theme-nord'
 import '@milkdown/theme-nord/style.css'
 import { timestampPlugin, unescapeNoteTimestamps } from './milkdownTimestamp'
+import { useLnEditorStore } from '@/store/lnEditorStore'
 
 interface MilkdownEditorProps {
   markdown: string
@@ -63,6 +64,41 @@ function MilkdownEditorInner({
     },
     [],
   )
+
+  // 向 lnEditorStore 注册 Milkdown 插入函数，供截图按钮调用
+  const [, getEditor] = useInstance()
+  useEffect(() => {
+    useLnEditorStore.getState().setInsertFn((text) => {
+      const editor = getEditor()
+      if (!editor) return false
+      editor.action((ctx: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+        const view = ctx.get(editorViewCtx)
+        const { state } = view
+        const trimmed = text.trim()
+        // 检测 markdown 图片语法 ![alt](url)，插入真正的 ProseMirror image 节点
+        const imgMatch = trimmed.match(/^!\[([^\]]*)\]\(([^)]+)\)$/)
+        if (imgMatch && state.schema.nodes['image']) {
+          try {
+            const imageNode = state.schema.nodes['image'].create({
+              src: imgMatch[2],
+              alt: imgMatch[1] || '',
+              title: '',
+            })
+            view.dispatch(state.tr.replaceSelectionWith(imageNode))
+            view.focus()
+            return
+          } catch {
+            // 创建节点失败时降级到文本插入
+          }
+        }
+        // 普通文本内容
+        view.dispatch(state.tr.insertText(text, state.selection.from, state.selection.to))
+        view.focus()
+      })
+      return true
+    })
+    return () => useLnEditorStore.getState().setInsertFn(null)
+  }, [getEditor])
 
   return <Milkdown />
 }
