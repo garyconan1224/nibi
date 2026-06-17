@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional
 import yaml  # PyYAML，项目已有依赖
 
 from backend.app.models.workspace import ItemSummary, WorkspaceItem
-from shared.config import get_workspace_root
+from shared.config import DATA_DIR, get_workspace_root
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +79,23 @@ def note_dir(workspace_id: str, item_id: str) -> Path:
     return get_workspace_root(workspace_id) / "notes" / item_id
 
 
+def _to_static_url(path: str) -> str:
+    """本地绝对路径 → /static/... URL（与 summary_generator._to_static_url 同逻辑）。"""
+    if not path:
+        return ""
+    if path.startswith("/static/"):
+        return path
+    try:
+        p = Path(path).resolve()
+        data_resolved = DATA_DIR.resolve()
+        if str(p).startswith(str(data_resolved)):
+            rel = p.relative_to(data_resolved)
+            return f"/static/{rel.as_posix()}"
+    except (ValueError, OSError):
+        pass
+    return ""
+
+
 # ── frontmatter ──────────────────────────────────────────────────
 def build_frontmatter(item: WorkspaceItem, workspace_id: str) -> Dict[str, Any]:
     """按 §3.4 schema v1 构建 frontmatter dict（不含 YAML 序列化）。"""
@@ -89,8 +106,16 @@ def build_frontmatter(item: WorkspaceItem, workspace_id: str) -> Dict[str, Any]:
     item_type = item.type
 
     if item_type == "image":
-        img_path = results.get("image_path", "")
-        media["images"] = [img_path] if img_path else []
+        # 优先用 results["images"]（本地路径列表），转为 /static/ URL；兜底 image_path
+        raw_images = results.get("images", [])
+        if raw_images:
+            media["images"] = [_to_static_url(p) for p in raw_images]
+        else:
+            img_path = results.get("image_path", "")
+            media["images"] = [_to_static_url(img_path)] if img_path else []
+        # image_infos 直接透传（内含 static_url，由后端 pipeline 写入）
+        if results.get("image_infos"):
+            media["image_infos"] = results["image_infos"]
     elif item_type == "video":
         video_url = results.get("video_file") or results.get("video_url") or ""
         duration = results.get("duration")
