@@ -124,9 +124,26 @@ export interface ItemNoteSummary {
   content: string
 }
 
+/** 单张图片的结构化分析信息（来自 VLM description_parts） */
+export interface ImageInfo {
+  idx: number
+  description: string
+  ocr_text: string
+  static_url: string
+  description_parts: {
+    subject?: string
+    scene?: string
+    color?: string
+    composition?: string
+    style?: string
+    details?: string
+  }
+}
+
 /** R3.1: note API 返回的 media 结构（按 item.type 填充） */
 export interface NoteMedia {
   images?: string[]        // image 类型：图片 URL 列表
+  image_infos?: ImageInfo[]  // image 类型：每张图的结构化分析信息
   video?: { url: string; duration: number }  // video 类型
   frames?: { sec: number; url: string }[]    // video 类型：关键帧
   audio?: string           // audio 类型：音频 URL

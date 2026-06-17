@@ -3357,6 +3357,10 @@ def get_item_note(workspace_id: str, item_id: str) -> Dict[str, Any]:
                 # upload：source_value 是本地绝对路径
                 img_url = to_static_url(item.source_value)
             media["images"] = [img_url] if img_url else []
+        # 结构化图片信息（description_parts），供前端展示
+        _image_infos = results.get("image_infos")
+        if _image_infos:
+            media["image_infos"] = _image_infos
 
     elif item_type == "video":
         # 视频文件 URL：优先用 note task 结果中的确切 video_file，扫目录只作 fallback。
@@ -3518,6 +3522,9 @@ def update_item_note(workspace_id: str, item_id: str, req: NoteUpdateRequest) ->
         else:
             img_url = to_static_url(item.source_value)
         media["images"] = [img_url] if img_url else []
+        _image_infos = results.get("image_infos")
+        if _image_infos:
+            media["image_infos"] = _image_infos
 
     elif item_type == "video":
         _video_url = ""

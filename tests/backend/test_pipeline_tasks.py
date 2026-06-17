@@ -1537,6 +1537,8 @@ class TestAnalyzeImageFile:
 
         assert "风景照片" in result["description"]
         assert result["ocr_text"] == "图中文字"
+        # 非 JSON 返回走回退路径，description_parts 为空
+        assert result["description_parts"] == {}
 
     def test_no_api_key_skips_vlm(self, tmp_path: Path) -> None:
         from backend.app.services.pipeline_tasks import analyze_image_file
@@ -1606,4 +1608,55 @@ class TestAnalyzeImageFile:
         from backend.app.services.pipeline_tasks import analyze_image_file
 
         result = analyze_image_file(str(tmp_path / "不存在.jpg"), "gpt-4o", "test-key")
-        assert result == {"description": "", "ocr_text": ""}
+        assert result == {"description": "", "ocr_text": "", "description_parts": {}}
+
+    def test_vlm_json_valid_populates_description_parts(self, tmp_path: Path) -> None:
+        """VLM 返回合法 JSON → description_parts 被填充，description 为拼接字符串。"""
+        from backend.app.services.pipeline_tasks import analyze_image_file
+
+        img = tmp_path / "photo.jpg"
+        img.write_bytes(b"\xff\xd8" + b"\x00" * 100)
+
+        vlm_json = (
+            '{"subject": "一只橘猫", "scene": "窗台上", "color": "暖橙色", '
+            '"composition": "居中构图", "style": "写实摄影", "details": "阳光洒在猫身上"}'
+        )
+
+        with (
+            patch("shared.ocr_service.extract_text", return_value=""),
+            patch("backend.app.services.pipeline_tasks.create_default_registry") as mock_reg,
+        ):
+            mock_provider = MagicMock()
+            mock_provider.chat.return_value = vlm_json
+            mock_reg.return_value.resolve_default_profile.return_value = MagicMock()
+            mock_reg.return_value.build.return_value = mock_provider
+
+            result = analyze_image_file(str(img), "gpt-4o", "test-key")
+
+        dp = result["description_parts"]
+        assert dp["subject"] == "一只橘猫"
+        assert dp["scene"] == "窗台上"
+        # description 字符串由 description_parts 拼接而成
+        assert "一只橘猫" in result["description"]
+        assert "窗台上" in result["description"]
+
+    def test_vlm_json_parse_fallback_to_description_string(self, tmp_path: Path) -> None:
+        """VLM 返回非 JSON（旧格式纯文本）→ description_parts 为空，description 为原字符串。"""
+        from backend.app.services.pipeline_tasks import analyze_image_file
+
+        img = tmp_path / "photo.jpg"
+        img.write_bytes(b"\xff\xd8" + b"\x00" * 100)
+
+        with (
+            patch("shared.ocr_service.extract_text", return_value=""),
+            patch("backend.app.services.pipeline_tasks.create_default_registry") as mock_reg,
+        ):
+            mock_provider = MagicMock()
+            mock_provider.chat.return_value = "这是一张美丽的风景照片，蓝天白云。"
+            mock_reg.return_value.resolve_default_profile.return_value = MagicMock()
+            mock_reg.return_value.build.return_value = mock_provider
+
+            result = analyze_image_file(str(img), "gpt-4o", "test-key")
+
+        assert result["description_parts"] == {}
+        assert "风景照片" in result["description"]

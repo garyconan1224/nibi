@@ -1565,13 +1565,14 @@ def analyze_image_file(
     api_key: str,
     *,
     log: Callable[[str], None] = lambda _msg: None,
-) -> Dict[str, str]:
-    """对单张图片做 OCR + VLM 描述，返回 {"description", "ocr_text"}。
+) -> Dict[str, Any]:
+    """对单张图片做 OCR + VLM 描述，返回 {"description", "ocr_text", "description_parts"}。
 
+    description_parts: {"subject", "scene", "color", "composition", "style", "details"}
     无 api_key/vision_model 时跳过 VLM，只做 OCR。
     单张失败不抛异常，返回空字符串兜底。
     """
-    result: Dict[str, str] = {"description": "", "ocr_text": ""}
+    result: Dict[str, Any] = {"description": "", "ocr_text": "", "description_parts": {}}
     path = Path(image_path)
     if not path.is_file():
         log(f"⚠️  图片文件不存在：{image_path}")
@@ -1611,8 +1612,16 @@ def analyze_image_file(
         provider = registry.build(profile)
 
         prompt = (
-            "你是一名专业的图像分析助手。请用中文详细描述这张图片的内容（100-200字）。"
-            "只输出描述文字，不要 JSON，不要 markdown。"
+            "你是一名专业的图像分析助手。请用中文分析这张图片，严格按以下 JSON 格式输出（不要输出其它内容）：\n"
+            "{\n"
+            '  "subject": "图片主体（人/物/场景，一句话）",\n'
+            '  "scene": "场景环境描述（30字以内）",\n'
+            '  "color": "主色调与色彩氛围（30字以内）",\n'
+            '  "composition": "构图方式与视觉重心（30字以内）",\n'
+            '  "style": "视觉风格（写实/插画/摄影等，20字以内）",\n'
+            '  "details": "其它值得注意的细节（50字以内）"\n'
+            "}\n"
+            "只输出 JSON，不要 markdown 代码块。"
         )
         raw = provider.chat(
             ChatRequest(
@@ -1628,7 +1637,21 @@ def analyze_image_file(
                 max_tokens=400,
             )
         )
-        result["description"] = raw.strip()
+        raw = raw.strip()
+        # 尝试解析 JSON；成功则填充 description_parts，同时拼 description 字符串
+        _parts: Dict[str, str] = {}
+        try:
+            _parts = json.loads(raw)
+            _parts = {k: str(v).strip() for k, v in _parts.items() if isinstance(v, str) and v.strip()}
+        except (json.JSONDecodeError, TypeError):
+            # JSON 解析失败 → raw 就是旧格式的纯文本描述，直接用
+            pass
+        result["description_parts"] = _parts
+        if _parts:
+            # 结构化字段拼成人类可读描述（保留旧 description 字符串兼容性）
+            result["description"] = "；".join(_parts.values())
+        else:
+            result["description"] = raw
         log(f"🔍 VLM 描述 {len(raw)} 字：{path.name}")
     except Exception as err:
         log(f"⚠️  VLM 描述失败（{path.name}）：{err}")
@@ -1688,11 +1711,27 @@ def _compose_images_with_llm(
         log(f"⚠️  LLM 初始化失败，跳过图文语境合成：{exc}")
         return ""
 
-    # 构造图列表
+    # 构造图列表（优先使用 description_parts 结构化字段）
     img_lines: list[str] = []
     for img in image_infos:
         parts = [f"图{img['idx']}"]
-        if img["description"]:
+        dp = img.get("description_parts") or {}
+        if dp:
+            # 结构化字段：更精准的语义信息
+            if dp.get("subject"):
+                parts.append(f"主体: {dp['subject']}")
+            if dp.get("scene"):
+                parts.append(f"场景: {dp['scene']}")
+            if dp.get("color"):
+                parts.append(f"色彩: {dp['color']}")
+            if dp.get("composition"):
+                parts.append(f"构图: {dp['composition']}")
+            if dp.get("style"):
+                parts.append(f"风格: {dp['style']}")
+            if dp.get("details"):
+                parts.append(f"细节: {dp['details']}")
+        elif img["description"]:
+            # 回退：旧 description 字符串（历史数据）
             parts.append(f"描述: {img['description']}")
         if img["ocr_text"]:
             parts.append(f"OCR文字: {img['ocr_text']}")
@@ -1882,6 +1921,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         })
 
     # ── 3.6. 图集分析（image_text: OCR + VLM 逐图描述 + LLM 语境合成）──
+    image_infos: list[dict] = []  # 外层声明，供后面写入 result 使用
     if note_kind == "image_text" and images_from_download:
         runner.store.update(task_id, status=TaskStatus.VLM.value)
         runner.set_progress(task_id, 0.15, "图集分析中...")
@@ -1890,7 +1930,6 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             runner.append_log(task_id, f"[图集] {msg}")
 
         data_dir = DATA_DIR
-        image_infos: list[dict] = []
         image_descriptions: list[str] = []  # 兜底用
         for idx, img_path in enumerate(images_from_download):
             runner.set_progress(
@@ -1907,6 +1946,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 "description": info["description"],
                 "ocr_text": info["ocr_text"],
                 "static_url": static_url,
+                "description_parts": info.get("description_parts") or {},
             })
             # 兜底：纯文本描述（LLM 合成失败时使用）
             parts: list[str] = []
@@ -2337,6 +2377,9 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         result["note_kind"] = note_kind
     if images_from_download:
         result["images"] = images_from_download
+    # image_text 分支：保存结构化图片信息（供前端 NoteMedia.image_infos）
+    if note_kind == "image_text" and image_infos:
+        result["image_infos"] = image_infos
     if background_context:
         result["background_for_recognition"] = background_context
     return result

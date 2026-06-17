@@ -832,14 +832,19 @@ export default function NoteShell() {
         </div>
       )}
 
-      {/* ════════ R3.1: image 类型 — 正文上方显示原图 ════════ */}
-      {itemType === 'image' && note.media?.images?.[0] && (
-        <div style={{ padding: '0 24px', flexShrink: 0, maxHeight: '40%', overflow: 'auto', borderBottom: '1px solid var(--line)' }}>
-          <img
-            src={note.media.images[0]}
-            alt={title || '原图'}
-            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block', margin: '12px auto', borderRadius: 6 }}
-          />
+      {/* ════════ R3.1: image 类型 — 正文上方显示所有原图（安静工作台风格）════════ */}
+      {itemType === 'image' && (note.media?.images?.length ?? 0) > 0 && (
+        <div style={{ padding: '12px 24px', flexShrink: 0, maxHeight: '45%', overflow: 'auto', borderBottom: '1px solid var(--line)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {note.media!.images!.map((imgUrl, idx) => (
+              <img
+                key={idx}
+                src={imgUrl}
+                alt={title ? `${title}（${idx + 1}）` : `原图 ${idx + 1}`}
+                style={{ maxWidth: '100%', maxHeight: 360, objectFit: 'contain', display: 'block', margin: '0 auto', borderRadius: 6, background: 'var(--bg-sunken)' }}
+              />
+            ))}
+          </div>
         </div>
       )}
 
