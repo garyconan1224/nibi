@@ -186,6 +186,9 @@ export default function ProcessingPage() {
   const payload = task?.payload ?? {} as Record<string, unknown>
   const taskType: string = task?.task_type ?? ''
   const isAudioTask = taskType === 'audio'
+  // 图文笔记检测：result.note_kind（任务完成后）或 payload.kind_hint（下载阶段）
+  const isImageNote = (result.note_kind as string) === 'image_text'
+    || (payload.kind_hint as string) === 'image_text'
   // R4.7: 从 payload 读取配图开关（note task 专属）
   const preflight = (payload.preflight ?? {}) as Record<string, unknown>
   const embedFrames: boolean = preflight.embed_frames !== false // 默认 true
@@ -210,9 +213,13 @@ export default function ProcessingPage() {
     (payload.video_title as string) ||
     (task?.payload?.title as string) ||
     safeHostname
+  // 图文笔记封面：cover_thumbnail（PROBE 后已有 static URL）→ image_infos[0].static_url
+  // 注意：result.images[0] 是本地文件路径，不能直接进 img src，不使用
+  const resultImageInfos = (result.image_infos as Array<{ static_url?: string }>) ?? []
   const coverUrl: string =
     (result.video_thumbnail_url as string) ||
     (result.cover_thumbnail as string) ||
+    (isImageNote ? resultImageInfos[0]?.static_url || '' : '') ||
     audioThumbnailFromResult(result, resultAudio) ||
     (payload.video_thumbnail_url as string) ||
     ''
@@ -231,6 +238,10 @@ export default function ProcessingPage() {
   }
   const durationLabel = fmtDuration(durationSec)
   const framesCount: number = Number(result.frames_count as number) || 0
+  // 图文笔记图片数量：优先用 image_count（后端 PROBE 后已写入），兜底 images.length
+  const imageCount: number = isImageNote
+    ? (Number(result.image_count as number) || ((result.images as string[])?.length ?? 0))
+    : 0
   const asrSegments: number = Number(result.asr_segments as number) || 0
   // 全局 ETA：所有活跃任务的剩余时间之和，每秒递减
   const etaSec = useGlobalEta()
@@ -293,12 +304,17 @@ export default function ProcessingPage() {
                     <strong>{durationLabel}</strong> 时长
                   </span>
                 )}
-                {framesCount > 0 && !isAudioTask && (
+                {isImageNote && imageCount > 0 && (
+                  <span>
+                    <strong>{imageCount}</strong> 张图
+                  </span>
+                )}
+                {!isImageNote && framesCount > 0 && !isAudioTask && (
                   <span>
                     <strong>{framesCount}</strong> 帧
                   </span>
                 )}
-                {asrSegments > 0 && (
+                {asrSegments > 0 && !isImageNote && (
                   <span>
                     <strong>{asrSegments}</strong> 句转录
                   </span>
@@ -407,6 +423,7 @@ export default function ProcessingPage() {
               taskType={taskType}
               taskLogs={logs}
               embedFrames={embedFrames}
+              isImageNote={isImageNote}
             />
           )}
         </div>

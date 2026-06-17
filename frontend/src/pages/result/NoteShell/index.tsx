@@ -555,6 +555,9 @@ export default function NoteShell() {
   const [summariesOpen, setSummariesOpen] = useState(false)
   const [sourceModalOpen, setSourceModalOpen] = useState(false)
   const [activeSummaryId, setActiveSummaryId] = useState<string | undefined>(undefined)
+  // 图文笔记：图片索引 + 加载错误
+  const [selectedImageIdx, setSelectedImageIdx] = useState(0)
+  const [imageLoadError, setImageLoadError] = useState<Record<number, boolean>>({})
   const handleTimeUpdate = useCallback((t: number) => setCurrentTime(t), [])
   const handleSeek = useCallback((sec: number) => {
     videoRef.current?.seekTo(sec)
@@ -727,6 +730,11 @@ export default function NoteShell() {
 
   // 7.3: 视频笔记三列布局标志
   const isVideoNote = itemType === 'video' && !!note.media?.video?.url
+  // 图文笔记三列布局标志
+  const isImageNote = itemType === 'image' && (note.media?.images?.length ?? 0) > 0
+  const images = note.media?.images ?? []
+  const imageInfos = note.media?.image_infos ?? []
+  const currentInfo = imageInfos[selectedImageIdx]
 
   // ── 提取正文 JSX（视频 / 非视频布局复用）──
   const noteContent = (
@@ -832,23 +840,7 @@ export default function NoteShell() {
         </div>
       )}
 
-      {/* ════════ R3.1: image 类型 — 正文上方显示所有原图（安静工作台风格）════════ */}
-      {itemType === 'image' && (note.media?.images?.length ?? 0) > 0 && (
-        <div style={{ padding: '12px 24px', flexShrink: 0, maxHeight: '45%', overflow: 'auto', borderBottom: '1px solid var(--line)' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {note.media!.images!.map((imgUrl, idx) => (
-              <img
-                key={idx}
-                src={imgUrl}
-                alt={title ? `${title}（${idx + 1}）` : `原图 ${idx + 1}`}
-                style={{ maxWidth: '100%', maxHeight: 360, objectFit: 'contain', display: 'block', margin: '0 auto', borderRadius: 6, background: 'var(--bg-sunken)' }}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ════════ 主内容区（视频笔记 = 三列布局，其余 = 通用布局）════════ */}
+      {/* ════════ 主内容区（视频笔记 = 三列 / 图文笔记 = 三列 / 其余 = 通用布局）════════ */}
       {isVideoNote ? (
         /* ── 视频笔记三列布局（蓝图 §3.5）：左播放器+字幕 / 中正文 / 右操作 ── */
         <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex', position: 'relative' }}>
@@ -970,8 +962,185 @@ export default function NoteShell() {
             </div>
           </div>
         </div>
+      ) : isImageNote ? (
+        /* ── 图文笔记三列布局：左图片浏览 / 中正文 / 右图片分析 ── */
+        (() => {
+          const PART_LABELS: Record<string, string> = {
+            subject: '主体', scene: '场景', color: '色调',
+            composition: '构图', style: '风格', details: '细节',
+          }
+          return (
+            <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex', position: 'relative' }}>
+
+              {/* ── 左列：图片浏览区 ── */}
+              <div style={{
+                width: '25%', minWidth: 200, maxWidth: 380, flexShrink: 0,
+                display: 'flex', flexDirection: 'column',
+                borderRight: '1px solid var(--line)',
+                overflow: 'hidden', background: 'var(--bg-sunken)',
+              }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 12, minHeight: 0 }}>
+                  {/* 大图预览 */}
+                  <div style={{
+                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'var(--bg)', borderRadius: 8, overflow: 'hidden', minHeight: 0,
+                  }}>
+                    {imageLoadError[selectedImageIdx] ? (
+                      <span style={{ color: 'var(--ink-4)', fontSize: 12 }}>图片加载失败</span>
+                    ) : (
+                      <img
+                        src={images[selectedImageIdx]}
+                        alt={title ? `${title}（${selectedImageIdx + 1}）` : `图片 ${selectedImageIdx + 1}`}
+                        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                        onError={() => setImageLoadError((prev) => ({ ...prev, [selectedImageIdx]: true }))}
+                      />
+                    )}
+                  </div>
+                  {/* 缩略图列表 */}
+                  {images.length > 1 && (
+                    <div style={{
+                      display: 'flex', gap: 4, overflowX: 'auto', paddingTop: 8, flexShrink: 0,
+                    }}>
+                      {images.map((img, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setSelectedImageIdx(idx)}
+                          style={{
+                            flexShrink: 0, width: 44, height: 44, padding: 0, border: 'none', borderRadius: 4,
+                            overflow: 'hidden', cursor: 'pointer', opacity: idx === selectedImageIdx ? 1 : 0.5,
+                            outline: idx === selectedImageIdx ? '2px solid var(--accent-2)' : 'none',
+                          }}
+                        >
+                          <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {images.length > 1 && (
+                    <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--ink-4)', marginTop: 4 }}>
+                      {selectedImageIdx + 1} / {images.length}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ── 中列：视图切换 tab + 整篇笔记 ── */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 0, padding: '0 24px', flexShrink: 0, borderBottom: '1px solid var(--line)', height: 36 }}>
+                  {(['wysiwyg', 'edit'] as ViewMode[]).map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => switchView(m)}
+                      style={{
+                        padding: '6px 16px', fontSize: 12, border: 'none', cursor: 'pointer', background: 'transparent',
+                        color: viewMode === m ? 'var(--accent-2)' : 'var(--ink-4)',
+                        fontWeight: viewMode === m ? 600 : 400,
+                        borderBottom: viewMode === m ? '2px solid var(--accent-2)' : '2px solid transparent',
+                        transition: 'color .15s, border-color .15s',
+                      }}
+                    >
+                      {videoViewModeLabels[m]}
+                    </button>
+                  ))}
+                  {(viewMode === 'edit' || viewMode === 'wysiwyg') && (
+                    <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-4)' }}>
+                      {saveStatus === 'saving' && '保存中…'}
+                      {saveStatus === 'saved' && `已保存 ${savedAt}`}
+                      {saveStatus === 'failed' && <span style={{ color: 'var(--accent)' }}>保存失败</span>}
+                    </span>
+                  )}
+                </div>
+                <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
+                  {noteContent}
+                </div>
+              </div>
+
+              {/* ── 右列：图片分析面板 ── */}
+              <div style={{
+                width: 280, flexShrink: 0,
+                borderLeft: '1px solid var(--line)',
+                display: 'flex', flexDirection: 'column',
+                overflow: 'hidden', background: 'var(--bg-elev)',
+              }}>
+                <div style={{ padding: '10px 14px 8px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-2)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--mono)' }}>
+                    图片分析 {images.length > 1 ? `· ${selectedImageIdx + 1}/${images.length}` : ''}
+                  </span>
+                </div>
+
+                <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', padding: '12px 14px', gap: 12 }}>
+
+                  {/* description_parts 结构化分析 */}
+                  {currentInfo?.description_parts && Object.keys(currentInfo.description_parts).length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {Object.entries(PART_LABELS).map(([key, label]) => {
+                        const value = currentInfo.description_parts[key as keyof typeof currentInfo.description_parts]
+                        if (!value) return null
+                        return (
+                          <div key={key}>
+                            <div style={{ fontSize: 10, color: 'var(--ink-4)', marginBottom: 2 }}>{label}</div>
+                            <div style={{ fontSize: 12, color: 'var(--ink-1)', lineHeight: 1.5 }}>{value}</div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : currentInfo?.description ? (
+                    /* fallback: 无 description_parts 时显示 description 字符串 */
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--ink-4)', marginBottom: 2 }}>描述</div>
+                      <div style={{ fontSize: 12, color: 'var(--ink-1)', lineHeight: 1.5 }}>{currentInfo.description}</div>
+                    </div>
+                  ) : null}
+
+                  {/* OCR 文本（默认折叠） */}
+                  {currentInfo?.ocr_text && (
+                    <details style={{ borderTop: '1px solid var(--line)', paddingTop: 8 }}>
+                      <summary style={{ fontSize: 10, color: 'var(--ink-4)', cursor: 'pointer', userSelect: 'none', marginBottom: 4 }}>
+                        OCR 文本
+                      </summary>
+                      <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5, whiteSpace: 'pre-wrap', maxHeight: 160, overflowY: 'auto' }}>
+                        {currentInfo.ocr_text}
+                      </div>
+                    </details>
+                  )}
+
+                  {/* 源 md */}
+                  <div style={{ borderTop: '1px solid var(--line)', paddingTop: 8 }}>
+                    <button
+                      className="btn-ghost"
+                      onClick={() => note.source_md && setSourceModalOpen(true)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', justifyContent: 'flex-start', fontSize: 12, padding: '4px 0' }}
+                    >
+                      <FileCode size={13} /> 源 md
+                    </button>
+                  </div>
+
+                  {/* 换总结 */}
+                  <div style={{ borderTop: '1px solid var(--line)', paddingTop: 8 }}>
+                    <button
+                      className="btn-ghost"
+                      onClick={() => setSummariesOpen((v) => !v)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', justifyContent: 'flex-start', fontSize: 12, padding: '4px 0', color: summariesOpen ? 'var(--accent-2)' : undefined }}
+                    >
+                      <RefreshCw size={13} /> 换总结
+                    </button>
+                    {summariesOpen && (
+                      <div style={{ maxHeight: 300, overflowY: 'auto', marginTop: 4 }}>
+                        <SummariesTab
+                          workspaceId={workspaceId}
+                          itemId={itemId}
+                          onApplyToNote={handleApplyToNote}
+                          activeSummaryId={activeSummaryId}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        })()
       ) : (
-        /* ── 通用布局（文字/图片/音频）：左正文 + 右伴随 ── */
         <>
           <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
             {noteContent}

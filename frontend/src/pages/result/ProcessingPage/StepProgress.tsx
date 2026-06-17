@@ -31,12 +31,31 @@ const STAGE_DESC: Record<string, string> = {
   STORE:    '写入任务数据库 · 索引多维度标签。',
 }
 
+// 图文笔记阶段名称（去视频化）
+const IMAGE_STAGE_NAME: Record<string, string> = {
+  DOWNLOAD: '抓取图文',
+  ASR:      '识别文字',
+  FRAMES:   '整理图片',
+  VLM:      '图片理解',
+  SUM:      '生成笔记',
+}
+
+// 图文笔记阶段描述
+const IMAGE_STAGE_DESC: Record<string, string> = {
+  DOWNLOAD: '抓取图文链接 · 下载图片资源。',
+  ASR:      'OCR · 提取图片中的文字。',
+  FRAMES:   '整理图片集 · 建立索引。',
+  VLM:      'VLM 逐图描述 · 场景 · 构图 · 色调。',
+  SUM:      'LLM 生成图文笔记 · 整篇总结。',
+}
+
 interface StepProgressProps {
   currentStatus: string
   progress: number
   taskType: string
   taskLogs: Array<{ ts: string; level: string; message: string }>
   embedFrames?: boolean // R4.7: false 时跳过截帧+VLM 步骤显示
+  isImageNote?: boolean // 图文笔记：使用去视频化的阶段文案
 }
 
 type StepState = 'queued' | 'running' | 'done'
@@ -180,7 +199,7 @@ function extractDownloadProgress(
   return null
 }
 
-export function StepProgress({ currentStatus, progress, taskType, taskLogs, embedFrames = true }: StepProgressProps) {
+export function StepProgress({ currentStatus, progress, taskType, taskLogs, embedFrames = true, isImageNote = false }: StepProgressProps) {
   const steps = deriveSteps(currentStatus, progress, taskType, embedFrames)
 
   return (
@@ -188,6 +207,8 @@ export function StepProgress({ currentStatus, progress, taskType, taskLogs, embe
       {steps.map((s) => {
         const Icon = s.icon
         const stageLogs = getLogsForStage(taskLogs, s.id)
+        const displayName = isImageNote ? (IMAGE_STAGE_NAME[s.id] ?? s.name) : s.name
+        const displayDesc = isImageNote ? (IMAGE_STAGE_DESC[s.id] ?? STAGE_DESC[s.id] ?? '') : (STAGE_DESC[s.id] ?? '')
 
         return (
           <div key={s.id} className="step-row" data-state={s.state}>
@@ -202,10 +223,10 @@ export function StepProgress({ currentStatus, progress, taskType, taskLogs, embe
             </div>
             <div className="body">
               <div className="hd">
-                {s.name}
+                {displayName}
                 <span className="kbd">{s.id.toLowerCase()}</span>
               </div>
-              <div className="desc">{STAGE_DESC[s.id] ?? ''}</div>
+              <div className="desc">{displayDesc}</div>
               {/* R18.1.4: ASR 模型下载进度条 */}
               {s.id === 'ASR' && s.state === 'running' && (() => {
                 const dl = extractDownloadProgress(taskLogs)

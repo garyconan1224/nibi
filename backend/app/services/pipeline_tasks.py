@@ -1674,6 +1674,21 @@ def _img_to_static_url(img_path: str, data_dir: Path) -> str:
     return ""
 
 
+def _image_intermediate_patch(
+    note_kind: str,
+    images_from_download: List[str],
+    data_dir: Path,
+) -> Dict[str, Any]:
+    """图文笔记 PROBE 后写入中间结果，让处理页能展示首图封面和图片数量。"""
+    if note_kind != "image_text" or not images_from_download:
+        return {}
+    cover = _img_to_static_url(images_from_download[0], data_dir)
+    return {
+        "cover_thumbnail": cover,
+        "image_count": len(images_from_download),
+    }
+
+
 def _compose_images_with_llm(
     *,
     source_text: str,
@@ -1918,6 +1933,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             "background_for_recognition": background_context,
             "source_description": source_text_from_download[:500] if source_text_from_download else "",
             "background_context": background_context,
+            **_image_intermediate_patch(note_kind, images_from_download, DATA_DIR),
         })
 
     # ── 3.6. 图集分析（image_text: OCR + VLM 逐图描述 + LLM 语境合成）──
@@ -2377,6 +2393,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         result["note_kind"] = note_kind
     if images_from_download:
         result["images"] = images_from_download
+        result["image_count"] = len(images_from_download)
     # image_text 分支：保存结构化图片信息（供前端 NoteMedia.image_infos）
     if note_kind == "image_text" and image_infos:
         result["image_infos"] = image_infos
