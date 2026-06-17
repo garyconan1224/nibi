@@ -64,7 +64,7 @@
 ## 结果页按钮 checklist（视频用例逐项验证）
 
 - [ ] 三视图 tab：**所见即所得 / md格式 / 源 md** 切换正常、内容一致
-- [ ] 时间戳跳转：所见即所得 **和** md格式 里点 `[mm:ss]` 都能跳视频对应位置（验 `video.currentTime` 变化）
+- [ ] 时间戳跳转：用 `browser_click`（真实 Playwright 操作，走浏览器完整 mousedown→click 事件链）点**非 0 秒** `[mm:ss]`，所见即所得 **和** md格式 都要验；记录 data-sec、点击前后 `video.currentTime`、`video.duration`、`video.readyState`，断言 currentTime 变到目标秒数（±1s）。**禁止在 `browser_evaluate` 里用 `el.click()` / `dispatchEvent` 当作真实点击证据**（evaluate 只读状态/辅助断言，不触发 ProseMirror 等框架依赖的 mousedown 前置状态）
 - [ ] 换总结：打开 6 模板弹窗 → 选一个不同模板 → 生成成功
 - [ ] 导出：md 导出 + Obsidian 导出，文件能下出来
 - [ ] 截图插入：按钮能把截图插进当前光标
