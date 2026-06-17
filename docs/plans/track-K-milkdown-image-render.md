@@ -1,26 +1,26 @@
-# Track K · 带图笔记所见即所得(Milkdown)不渲染图片 — 调查+修复卡
+# Track K · 带图笔记所见即所得(Milkdown)图片渲染 — 调查卡（已勘误）
 
-> 由 2026-06-16 抖音 E2E 回归测出。Claude 桌面已核实坐实是真 bug、锁定根因层，但精确根因待浏览器一锤。
-> 状态：**done**（2026-06-17 复核，非产品 bug，E2E 断言时机误报）｜ 性质：**先调查定位、再按根因修** ｜ 预计 1-2h
+> 由 2026-06-16 抖音 E2E 回归测出（用例1 报告 WYSIWYG `img=0`）。2026-06-17 浏览器实锤复核：**非产品 bug，原 `img=0` 为 E2E 断言时机误报**。已归档。
+> 状态：**done**（勘误，不改代码）｜ commit `7780f27`
 
 ---
 
-## 现象（用户可见）
+## 现象（E2E 原始报告，已勘误）
 
-带图笔记打开后，默认「所见即所得」(Milkdown) 视图**一张图都不显示**；手动切到「md 格式」才能看到 `![]` 源码文本（还不是渲染的图）。影响**所有带图笔记**这一核心功能。
+用例1（抖音·带图）E2E 报告称：所见即所得视图 DOM `img=0`，API `note_body` 含 7 张图片 markdown，推测 Milkdown 未渲染图片。
 
-小米 E2E 报告里把它记成「视图差异，非 bug」——**判断错误**，下方是 Claude 桌面的核实证据。
+## 2026-06-17 浏览器复核（结论：非产品 bug）
 
-## 已核实证据（桌面，2026-06-16）
+复核数据：带图 item `45138372-7e8d-4233-9689-9c893495f08a`，wid `0189e82d`（抖音）；交叉验证 `20e532e3`，wid `26965fa0`（B站②）。
 
-复现数据：带图 item `45138372-7e8d-4233-9689-9c893495f08a`，wid `0189e82d-3dea-4bc8-903f-3300945a539c`。
+| 检查项 | 抖音带图 | B站②带图 |
+|---|---|---|
+| `.ProseMirror img`（真实图片） | **7** | **4** |
+| 图片尺寸（offsetWidth×Height） | 514×289px | 514×289 / 494×278 |
+| `rawTextHasBang`（语法变纯文本？） | false | false |
+| console error | 无 | 无 |
 
-1. **markdown 语法标准**：`data/workspaces/0189e82d-.../notes/45138372-.../note.md` 第 149–155 行是 7 个连续 `![中文alt](/static/workspaces/default_project/videos/.../frames/*.jpg)`，每行一个、行尾两空格、行间无空行（CommonMark 下是一个段落内的 inline image）。
-2. **资源完全正常**：图片磁盘存在（default_project frames 共 2362 张）；该图 URL 在后端 `8000` **和**前端 `5177` proxy 都返回 **200**（不是 404、proxy 配置正常）。
-3. **数据同源**：默认视图 `wysiwyg`（`index.tsx:529`），与「md 格式」(CodeMirror) 共用同一份 `editingBody`；md 格式能显示 `![]` 原文 → 内容里确实有图片 markdown。
-4. **唯独 Milkdown 没出 img**：实测默认视图 DOM `img=0`。
-
-→ 资源/语法/数据全部正常，唯独 Milkdown 不渲染。**根因在 Milkdown 把 markdown 解析/渲染成 ProseMirror DOM 的环节**（`MilkdownEditor.tsx:46` `ctx.set(defaultValueCtx, markdown)` 喂的是含图原文）。
+**结论**：Milkdown 正确渲染所有 `![alt](url)` 为 `<img>` 标签。E2E 初测 `img=0` 是断言时机问题（可能在视图切换/数据加载过程中采样），非产品 bug。已更新 E2E 报告对应条目。
 
 ## 目标
 
