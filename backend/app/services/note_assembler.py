@@ -80,7 +80,13 @@ def note_dir(workspace_id: str, item_id: str) -> Path:
 
 
 def _to_static_url(path: str) -> str:
-    """本地绝对路径 → /static/... URL（与 summary_generator._to_static_url 同逻辑）。"""
+    """本地绝对路径 → /static/... URL（与 summary_generator._to_static_url 同逻辑）。
+
+    兼容规则：
+    - /static/...：原样返回
+    - DATA_DIR 下绝对路径：转 /static/...
+    - 普通相对路径或外部 URL：返回原始 path（不吞掉）
+    """
     if not path:
         return ""
     if path.startswith("/static/"):
@@ -93,7 +99,7 @@ def _to_static_url(path: str) -> str:
             return f"/static/{rel.as_posix()}"
     except (ValueError, OSError):
         pass
-    return ""
+    return path
 
 
 # ── frontmatter ──────────────────────────────────────────────────

@@ -2030,6 +2030,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     transcript_segments: List[Dict[str, Any]] = []  # 7.4: 带时间码的分段
     analysis_text = ""
     markdown = ""
+    note_body = ""
     download_save_path = ""
     # PROBE 结果（download 后由内容识别填充）
     note_kind = "text"  # 默认；PROBE 后可能变为 image_text / video / audio
@@ -2506,9 +2507,8 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     if not _source_title:
         _source_title = str((probe.get("source_title") if "download" in steps else "") or "").strip()
 
-    # note_body: image_text 分支已在 §3.7 设置学习笔记，此处仅对有 transcript 的类型生成 standard 总结
-    if not note_body:
-        note_body = ""
+    # note_body: image_text 分支已在 §3.7 设置学习笔记；此处对有 transcript 的类型生成 standard 总结。
+    # note_body 已在中间产出容器初始化为 ""，image_text 设置后不会被覆盖（transcript_text 为空时不进此块）。
     if "note" in steps and api_key and transcript_text and len(transcript_text) > 50:
         try:
             from backend.app.models.workspace import WorkspaceItem
