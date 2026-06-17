@@ -415,3 +415,95 @@ class TestAssembleItemNote:
         # 不崩溃就是成功
         assert "error" not in result
         assert result["note_md"] != ""
+
+
+# ── 图文笔记学习总结测试 ─────────────────────────────────────────
+
+
+class TestImageTextLearningNote:
+    """图文笔记：note_body 优先 + source_md_raw 保留原始文本。"""
+
+    @pytest.fixture()
+    def ws_root(self, tmp_path: Path) -> Path:
+        return tmp_path
+
+    def _patch_ws_root(self, ws_root: Path):
+        return patch(
+            "backend.app.services.note_assembler.get_workspace_root",
+            return_value=ws_root,
+        )
+
+    def test_note_body_priority_over_markdown(self) -> None:
+        """build_note_md 应优先使用 note_body（学习笔记），而非 results['markdown']。"""
+        item = _make_item(
+            item_type="image",
+            results={
+                "markdown": "【图片 1】主体: 卡片；OCR文字: 原始内容描述",
+                "note_body": "# 学习笔记\n\n## 核心观点\n\n这是学习总结。",
+                "note_kind": "image_text",
+            },
+        )
+        fm = build_frontmatter(item, "ws-01")
+        note = build_note_md(item, fm)
+        assert "学习笔记" in note
+        assert "学习总结" in note
+        assert "【图片 1】" not in note
+
+    def test_build_body_prefers_source_md_raw(self) -> None:
+        """_build_body 对 image 类型优先取 source_md_raw（原始文本），而非合成后 markdown。"""
+        item = _make_item(
+            item_type="image",
+            results={
+                "markdown": "合成后含图片描述的版本",
+                "source_md_raw": "原始正文，未经 LLM 合成",
+                "note_kind": "image_text",
+            },
+        )
+        src = build_source_md(item)
+        assert "原始正文" in src
+        assert "合成后含图片描述" not in src
+
+    def test_build_body_fallback_to_markdown_without_source_md_raw(self) -> None:
+        """没有 source_md_raw 时，_build_body 回退到 results['markdown']。"""
+        item = _make_item(
+            item_type="image",
+            results={
+                "markdown": "含 OCR 和描述的 markdown",
+            },
+        )
+        src = build_source_md(item)
+        assert "含 OCR 和描述的 markdown" in src
+
+    def test_image_text_note_body_no_image_description_fields(self) -> None:
+        """图文笔记 note_body 不应包含逐图描述字段。"""
+        note_body = "# 学习笔记\n\n## 核心观点\n\n小红书图文内容的核心学习价值。"
+        bad_fields = ["主体", "场景", "色调", "构图", "风格", "细节"]
+        for field in bad_fields:
+            assert field not in note_body, f"note_body 不应包含「{field}」"
+
+    def test_image_text_note_body_no_image_embed_for_text_images(self) -> None:
+        """文字型图片场景下，note_body 默认不包含 ![...] 图片引用。"""
+        note_body = "# 学习笔记\n\n## 核心观点\n\n文字卡片内容已提炼为文字。"
+        assert "![" not in note_body, "文字型图片笔记不应插图"
+
+    def test_assemble_image_note_uses_note_body(self, ws_root: Path) -> None:
+        """assemble_item_note 对有 note_body 的 image item，note.md 应含学习笔记内容。"""
+        item = _make_item(
+            item_id="img-learning",
+            item_type="image",
+            results={
+                "markdown": "合成后 markdown（含图片引用）",
+                "source_md_raw": "原始正文",
+                "note_body": "# 学习笔记\n\n## 一句话结论\n\n小红书信息卡片的学习价值。",
+                "note_kind": "image_text",
+            },
+        )
+        with self._patch_ws_root(ws_root):
+            result = assemble_item_note("ws-01", item.item_id, _item=item)
+        note_content = Path(result["note_md"]).read_text(encoding="utf-8")
+        source_content = Path(result["source_md"]).read_text(encoding="utf-8")
+        # note.md 应含学习笔记
+        assert "学习笔记" in note_content
+        assert "学习价值" in note_content
+        # source.md 应含原始文本
+        assert "原始正文" in source_content

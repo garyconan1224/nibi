@@ -1800,6 +1800,169 @@ def _compose_images_with_llm(
         return ""
 
 
+def _generate_image_text_learning_note(
+    *,
+    source_text: str,
+    image_infos: list[dict],
+    title: str,
+    settings: Any,
+    payload: Dict[str, Any],
+    log: Callable[[str], None],
+) -> str:
+    """图文笔记：用 LLM 把图文内容整理成学习类总结笔记。
+
+    与 _compose_images_with_llm 不同，本函数目标是「提炼学习价值」，
+    而不是「把图片按语境插入正文」。
+
+    image_infos: [{"idx": int, "description": str, "ocr_text": str, "static_url": str,
+                   "description_parts": dict, "is_text_image": bool}]
+    失败返回空串（调用方自行兜底）。
+    """
+    api_key = (
+        str(payload.get("api_key") or "").strip()
+        or (settings.openai_api_key or "").strip()
+    )
+    if not api_key:
+        log("⚠️  无 api_key，跳过学习笔记生成")
+        return ""
+
+    try:
+        registry = create_default_registry()
+        profile = registry.resolve_default_profile(settings, "chat")
+        provider = registry.build(profile)
+        model = (
+            str(payload.get("text_model") or "").strip()
+            or profile.default_models.get("chat")
+            or (settings.text_model or "").strip()
+        )
+        if not model:
+            log("⚠️  未配置 text_model，跳过学习笔记生成")
+            return ""
+    except Exception as exc:
+        log(f"⚠️  LLM 初始化失败，跳过学习笔记生成：{exc}")
+        return ""
+
+    # ── 构造图列表（含类型分类）──
+    img_lines: list[str] = []
+    for img in image_infos:
+        parts = [f"图{img['idx']}"]
+        dp = img.get("description_parts") or {}
+        if dp:
+            if dp.get("subject"):
+                parts.append(f"主体: {dp['subject']}")
+            if dp.get("scene"):
+                parts.append(f"场景: {dp['scene']}")
+            if dp.get("color"):
+                parts.append(f"色彩: {dp['color']}")
+            if dp.get("composition"):
+                parts.append(f"构图: {dp['composition']}")
+            if dp.get("style"):
+                parts.append(f"风格: {dp['style']}")
+            if dp.get("details"):
+                parts.append(f"细节: {dp['details']}")
+        elif img["description"]:
+            parts.append(f"描述: {img['description']}")
+        if img["ocr_text"]:
+            parts.append(f"OCR文字: {img['ocr_text']}")
+        # 图片类型提示（帮助 LLM 判断是否插图）
+        img_type = "文字型" if img.get("is_text_image") else "视觉型"
+        parts.append(f"类型: {img_type}")
+        img_lines.append(" | ".join(parts))
+    img_list_text = "\n".join(img_lines)
+
+    # ── 图片分类统计（供 prompt 决策）──
+    text_images = [i for i in image_infos if i.get("is_text_image")]
+    non_text_images = [i for i in image_infos if not i.get("is_text_image")]
+    classification_hint = (
+        f"其中 {len(text_images)} 张是文字型（信息卡片/文字截图，不要插图），"
+        f"{len(non_text_images)} 张是视觉型（仅当图片是流程图/示意图且文字无法表达时才插入）。"
+        if image_infos else ""
+    )
+
+    sys_prompt = (
+        "你是学习笔记整理专家。任务：把图文内容整理成学习笔记，而不是原文搬运。\n"
+        "规则：\n"
+        "1. 不要复述原文，要提炼学习价值和可操作要点。\n"
+        "2. 如果图片主要是文字卡片、截图、信息图，不要在正文中插入图片，提炼其中信息即可。\n"
+        "3. 不要逐张描述图片外观、主体、场景、色调、构图、风格、细节。\n"
+        "4. 不要保留营销 CTA、话题标签、关注引导，除非它们对理解内容有价值。\n"
+        "5. 不要插入「文字型」图片；「视觉型」图片仅在图片是流程图/示意图且文字无法等价表达时，才允许插入少量（最多 3 张）。\n"
+        "6. 不要输出图片分类标签（如「文字型」「视觉型」）。\n"
+        "7. 输出结构建议：\n"
+        "   # 学习笔记\n"
+        "   ## 一句话结论\n"
+        "   ## 核心观点\n"
+        "   ## 方法/流程\n"
+        "   ## 可复用做法\n"
+        "   ## 注意点\n"
+        "   ## 我可以怎么用\n"
+        "8. 只输出 Markdown，不要解释。"
+    )
+
+    body = source_text[:12000]
+    user_prompt = (
+        f"# 标题\n{title}\n\n"
+        f"# 原始内容\n{body}\n\n"
+        f"# 参考图片信息（共 {len(image_infos)} 张）\n{classification_hint}\n{img_list_text}\n\n"
+        "请输出学习笔记 Markdown："
+    )
+
+    try:
+        raw = provider.chat(
+            ChatRequest(
+                model=model,
+                messages=[
+                    {"role": "system", "content": sys_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.3,
+                max_tokens=4096,
+            )
+        )
+        note = raw.strip()
+        if note and len(note) > 80:
+            log(f"✅ 学习笔记生成完成，{len(note)} 字")
+            return note
+        log("⚠️  学习笔记 LLM 返回过短，回退到纯文本提炼")
+    except Exception as exc:
+        log(f"⚠️  学习笔记生成失败，回退到纯文本提炼：{exc}")
+
+    # ── 纯文本兜底：不用 LLM，直接从原始文本提炼结构化笔记 ──
+    return _fallback_learning_note(source_text=source_text, title=title, log=log)
+
+
+def _fallback_learning_note(
+    *,
+    source_text: str,
+    title: str,
+    log: Callable[[str], None],
+) -> str:
+    """无 LLM 时的纯文本兜底：从原始文本提炼学习笔记结构。
+
+    不使用逐图描述，只保留原始文本的核心内容。
+    """
+    if not source_text or len(source_text.strip()) < 30:
+        log("⚠️  原始文本过短，无法生成学习笔记兜底")
+        return ""
+
+    lines = [f"# {title}"] if title else ["# 学习笔记"]
+    lines.append("")
+    lines.append("## 核心内容")
+    lines.append("")
+    paragraphs = [p.strip() for p in source_text.split("\n\n") if p.strip()]
+    for para in paragraphs[:10]:
+        # 跳过纯图片描述段（含「【图片 N】」标记）
+        if "【图片" in para and ("描述" in para or "OCR" in para):
+            continue
+        # 跳过空行或纯标点
+        if len(para) < 5:
+            continue
+        lines.append(para)
+        lines.append("")
+    log(f"📝 纯文本兜底笔记，{len(paragraphs)} 段原文（跳过图片描述段）")
+    return "\n".join(lines).strip()
+
+
 def _steps_for_note_kind(kind: str, requested_steps: list[str]) -> list[str]:
     """根据内容类型裁剪后续步骤。"""
     steps = list(requested_steps)
@@ -1937,6 +2100,9 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         })
 
     # ── 3.6. 图集分析（image_text: OCR + VLM 逐图描述 + LLM 语境合成）──
+    # 保存原始文本：_compose_images_with_llm 会覆盖 source_text_from_download，
+    # 但 source_md（原始依据）和学习笔记生成需要原始版本。
+    raw_source_text = source_text_from_download
     image_infos: list[dict] = []  # 外层声明，供后面写入 result 使用
     if note_kind == "image_text" and images_from_download:
         runner.store.update(task_id, status=TaskStatus.VLM.value)
@@ -1963,6 +2129,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 "ocr_text": info["ocr_text"],
                 "static_url": static_url,
                 "description_parts": info.get("description_parts") or {},
+                "is_text_image": bool(info["ocr_text"] and len(info["ocr_text"]) > 30),
             })
             # 兜底：纯文本描述（LLM 合成失败时使用）
             parts: list[str] = []
@@ -1995,6 +2162,28 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                     source_text_from_download + "\n\n" + images_text
                     if source_text_from_download
                     else images_text
+                )
+
+        # ── 3.7. 图文学习笔记生成（独立于图文混排合成）──
+        # note_body 用于 note.md 默认正文（学习总结），区别于 source.md（原始依据）。
+        if "note" in steps and api_key:
+            _img_log = _log_img  # 复用已有的日志回调
+            image_text_note_body = _generate_image_text_learning_note(
+                source_text=raw_source_text,
+                image_infos=image_infos,
+                title=_source_title,
+                settings=load_settings(),
+                payload=payload,
+                log=_img_log,
+            )
+            if image_text_note_body:
+                note_body = image_text_note_body
+            else:
+                # LLM 失败时用纯文本兜底
+                note_body = _fallback_learning_note(
+                    source_text=raw_source_text or source_text_from_download,
+                    title=_source_title,
+                    log=_img_log,
                 )
 
     # ── 4+5. transcribe + analyze 并行步骤 ──────────────────────
@@ -2317,7 +2506,9 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     if not _source_title:
         _source_title = str((probe.get("source_title") if "download" in steps else "") or "").strip()
 
-    note_body = ""
+    # note_body: image_text 分支已在 §3.7 设置学习笔记，此处仅对有 transcript 的类型生成 standard 总结
+    if not note_body:
+        note_body = ""
     if "note" in steps and api_key and transcript_text and len(transcript_text) > 50:
         try:
             from backend.app.models.workspace import WorkspaceItem
@@ -2397,6 +2588,9 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     # image_text 分支：保存结构化图片信息（供前端 NoteMedia.image_infos）
     if note_kind == "image_text" and image_infos:
         result["image_infos"] = image_infos
+    # image_text 分支：保存原始文本（供 source.md 显示原始依据，不受 _compose 覆盖）
+    if note_kind == "image_text" and raw_source_text:
+        result["source_md_raw"] = raw_source_text
     if background_context:
         result["background_for_recognition"] = background_context
     return result

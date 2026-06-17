@@ -231,6 +231,11 @@ def _build_body(item: WorkspaceItem) -> str:
         return results.get("summary", "")
 
     if item_type == "image":
+        # R3.5: note_body 优先（学习笔记），由 build_note_md 处理；
+        # 此处用于 source.md，优先取原始文本（source_md_raw），不受图文混排合成覆盖。
+        source_raw = results.get("source_md_raw", "")
+        if source_raw:
+            return source_raw
         # NI.1: note task 产出 results["markdown"]（含图集描述），优先使用
         md = results.get("markdown", "")
         if md:

@@ -83,6 +83,16 @@ function extractBody(noteMd: string): string {
   return idx >= 0 ? rest.slice(idx + 4) : noteMd
 }
 
+/** 规范化 Markdown 里 ![alt](url) 的 URL：
+ *  已编码的不动（防 %20 → %2520）；未编码的补 encodeURI。
+ *  解决中文/空格路径在 Milkdown 解析器中截断的问题。 */
+function normalizeMarkdownImageUrls(md: string): string {
+  return md.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_m, alt: string, url: string) => {
+    const needsEncode = /[一-鿿\s]/.test(url) && !/%[0-9A-Fa-f]{2}/.test(url)
+    return `![${alt}](${needsEncode ? encodeURI(url) : url})`
+  })
+}
+
 /** type → 中文标签映射。 */
 const TYPE_LABEL: Record<string, string> = {
   text: '文本',
@@ -232,6 +242,45 @@ const videoViewModeLabels: Record<ViewMode, string> = {
   edit: 'md格式',
   compare: '源md对照',
   wysiwyg: '所见即所得',
+}
+const imageNoteViewModeLabels: Record<ViewMode, string> = {
+  edit: 'md格式',
+  compare: '源md对照',
+  wysiwyg: '阅读',
+}
+
+/* ────────────────── ReadView（图文笔记只读渲染）────────────────── */
+
+interface ReadViewProps {
+  markdown: string
+}
+
+/** 图文笔记只读视图：ReactMarkdown + 图片样式优化。 */
+function ReadView({ markdown }: ReadViewProps) {
+  const normalized = useMemo(() => normalizeMarkdownImageUrls(markdown), [markdown])
+  return (
+    <div style={{ padding: '0 24px', overflowY: 'auto', flex: 1 }}>
+      <ReactMarkdown
+        remarkPlugins={remarkPlugins}
+        components={{
+          img: ({ src, alt }) => (
+            <img
+              src={src}
+              alt={alt ?? ''}
+              style={{
+                maxWidth: '100%',
+                display: 'block',
+                margin: '16px auto',
+                borderRadius: 6,
+              }}
+            />
+          ),
+        }}
+      >
+        {normalized}
+      </ReactMarkdown>
+    </div>
+  )
 }
 
 /* ────────────────── NoteEditor ────────────────── */
@@ -748,7 +797,9 @@ export default function NoteShell() {
       {viewMode === 'compare' ? (
         <CompareView markdown={editingBody} onMarkdownChange={handleEditorChange} sourceMd={note.source_md} onSeek={handleSeek} />
       ) : viewMode === 'wysiwyg' ? (
-        <MilkdownEditor key={milkdownKey} markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
+        isImageNote
+          ? <ReadView markdown={editingBody} />
+          : <MilkdownEditor key={milkdownKey} markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
       ) : (
         <NoteEditor markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
       )}
@@ -963,12 +1014,8 @@ export default function NoteShell() {
           </div>
         </div>
       ) : isImageNote ? (
-        /* ── 图文笔记三列布局：左图片浏览 / 中正文 / 右图片分析 ── */
+        /* ── 图文笔记三列布局：左图片浏览 / 中正文 / 右操作区 ── */
         (() => {
-          const PART_LABELS: Record<string, string> = {
-            subject: '主体', scene: '场景', color: '色调',
-            composition: '构图', style: '风格', details: '细节',
-          }
           return (
             <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex', position: 'relative' }}>
 
@@ -1039,10 +1086,10 @@ export default function NoteShell() {
                         transition: 'color .15s, border-color .15s',
                       }}
                     >
-                      {videoViewModeLabels[m]}
+                      {imageNoteViewModeLabels[m]}
                     </button>
                   ))}
-                  {(viewMode === 'edit' || viewMode === 'wysiwyg') && (
+                  {viewMode === 'edit' && (
                     <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-4)' }}>
                       {saveStatus === 'saving' && '保存中…'}
                       {saveStatus === 'saved' && `已保存 ${savedAt}`}
@@ -1055,7 +1102,7 @@ export default function NoteShell() {
                 </div>
               </div>
 
-              {/* ── 右列：图片分析面板 ── */}
+              {/* ── 右列：操作区（图文笔记） ── */}
               <div style={{
                 width: 280, flexShrink: 0,
                 borderLeft: '1px solid var(--line)',
@@ -1064,77 +1111,51 @@ export default function NoteShell() {
               }}>
                 <div style={{ padding: '10px 14px 8px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
                   <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-2)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--mono)' }}>
-                    图片分析 {images.length > 1 ? `· ${selectedImageIdx + 1}/${images.length}` : ''}
+                    操作区
                   </span>
                 </div>
 
-                <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', padding: '12px 14px', gap: 12 }}>
+                <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', padding: '12px 14px', gap: 8 }}>
 
-                  {/* description_parts 结构化分析 */}
-                  {currentInfo?.description_parts && Object.keys(currentInfo.description_parts).length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {Object.entries(PART_LABELS).map(([key, label]) => {
-                        const value = currentInfo.description_parts[key as keyof typeof currentInfo.description_parts]
-                        if (!value) return null
-                        return (
-                          <div key={key}>
-                            <div style={{ fontSize: 10, color: 'var(--ink-4)', marginBottom: 2 }}>{label}</div>
-                            <div style={{ fontSize: 12, color: 'var(--ink-1)', lineHeight: 1.5 }}>{value}</div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  ) : currentInfo?.description ? (
-                    /* fallback: 无 description_parts 时显示 description 字符串 */
-                    <div>
-                      <div style={{ fontSize: 10, color: 'var(--ink-4)', marginBottom: 2 }}>描述</div>
-                      <div style={{ fontSize: 12, color: 'var(--ink-1)', lineHeight: 1.5 }}>{currentInfo.description}</div>
-                    </div>
-                  ) : null}
+                  {/* 源 md */}
+                  <button
+                    className="btn-ghost"
+                    onClick={() => note.source_md && setSourceModalOpen(true)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', justifyContent: 'flex-start', height: 36, padding: '0 14px', fontSize: 12, borderRadius: 0, borderBottom: '1px solid var(--line)', flexShrink: 0 }}
+                  >
+                    <FileCode size={13} /> 源 md
+                  </button>
 
-                  {/* OCR 文本（默认折叠） */}
+                  {/* 换总结 */}
+                  <button
+                    className="btn-ghost"
+                    onClick={() => setSummariesOpen((v) => !v)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', justifyContent: 'flex-start', height: 36, padding: '0 14px', fontSize: 12, borderRadius: 0, borderBottom: '1px solid var(--line)', flexShrink: 0, color: summariesOpen ? 'var(--accent-2)' : undefined }}
+                  >
+                    <RefreshCw size={13} /> 换总结
+                  </button>
+                  {summariesOpen && (
+                    <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+                      <SummariesTab
+                        workspaceId={workspaceId}
+                        itemId={itemId}
+                        onApplyToNote={handleApplyToNote}
+                        activeSummaryId={activeSummaryId}
+                      />
+                    </div>
+                  )}
+
+                  {/* OCR 识别文本（默认折叠，仅当非空时显示） */}
                   {currentInfo?.ocr_text && (
-                    <details style={{ borderTop: '1px solid var(--line)', paddingTop: 8 }}>
-                      <summary style={{ fontSize: 10, color: 'var(--ink-4)', cursor: 'pointer', userSelect: 'none', marginBottom: 4 }}>
-                        OCR 文本
+                    <details style={{ marginTop: 4 }}>
+                      <summary style={{ fontSize: 11, color: 'var(--ink-4)', cursor: 'pointer', userSelect: 'none', padding: '4px 0' }}>
+                        识别文本
                       </summary>
-                      <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5, whiteSpace: 'pre-wrap', maxHeight: 160, overflowY: 'auto' }}>
+                      <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5, whiteSpace: 'pre-wrap', maxHeight: 200, overflowY: 'auto', padding: '4px 0' }}>
                         {currentInfo.ocr_text}
                       </div>
                     </details>
                   )}
-
-                  {/* 源 md */}
-                  <div style={{ borderTop: '1px solid var(--line)', paddingTop: 8 }}>
-                    <button
-                      className="btn-ghost"
-                      onClick={() => note.source_md && setSourceModalOpen(true)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', justifyContent: 'flex-start', fontSize: 12, padding: '4px 0' }}
-                    >
-                      <FileCode size={13} /> 源 md
-                    </button>
-                  </div>
-
-                  {/* 换总结 */}
-                  <div style={{ borderTop: '1px solid var(--line)', paddingTop: 8 }}>
-                    <button
-                      className="btn-ghost"
-                      onClick={() => setSummariesOpen((v) => !v)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', justifyContent: 'flex-start', fontSize: 12, padding: '4px 0', color: summariesOpen ? 'var(--accent-2)' : undefined }}
-                    >
-                      <RefreshCw size={13} /> 换总结
-                    </button>
-                    {summariesOpen && (
-                      <div style={{ maxHeight: 300, overflowY: 'auto', marginTop: 4 }}>
-                        <SummariesTab
-                          workspaceId={workspaceId}
-                          itemId={itemId}
-                          onApplyToNote={handleApplyToNote}
-                          activeSummaryId={activeSummaryId}
-                        />
-                      </div>
-                    )}
-                  </div>
                 </div>
               </div>
             </div>
