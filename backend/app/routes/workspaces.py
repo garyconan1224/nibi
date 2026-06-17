@@ -3516,12 +3516,20 @@ def update_item_note(workspace_id: str, item_id: str, req: NoteUpdateRequest) ->
     transcript: Any = None
 
     if item_type == "image":
-        img_url = ""
-        if item.source == "url":
-            img_url = item.source_value
+        # NI.1: 与 GET 同逻辑，优先使用 results["images"]（下载的图集）
+        result_images = results.get("images") or []
+        if result_images:
+            media["images"] = [
+                to_static_url(p) if not str(p).startswith("/static/") else str(p)
+                for p in result_images
+            ]
         else:
-            img_url = to_static_url(item.source_value)
-        media["images"] = [img_url] if img_url else []
+            img_url = ""
+            if item.source == "url":
+                img_url = item.source_value
+            else:
+                img_url = to_static_url(item.source_value)
+            media["images"] = [img_url] if img_url else []
         _image_infos = results.get("image_infos")
         if _image_infos:
             media["image_infos"] = _image_infos

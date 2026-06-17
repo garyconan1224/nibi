@@ -227,3 +227,57 @@ def test_export_item_note_rejects_unsupported_format(client: TestClient):
     ws_id, item_id = _create_ws_and_item(client)
     resp = client.get(f"/workspaces/{ws_id}/items/{item_id}/note/export?format=pdf")
     assert resp.status_code == 400
+
+
+def test_put_note_preserves_image_results_images(client: TestClient):
+    """PUT 后 media.images 仍优先使用 results["images"]（下载图集），不回退到 source_value。"""
+    # 创建 image 类型素材
+    ws = client.post("/workspaces", json={"name": "img-test"}).json()
+    ws_id = ws["workspace_id"]
+    resp = client.post(
+        f"/workspaces/{ws_id}/items",
+        json={
+            "source": "url",
+            "source_value": "https://example.com/page",
+            "type": "image",
+            "name": "图集笔记",
+        },
+    )
+    items = resp.json()["items"]
+    item_id = items[-1]["item_id"]
+
+    # 模拟 note task 产出的 results（下载了 3 张图）
+    item = ws_module._find_item(ws_module._store.get(ws_id), item_id)
+    fake_data = ws_module._store.root
+    ws_dir = fake_data / ws_id / "items" / item_id
+    ws_dir.mkdir(parents=True, exist_ok=True)
+    for i in range(1, 4):
+        (ws_dir / f"img_{i}.jpg").write_bytes(b"\xff\xd8\x00")
+    item.results = {
+        "images": [
+            str(ws_dir / "img_1.jpg"),
+            str(ws_dir / "img_2.jpg"),
+            str(ws_dir / "img_3.jpg"),
+        ],
+        "image_infos": [
+            {"idx": 1, "description": "猫", "ocr_text": "", "static_url": "", "description_parts": {"subject": "猫"}},
+            {"idx": 2, "description": "狗", "ocr_text": "", "static_url": "", "description_parts": {"subject": "狗"}},
+            {"idx": 3, "description": "鸟", "ocr_text": "", "static_url": "", "description_parts": {"subject": "鸟"}},
+        ],
+        "content": "图文正文",
+    }
+    assemble_item_note(ws_id, item_id, _item=item)
+
+    # PUT 保存（模拟用户编辑）
+    resp = client.put(
+        f"/workspaces/{ws_id}/items/{item_id}/note",
+        json={"body": "# 编辑后\n\n修改了正文"},
+    )
+    assert resp.status_code == 200
+    put_data = resp.json()
+
+    # 关键断言：PUT 响应的 media.images 应为 3 张（来自 results），不是 1 个 source_value
+    assert len(put_data["media"]["images"]) == 3
+    assert put_data["media"]["image_infos"] is not None
+    assert len(put_data["media"]["image_infos"]) == 3
+    assert put_data["media"]["image_infos"][0]["description_parts"]["subject"] == "猫"
