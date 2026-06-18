@@ -1743,11 +1743,17 @@ def _analyze_image_for_note(
         "1. 读出图中所有可见文字（按阅读顺序）。\n"
         "2. 判断图片类型。\n"
         "3. 决定这张图在学习笔记中该怎么处理。\n\n"
+        "extracted_text 格式化规则（重要）：\n"
+        "- 文字型图（text_card）：把图中文字按结构转成 Markdown 标题、列表或表格，不要保留原始 OCR 碎片。\n"
+        "- 演示/流程图（ui_demo/flow_diagram）：把步骤转成有序列表，箭头/节点顺序即步骤顺序；只保留对理解有帮助的界面状态说明。\n"
+        "- 表格/对比图（chart_table）：优先还原为 Markdown 表格；结构不完整时保留关键行列，缺失单元格用「—」填充。\n"
+        "- Logo/装饰图（icon_logo/decorative）：只输出有业务含义的文字（产品名、按钮入口、关键状态），纯装饰信息留空。\n"
+        "- 混合图（mixed）：文字转 Markdown，图标/界面状态只保留一句话说明。\n\n"
         "输出格式（严格 JSON，字段顺序固定）：\n"
         "{\n"
         '  "image_type": "text_card | ui_demo | flow_diagram | chart_table'
         ' | icon_logo | decorative | photo | mixed | unknown",\n'
-        '  "extracted_text": "按阅读顺序提取图中文字，没有则空字符串",\n'
+        '  "extracted_text": "按上述规则格式化后的 Markdown 文字；没有则空字符串",\n'
         '  "content_summary": "这张图表达的知识点或信息价值，80-200字",\n'
         '  "action_steps": ["如果是演示/教程图，提取操作步骤"],\n'
         '  "key_entities": ["工具名、功能名、对象名、指标名"],\n'
@@ -1886,6 +1892,8 @@ _TOOL_SIGNALS: frozenset[str] = frozenset({
     "Obsidian", "导出", "记录", "转写", "效率",
     "iOS", "Mac", "Windows", "Android", "浏览器",
     "下载", "扩展", "自动化", "模板", "同步",
+    "笔记", "AI", "Notion", "飞书", "WPS", "Office",
+    "截图", "OCR", "搜索", "翻译", "整理", "收集",
 })
 
 
@@ -1895,16 +1903,22 @@ def _classify_image_text_content(
     image_infos: List[Dict[str, Any]],
     note_body: str,
 ) -> None:
-    """轻量图文内容分类：识别 tool_recommendation vs unknown，写入 result。"""
+    """轻量图文内容分类：识别 tool_recommendation vs unknown，写入 result。
+
+    优先使用 source.md / source_text_enriched，其次才看 image_infos。
+    """
     if result.get("content_category"):
         return  # 已有分类（重试等），不覆盖
 
-    # 收集所有文本信号
-    texts: List[str] = [raw_source_text, note_body]
+    # 收集所有文本信号：优先 source.md（结构化源材料）
+    source_md_raw = str(result.get("source_md_raw") or "")
+    source_text_enriched = str(result.get("source_text_enriched") or "")
+    texts: List[str] = [source_md_raw or raw_source_text, source_text_enriched, note_body]
+    # image_infos 作为补充信号
     for info in image_infos:
         if isinstance(info, dict):
-            texts.append(str(info.get("description") or ""))
-            texts.append(str(info.get("ocr_text") or ""))
+            texts.append(str(info.get("content_summary") or ""))
+            texts.append(str(info.get("extracted_text") or info.get("description") or ""))
     blob = "\n".join(texts)
 
     hit = sum(1 for w in _TOOL_SIGNALS if w in blob)
@@ -2075,21 +2089,16 @@ def _compose_images_with_llm(
 
 def _generate_image_text_learning_note(
     *,
-    source_text: str,
-    image_infos: list[dict],
+    source_md: str,
     title: str,
     settings: Any,
     payload: Dict[str, Any],
     log: Callable[[str], None],
 ) -> str:
-    """图文笔记：用 LLM 把图文内容整理成学习类总结笔记。
+    """图文笔记：基于 source.md 生成标准总结笔记。
 
-    与 _compose_images_with_llm 不同，本函数目标是「提炼学习价值」，
-    而不是「把图片按语境插入正文」。
-
-    image_infos: [{"idx": int, "description": str, "ocr_text": str, "static_url": str,
-                   "description_parts": dict, "is_text_image": bool}]
-    失败返回空串（调用方自行兜底）。
+    source_md 是 VLM 逐图理解后构建的结构化源材料（Markdown），包含原始文字和图片转化内容。
+    note.md 只基于 source.md 做总结，不允许直接逐图描述 image_infos。
     """
     api_key = (
         str(payload.get("api_key") or "").strip()
@@ -2115,86 +2124,36 @@ def _generate_image_text_learning_note(
         log(f"⚠️  LLM 初始化失败，跳过学习笔记生成：{exc}")
         return ""
 
-    # ── 构造图列表（VLM-first：优先使用结构化理解字段）──
-    img_lines: list[str] = []
-    for img in image_infos:
-        parts = [f"图{img['idx']}"]
-        # VLM-first 字段优先
-        if img.get("image_type") and img["image_type"] != "unknown":
-            parts.append(f"类型: {img['image_type']}")
-        if img.get("content_summary"):
-            parts.append(f"知识点: {img['content_summary']}")
-        elif img.get("description"):
-            parts.append(f"描述: {img['description']}")
-        if img.get("extracted_text"):
-            parts.append(f"文字: {img['extracted_text']}")
-        elif img.get("ocr_text"):
-            parts.append(f"文字: {img['ocr_text']}")
-        if img.get("action_steps"):
-            parts.append(f"步骤: {'；'.join(img['action_steps'][:5])}")
-        if img.get("visual_elements"):
-            parts.append(f"视觉元素: {', '.join(img['visual_elements'][:5])}")
-        if img.get("key_entities"):
-            parts.append(f"对象: {', '.join(img['key_entities'][:5])}")
-        if img.get("embed_decision"):
-            parts.append(f"决策: {img['embed_decision']}")
-        if img.get("insert_hint"):
-            parts.append(f"建议段落: {img['insert_hint']}")
-        if img.get("static_url") and img.get("embed_decision") == "embed_image":
-            parts.append(f"图片URL: {img['static_url']}")
-        img_lines.append(" | ".join(parts))
-    img_list_text = "\n".join(img_lines)
+    # ── 基于 source.md 构造 prompt ──
+    # source_md 已是结构化 Markdown（原始文字 + VLM 转化内容），直接作为唯一依据。
+    body = source_md[:12000]
 
-    # ── 图片分类统计（供 prompt 决策）──
-    _TEXT_TYPES = {"text_card", "ui_demo", "mixed"}
-    merge_count = sum(
-        1 for img in image_infos
-        if img.get("embed_decision") == "merge_text"
-        or (img.get("image_type") in _TEXT_TYPES and img.get("is_text_image"))
-    )
-    embed_count = sum(
-        1 for img in image_infos if img.get("embed_decision") == "embed_image"
-    )
-    skip_count = sum(
-        1 for img in image_infos if img.get("embed_decision") == "skip"
-    )
-    classification_hint = (
-        f"其中 {merge_count} 张文字型（提取文字合入正文，不插图），"
-        f"{embed_count} 张演示/流程型（文字提炼 + 图片插入对应段落），"
-        f"{skip_count} 张装饰/跳过型。"
-        if image_infos else ""
-    )
+    # 判断内容是否明显是教程/工作流（用于 prompt 结构选择）
+    _WORKFLOW_SIGNALS = {"步骤", "教程", "操作", "流程", "工作流", "方法", "怎么", "如何"}
+    is_workflow_hint = any(s in body for s in _WORKFLOW_SIGNALS)
 
     sys_prompt = (
-        "你是学习笔记整理专家。任务：把图文内容整理成学习笔记，而不是原文搬运。\n"
-        "规则：\n"
-        "1. 不要复述原文，要提炼学习价值和可操作要点。\n"
-        "2. 如果图片主要是文字卡片、截图、信息图，不要在正文中插入图片，提炼其中信息即可。\n"
-        "3. 不要逐张描述图片外观、主体、场景、色调、构图、风格、细节。\n"
+        "你是图文笔记整理专家。任务：基于 source.md 材料生成标准总结笔记。\n"
+        "严格规则：\n"
+        "1. 只基于 source.md 内容做总结，不要编造原文没有的信息。\n"
+        "2. 正文不能出现「图1 显示」「OCR」「图片描述」「视觉元素列表」等材料层调试词。\n"
+        "3. 不要逐张描述图片外观、色调、构图、风格。\n"
         "4. 不要保留营销 CTA、话题标签、关注引导，除非它们对理解内容有价值。\n"
-        "5. 不要插入「文字型」图片；「视觉型」图片仅在图片是流程图/示意图且文字无法等价表达时，才允许插入少量（最多 3 张）。\n"
-        "6. 不要输出图片分类标签（如「文字型」「视觉型」）。\n"
-        "7. 输出结构建议：\n"
-        "   # 学习笔记\n"
-        "   ## 一句话结论\n"
-        "   ## 核心观点\n"
-        "   ## 方法/流程\n"
-        "   ## 可复用做法\n"
-        "   ## 注意点\n"
-        "   ## 我可以怎么用\n"
-        "8. 只输出 Markdown，不要解释。"
+        "5. 不要添加 [mm:ss] 这类视频时间戳。\n"
+        "6. 如果内容明显是教程/工作流，可以组织成「掌握什么 / 前置条件 / 核心步骤 / 常见坑 / 验收方法」。\n"
+        "7. 否则用「## 观点」「## 方法」「## 可带走的结论」等通用结构。\n"
+        "8. 结尾给 3-5 条具体 takeaway。\n"
+        "9. 只输出 Markdown，不要解释。"
     )
 
-    body = source_text[:12000]
     user_prompt = (
         f"# 标题\n{title}\n\n"
-        f"# 原始内容\n{body}\n\n"
-        f"# 参考图片信息（共 {len(image_infos)} 张）\n{classification_hint}\n{img_list_text}\n\n"
-        "请输出学习笔记 Markdown："
+        f"# source.md 材料\n{body}\n\n"
+        "请基于 source.md 生成标准总结 Markdown："
     )
 
     timeout_sec = _image_text_llm_timeout_sec(payload)
-    log(f"⏳ 学习笔记生成中，最多等待 {timeout_sec:g}s")
+    log(f"⏳ 标准总结生成中，最多等待 {timeout_sec:g}s")
     try:
         raw = _chat_with_timeout(
             provider,
@@ -2208,18 +2167,17 @@ def _generate_image_text_learning_note(
                 max_tokens=4096,
             ),
             timeout_sec=timeout_sec,
-            label="学习笔记生成",
+            label="标准总结生成",
         )
         note = raw.strip()
         if note and len(note) > 80:
-            log(f"✅ 学习笔记生成完成，{len(note)} 字")
+            log(f"✅ 标准总结生成完成，{len(note)} 字")
             return note
-        log("⚠️  学习笔记 LLM 返回过短，回退到纯文本提炼")
+        log("⚠️  标准总结 LLM 返回过短，回退到纯文本提炼")
     except Exception as exc:
-        log(f"⚠️  学习笔记生成失败，回退到纯文本提炼：{exc}")
+        log(f"⚠️  标准总结生成失败，回退到纯文本提炼：{exc}")
 
-    # ── 纯文本兜底：不用 LLM，直接从原始文本提炼结构化笔记 ──
-    return _fallback_learning_note(source_text=source_text, title=title, log=log)
+    return _fallback_learning_note(source_text=source_md, title=title, log=log)
 
 
 def _fallback_learning_note(
@@ -2460,31 +2418,60 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 or img.get("visual_elements") or img.get("action_steps"))
         ]
         if images_with_content:
+            # ── 构建 source.md（干净 Markdown，按图片类型分流）──
+            _TEXT_TYPES = {"text_card", "ui_demo", "mixed"}
+            text_imgs = [
+                img for img in images_with_content
+                if img.get("image_type") in _TEXT_TYPES
+                or (img.get("is_text_image") and img.get("extracted_text"))
+            ]
+            flow_imgs = [
+                img for img in images_with_content
+                if img.get("image_type") in ("flow_diagram", "ui_demo")
+                and img.get("action_steps")
+                and img not in text_imgs
+            ]
+            table_imgs = [
+                img for img in images_with_content
+                if img.get("image_type") == "chart_table"
+                and img.get("extracted_text")
+                and img not in text_imgs
+            ]
+            other_imgs = [
+                img for img in images_with_content
+                if img not in text_imgs and img not in flow_imgs and img not in table_imgs
+            ]
+
             img_sections: list[str] = []
-            for img in images_with_content:
-                header = f"## 图 {img['idx']} · {img.get('image_type', 'unknown')} · {img.get('embed_decision', 'skip')}"
-                lines = [header]
-                if img.get("extracted_text"):
-                    lines.append(f"- 图中文字：{img['extracted_text']}")
-                if img.get("content_summary"):
-                    lines.append(f"- 知识点：{img['content_summary']}")
-                if img.get("action_steps"):
-                    lines.append(f"- 操作步骤：{'；'.join(img['action_steps'])}")
-                if img.get("key_entities"):
-                    lines.append(f"- 关键对象：{', '.join(img['key_entities'])}")
-                if img.get("visual_elements"):
-                    lines.append(f"- 视觉元素：{', '.join(img['visual_elements'])}")
-                # 只有 embed_image 决策才插入图片 URL
-                if img.get("embed_decision") == "embed_image" and img.get("static_url"):
-                    lines.append(f"- 图片：{img['static_url']}")
-                if img.get("insert_hint"):
-                    lines.append(f"- 建议段落：{img['insert_hint']}")
-                img_sections.append("\n".join(lines))
+            if text_imgs:
+                for img in text_imgs:
+                    if img.get("extracted_text"):
+                        img_sections.append(img["extracted_text"].strip())
+                    if img.get("content_summary"):
+                        img_sections.append(f"> {img['content_summary']}")
+            if flow_imgs:
+                for img in flow_imgs:
+                    steps_text = "\n".join(
+                        f"{i+1}. {s}" for i, s in enumerate(img["action_steps"])
+                    )
+                    img_sections.append(steps_text)
+                    if img.get("content_summary"):
+                        img_sections.append(f"> {img['content_summary']}")
+            if table_imgs:
+                for img in table_imgs:
+                    img_sections.append(img["extracted_text"].strip())
+            if other_imgs:
+                for img in other_imgs:
+                    if img.get("embed_decision") == "embed_image" and img.get("static_url"):
+                        img_sections.append(f"![图{img['idx']}]({img['static_url']})")
+                    if img.get("content_summary"):
+                        img_sections.append(f"> {img['content_summary']}")
+
             images_source_text = "\n\n".join(img_sections)
             source_text_from_download = (
-                f"{raw_source_text}\n\n# 图片理解结果\n\n{images_source_text}"
-                if raw_source_text
-                else images_source_text
+                f"{raw_source_text}\n\n---\n\n{images_source_text}"
+                if raw_source_text and images_source_text
+                else images_source_text or raw_source_text
             )
 
         # ── 质量闸门：全部 VLM 失败时不能生成假成功 ──
@@ -2499,13 +2486,12 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 runner.append_log(task_id, f"[图集] ❌ {error_msg}")
                 raise RuntimeError(error_msg)
 
-        # ── 3.7. 图文学习笔记生成（基于 VLM-first 理解结果）──
-        # note_body 用于 note.md 默认正文（学习总结），区别于 source.md（原始依据）。
+        # ── 3.7. 图文标准总结生成（基于 source.md）──────────────────
+        # note_body 用于 note.md 默认正文（标准总结），source.md 作为唯一依据。
         if "note" in steps and api_key:
-            runner.set_progress(task_id, 0.45, "生成图文学习笔记中...")
+            runner.set_progress(task_id, 0.45, "生成图文标准总结中...")
             image_text_note_body = _generate_image_text_learning_note(
-                source_text=raw_source_text,
-                image_infos=image_infos,
+                source_md=source_text_from_download,
                 title=_source_title,
                 settings=load_settings(),
                 payload=payload,
@@ -2515,7 +2501,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 note_body = image_text_note_body
             else:
                 note_body = _fallback_learning_note(
-                    source_text=raw_source_text or source_text_from_download,
+                    source_text=source_text_from_download,
                     title=_source_title,
                     log=_log_img,
                 )

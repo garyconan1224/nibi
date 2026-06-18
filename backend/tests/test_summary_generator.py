@@ -103,7 +103,7 @@ class TestBuildPrompt:
         assert "外观对比" in usr_p
 
     def test_image_text_standard_uses_image_note_prompt(self) -> None:
-        """图文 standard 总结应使用图文材料，不走视频时间轴模板。"""
+        """图文 standard 总结应使用 source.md 材料，不走视频时间轴模板。"""
         item = _make_item(
             type="image",
             source_value="https://www.xiaohongshu.com/explore/test",
@@ -126,8 +126,8 @@ class TestBuildPrompt:
 
         assert "图文笔记整理专家" in sys_p
         assert "手机负责快速捕捉" in usr_p
-        assert "图片展示了移动端到桌面端的流程" in usr_p
-        assert "一张展示手机记录" in usr_p
+        # source.md 材料是唯一依据，不再单独注入 markdown 和 image_infos
+        assert "source.md" in usr_p
         assert "章节时间戳锚点" not in sys_p + usr_p
         assert "视频时长" not in usr_p
         assert "[00:42]" not in usr_p
@@ -149,7 +149,7 @@ class TestBuildPrompt:
         assert "图文混排内容" in usr_p
 
     def test_tool_recommendation_uses_text_image_material_without_images(self) -> None:
-        """工具推荐模板：总结图中文字，不要求插图或时间点。"""
+        """工具推荐模板：基于 source.md，不要求插图或时间点。"""
         item = _make_item(
             type="image",
             name="工具推荐",
@@ -172,8 +172,8 @@ class TestBuildPrompt:
 
         assert "工具推荐笔记整理专家" in sys_p
         assert "不要插入图片 Markdown" in sys_p
-        assert "SiloNote" in usr_p
-        assert "语音转写" in usr_p
+        assert "Markdown 移动端记录工具" in usr_p
+        assert "source.md" in usr_p
         assert "适合谁使用" in usr_p
         assert "局限与注意" in usr_p
         assert "视频时间戳" in sys_p
@@ -245,7 +245,8 @@ class TestGenerateSummary:
         sys_p, usr_p = mock_llm.call_args[0]
         assert "工具推荐笔记整理专家" in sys_p
         assert "工具推荐原文" in usr_p
-        assert "Markdown 导出" in usr_p
+        # source.md 是唯一依据，image_infos 不再单独注入
+        assert "source.md" in usr_p
         assert "章节时间戳锚点" not in sys_p + usr_p
 
 

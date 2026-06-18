@@ -57,26 +57,37 @@ def _build_image_text_standard_prompt(
     item: WorkspaceItem,
     background: str = "",
 ) -> Tuple[str, str]:
-    """Build a note-summary prompt for image-text posts, separate from video transcript prompts."""
-    source_text, composed_md, image_notes = _image_text_material(item)
+    """Build a note-summary prompt for image-text posts, based on source.md."""
+    results = item.results or {}
+    # 优先使用 source_md_raw（VLM 构建的结构化源材料）；其次 fallback 到旧字段。
+    source_md = str(
+        results.get("source_md_raw")
+        or results.get("source_text_enriched")
+        or results.get("note_body")
+        or results.get("content")
+        or ""
+    ).strip()
+
     system_prompt = (
-        "你是一名图文笔记整理专家。请把一篇图文平台笔记整理成可读、可复用的中文学习笔记。\n"
-        "你必须同时参考原文、图片理解和图文混排语境；不要按视频转写、字幕或时间轴来写。\n"
-        "输出 Markdown，重点是观点提炼、结构梳理、图片补充的信息价值和可行动 takeaway。\n"
-        "不要添加 [mm:ss] 这类视频时间戳，也不要编造原文没有的信息。"
+        "你是图文笔记整理专家。请基于 source.md 材料生成一篇标准总结。\n"
+        "严格规则：\n"
+        "1. 只基于 source.md 内容做总结，不要编造原文没有的信息。\n"
+        "2. 正文不能出现「图1 显示」「OCR」「图片描述」「视觉元素列表」等材料层调试词。\n"
+        "3. 不要逐张描述图片外观、色调、构图、风格。\n"
+        "4. 不要添加 [mm:ss] 这类视频时间戳。\n"
+        "5. 如果内容明显是教程/工作流，可以组织成「掌握什么 / 前置条件 / 核心步骤 / 常见坑 / 验收方法」。\n"
+        "6. 否则用「## 观点」「## 方法」「## 可带走的结论」等通用结构。\n"
+        "7. 结尾给 3-5 条具体 takeaway。\n"
+        "8. 只输出 Markdown，不要解释。"
     )
     sections: List[str] = []
     if background.strip():
         sections.append(f"【背景信息】\n{background.strip()}")
-    if source_text:
-        sections.append(f"【原文】\n{source_text}")
-    if composed_md:
-        sections.append(f"【图文语境】\n{composed_md}")
-    if image_notes:
-        sections.append(f"【图片理解】\n{image_notes}")
+    if source_md:
+        sections.append(f"【source.md 材料】\n{source_md[:12000]}")
     material = "\n\n".join(sections).strip()
     user_prompt = (
-        "请基于以下图文材料生成一篇标准总结。要求：\n"
+        "请基于 source.md 材料生成标准总结 Markdown。要求：\n"
         "1. 开头用 2-3 句概括这篇图文真正想表达什么。\n"
         "2. 用 `##` 分成 2-4 个主题，不要写时间点。\n"
         "3. 每个主题说明：原文观点是什么、图片补充了什么、对读者有什么启发。\n"
@@ -115,34 +126,38 @@ def _build_tool_recommendation_prompt(
     item: WorkspaceItem,
     background: str = "",
 ) -> Tuple[str, str]:
-    """Build a no-image tool recommendation summary prompt."""
-    source_text, composed_md, image_notes = _image_text_material(item)
-    if not (source_text or composed_md or image_notes):
-        source_text = _summary_source_text(item)
+    """Build a tool recommendation summary prompt based on source.md."""
+    results = item.results or {}
+    # 优先使用 source.md（VLM 构建的结构化源材料）
+    source_md = str(
+        results.get("source_md_raw")
+        or results.get("source_text_enriched")
+        or results.get("content")
+        or results.get("note_body")
+        or ""
+    ).strip()
 
     system_prompt = (
-        "你是一名工具推荐笔记整理专家。请把文字型图文、工具截图、OCR 文本和原文说明，"
+        "你是工具推荐笔记整理专家。请基于 source.md 材料，"
         "整理成一篇能帮助读者判断是否值得尝试的工具推荐总结。\n"
-        "严格要求：不要插入图片 Markdown，不要输出图片链接，不要写视频时间戳。"
-        "如果图片主要是文字，请把图中文字提炼成信息和判断，而不是描述图片本身。"
+        "严格要求：\n"
+        "1. 不要插入图片 Markdown，不要输出图片链接，不要写视频时间戳。\n"
+        "2. 正文不能出现「OCR」「图片描述」「视觉元素」等材料调试词。\n"
+        "3. 如果图片主要是文字，请把图中文字提炼成信息和判断，而不是描述图片本身。"
     )
     sections: List[str] = []
     if background.strip():
         sections.append(f"【背景信息】\n{background.strip()}")
-    if source_text:
-        sections.append(f"【原文/正文】\n{source_text}")
-    if composed_md:
-        sections.append(f"【图文语境】\n{composed_md}")
-    if image_notes:
-        sections.append(f"【图片文字与理解】\n{image_notes}")
+    if source_md:
+        sections.append(f"【source.md 材料】\n{source_md[:12000]}")
     material = "\n\n".join(sections).strip()
     user_prompt = (
-        "请基于以下材料生成「工具推荐」总结。输出 Markdown，按这个结构写：\n"
+        "请基于 source.md 材料生成「工具推荐」总结。输出 Markdown，按这个结构写：\n"
         "1. `## 一句话判断`：这个工具是什么，最值得关注的价值是什么。\n"
         "2. `## 解决的问题`：它试图解决什么具体痛点。\n"
-        "3. `## 核心功能与亮点`：从原文和图片文字中提炼功能，不要贴图。\n"
+        "3. `## 核心功能与亮点`：从材料中提炼功能，不要贴图。\n"
         "4. `## 适合谁使用`：列出 2-4 类适用人群或场景。\n"
-        "5. `## 使用方式或工作流`：如果材料里有步骤/入口/流程，就整理出来；没有就写“材料未明确”。\n"
+        "5. `## 使用方式或工作流`：如果材料里有步骤/入口/流程，就整理出来；没有就写「材料未明确」。\n"
         "6. `## 局限与注意`：只基于材料指出可能限制、缺失信息或需要进一步确认的点。\n"
         "7. `## 是否值得尝试`：给出简短判断和下一步行动。\n\n"
         "注意：过滤点赞关注、话题标签等平台话术；不要编造价格、官网、下载地址或功能。"

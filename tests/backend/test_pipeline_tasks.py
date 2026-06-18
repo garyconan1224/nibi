@@ -1566,7 +1566,7 @@ class TestM7ProbeDownload:
         assert "小红书图文标题" in result["note_body"]
         assert "核心内容" in result["note_body"]
         messages = [row.message for row in stored.log]
-        assert any("学习笔记生成失败" in msg and "超时" in msg for msg in messages)
+        assert any("标准总结" in msg and "超时" in msg for msg in messages)
 
     def test_background_for_recognition_in_result(self, tmp_path: Path) -> None:
         """background_for_recognition 出现在 PROBE 结果中。"""
