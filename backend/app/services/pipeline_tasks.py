@@ -1684,6 +1684,187 @@ def _img_to_static_url(img_path: str, data_dir: Path) -> str:
     return ""
 
 
+def _vlm_note_empty_analysis() -> Dict[str, Any]:
+    """VLM 分析失败时的空结果字典（降级兜底）。"""
+    return {
+        "image_type": "unknown",
+        "extracted_text": "",
+        "content_summary": "",
+        "action_steps": [],
+        "key_entities": [],
+        "visual_elements": [],
+        "visual_value": "low",
+        "embed_decision": "skip",
+        "insert_hint": "",
+        "confidence": 0.0,
+    }
+
+
+def _analyze_image_for_note(
+    image_path: str,
+    vision_model: str,
+    api_key: str,
+    *,
+    log: Callable[[str], None] = lambda _msg: None,
+) -> Dict[str, Any]:
+    """VLM-first 图片理解：逐图调视觉模型，返回结构化笔记分析。
+
+    与 analyze_image_file（通用 VLM 描述）不同，本函数面向笔记生成场景：
+    - 读出图中文字（不依赖 OCR 库）
+    - 判断图片类型和理解价值
+    - 决定文字合并或图片插入策略
+
+    单张失败不抛异常，返回空/降级结果。
+    """
+    result = _vlm_note_empty_analysis()
+    result["description"] = ""  # 兼容旧字段
+    result["ocr_text"] = ""
+    path = Path(image_path)
+    if not path.is_file():
+        log(f"⚠️  图片文件不存在：{image_path}")
+        return result
+    if not api_key or not vision_model:
+        log("⚠️  未配置 api_key/vision_model，跳过 VLM 分析")
+        return result
+
+    image_bytes = path.read_bytes()
+    if image_bytes[:4] == b"\x89PNG":
+        mime = "image/png"
+    elif image_bytes[:2] == b"\xff\xd8":
+        mime = "image/jpeg"
+    elif image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP":
+        mime = "image/webp"
+    else:
+        mime = "image/jpeg"
+
+    prompt = (
+        "你是一名专业的图文内容分析助手。请分析这张图片，返回严格 JSON（不要 markdown 代码块）。\n\n"
+        "要求：\n"
+        "1. 读出图中所有可见文字（按阅读顺序）。\n"
+        "2. 判断图片类型。\n"
+        "3. 决定这张图在学习笔记中该怎么处理。\n\n"
+        "输出格式（严格 JSON，字段顺序固定）：\n"
+        "{\n"
+        '  "image_type": "text_card | ui_demo | flow_diagram | chart_table'
+        ' | icon_logo | decorative | photo | mixed | unknown",\n'
+        '  "extracted_text": "按阅读顺序提取图中文字，没有则空字符串",\n'
+        '  "content_summary": "这张图表达的知识点或信息价值，80-200字",\n'
+        '  "action_steps": ["如果是演示/教程图，提取操作步骤"],\n'
+        '  "key_entities": ["工具名、功能名、对象名、指标名"],\n'
+        '  "visual_elements": ["图中对理解有价值的界面、图标、流程、表格、对比区域"],\n'
+        '  "visual_value": "high | medium | low",\n'
+        '  "embed_decision": "merge_text | embed_image | skip",\n'
+        '  "insert_hint": "适合放到哪个主题段落，例如：操作台设计、输入输出模块",\n'
+        '  "confidence": 0.0\n'
+        "}\n\n"
+        "embed_decision 规则：\n"
+        "- merge_text：文字型图，文字和总结进入笔记正文，不插图片。\n"
+        "- embed_image：演示图/流程图/表格图/混合图有关键视觉证据，保留图片插入。\n"
+        "- skip：装饰/重复/无信息图。\n\n"
+        "只输出 JSON，不要任何其它文字。"
+    )
+
+    try:
+        img_b64 = base64.b64encode(image_bytes).decode()
+        registry = create_default_registry()
+        profile = registry.resolve_default_profile(load_settings(), "vision")
+        provider = registry.build(profile)
+
+        raw = provider.chat(
+            ChatRequest(
+                model=vision_model,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{img_b64}"}},
+                        {"type": "text", "text": prompt},
+                    ],
+                }],
+                temperature=0.2,
+                max_tokens=800,
+            )
+        )
+        raw = raw.strip()
+
+        # 去掉可能的 markdown 代码块
+        m = re.search(r"```(?:json)?\s*\n?(.*?)```", raw, re.DOTALL)
+        if m:
+            raw = m.group(1).strip()
+
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict):
+            # 校验必需字段
+            _it = str(parsed.get("image_type") or "unknown").strip()
+            _et = str(parsed.get("extracted_text") or "").strip()
+            _cs = str(parsed.get("content_summary") or "").strip()
+            _ve_list = parsed.get("visual_elements") or []
+            if isinstance(_ve_list, list):
+                _ve_list = [str(v).strip() for v in _ve_list if str(v).strip()]
+
+            # 只有三个关键字段都为空时才算分析失败
+            if not _et and not _cs and not _ve_list:
+                log(f"⚠️  VLM 分析内容为空（{path.name}），image_type={_it}")
+                result["image_type"] = _it
+                return result
+
+            result.update({
+                "image_type": _it if _it else "unknown",
+                "extracted_text": _et,
+                "content_summary": _cs,
+                "action_steps": [
+                    str(s).strip() for s in (parsed.get("action_steps") or []) if str(s).strip()
+                ],
+                "key_entities": [
+                    str(e).strip() for e in (parsed.get("key_entities") or []) if str(e).strip()
+                ],
+                "visual_elements": _ve_list,
+                "visual_value": str(parsed.get("visual_value") or "low").strip() or "low",
+                "embed_decision": str(parsed.get("embed_decision") or "").strip() or "skip",
+                "insert_hint": str(parsed.get("insert_hint") or "").strip(),
+                "confidence": float(parsed.get("confidence") or 0),
+            })
+
+            # 归一化：有实质内容但 embed_decision 缺失/误填为 skip → 默认 merge_text
+            # （模型漏填 decision 或不完全听话时，不能让已有文字的图被丢掉）
+            if result["embed_decision"] in ("skip", "") and (_et or _cs or _ve_list):
+                result["embed_decision"] = "merge_text"
+                log(f"ℹ️  embed_decision 缺失但有内容，归一为 merge_text（{path.name}）")
+
+            # 兼容旧字段：description/ocr_text 供下游不感知新字段的函数使用
+            result["ocr_text"] = _et
+            result["description"] = _cs
+
+            # is_text_image：有文字内容的图
+            _TEXT_TYPES = {"text_card", "ui_demo", "mixed"}
+            result["is_text_image"] = _it in _TEXT_TYPES or len(_et) > 30
+
+            log(
+                f"✅ VLM 分析完成（{path.name}）：type={_it} | "
+                f"文字={len(_et)}字 | 决策={result['embed_decision']}"
+            )
+            return result
+
+        # JSON 解析成功但不是 dict
+        log(f"⚠️  VLM 返回非 dict（{path.name}），降级处理")
+        result["description"] = str(parsed)[:300]
+        result["ocr_text"] = ""
+        return result
+
+    except (json.JSONDecodeError, TypeError, ValueError) as exc:
+        log(f"⚠️  VLM 返回无法解析为 JSON（{path.name}）：{exc}，尝试提取兜底字段")
+        # 兜底：从 raw 文本中尽量提取有用信息
+        if raw:
+            _desc = raw.strip()[:300]
+            result["description"] = _desc
+            # 如果 raw 里有看起来像中文句子的，放到 content_summary
+            if len(_desc) > 50:
+                result["content_summary"] = _desc
+        return result
+    except Exception as exc:
+        log(f"⚠️  VLM 分析失败（{path.name}）：{exc}")
+        return result
+
+
 def _image_intermediate_patch(
     note_kind: str,
     images_from_download: List[str],
@@ -1934,40 +2115,53 @@ def _generate_image_text_learning_note(
         log(f"⚠️  LLM 初始化失败，跳过学习笔记生成：{exc}")
         return ""
 
-    # ── 构造图列表（含类型分类）──
+    # ── 构造图列表（VLM-first：优先使用结构化理解字段）──
     img_lines: list[str] = []
     for img in image_infos:
         parts = [f"图{img['idx']}"]
-        dp = img.get("description_parts") or {}
-        if dp:
-            if dp.get("subject"):
-                parts.append(f"主体: {dp['subject']}")
-            if dp.get("scene"):
-                parts.append(f"场景: {dp['scene']}")
-            if dp.get("color"):
-                parts.append(f"色彩: {dp['color']}")
-            if dp.get("composition"):
-                parts.append(f"构图: {dp['composition']}")
-            if dp.get("style"):
-                parts.append(f"风格: {dp['style']}")
-            if dp.get("details"):
-                parts.append(f"细节: {dp['details']}")
-        elif img["description"]:
+        # VLM-first 字段优先
+        if img.get("image_type") and img["image_type"] != "unknown":
+            parts.append(f"类型: {img['image_type']}")
+        if img.get("content_summary"):
+            parts.append(f"知识点: {img['content_summary']}")
+        elif img.get("description"):
             parts.append(f"描述: {img['description']}")
-        if img["ocr_text"]:
-            parts.append(f"OCR文字: {img['ocr_text']}")
-        # 图片类型提示（帮助 LLM 判断是否插图）
-        img_type = "文字型" if img.get("is_text_image") else "视觉型"
-        parts.append(f"类型: {img_type}")
+        if img.get("extracted_text"):
+            parts.append(f"文字: {img['extracted_text']}")
+        elif img.get("ocr_text"):
+            parts.append(f"文字: {img['ocr_text']}")
+        if img.get("action_steps"):
+            parts.append(f"步骤: {'；'.join(img['action_steps'][:5])}")
+        if img.get("visual_elements"):
+            parts.append(f"视觉元素: {', '.join(img['visual_elements'][:5])}")
+        if img.get("key_entities"):
+            parts.append(f"对象: {', '.join(img['key_entities'][:5])}")
+        if img.get("embed_decision"):
+            parts.append(f"决策: {img['embed_decision']}")
+        if img.get("insert_hint"):
+            parts.append(f"建议段落: {img['insert_hint']}")
+        if img.get("static_url") and img.get("embed_decision") == "embed_image":
+            parts.append(f"图片URL: {img['static_url']}")
         img_lines.append(" | ".join(parts))
     img_list_text = "\n".join(img_lines)
 
     # ── 图片分类统计（供 prompt 决策）──
-    text_images = [i for i in image_infos if i.get("is_text_image")]
-    non_text_images = [i for i in image_infos if not i.get("is_text_image")]
+    _TEXT_TYPES = {"text_card", "ui_demo", "mixed"}
+    merge_count = sum(
+        1 for img in image_infos
+        if img.get("embed_decision") == "merge_text"
+        or (img.get("image_type") in _TEXT_TYPES and img.get("is_text_image"))
+    )
+    embed_count = sum(
+        1 for img in image_infos if img.get("embed_decision") == "embed_image"
+    )
+    skip_count = sum(
+        1 for img in image_infos if img.get("embed_decision") == "skip"
+    )
     classification_hint = (
-        f"其中 {len(text_images)} 张是文字型（信息卡片/文字截图，不要插图），"
-        f"{len(non_text_images)} 张是视觉型（仅当图片是流程图/示意图且文字无法表达时才插入）。"
+        f"其中 {merge_count} 张文字型（提取文字合入正文，不插图），"
+        f"{embed_count} 张演示/流程型（文字提炼 + 图片插入对应段落），"
+        f"{skip_count} 张装饰/跳过型。"
         if image_infos else ""
     )
 
@@ -2201,94 +2395,133 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             **_image_intermediate_patch(note_kind, images_from_download, DATA_DIR),
         })
 
-    # ── 3.6. 图集分析（image_text: OCR + VLM 逐图描述 + LLM 语境合成）──
-    # 保存原始文本：_compose_images_with_llm 会覆盖 source_text_from_download，
-    # 但 source_md（原始依据）和学习笔记生成需要原始版本。
+    # ── 3.6. 图集分析（VLM-first：逐图视觉理解 → 文字提取 → 分类决策）──
+    # 保存原始文本：source_text_from_download 后面会被 VLM 理解结果补充。
     raw_source_text = source_text_from_download
     image_infos: list[dict] = []  # 外层声明，供后面写入 result 使用
     if note_kind == "image_text" and images_from_download:
         runner.store.update(task_id, status=TaskStatus.VLM.value)
-        runner.set_progress(task_id, 0.15, "图集分析中...")
+        runner.set_progress(task_id, 0.15, "图集视觉理解中...")
 
         def _log_img(msg: str) -> None:
             runner.append_log(task_id, f"[图集] {msg}")
 
         data_dir = DATA_DIR
-        image_descriptions: list[str] = []  # 兜底用
+        vlm_fail_count = 0
         for idx, img_path in enumerate(images_from_download):
             runner.set_progress(
                 task_id,
                 0.15 + 0.15 * (idx / len(images_from_download)),
-                f"分析图片 {idx + 1}/{len(images_from_download)}...",
+                f"视觉理解图片 {idx + 1}/{len(images_from_download)}...",
             )
-            info = analyze_image_file(
+            info = _analyze_image_for_note(
                 img_path, vision_model, api_key, log=_log_img,
             )
             static_url = _img_to_static_url(img_path, data_dir)
+
             image_infos.append({
+                # 兼容旧字段
                 "idx": idx + 1,
-                "description": info["description"],
-                "ocr_text": info["ocr_text"],
+                "description": info.get("description") or info.get("content_summary") or "",
+                "ocr_text": info.get("ocr_text") or info.get("extracted_text") or "",
                 "static_url": static_url,
-                "description_parts": info.get("description_parts") or {},
-                "is_text_image": bool(info["ocr_text"] and len(info["ocr_text"]) > 30),
+                "is_text_image": bool(info.get("is_text_image")),
+                # VLM-first 丰富字段
+                "image_type": info.get("image_type", "unknown"),
+                "extracted_text": info.get("extracted_text", ""),
+                "content_summary": info.get("content_summary", ""),
+                "action_steps": info.get("action_steps") or [],
+                "key_entities": info.get("key_entities") or [],
+                "visual_elements": info.get("visual_elements") or [],
+                "visual_value": info.get("visual_value", "low"),
+                "embed_decision": info.get("embed_decision", "skip"),
+                "insert_hint": info.get("insert_hint", ""),
+                "confidence": info.get("confidence", 0.0),
             })
-            # 兜底：纯文本描述（LLM 合成失败时使用）
-            parts: list[str] = []
-            if info["description"]:
-                parts.append(info["description"])
-            if info["ocr_text"]:
-                parts.append(f"图中文字：{info['ocr_text']}")
-            if parts:
-                image_descriptions.append(
-                    f"【图片 {idx + 1}】" + "；".join(parts)
-                )
 
-        if image_descriptions:
-            _log_img(f"图集分析完成，{len(image_descriptions)} 张有描述")
+            # 统计失败数量
+            if (not info.get("extracted_text")
+                    and not info.get("content_summary")
+                    and not info.get("visual_elements")):
+                vlm_fail_count += 1
 
-            # NI.3: 尝试 LLM 语境合成（图文混排 markdown）
-            runner.set_progress(task_id, 0.32, "生成图文内容中...")
-            composed = _compose_images_with_llm(
-                source_text=source_text_from_download,
-                image_infos=image_infos,
-                settings=load_settings(),
-                payload=payload,
-                log=_log_img,
+        _log_img(
+            f"图集视觉理解完成，{len(images_from_download) - vlm_fail_count}/"
+            f"{len(images_from_download)} 张有有效内容"
+        )
+
+        # ── 用 VLM 理解结果构造 source_text（原始正文 + 图片理解）──
+        # 规则：所有有实质内容（extracted_text/content_summary/visual_elements/action_steps）的图
+        # 都进入语料，不论 embed_decision 是什么。embed_decision 只决定是否插图片 URL。
+        runner.set_progress(task_id, 0.35, "组织图文内容中...")
+        images_with_content = [
+            img for img in image_infos
+            if (img.get("extracted_text") or img.get("content_summary")
+                or img.get("visual_elements") or img.get("action_steps"))
+        ]
+        if images_with_content:
+            img_sections: list[str] = []
+            for img in images_with_content:
+                header = f"## 图 {img['idx']} · {img.get('image_type', 'unknown')} · {img.get('embed_decision', 'skip')}"
+                lines = [header]
+                if img.get("extracted_text"):
+                    lines.append(f"- 图中文字：{img['extracted_text']}")
+                if img.get("content_summary"):
+                    lines.append(f"- 知识点：{img['content_summary']}")
+                if img.get("action_steps"):
+                    lines.append(f"- 操作步骤：{'；'.join(img['action_steps'])}")
+                if img.get("key_entities"):
+                    lines.append(f"- 关键对象：{', '.join(img['key_entities'])}")
+                if img.get("visual_elements"):
+                    lines.append(f"- 视觉元素：{', '.join(img['visual_elements'])}")
+                # 只有 embed_image 决策才插入图片 URL
+                if img.get("embed_decision") == "embed_image" and img.get("static_url"):
+                    lines.append(f"- 图片：{img['static_url']}")
+                if img.get("insert_hint"):
+                    lines.append(f"- 建议段落：{img['insert_hint']}")
+                img_sections.append("\n".join(lines))
+            images_source_text = "\n\n".join(img_sections)
+            source_text_from_download = (
+                f"{raw_source_text}\n\n# 图片理解结果\n\n{images_source_text}"
+                if raw_source_text
+                else images_source_text
             )
-            if composed:
-                source_text_from_download = composed
-            else:
-                # 兜底：回退到原逻辑（描述堆末尾）
-                images_text = "\n\n".join(image_descriptions)
-                source_text_from_download = (
-                    source_text_from_download + "\n\n" + images_text
-                    if source_text_from_download
-                    else images_text
-                )
 
-        # ── 3.7. 图文学习笔记生成（独立于图文混排合成）──
+        # ── 质量闸门：全部 VLM 失败时不能生成假成功 ──
+        all_analysis_empty = vlm_fail_count == len(images_from_download)
+        if all_analysis_empty:
+            if raw_source_text and len(raw_source_text.strip()) > 10:
+                _log_img("⚠️  所有图片 VLM 分析均失败，使用原始文字兜底")
+                all_analysis_empty = False  # 有文字，不阻断
+            else:
+                error_msg = "图片理解失败，缺少可总结内容"
+                _log_img(f"❌ {error_msg}")
+                runner.append_log(task_id, f"[图集] ❌ {error_msg}")
+                raise RuntimeError(error_msg)
+
+        # ── 3.7. 图文学习笔记生成（基于 VLM-first 理解结果）──
         # note_body 用于 note.md 默认正文（学习总结），区别于 source.md（原始依据）。
         if "note" in steps and api_key:
             runner.set_progress(task_id, 0.45, "生成图文学习笔记中...")
-            _img_log = _log_img  # 复用已有的日志回调
             image_text_note_body = _generate_image_text_learning_note(
                 source_text=raw_source_text,
                 image_infos=image_infos,
                 title=_source_title,
                 settings=load_settings(),
                 payload=payload,
-                log=_img_log,
+                log=_log_img,
             )
             if image_text_note_body:
                 note_body = image_text_note_body
             else:
-                # LLM 失败时用纯文本兜底
                 note_body = _fallback_learning_note(
                     source_text=raw_source_text or source_text_from_download,
                     title=_source_title,
-                    log=_img_log,
+                    log=_log_img,
                 )
+        # 更新中间结果（VLM-first 字段）
+        if image_infos:
+            _persist_intermediate(runner, task_id, {"image_infos": image_infos})
 
     # ── 4+5. transcribe + analyze 并行步骤 ──────────────────────
     # R22: 音频转录(ASR)与视频截帧(VLM)本质独立，可并行执行。
@@ -2697,6 +2930,9 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     # image_text 分支：保存原始文本（供 source.md 显示原始依据，不受 _compose 覆盖）
     if note_kind == "image_text" and raw_source_text:
         result["source_md_raw"] = raw_source_text
+    # image_text 分支：保存 VLM 理解后的富文本（含图片理解结果，供学习笔记生成和前端参考）
+    if note_kind == "image_text" and source_text_from_download and source_text_from_download != raw_source_text:
+        result["source_text_enriched"] = source_text_from_download
     if background_context:
         result["background_for_recognition"] = background_context
     # 图文内容分类：识别 tool_recommendation 等，写入 content_category + default_summary_template
