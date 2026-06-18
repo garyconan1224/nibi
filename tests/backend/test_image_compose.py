@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -18,6 +19,7 @@ import pytest
 
 from backend.app.services.pipeline_tasks import (
     _compose_images_with_llm,
+    _generate_image_text_learning_note,
     _img_to_static_url,
 )
 
@@ -159,3 +161,65 @@ class TestComposeImagesWithLlm:
             log=lambda _m: None,
         )
         assert result == ""  # 无 /static/ 引用 → fallback
+
+    @patch("backend.app.services.pipeline_tasks.create_default_registry")
+    def test_compose_timeout_returns_empty(self, mock_registry_fn):
+        """LLM 长时间无响应 → 触发任务级超时，返回空串让调用方兜底。"""
+        logs: list[str] = []
+        mock_provider = MagicMock()
+
+        def _slow_chat(_req):
+            time.sleep(0.05)
+            return "too late"
+
+        mock_provider.chat.side_effect = _slow_chat
+        mock_profile = MagicMock()
+        mock_profile.default_models.get.return_value = "gpt-4o"
+        mock_registry_fn.return_value.resolve_default_profile.return_value = mock_profile
+        mock_registry_fn.return_value.build.return_value = mock_provider
+
+        settings = SimpleNamespace(openai_api_key="sk-test", text_model="gpt-4o")
+        result = _compose_images_with_llm(
+            source_text="正文",
+            image_infos=_IMAGE_INFOS,
+            settings=settings,
+            payload={"image_text_llm_timeout_sec": 0.01},
+            log=logs.append,
+        )
+
+        assert result == ""
+        assert any("超时" in msg for msg in logs)
+
+
+class TestGenerateImageTextLearningNote:
+    """图文学习笔记生成。"""
+
+    @patch("backend.app.services.pipeline_tasks.create_default_registry")
+    def test_learning_note_timeout_falls_back(self, mock_registry_fn):
+        """学习笔记 LLM 超时 → 返回纯文本兜底笔记，不阻断任务。"""
+        logs: list[str] = []
+        mock_provider = MagicMock()
+
+        def _slow_chat(_req):
+            time.sleep(0.05)
+            return "# 太晚返回的笔记"
+
+        mock_provider.chat.side_effect = _slow_chat
+        mock_profile = MagicMock()
+        mock_profile.default_models.get.return_value = "gpt-4o"
+        mock_registry_fn.return_value.resolve_default_profile.return_value = mock_profile
+        mock_registry_fn.return_value.build.return_value = mock_provider
+
+        settings = SimpleNamespace(openai_api_key="sk-test", text_model="gpt-4o")
+        result = _generate_image_text_learning_note(
+            source_text="这是一段足够长的图文原始内容，用于验证超时后仍然可以生成兜底学习笔记。",
+            image_infos=_IMAGE_INFOS,
+            title="图文标题",
+            settings=settings,
+            payload={"image_text_llm_timeout_sec": 0.01},
+            log=logs.append,
+        )
+
+        assert "图文标题" in result
+        assert "核心内容" in result
+        assert any("超时" in msg for msg in logs)

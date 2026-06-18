@@ -434,14 +434,14 @@ def test_user_cancel_during_frames_keeps_real_progress_and_writes_no_note(
             tmp_path, steps=["download", "transcribe", "analyze", "note"]
         )
 
-        # 等进入 analyze 帧轮询（progress 进入 0.58~0.85 区间）
+        # 等进入 analyze 帧轮询（50% 截帧按 0.30 + 0.50 * 0.30 映射到约 0.45）
         deadline = time.monotonic() + 5.0
         while time.monotonic() < deadline:
             cur = runner.store.get(rec.task_id)
-            if cur and cur.progress >= 0.58:
+            if cur and cur.progress >= 0.44:
                 break
             time.sleep(0.02)
-        assert runner.store.get(rec.task_id).progress >= 0.58, (
+        assert runner.store.get(rec.task_id).progress >= 0.44, (
             "未进入 FRAMES 轮询就触发取消，测试时序失效"
         )
 
@@ -460,7 +460,7 @@ def test_user_cancel_during_frames_keeps_real_progress_and_writes_no_note(
     assert done.status == TaskStatus.CANCELLED.value
     # 进度不被顶到 100%，且保留取消时刻的真实值
     assert done.progress < 1.0, f"取消后进度被顶到 {done.progress}（应保留真实进度）"
-    assert done.progress >= 0.58, f"取消后真实进度丢失：{done.progress}"
+    assert done.progress >= 0.44, f"取消后真实进度丢失：{done.progress}"
     # 不落完整笔记
     result = done.result or {}
     assert not result.get("markdown"), "取消后仍写入了完整笔记 markdown"
@@ -1445,6 +1445,126 @@ class TestM7ProbeDownload:
         assert "transcribe" not in probe["steps"]
         assert "analyze" not in probe["steps"]
 
+    def test_probe_note_media_kind_image_text_overrides_when_images_exist(self) -> None:
+        """用户手动选择图文笔记时，有图片材料就优先走 image_text。"""
+        from backend.app.services.pipeline_tasks import _probe_note_source
+
+        dl_result = {
+            "ok": True,
+            "kind_hint": "text",
+            "content": "图文描述",
+            "title": "图文笔记",
+            "images": ["a.jpg"],
+            "video_file": "",
+            "metadata": {},
+        }
+        probe = _probe_note_source(dl_result, {
+            "steps": ["download", "transcribe", "analyze", "note"],
+            "note_media_kind": "image_text",
+        })
+
+        assert probe["note_kind"] == "image_text"
+        assert "transcribe" not in probe["steps"]
+        assert "analyze" not in probe["steps"]
+
+    def test_probe_note_media_kind_conflict_falls_back_to_probe(self) -> None:
+        """用户选择和材料明显冲突时，第一版回退 PROBE 结果。"""
+        from backend.app.services.pipeline_tasks import _probe_note_source
+
+        dl_result = {
+            "ok": True,
+            "kind_hint": "text",
+            "content": "纯文本正文",
+            "title": "文章",
+            "images": [],
+            "video_file": "",
+            "metadata": {},
+        }
+        probe = _probe_note_source(dl_result, {
+            "steps": ["download", "transcribe", "analyze", "note"],
+            "note_media_kind": "image_text",
+        })
+
+        assert probe["note_kind"] == "text"
+        assert "transcribe" not in probe["steps"]
+        assert "analyze" not in probe["steps"]
+
+    def test_image_text_note_timeout_fallback_reaches_store(self, tmp_path: Path) -> None:
+        """图文笔记文本 LLM 超时后应兜底完成，不停在 VLM，也不触发标题未定义。"""
+        from backend.app.services.pipeline_tasks import handle_note_task
+
+        img = tmp_path / "xhs" / "01.jpg"
+        img.parent.mkdir(parents=True)
+        img.write_bytes(b"\xff\xd8")
+        source_dir = img.parent
+        dl_result = {
+            "ok": True,
+            "kind_hint": "image_text",
+            "title": "小红书图文标题",
+            "content": "这是一段足够长的小红书正文内容，用于验证图文笔记在模型超时后仍可生成兜底笔记。",
+            "images": [str(img)],
+            "source_path": str(source_dir),
+            "video_file": "",
+            "metadata": {},
+        }
+
+        store = TaskStore(path=tmp_path / "tasks.json")
+        runner = TaskRunner(store, max_workers=1)
+        rec = runner.create_task(
+            "proj-test",
+            "note",
+            {
+                "url": "https://www.xiaohongshu.com/explore/test",
+                "steps": ["download", "transcribe", "analyze", "note"],
+                "api_key": "sk-test",
+                "image_text_llm_timeout_sec": 0.01,
+            },
+        )
+
+        provider = MagicMock()
+
+        def _slow_chat(_req):
+            time.sleep(0.05)
+            return "# 太晚返回的内容"
+
+        provider.chat.side_effect = _slow_chat
+        registry = MagicMock()
+        registry.resolve_default_profile.return_value = MagicMock(
+            default_models=MagicMock(get=MagicMock(return_value="gpt-4o")),
+        )
+        registry.build.return_value = provider
+
+        with (
+            patch("backend.app.services.pipeline_tasks.load_settings",
+                  return_value=_mock_settings("sk-test")),
+            patch("backend.app.services.pipeline_tasks.get_workspace_videos_dir",
+                  return_value=tmp_path / "videos"),
+            patch("backend.app.services.pipeline_tasks.get_workspace_json_dir",
+                  return_value=tmp_path / "json"),
+            patch("backend.app.services.pipeline_tasks._download_note_source",
+                  return_value=dl_result),
+            patch("backend.app.services.pipeline_tasks.analyze_image_file",
+                  return_value={
+                      "description": "图片里展示了若干 UI 动效组件",
+                      "ocr_text": "",
+                      "description_parts": {},
+                  }),
+            patch("backend.app.services.pipeline_tasks.create_default_registry",
+                  return_value=registry),
+        ):
+            result = handle_note_task(rec, runner)
+
+        stored = runner.store.get(rec.task_id)
+        assert stored.status == TaskStatus.STORE.value
+        assert stored.progress >= 0.90
+        assert "note" in result["completed_steps"]
+        assert result["note_kind"] == "image_text"
+        assert "小红书图文标题" in result["note_body"]
+        assert "核心内容" in result["note_body"]
+        messages = [row.message for row in stored.log]
+        assert any("图文语境合成失败" in msg and "超时" in msg for msg in messages)
+        assert any("学习笔记生成失败" in msg and "超时" in msg for msg in messages)
+
     def test_background_for_recognition_in_result(self, tmp_path: Path) -> None:
         """background_for_recognition 出现在 PROBE 结果中。"""
         from backend.app.services.pipeline_tasks import _probe_note_source
@@ -1660,3 +1780,42 @@ class TestAnalyzeImageFile:
 
         assert result["description_parts"] == {}
         assert "风景照片" in result["description"]
+
+
+class TestClassifyImageTextContent:
+    """图文内容分类：_classify_image_text_content。"""
+
+    def test_tool_recommendation_detected(self) -> None:
+        from backend.app.services.pipeline_tasks import _classify_image_text_content
+
+        result: dict = {}
+        raw_source = "今天给大家推荐一个效率工具，支持 Markdown 导出，Obsidian 同步"
+        image_infos = [
+            {"description": "App 界面截图", "ocr_text": "下载地址 iOS Android"},
+        ]
+        note_body = "这是一款支持工作流自动化的软件，Mac Windows 都能用"
+
+        _classify_image_text_content(result, raw_source, image_infos, note_body)
+
+        assert result["content_category"] == "tool_recommendation"
+        assert result["default_summary_template"] == "tool_recommendation"
+
+    def test_unknown_when_few_signals(self) -> None:
+        from backend.app.services.pipeline_tasks import _classify_image_text_content
+
+        result: dict = {}
+        raw_source = "今天天气很好，出去散步"
+        image_infos: list = []
+        note_body = "阳光明媚的一天"
+
+        _classify_image_text_content(result, raw_source, image_infos, note_body)
+
+        assert result["content_category"] == "unknown"
+        assert "default_summary_template" not in result
+
+    def test_does_not_overwrite_existing(self) -> None:
+        from backend.app.services.pipeline_tasks import _classify_image_text_content
+
+        result: dict = {"content_category": "existing"}
+        _classify_image_text_content(result, "", [], "")
+        assert result["content_category"] == "existing"

@@ -158,6 +158,10 @@ export interface ItemNote {
   note_dir: string
   media: NoteMedia         // R3.1: 媒体 URL（实时从 results 提取）
   transcript: unknown      // R3.1: 转录数据（video/audio 时为 list）
+  summary_hint?: {
+    content_category?: string
+    default_template?: string
+  }
 }
 
 /** 中文展示文案——状态 */

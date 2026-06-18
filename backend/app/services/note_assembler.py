@@ -378,6 +378,26 @@ def build_note_md(item: WorkspaceItem, frontmatter: Dict[str, Any]) -> str:
     """
     fm_yaml = yaml.dump(frontmatter, allow_unicode=True, default_flow_style=False, sort_keys=False)
 
+    results = item.results or {}
+
+    # 图文笔记主笔记需要可读总结，也需要保留图文混排语境；否则 NoteShell
+    # 所见即所得只像原文摘录，看不到图片如何参与笔记。
+    if item.type == "image" and results.get("note_kind") == "image_text":
+        note_body = results.get("note_body", "")
+        composed_md = results.get("markdown", "")
+        sections: List[str] = []
+        if isinstance(note_body, str) and note_body.strip():
+            sections.append(note_body.strip())
+        if isinstance(composed_md, str) and composed_md.strip():
+            composed = composed_md.strip()
+            if composed not in sections:
+                if sections:
+                    sections.append(f"---\n\n## 图文语境\n\n{composed}")
+                else:
+                    sections.append(composed)
+        if sections:
+            return f"---\n{fm_yaml}---\n\n" + "\n\n".join(sections)
+
     # R3.5 优先：note_body = pipeline 自动生成的 standard 总结
     note_body = (item.results or {}).get("note_body", "")
     if note_body and isinstance(note_body, str) and note_body.strip():

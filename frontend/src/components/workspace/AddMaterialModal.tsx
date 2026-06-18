@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, FileText, Link2, Settings2, Wand2, X } from 'lucide-react'
+import { Link2, Settings2, Wand2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -65,6 +65,23 @@ interface AddMaterialModalProps {
 
 const ALL_TYPES: ItemType[] = ['video', 'audio', 'image', 'text']
 
+type TaskIntent = 'note' | 'replica' | 'competitive' | 'collect'
+type NoteMediaKind = 'auto' | 'video' | 'image_text' | 'audio'
+
+const TASK_CARDS: { value: TaskIntent; label: string; desc: string; available: boolean }[] = [
+  { value: 'note', label: '笔记', desc: '下载 · 转写 · 整理成笔记', available: true },
+  { value: 'replica', label: '复刻分析', desc: '拆解内容结构与表达策略', available: false },
+  { value: 'competitive', label: '竞品分析', desc: '横向对比同类内容', available: false },
+  { value: 'collect', label: '资料收藏', desc: '归档素材供日后检索', available: false },
+]
+
+const NOTE_TYPE_CARDS: { value: NoteMediaKind; label: string; desc: string }[] = [
+  { value: 'auto', label: '自动识别', desc: '由系统判断笔记类型' },
+  { value: 'video', label: '视频笔记', desc: '视频转写 + 时间戳 + 截帧' },
+  { value: 'image_text', label: '图文笔记', desc: '图片理解 + OCR + 图文混排' },
+  { value: 'audio', label: '音频笔记', desc: '音频转写 + 章节整理' },
+]
+
 function getSniffTypes(sniffResult: SniffResult | null | undefined): ItemType[] {
   if (!sniffResult) return []
   return sniffResult.possible_types.filter((t): t is ItemType =>
@@ -107,10 +124,11 @@ export function AddMaterialModal({
   const [internalUrl, setInternalUrl] = useState('')
   const [internalSniff, setInternalSniff] = useState<SniffResult | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [selectedTask, setSelectedTask] = useState<TaskIntent>('note')
+  const [selectedNoteType, setSelectedNoteType] = useState<NoteMediaKind>('auto')
   const [embedFrames, setEmbedFrames] = useState(false) // R4.7: 默认关，检测到视觉模型后自动开
   const [selectedVisionModel, setSelectedVisionModel] = useState('') // 空=用系统默认
   const [frameInterval, setFrameInterval] = useState(5)
-  const [noteExpanded, setNoteExpanded] = useState(false)
   const [captureMode, setCaptureMode] = useState<'auto' | 'manual'>('auto')
   const [videoDuration, setVideoDuration] = useState(0) // 探测到的视频时长（秒），0=未知
   const [error, setError] = useState<string | null>(null)
@@ -204,6 +222,12 @@ export function AddMaterialModal({
       setError('请先输入素材链接')
       return
     }
+    // 占位任务：只 toast，不提交
+    const taskMeta = TASK_CARDS.find(c => c.value === selectedTask)
+    if (taskMeta && !taskMeta.available) {
+      toast.info(`「${taskMeta.label}」即将支持，敬请期待`)
+      return
+    }
     setSubmitting(true)
     setError(null)
 
@@ -220,7 +244,9 @@ export function AddMaterialModal({
         captureMode === 'auto' ? computeAutoInterval(videoDuration) : frameInterval
       const effVisionModel = selectedVisionModel === '__default__' ? '' : selectedVisionModel
       const result = await generateNote(
-        wsId, effectiveUrl, effectiveSniff?.title ?? undefined, embedFrames, 'vision', effInterval, effVisionModel,
+        wsId, effectiveUrl, effectiveSniff?.title ?? undefined,
+        embedFrames, 'vision', effInterval, effVisionModel,
+        selectedTask, selectedNoteType,
       )
       toast.success('笔记生成中', { description: `${result.item_type} · ${effectiveUrl}` })
 
@@ -312,31 +338,75 @@ export function AddMaterialModal({
             )}
           </div>
 
-        <div className="m-section">
-          <div className="eyebrow" style={{ marginBottom: 10 }}>② 生成笔记</div>
+          {/* ② 选择任务 */}
+          <div className="m-section">
+            <div className="eyebrow" style={{ marginBottom: 10 }}>② 选择任务</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {TASK_CARDS.map(card => {
+                const active = selectedTask === card.value
+                return (
+                  <button
+                    key={card.value}
+                    type="button"
+                    onClick={() => {
+                      setSelectedTask(card.value)
+                      if (card.available) {
+                        return
+                      } else {
+                        toast.info(`「${card.label}」即将支持，当前请使用「笔记」`)
+                      }
+                    }}
+                    style={{
+                      textAlign: 'left', padding: '12px 14px', borderRadius: 10,
+                      cursor: 'pointer',
+                      border: active ? '2px solid var(--accent-warm)' : '1px solid var(--line)',
+                      background: active ? 'rgba(255,184,76,0.08)' : 'var(--bg)',
+                      opacity: card.available ? 1 : 0.65,
+                      transition: 'border-color .15s, background .15s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600 }}>{card.label}</span>
+                      {!card.available && (
+                        <span className="kw" style={{ fontSize: 10 }}>即将支持</span>
+                      )}
+                    </div>
+                    <div className="kw" style={{ fontSize: 11 }}>{card.desc}</div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
 
-          {/* 一体折叠卡：边框包裹「卡头 + 展开内容」，点击卡头切换 */}
-          <div style={{ border: '1px solid var(--line)', borderRadius: 12, overflow: 'hidden', background: 'var(--bg)' }}>
-            <button
-              type="button"
-              onClick={() => setNoteExpanded((v) => !v)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10, width: '100%',
-                padding: '14px 16px', border: 'none', background: 'transparent',
-                cursor: 'pointer', textAlign: 'left',
-                borderBottom: noteExpanded ? '1px solid var(--line)' : 'none',
-              }}
-            >
-              <FileText size={18} style={{ color: 'var(--accent-2)' }} />
-              <span style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
-                <span style={{ fontWeight: 600, fontSize: 14 }}>生成笔记</span>
-                <span className="kw" style={{ fontSize: 11 }}>下载 · 转写 · 整理成图文笔记</span>
-              </span>
-              <ChevronDown size={16} style={{ transform: noteExpanded ? 'rotate(180deg)' : 'none', transition: 'transform .15s', color: 'var(--ink-3)' }} />
-            </button>
+          {/* ③ 笔记类型 + 设置（仅选「笔记」时展开） */}
+          {selectedTask === 'note' && (
+            <div className="m-section">
+              <div className="eyebrow" style={{ marginBottom: 10 }}>③ 笔记类型</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
+                {NOTE_TYPE_CARDS.map(card => {
+                  const active = selectedNoteType === card.value
+                  return (
+                    <button
+                      key={card.value}
+                      type="button"
+                      onClick={() => setSelectedNoteType(card.value)}
+                      style={{
+                        textAlign: 'left', padding: '10px 12px', borderRadius: 10,
+                        cursor: 'pointer',
+                        border: active ? '2px solid var(--accent-warm)' : '1px solid var(--line)',
+                        background: active ? 'rgba(255,184,76,0.08)' : 'var(--bg)',
+                        transition: 'border-color .15s, background .15s',
+                      }}
+                    >
+                      <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2 }}>{card.label}</div>
+                      <div className="kw" style={{ fontSize: 10 }}>{card.desc}</div>
+                    </button>
+                  )
+                })}
+              </div>
 
-            {noteExpanded && (
-              <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* 笔记设置区（视频相关设置仅 auto/video 时显示） */}
+              <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <label htmlFor="add-material-embed" style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
                   <Switch id="add-material-embed" checked={embedFrames} onCheckedChange={(v) => { userToggledRef.current = true; setEmbedFrames(v) }} />
                   <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -370,7 +440,8 @@ export function AddMaterialModal({
                   </span>
                 )}
 
-                {embedFrames && hasVisionModel && (() => {
+                {/* 视频截帧设置：仅 auto/video 时显示 */}
+                {(selectedNoteType === 'auto' || selectedNoteType === 'video') && embedFrames && hasVisionModel && (() => {
                   const autoInterval = computeAutoInterval(videoDuration)
                   const autoFrames = estimateFrames(videoDuration, autoInterval)
                   const manualFrames = estimateFrames(videoDuration, frameInterval)
@@ -426,15 +497,17 @@ export function AddMaterialModal({
                   )
                 })()}
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          )}
         </div>
 
         <div className="m-foot">
           <span className="mono modal-foot-status">
             <span className="chip-dot" style={{ marginRight: 6 }} />
-            生成笔记 · 智能识别
+            {TASK_CARDS.find(c => c.value === selectedTask)?.label ?? '笔记'}
+            {selectedTask === 'note' && selectedNoteType !== 'auto'
+              ? ` · ${NOTE_TYPE_CARDS.find(c => c.value === selectedNoteType)?.label ?? ''}`
+              : ''}
           </span>
           <div className="modal-actions">
             <button
@@ -442,14 +515,14 @@ export function AddMaterialModal({
               className="btn btn-primary"
               onClick={handleGenerateNote}
               disabled={!effectiveUrl || submitting}
-              title="自动识别内容类型，生成图文笔记"
+              title={TASK_CARDS.find(c => c.value === selectedTask)?.available ? '开始生成' : '即将支持'}
             >
               {submitting ? (
                 '处理中…'
               ) : (
                 <>
                   <Wand2 size={14} />
-                  生成笔记
+                  {TASK_CARDS.find(c => c.value === selectedTask)?.available ? '开始生成' : '即将支持'}
                 </>
               )}
             </button>

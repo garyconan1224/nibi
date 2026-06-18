@@ -59,6 +59,24 @@ def _create_ws_and_item(client: TestClient) -> tuple[str, str]:
     return ws_id, item_id
 
 
+def _create_ws_and_image_item(client: TestClient) -> tuple[str, str]:
+    """创建工作空间和 image 类型素材，返回 (ws_id, item_id)。"""
+    ws = client.post("/workspaces", json={"name": "note-image-test"}).json()
+    ws_id = ws["workspace_id"]
+    resp = client.post(
+        f"/workspaces/{ws_id}/items",
+        json={
+            "source": "url",
+            "source_value": "https://www.xiaohongshu.com/explore/test-image-note",
+            "type": "image",
+            "name": "图文测试",
+        },
+    )
+    items = resp.json()["items"]
+    item_id = items[-1]["item_id"]
+    return ws_id, item_id
+
+
 def _seed_note_md(ws_id: str, item_id: str, content: str) -> None:
     """手动写入 note.md 到磁盘。"""
     nd = note_dir(ws_id, item_id)
@@ -195,6 +213,70 @@ def test_creates_note_md_when_missing(client: TestClient):
     # GET 也能读到
     get_data = client.get(f"/workspaces/{ws_id}/items/{item_id}/note").json()
     assert new_body in get_data["note_md"]
+
+
+def test_get_refreshes_stale_auto_image_text_note(client: TestClient):
+    """GET /note 应刷新未手改的旧图文自动稿，展示学习笔记 + 图文语境。"""
+    ws_id, item_id = _create_ws_and_image_item(client)
+    item = ws_module._find_item(ws_module._store.get(ws_id), item_id)
+    item.results = {
+        "note_kind": "image_text",
+        "source_md_raw": "原始正文",
+        "note_body": "# 学习笔记\n\n## 核心观点\n\n这是结合原文提炼的笔记。",
+        "markdown": "![配图](/static/workspaces/ws/image/01.jpg)\n\n图片补充了使用场景。",
+    }
+    fm_yaml = yaml.dump(
+        {
+            "schema_version": 1,
+            "type": "image",
+            "title": "图文测试",
+            "version": 1,
+        },
+        allow_unicode=True,
+        default_flow_style=False,
+        sort_keys=False,
+    )
+    _seed_note_md(ws_id, item_id, f"---\n{fm_yaml}---\n\n原始正文")
+
+    resp = client.get(f"/workspaces/{ws_id}/items/{item_id}/note")
+
+    assert resp.status_code == 200
+    note_md = resp.json()["note_md"]
+    assert "学习笔记" in note_md
+    assert "图文语境" in note_md
+    assert "![配图](/static/workspaces/ws/image/01.jpg)" in note_md
+    assert "图片补充了使用场景" in note_md
+
+
+def test_get_keeps_user_edited_image_text_note(client: TestClient):
+    """GET /note 不应覆盖 user_edited=true 的手改图文笔记。"""
+    ws_id, item_id = _create_ws_and_image_item(client)
+    item = ws_module._find_item(ws_module._store.get(ws_id), item_id)
+    item.results = {
+        "note_kind": "image_text",
+        "note_body": "# 自动学习笔记",
+        "markdown": "![自动配图](/static/auto.jpg)",
+    }
+    fm_yaml = yaml.dump(
+        {
+            "schema_version": 1,
+            "type": "image",
+            "title": "图文测试",
+            "version": 2,
+            "user_edited": True,
+        },
+        allow_unicode=True,
+        default_flow_style=False,
+        sort_keys=False,
+    )
+    _seed_note_md(ws_id, item_id, f"---\n{fm_yaml}---\n\n# 我的手改笔记")
+
+    resp = client.get(f"/workspaces/{ws_id}/items/{item_id}/note")
+
+    assert resp.status_code == 200
+    note_md = resp.json()["note_md"]
+    assert "我的手改笔记" in note_md
+    assert "自动配图" not in note_md
 
 
 def test_export_item_note_obsidian_zip(client: TestClient):

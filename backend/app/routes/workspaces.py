@@ -323,22 +323,22 @@ def _assemble_note_for_task(task: TaskRecord, runner) -> None:  # type: ignore[t
     只在 notes/<item_id>/ 不存在时组装（幂等：已组装的跳过）。
     任何异常都不阻塞主流程。
     """
-    for ws in _store.list_all():
-        for item in ws.items:
-            if task.task_id not in item.related_task_ids:
-                continue
-            nd = note_dir(ws.workspace_id, item.item_id)
-            if (nd / "note.md").exists():
-                continue
-            # 从 task store 回填 results（与 get_item_note 同逻辑）
-            merged = dict(item.results or {})
-            if task.result:
-                merged.update(task.result)
-            item.results = merged
-            try:
-                assemble_item_note(ws.workspace_id, item.item_id, _item=item)
-            except Exception:
-                pass
+    for ws, item in _iter_workspace_items_for_task(task, runner):
+        _ensure_task_linked_to_item(ws.workspace_id, item, task, runner)
+        nd = note_dir(ws.workspace_id, item.item_id)
+        # 从 task store 回填 results（与 get_item_note 同逻辑），再判断 note.md
+        # 是否为旧自动稿；未手改的旧稿可以用最新结果重建。
+        merged = dict(item.results or {})
+        if task.result:
+            merged.update(task.result)
+        item.results = merged
+        note_path = nd / "note.md"
+        if note_path.exists() and not _refresh_auto_note_if_stale(ws.workspace_id, item, note_path):
+            continue
+        try:
+            assemble_item_note(ws.workspace_id, item.item_id, _item=item)
+        except Exception:
+            pass
 
 
 def _on_analysis_success_assemble(completed_task: TaskRecord, runner) -> None:  # type: ignore[type-arg]
@@ -358,32 +358,162 @@ for _tt in ("analyze", "text", "audio", "image", "note"):
 # ── 7.2 标题全链路：note task 成功后回写 item.name ─────────────
 
 
+def _task_lineage_ids(task: TaskRecord, runner) -> List[str]:  # type: ignore[type-arg]
+    """返回当前 task 及其 retry_of 链路上的 task_id，供 workspace item 反查。"""
+    ids: List[str] = []
+    seen: set[str] = set()
+    current: Optional[TaskRecord] = task
+
+    while current is not None and current.task_id not in seen:
+        ids.append(current.task_id)
+        seen.add(current.task_id)
+        retry_of = str(current.retry_of or "").strip()
+        if not retry_of:
+            break
+        parent = runner.store.get(retry_of)
+        if parent is None and retry_of not in seen:
+            ids.append(retry_of)
+            seen.add(retry_of)
+        current = parent
+
+    return ids
+
+
+def _iter_workspace_items_for_task(
+    task: TaskRecord, runner,  # type: ignore[type-arg]
+) -> List[tuple[WorkspaceRecord, WorkspaceItem]]:
+    """按 task_id/retry_of 链路找到关联的 workspace item。"""
+    lineage = set(_task_lineage_ids(task, runner))
+    if not lineage:
+        return []
+
+    matches: List[tuple[WorkspaceRecord, WorkspaceItem]] = []
+    for ws in _store.list_all():
+        for item in ws.items:
+            if lineage.intersection(item.related_task_ids):
+                matches.append((ws, item))
+    return matches
+
+
+def _ensure_task_linked_to_item(
+    workspace_id: str,
+    item: WorkspaceItem,
+    task: TaskRecord,
+    runner=None,  # type: ignore[no-untyped-def]
+) -> None:
+    """重试任务成功后，把新 task_id 补挂回原 item，避免库页只看到旧失败任务。"""
+    if task.task_id not in item.related_task_ids:
+        try:
+            _store.update_item(
+                workspace_id,
+                item.item_id,
+                related_task_ids=[*item.related_task_ids, task.task_id],
+                status=ItemStatus.DONE.value,
+            )
+        except Exception:
+            pass
+
+    if runner is None:
+        return
+    payload = dict(task.payload or {})
+    result = dict(task.result or {})
+    changed = False
+    if not payload.get("workspace_id"):
+        payload["workspace_id"] = workspace_id
+        changed = True
+    if not payload.get("item_id"):
+        payload["item_id"] = item.item_id
+        changed = True
+    if not result.get("workspace_id"):
+        result["workspace_id"] = workspace_id
+        changed = True
+    if not result.get("item_id"):
+        result["item_id"] = item.item_id
+        changed = True
+    if changed:
+        try:
+            runner.store.update(task.task_id, payload=payload, result=result)
+        except Exception:
+            pass
+
+
+def _note_frontmatter(raw: str) -> Dict[str, Any]:
+    """解析 note.md frontmatter；失败返回空 dict。"""
+    if not raw.startswith("---\n"):
+        return {}
+    parts = raw.split("---\n", 2)
+    if len(parts) < 3:
+        return {}
+    try:
+        import yaml  # noqa: PLC0415
+
+        parsed = yaml.safe_load(parts[1]) or {}
+        return parsed if isinstance(parsed, dict) else {}
+    except Exception:
+        return {}
+
+
+def _auto_note_is_stale(item: WorkspaceItem, note_md: str) -> bool:
+    """判断现有 note.md 是否是需要被最新 task result 刷新的自动旧稿。"""
+    fm = _note_frontmatter(note_md)
+    if fm.get("user_edited") is True:
+        return False
+
+    results = item.results or {}
+    markers: List[str] = []
+    if item.type == ItemType.IMAGE.value and results.get("note_kind") == "image_text":
+        # 图文笔记主稿必须包含图文混排正文；只有 note_body 不够。
+        markers.extend([
+            str(results.get("note_body") or "").strip(),
+            str(results.get("markdown") or "").strip(),
+        ])
+    else:
+        markers.append(str(results.get("note_body") or "").strip())
+
+    return any(marker and marker not in note_md for marker in markers)
+
+
+def _refresh_auto_note_if_stale(workspace_id: str, item: WorkspaceItem, note_path: Path) -> bool:
+    """若 note.md 是未手改的旧自动稿，则按最新 item.results 重建。"""
+    if not note_path.exists():
+        return False
+    try:
+        raw = note_path.read_text(encoding="utf-8")
+    except Exception:
+        return False
+    if not _auto_note_is_stale(item, raw):
+        return False
+    assembled = assemble_item_note(workspace_id, item.item_id, overwrite=True, _item=item)
+    return not bool(assembled.get("skipped"))
+
+
 def _on_note_success_write_title(completed_task: TaskRecord, runner) -> None:  # type: ignore[type-arg]
     """note task 完成后，把真实标题回写 item.name。
 
     仅在 item.name 仍为 URL/ID 占位时覆盖，避免覆盖用户自定义名。
     """
+    matches = _iter_workspace_items_for_task(completed_task, runner)
+    for ws, item in matches:
+        _ensure_task_linked_to_item(ws.workspace_id, item, completed_task, runner)
+
     video_title = str((completed_task.result or {}).get("video_title") or "").strip()
     if not video_title:
         return
 
-    for ws in _store.list_all():
-        for item in ws.items:
-            if completed_task.task_id not in item.related_task_ids:
-                continue
-            # 判断 item.name 是否仍是占位名（_derive_item_name 产出）
-            raw_name = item.name or ""
-            derived = _derive_item_name(item.source_value or "")
-            is_placeholder = (
-                not raw_name
-                or raw_name == derived
-                or raw_name == (item.source_value or "")
-            )
-            if is_placeholder and raw_name != video_title:
-                try:
-                    _store.update_item(ws.workspace_id, item.item_id, name=video_title)
-                except Exception:
-                    pass
+    for ws, item in matches:
+        # 判断 item.name 是否仍是占位名（_derive_item_name 产出）
+        raw_name = item.name or ""
+        derived = _derive_item_name(item.source_value or "")
+        is_placeholder = (
+            not raw_name
+            or raw_name == derived
+            or raw_name == (item.source_value or "")
+        )
+        if is_placeholder and raw_name != video_title:
+            try:
+                _store.update_item(ws.workspace_id, item.item_id, name=video_title)
+            except Exception:
+                pass
 
 
 _pipeline_runner.register_success_callback("note", _on_note_success_write_title)
@@ -456,6 +586,11 @@ class GenerateNoteRequest(BaseModel):
     image_mode: str = Field(default="vision", description="提取模式: vision 或 ocr")
     frame_interval: int = Field(default=5, description="截帧间隔，多少秒截一帧")
     vision_model: str = Field(default="", description="视觉模型 ID（空=用系统默认）")
+    intent: str = Field(default="note", description="任务意图：note / replica / collect 等")
+    note_media_kind: str = Field(
+        default="auto",
+        description="笔记子类型：auto / video / image_text / audio / text",
+    )
 
 
 class PreflightSaveRequest(BaseModel):
@@ -1802,7 +1937,11 @@ def generate_note(workspace_id: str, req: GenerateNoteRequest) -> Dict[str, Any]
 
     # 3. 创建 note task（复用 handle_note_task 统一流程）
     #    注入 LLM 配置（从 provider store 获取活跃 chat provider 的 key + model）
-    _task_payload: dict = {"url": url, "workspace_id": workspace_id}
+    _task_payload: dict = {
+        "url": url,
+        "workspace_id": workspace_id,
+        "item_id": item.item_id,
+    }
     # R3.16: 透传嵌图开关 → note task；embed_frames=False 时 standard 总结不配图。
     # max_embed_frames 不传，由 summary_generator 按候选数自适应封顶（智能按需）。
     _task_payload["preflight"] = {
@@ -1816,6 +1955,9 @@ def generate_note(workspace_id: str, req: GenerateNoteRequest) -> Dict[str, Any]
     # R4.7: 透传用户选择的视觉模型（空=用系统默认）
     if req.vision_model.strip():
         _task_payload["vision_model"] = req.vision_model.strip()
+    # 意图分流：记录用户选择的任务意图和笔记子类型
+    _task_payload["intent"] = req.intent or "note"
+    _task_payload["note_media_kind"] = req.note_media_kind or "auto"
     try:
         _s = load_settings()
         for _p in _s.providers:
@@ -3092,6 +3234,22 @@ def _ensure_valid_template(template_id: str) -> None:
         )
 
 
+def _summary_source_present(results: Dict[str, Any]) -> bool:
+    """Whether task/item results contain enough material to generate a summary."""
+    return any(
+        key in results and bool(results.get(key))
+        for key in (
+            "content",
+            "transcript",
+            "summary",
+            "note_body",
+            "markdown",
+            "source_md_raw",
+            "image_infos",
+        )
+    )
+
+
 @router.get("/{workspace_id}/items/{item_id}/summaries")
 def list_summaries(workspace_id: str, item_id: str) -> List[Dict[str, Any]]:
     """列出该 item 的所有总结（按 template 分组，按 version 排序）。"""
@@ -3118,15 +3276,11 @@ async def create_summary(
     item = _find_item(rec, item_id)
 
     # item.results 缺少实质内容时，从 task store 回填（与 _sync_item_with_tasks 同逻辑）
-    has_content = item.results and (
-        "content" in item.results or "transcript" in item.results
-    )
+    has_content = bool(item.results and _summary_source_present(item.results))
     if not has_content and item.related_task_ids:
         for tid in reversed(item.related_task_ids):
             task = _pipeline_runner.store.get(tid)
-            if task and task.result and (
-                "content" in task.result or "transcript" in task.result
-            ):
+            if task and task.result and _summary_source_present(task.result):
                 item.results = dict(task.result)
                 break
 
@@ -3283,18 +3437,22 @@ def get_item_note(workspace_id: str, item_id: str) -> Dict[str, Any]:
     nd = note_dir(workspace_id, item_id)
     note_path = nd / "note.md"
 
-    # 惰性组装：目录不存在或 note.md 缺失时触发
+    # 从 task store 回填最新 SUCCESS result；note.md 已存在时也需要回填，
+    # 因为 retry 成功可能晚于旧 note.md 的首次惰性组装。
+    if item.related_task_ids:
+        for tid in reversed(item.related_task_ids):
+            task = _pipeline_runner.store.get(tid)
+            if task and task.result:
+                merged = dict(item.results or {})
+                merged.update(task.result)
+                item.results = merged
+                break
+
+    # 惰性组装：目录不存在或 note.md 缺失时触发；旧自动稿则按最新结果刷新。
     if not note_path.exists():
-        # 从 task store 回填 results（与 create_summary 同逻辑）
-        if item.related_task_ids:
-            for tid in reversed(item.related_task_ids):
-                task = _pipeline_runner.store.get(tid)
-                if task and task.result:
-                    merged = dict(item.results or {})
-                    merged.update(task.result)
-                    item.results = merged
-                    break
         assemble_item_note(workspace_id, item_id, _item=item)
+    else:
+        _refresh_auto_note_if_stale(workspace_id, item, note_path)
 
     # 读取文件（assemble 失败时文件可能不存在，返回空字符串）
     source_md = ""
@@ -3411,6 +3569,15 @@ def get_item_note(workspace_id: str, item_id: str) -> Dict[str, Any]:
         # transcript：统一规范成 [{t_sec, t_str, text}]
         transcript = _note_transcript(results, nd)
 
+    # summary_hint：图文内容分类结果，供前端 NewSummaryModal 默认选中模板
+    summary_hint: Dict[str, Any] = {}
+    _cc = results.get("content_category")
+    if _cc:
+        summary_hint["content_category"] = _cc
+    _dst = results.get("default_summary_template")
+    if _dst:
+        summary_hint["default_template"] = _dst
+
     return {
         "frontmatter": frontmatter,
         "source_md": source_md,
@@ -3419,6 +3586,7 @@ def get_item_note(workspace_id: str, item_id: str) -> Dict[str, Any]:
         "note_dir": str(nd),
         "media": media,
         "transcript": transcript,
+        "summary_hint": summary_hint,
     }
 
 
@@ -3579,6 +3747,15 @@ def update_item_note(workspace_id: str, item_id: str, req: NoteUpdateRequest) ->
         media["audio"] = audio_url
         transcript = _note_transcript(results, nd)
 
+    # summary_hint：图文内容分类结果（与 GET 同逻辑）
+    summary_hint: Dict[str, Any] = {}
+    _cc = results.get("content_category")
+    if _cc:
+        summary_hint["content_category"] = _cc
+    _dst = results.get("default_summary_template")
+    if _dst:
+        summary_hint["default_template"] = _dst
+
     return {
         "frontmatter": frontmatter,
         "source_md": source_md,
@@ -3587,6 +3764,7 @@ def update_item_note(workspace_id: str, item_id: str, req: NoteUpdateRequest) ->
         "note_dir": str(nd),
         "media": media,
         "transcript": transcript,
+        "summary_hint": summary_hint,
     }
 
 

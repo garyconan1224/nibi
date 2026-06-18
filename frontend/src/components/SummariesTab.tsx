@@ -21,6 +21,7 @@ import {
   renameSummary,
   type ItemSummary,
 } from '@/services/summaries'
+import { getItemNote } from '@/services/workspaces'
 
 import { NewSummaryModal } from './NewSummaryModal'
 
@@ -47,6 +48,7 @@ const TEMPLATE_LABEL_MAP: Record<string, string> = {
   outline: '大纲',
   qa: '问答卡(Anki)',
   actions: '行动清单',
+  tool_recommendation: '工具推荐',
   standard: '标准总结',
 }
 
@@ -79,6 +81,7 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
   const [showModal, setShowModal] = useState(false)
   /** null = 没在生成；string = 正在生成的模板 id（列表里显示进度条） */
   const [creatingTemplate, setCreatingTemplate] = useState<string | null>(null)
+  const [defaultTemplate, setDefaultTemplate] = useState<string | undefined>(undefined)
 
   // 对比模式
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -111,6 +114,19 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
   useEffect(() => {
     refresh()
   }, [refresh])
+
+  // 获取 summary_hint（图文内容分类推荐模板）
+  useEffect(() => {
+    let cancelled = false
+    getItemNote(workspaceId, itemId)
+      .then(note => {
+        if (!cancelled && note.summary_hint?.default_template) {
+          setDefaultTemplate(note.summary_hint.default_template)
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [workspaceId, itemId])
 
   /* ── 创建（从弹窗回调） ─────────────────────────────── */
 
@@ -264,6 +280,7 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
         {showModal && (
           <NewSummaryModal
             creating={false}
+            defaultTemplate={defaultTemplate}
             onSubmit={handleCreate}
             onClose={() => setShowModal(false)}
           />
@@ -494,6 +511,7 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
       {showModal && (
         <NewSummaryModal
           creating={creatingTemplate !== null}
+          defaultTemplate={defaultTemplate}
           onSubmit={handleCreate}
           onClose={() => setShowModal(false)}
         />

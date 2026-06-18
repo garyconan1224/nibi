@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   createSummary: vi.fn(),
   deleteSummary: vi.fn(),
   renameSummary: vi.fn(),
+  getItemNote: vi.fn(),
 }))
 
 vi.mock('@/services/summaries', () => ({
@@ -25,6 +26,10 @@ vi.mock('@/services/summaries', () => ({
   createSummary: mocks.createSummary,
   deleteSummary: mocks.deleteSummary,
   renameSummary: mocks.renameSummary,
+}))
+
+vi.mock('@/services/workspaces', () => ({
+  getItemNote: mocks.getItemNote,
 }))
 
 vi.mock('sonner', () => ({
@@ -82,6 +87,7 @@ const SUMMARY_QUOTES: ItemSummary = {
 describe('SummariesTab', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.getItemNote.mockResolvedValue({})
   })
 
   it('加载后显示扁平版列表', async () => {
@@ -151,7 +157,37 @@ describe('SummariesTab', () => {
       expect(mocks.createSummary).toHaveBeenCalledWith(
         'ws-1',
         'item-1',
-        'concise',
+        'standard',
+        '',
+        { provider_id: '', model: '', search_web: false },
+      )
+    })
+  })
+
+  it('note API 推荐工具模板时，新建总结默认使用工具推荐', async () => {
+    mocks.listSummaries.mockResolvedValue([])
+    mocks.createSummary.mockResolvedValue({
+      ...SUMMARY_1,
+      template: 'tool_recommendation',
+    })
+    mocks.getItemNote.mockResolvedValue({
+      summary_hint: { default_template: 'tool_recommendation' },
+    })
+
+    render(<MemoryRouter><SummariesTab workspaceId="ws-1" itemId="item-1" /></MemoryRouter>)
+
+    await waitFor(() => {
+      expect(screen.getByText('+ 新建总结')).toBeTruthy()
+    })
+
+    fireEvent.click(screen.getByText('+ 新建总结'))
+    fireEvent.click(screen.getByText('生成'))
+
+    await waitFor(() => {
+      expect(mocks.createSummary).toHaveBeenCalledWith(
+        'ws-1',
+        'item-1',
+        'tool_recommendation',
         '',
         { provider_id: '', model: '', search_web: false },
       )

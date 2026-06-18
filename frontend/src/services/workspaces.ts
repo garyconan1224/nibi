@@ -236,10 +236,12 @@ export async function generateNote(
   imageMode: string = 'vision',
   frameInterval: number = 5,
   visionModel: string = '',
+  intent: string = 'note',
+  noteMediaKind: string = 'auto',
 ): Promise<GenerateNoteResponse> {
   const res = await http.post<GenerateNoteResponse>(
     `${BASE}/${workspaceId}/items/generate-note`,
-    { url, name, embed_frames: embedFrames, image_mode: imageMode, frame_interval: frameInterval, vision_model: visionModel },
+    { url, name, embed_frames: embedFrames, image_mode: imageMode, frame_interval: frameInterval, vision_model: visionModel, intent, note_media_kind: noteMediaKind },
   )
   return res.data
 }

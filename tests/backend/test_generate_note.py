@@ -79,6 +79,9 @@ def test_xhs_image_text_creates_image_item(client):
     assert items[0].type == "image"
     assert items[0].source == "url"
     assert "note-test-001" in items[0].related_task_ids
+    created_payload = ws_module._pipeline_runner.create_task.call_args.args[2]
+    assert created_payload["workspace_id"] == ws_id
+    assert created_payload["item_id"] == items[0].item_id
 
 
 # ── 2. 小红书视频 → 不误判为 image ────────────────────────────────
@@ -215,3 +218,75 @@ def test_get_note_image_fallback_to_source_value(client):
     data = resp.json()
 
     assert data["media"]["images"] == ["https://example.com/photo.jpg"]
+
+
+def test_intent_and_note_media_kind_in_payload(client):
+    """generate-note payload 应包含 intent 和 note_media_kind。"""
+    c, store, _ = client
+    ws_id = _create_ws(store)
+
+    sniff_result = SniffResult(
+        primary_type="text",
+        possible_types=["text"],
+        platform="xiaohongshu",
+    )
+    with patch.object(ws_module, "sniff_url", return_value=sniff_result):
+        resp = c.post(f"/workspaces/{ws_id}/items/generate-note", json={
+            "url": "https://www.xiaohongshu.com/explore/683f6b75000000001c010bb3",
+            "intent": "note",
+            "note_media_kind": "image_text",
+        })
+
+    assert resp.status_code == 200
+
+    created_payload = ws_module._pipeline_runner.create_task.call_args.args[2]
+    assert created_payload["intent"] == "note"
+    assert created_payload["note_media_kind"] == "image_text"
+
+
+def test_intent_defaults_to_note(client):
+    """不传 intent/note_media_kind 时应使用默认值。"""
+    c, store, _ = client
+    ws_id = _create_ws(store)
+
+    sniff_result = SniffResult(
+        primary_type="video",
+        possible_types=["video"],
+        platform="bilibili",
+    )
+    with patch.object(ws_module, "sniff_url", return_value=sniff_result):
+        resp = c.post(f"/workspaces/{ws_id}/items/generate-note", json={
+            "url": "https://www.bilibili.com/video/BV1xx",
+        })
+
+    assert resp.status_code == 200
+
+    created_payload = ws_module._pipeline_runner.create_task.call_args.args[2]
+    assert created_payload["intent"] == "note"
+    assert created_payload["note_media_kind"] == "auto"
+
+
+def test_summary_hint_in_note_response(client):
+    """note API 返回 summary_hint（content_category + default_template）。"""
+    c, store, _ = client
+    ws_id = _create_ws(store)
+
+    item = WorkspaceItem(
+        item_id="img_hint",
+        type="image",
+        source="url",
+        source_value="https://example.com/photo.jpg",
+        name="图文笔记",
+        results={
+            "content_category": "tool_recommendation",
+            "default_summary_template": "tool_recommendation",
+        },
+    )
+    store.add_item(ws_id, item)
+
+    resp = c.get(f"/workspaces/{ws_id}/items/img_hint/note")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["summary_hint"]["content_category"] == "tool_recommendation"
+    assert data["summary_hint"]["default_template"] == "tool_recommendation"

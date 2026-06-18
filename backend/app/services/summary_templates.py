@@ -143,6 +143,19 @@ TEMPLATES: dict[str, SummaryTemplate] = {
         user_prompt="请从以下转写文本中提取行动清单：\n\n{transcript}",
         output_format="markdown",
     ),
+    "tool_recommendation": SummaryTemplate(
+        id="tool_recommendation",
+        label="工具推荐",
+        desc="文字型图文：提炼工具用途、适用场景、亮点与取舍",
+        use_case="图文工具推荐",
+        system_prompt=(
+            "你是一名工具推荐笔记整理专家。请把文字型图文、工具截图、OCR 文本和原文说明，"
+            "整理成一篇可判断是否值得尝试的工具推荐总结。不要插入图片，不要写视频时间戳，"
+            "不要把图片描述当成视觉赏析；重点是把图片里的文字信息转成结构化分析。"
+        ),
+        user_prompt="请为以下工具推荐材料生成总结：\n\n{transcript}",
+        output_format="markdown",
+    ),
     "standard": SummaryTemplate(
         id="standard",
         label="标准总结",

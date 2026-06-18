@@ -1530,6 +1530,16 @@ def _probe_note_source(download_result: dict, payload: dict) -> dict:
     content = download_result.get("content", "")
     images = download_result.get("images", [])
     video_file = download_result.get("video_file", "")
+    requested_kind = str(payload.get("note_media_kind") or "auto").strip()
+    if requested_kind and requested_kind != "auto":
+        if requested_kind == "image_text" and images:
+            kind = "image_text"
+        elif requested_kind == "video" and video_file:
+            kind = "video"
+        elif requested_kind == "audio" and video_file:
+            kind = "audio"
+        elif requested_kind == "text" and content:
+            kind = "text"
 
     # 合并 background_for_recognition
     bg_parts = []
@@ -1689,6 +1699,83 @@ def _image_intermediate_patch(
     }
 
 
+_TOOL_SIGNALS: frozenset[str] = frozenset({
+    "工具", "App", "app", "应用", "软件", "插件", "网站",
+    "推荐", "支持", "功能", "工作流", "Markdown", "markdown",
+    "Obsidian", "导出", "记录", "转写", "效率",
+    "iOS", "Mac", "Windows", "Android", "浏览器",
+    "下载", "扩展", "自动化", "模板", "同步",
+})
+
+
+def _classify_image_text_content(
+    result: Dict[str, Any],
+    raw_source_text: str,
+    image_infos: List[Dict[str, Any]],
+    note_body: str,
+) -> None:
+    """轻量图文内容分类：识别 tool_recommendation vs unknown，写入 result。"""
+    if result.get("content_category"):
+        return  # 已有分类（重试等），不覆盖
+
+    # 收集所有文本信号
+    texts: List[str] = [raw_source_text, note_body]
+    for info in image_infos:
+        if isinstance(info, dict):
+            texts.append(str(info.get("description") or ""))
+            texts.append(str(info.get("ocr_text") or ""))
+    blob = "\n".join(texts)
+
+    hit = sum(1 for w in _TOOL_SIGNALS if w in blob)
+    if hit >= 3:
+        result["content_category"] = "tool_recommendation"
+        result["default_summary_template"] = "tool_recommendation"
+    else:
+        result["content_category"] = "unknown"
+
+
+def _image_text_llm_timeout_sec(payload: Dict[str, Any]) -> float:
+    """Return the bounded wait time for image-text note LLM calls."""
+    raw = payload.get("image_text_llm_timeout_sec", 45)
+    try:
+        timeout = float(raw)
+    except (TypeError, ValueError):
+        timeout = 45.0
+    return max(0.01, min(timeout, 120.0))
+
+
+def _chat_with_timeout(
+    provider: Any,
+    request: ChatRequest,
+    *,
+    timeout_sec: float,
+    label: str,
+) -> str:
+    """Run provider.chat with a task-level timeout so image notes can fallback."""
+    result: Dict[str, Any] = {}
+    done = threading.Event()
+
+    def _target() -> None:
+        try:
+            result["value"] = provider.chat(request)
+        except BaseException as exc:  # propagate into the caller thread
+            result["error"] = exc
+        finally:
+            done.set()
+
+    thread = threading.Thread(
+        target=_target,
+        name=f"image-text-llm-{label}",
+        daemon=True,
+    )
+    thread.start()
+    if not done.wait(timeout_sec):
+        raise TimeoutError(f"{label} 超时（>{timeout_sec:g}s）")
+    if "error" in result:
+        raise result["error"]
+    return str(result.get("value") or "")
+
+
 def _compose_images_with_llm(
     *,
     source_text: str,
@@ -1772,8 +1859,11 @@ def _compose_images_with_llm(
         "请将图片按语境插入正文，输出完整 markdown："
     )
 
+    timeout_sec = _image_text_llm_timeout_sec(payload)
+    log(f"⏳ 图文语境合成中，最多等待 {timeout_sec:g}s")
     try:
-        raw = provider.chat(
+        raw = _chat_with_timeout(
+            provider,
             ChatRequest(
                 model=model,
                 messages=[
@@ -1782,7 +1872,9 @@ def _compose_images_with_llm(
                 ],
                 temperature=0.3,
                 max_tokens=4096,
-            )
+            ),
+            timeout_sec=timeout_sec,
+            label="图文语境合成",
         )
         composed = raw.strip()
         if composed:
@@ -1907,8 +1999,11 @@ def _generate_image_text_learning_note(
         "请输出学习笔记 Markdown："
     )
 
+    timeout_sec = _image_text_llm_timeout_sec(payload)
+    log(f"⏳ 学习笔记生成中，最多等待 {timeout_sec:g}s")
     try:
-        raw = provider.chat(
+        raw = _chat_with_timeout(
+            provider,
             ChatRequest(
                 model=model,
                 messages=[
@@ -1917,7 +2012,9 @@ def _generate_image_text_learning_note(
                 ],
                 temperature=0.3,
                 max_tokens=4096,
-            )
+            ),
+            timeout_sec=timeout_sec,
+            label="学习笔记生成",
         )
         note = raw.strip()
         if note and len(note) > 80:
@@ -2037,6 +2134,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     source_text_from_download = ""
     images_from_download: List[str] = []
     background_context = ""
+    _source_title = ""
 
     # ── 3. download 步骤（M7: 按 URL 类型选择下载器）──────────
     if "download" in steps:
@@ -2079,6 +2177,9 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         images_from_download = probe["images"] or images_from_download
         background_context = probe["background_context"]
         steps = probe["steps"]
+        _source_title = str((dl_result or {}).get("title") or "").strip()
+        if not _source_title:
+            _source_title = str(probe.get("source_title") or "").strip()
 
         # R4.7: 配图关闭时跳过截帧+VLM（省掉重 API 调用），笔记只用转写文本
         _pf = payload.get("preflight") or {}
@@ -2147,6 +2248,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             _log_img(f"图集分析完成，{len(image_descriptions)} 张有描述")
 
             # NI.3: 尝试 LLM 语境合成（图文混排 markdown）
+            runner.set_progress(task_id, 0.32, "生成图文内容中...")
             composed = _compose_images_with_llm(
                 source_text=source_text_from_download,
                 image_infos=image_infos,
@@ -2168,6 +2270,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         # ── 3.7. 图文学习笔记生成（独立于图文混排合成）──
         # note_body 用于 note.md 默认正文（学习总结），区别于 source.md（原始依据）。
         if "note" in steps and api_key:
+            runner.set_progress(task_id, 0.45, "生成图文学习笔记中...")
             _img_log = _log_img  # 复用已有的日志回调
             image_text_note_body = _generate_image_text_learning_note(
                 source_text=raw_source_text,
@@ -2500,10 +2603,9 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     # ._adaptive_frame_cap），不再是「无限」；generate-note 入口未传 preflight 时即走此默认。
     _max_embed = int(_preflight.get("max_embed_frames", 0) or 0)
 
-    # 先算标题（standard prompt 需要）
-    _source_title = ""
+    # 先算标题（standard prompt 需要；image_text 分支已提前算过）
     if "download" in steps:
-        _source_title = str((dl_result or {}).get("title") or "").strip()
+        _source_title = _source_title or str((dl_result or {}).get("title") or "").strip()
     if not _source_title:
         _source_title = str((probe.get("source_title") if "download" in steps else "") or "").strip()
 
@@ -2579,6 +2681,10 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     # 供 success callback 回写 item.name（解决 NoteShell 显示 ID/BV 号的问题）
     if _source_title:
         result["video_title"] = _source_title
+    if payload.get("workspace_id"):
+        result["workspace_id"] = str(payload.get("workspace_id") or "")
+    if payload.get("item_id"):
+        result["item_id"] = str(payload.get("item_id") or "")
     # M7: 附加 PROBE 识别结果
     if note_kind != "video":
         result["note_kind"] = note_kind
@@ -2593,6 +2699,9 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         result["source_md_raw"] = raw_source_text
     if background_context:
         result["background_for_recognition"] = background_context
+    # 图文内容分类：识别 tool_recommendation 等，写入 content_category + default_summary_template
+    if note_kind == "image_text":
+        _classify_image_text_content(result, raw_source_text, image_infos, note_body)
     return result
 
 

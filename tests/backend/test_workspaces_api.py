@@ -503,6 +503,65 @@ def test_sync_item_with_tasks_failed_maps_to_failed(tmp_path: Path) -> None:
             assert body["items"][0]["status"] == "failed"
 
 
+def test_note_retry_success_links_back_to_workspace_item(tmp_path: Path) -> None:
+    """note retry SUCCESS 应补挂回原 item，库页可读到最新成功结果。"""
+    isolated_store = WorkspaceStore(root=tmp_path / "workspaces")
+    ws_id = "ws-retry-note"
+    item_id = "item-note"
+    isolated_store.create(WorkspaceRecord(workspace_id=ws_id, name="retry"))
+    isolated_store.add_item(
+        ws_id,
+        WorkspaceItem(
+            item_id=item_id,
+            type="image",
+            source="url",
+            source_value="https://www.xiaohongshu.com/explore/retry-note",
+            name="https://www.xiaohongshu.com/explore/retry-note",
+            related_task_ids=["note-old"],
+            status="failed",
+        ),
+    )
+
+    old_task = TaskRecord(
+        task_id="note-old",
+        project_id="default_project",
+        task_type="note",
+        payload={},
+        status=TaskStatus.FAILED.value,
+    )
+    new_task = TaskRecord(
+        task_id="note-new",
+        project_id="default_project",
+        task_type="note",
+        payload={},
+        status=TaskStatus.SUCCESS.value,
+        retry_of="note-old",
+        result={"video_title": "新图文标题", "note_body": "ok"},
+    )
+    old_task.updated_at = "2026-05-17T00:00:00+00:00"
+    new_task.updated_at = "2026-05-17T01:00:00+00:00"
+
+    mock_runner = MagicMock()
+    tasks = {"note-old": old_task, "note-new": new_task}
+    mock_runner.store.get.side_effect = lambda tid: tasks.get(tid)
+
+    app = FastAPI()
+    with (
+        patch.object(ws_module, "_store", isolated_store),
+        patch.object(ws_module, "_pipeline_runner", mock_runner),
+    ):
+        app.include_router(ws_module.router)
+        ws_module._on_note_success_write_title(new_task, mock_runner)
+        with TestClient(app) as c:
+            body = c.get(f"/workspaces/{ws_id}").json()
+
+    item = isolated_store.get(ws_id).items[0]
+    assert item.related_task_ids == ["note-old", "note-new"]
+    assert item.name == "新图文标题"
+    assert body["items"][0]["status"] == "done"
+    assert body["items"][0]["results"]["note_body"] == "ok"
+
+
 # ── Phase L1：资料库聚合端点 ──────────────────────────────────────────────
 
 

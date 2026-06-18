@@ -56,7 +56,7 @@ describe('AddMaterialModal', () => {
     })
   })
 
-  it('只显示生成笔记入口，不显示手动分析模式', () => {
+  it('显示三层入口，不显示手动分析模式', () => {
     render(
       <AddMaterialModal
         open={true}
@@ -73,8 +73,13 @@ describe('AddMaterialModal', () => {
       />,
     )
 
-    expect(screen.getByText('② 生成笔记')).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: /生成笔记/ }).length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByText('② 选择任务')).toBeTruthy()
+    expect(screen.getByText('③ 笔记类型')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /笔记 下载/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /复刻分析/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /竞品分析/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /资料收藏/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /开始生成/ })).toBeTruthy()
     expect(screen.queryByText(/分析范围/)).toBeNull()
     expect(screen.queryByText(/勾选分析任务/)).toBeNull()
     expect(screen.queryByText(/音视频综合/)).toBeNull()
@@ -104,11 +109,21 @@ describe('AddMaterialModal', () => {
       />,
     )
 
-    const buttons = screen.getAllByRole('button', { name: /生成笔记/ })
-    fireEvent.click(buttons[buttons.length - 1])
+    fireEvent.click(screen.getByRole('button', { name: /图文笔记/ }))
+    fireEvent.click(screen.getByRole('button', { name: /开始生成/ }))
 
     await waitFor(() => {
-      expect(generateNoteMock).toHaveBeenCalledWith('ws-1', 'https://example.com/video', '测试视频', true, 'vision', 10)
+      expect(generateNoteMock).toHaveBeenCalledWith(
+        'ws-1',
+        'https://example.com/video',
+        '测试视频',
+        true,
+        'vision',
+        10,
+        '',
+        'note',
+        'image_text',
+      )
     })
     expect(addWorkspaceItemMock).not.toHaveBeenCalled()
     expect(savePreflightMock).not.toHaveBeenCalled()
@@ -137,13 +152,39 @@ describe('AddMaterialModal', () => {
       />,
     )
 
-    const buttons = screen.getAllByRole('button', { name: /生成笔记/ })
-    fireEvent.click(buttons[buttons.length - 1])
+    fireEvent.click(screen.getByRole('button', { name: /开始生成/ }))
 
     await waitFor(() => {
       expect(autoCreateWorkspaceMock).toHaveBeenCalledWith({ hint_url: 'https://example.com/article' })
-      expect(generateNoteMock).toHaveBeenCalledWith('ws-new', 'https://example.com/article', undefined, true, 'vision', 10)
+      expect(generateNoteMock).toHaveBeenCalledWith(
+        'ws-new',
+        'https://example.com/article',
+        undefined,
+        true,
+        'vision',
+        10,
+        '',
+        'note',
+        'auto',
+      )
     })
+  })
+
+  it('占位任务可点击提示但不会提交任务', () => {
+    render(
+      <AddMaterialModal
+        open={true}
+        onOpenChange={vi.fn()}
+        workspaceIds={['ws-1']}
+        urlValue="https://example.com/video"
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /复刻分析/ }))
+    const unsupportedButtons = screen.getAllByRole('button', { name: /即将支持/ })
+    fireEvent.click(unsupportedButtons[unsupportedButtons.length - 1])
+
+    expect(generateNoteMock).not.toHaveBeenCalled()
   })
 
   it('内部输入链接后自动嗅探并展示识别结果', async () => {

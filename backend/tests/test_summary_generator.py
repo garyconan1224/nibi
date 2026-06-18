@@ -102,6 +102,83 @@ class TestBuildPrompt:
         assert "[00:42]" not in usr_p
         assert "外观对比" in usr_p
 
+    def test_image_text_standard_uses_image_note_prompt(self) -> None:
+        """图文 standard 总结应使用图文材料，不走视频时间轴模板。"""
+        item = _make_item(
+            type="image",
+            source_value="https://www.xiaohongshu.com/explore/test",
+            name="手机捕捉和 Obsidian 整理",
+            results={
+                "note_kind": "image_text",
+                "source_md_raw": "手机负责快速捕捉，Obsidian 负责长期整理。",
+                "markdown": "![工作流图](/static/workflow.jpg)\n\n图片展示了移动端到桌面端的流程。",
+                "image_infos": [
+                    {
+                        "idx": 1,
+                        "description": "一张展示手机记录、桌面整理的工作流图",
+                        "static_url": "/static/workflow.jpg",
+                    }
+                ],
+            },
+        )
+
+        sys_p, usr_p = build_prompt(item, "standard", embed_frames=True)
+
+        assert "图文笔记整理专家" in sys_p
+        assert "手机负责快速捕捉" in usr_p
+        assert "图片展示了移动端到桌面端的流程" in usr_p
+        assert "一张展示手机记录" in usr_p
+        assert "章节时间戳锚点" not in sys_p + usr_p
+        assert "视频时长" not in usr_p
+        assert "[00:42]" not in usr_p
+
+    def test_image_text_non_standard_uses_image_material(self) -> None:
+        """图文非 standard 模板也应有真实图文内容兜底，而非空转写。"""
+        item = _make_item(
+            type="image",
+            results={
+                "note_kind": "image_text",
+                "source_md_raw": "原文观点",
+                "markdown": "图文混排内容",
+            },
+        )
+
+        _, usr_p = build_prompt(item, "concise")
+
+        assert "原文观点" in usr_p
+        assert "图文混排内容" in usr_p
+
+    def test_tool_recommendation_uses_text_image_material_without_images(self) -> None:
+        """工具推荐模板：总结图中文字，不要求插图或时间点。"""
+        item = _make_item(
+            type="image",
+            name="工具推荐",
+            results={
+                "note_kind": "image_text",
+                "source_md_raw": "推荐一个 Markdown 移动端记录工具，适合做 Obsidian 输入层。",
+                "markdown": "![工具截图](/static/tool.jpg)\n\n图片文字介绍：支持文字、图片、录音和语音转写。",
+                "image_infos": [
+                    {
+                        "idx": 1,
+                        "description": "一张工具功能介绍卡片，列出快速记录、图片、录音、语音转写等能力",
+                        "ocr_text": "SiloNote：文字、图片、录音、语音转写，导出 Markdown",
+                        "static_url": "/static/tool.jpg",
+                    }
+                ],
+            },
+        )
+
+        sys_p, usr_p = build_prompt(item, "tool_recommendation")
+
+        assert "工具推荐笔记整理专家" in sys_p
+        assert "不要插入图片 Markdown" in sys_p
+        assert "SiloNote" in usr_p
+        assert "语音转写" in usr_p
+        assert "适合谁使用" in usr_p
+        assert "局限与注意" in usr_p
+        assert "视频时间戳" in sys_p
+        assert "章节时间戳锚点" not in sys_p + usr_p
+
 
 # ── generate_summary（mock LLM）────────────────────────────────
 
@@ -131,6 +208,45 @@ class TestGenerateSummary:
         sys_p, usr_p = call_args[0]
         assert "要点" in sys_p or "分析师" in sys_p
         assert "转写文本" in usr_p
+
+    @patch("backend.app.services.summary_generator._call_llm")
+    def test_image_text_standard_llm_prompt_is_type_specific(self, mock_llm: MagicMock) -> None:
+        mock_llm.return_value = ("# 图文总结", "model")
+        item = _make_item(
+            type="image",
+            results={
+                "note_kind": "image_text",
+                "source_md_raw": "图文原文",
+                "markdown": "![图](/static/a.jpg)\n\n图文混排",
+            },
+        )
+
+        generate_summary(item, "standard")
+
+        sys_p, usr_p = mock_llm.call_args[0]
+        assert "图文笔记整理专家" in sys_p
+        assert "图文原文" in usr_p
+        assert "章节时间戳锚点" not in sys_p + usr_p
+
+    @patch("backend.app.services.summary_generator._call_llm")
+    def test_tool_recommendation_llm_prompt_is_type_specific(self, mock_llm: MagicMock) -> None:
+        mock_llm.return_value = ("# 工具推荐总结", "model")
+        item = _make_item(
+            type="image",
+            results={
+                "note_kind": "image_text",
+                "source_md_raw": "工具推荐原文",
+                "image_infos": [{"idx": 1, "ocr_text": "工具支持 Markdown 导出"}],
+            },
+        )
+
+        generate_summary(item, "tool_recommendation")
+
+        sys_p, usr_p = mock_llm.call_args[0]
+        assert "工具推荐笔记整理专家" in sys_p
+        assert "工具推荐原文" in usr_p
+        assert "Markdown 导出" in usr_p
+        assert "章节时间戳锚点" not in sys_p + usr_p
 
 
 # ── workspace_store summary helpers ─────────────────────────────

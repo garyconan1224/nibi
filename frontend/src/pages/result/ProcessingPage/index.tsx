@@ -63,8 +63,17 @@ export default function ProcessingPage() {
   const cancelTask = useTaskStore((s) => s.cancelTask)
   const retryTask = useTaskStore((s) => s.retryTask)
 
-  const workspaceId = state?.workspaceId ?? task?.project_id
-  const itemId = state?.itemId ?? (task?.payload as Record<string, unknown>)?.item_id as string | undefined
+  const taskPayload = (task?.payload ?? {}) as Record<string, unknown>
+  const taskResult = (task?.result ?? {}) as Record<string, unknown>
+  const workspaceId =
+    state?.workspaceId ??
+    (taskPayload.workspace_id as string | undefined) ??
+    (taskResult.workspace_id as string | undefined) ??
+    task?.project_id
+  const itemId =
+    state?.itemId ??
+    (taskPayload.item_id as string | undefined) ??
+    (taskResult.item_id as string | undefined)
 
   const isActive = task ? !isTaskTerminal(task.status) : false
   useTaskSse(taskId, isActive)
@@ -182,8 +191,8 @@ export default function ProcessingPage() {
 
   const categorized = categorizeError(task?.error)
 
-  const result = task?.result ?? {} as Record<string, unknown>
-  const payload = task?.payload ?? {} as Record<string, unknown>
+  const result = taskResult
+  const payload = taskPayload
   const taskType: string = task?.task_type ?? ''
   const isAudioTask = taskType === 'audio'
   // 图文笔记检测：result.note_kind（任务完成后）或 payload.kind_hint（下载阶段）

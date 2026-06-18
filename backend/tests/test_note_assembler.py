@@ -434,11 +434,11 @@ class TestImageTextLearningNote:
         )
 
     def test_note_body_priority_over_markdown(self) -> None:
-        """build_note_md 应优先使用 note_body（学习笔记），而非 results['markdown']。"""
+        """build_note_md 应把图文笔记组装成学习笔记 + 图文语境。"""
         item = _make_item(
             item_type="image",
             results={
-                "markdown": "【图片 1】主体: 卡片；OCR文字: 原始内容描述",
+                "markdown": "![图 1](/static/img.jpg)\n\n【图片 1】主体: 卡片；OCR文字: 原始内容描述",
                 "note_body": "# 学习笔记\n\n## 核心观点\n\n这是学习总结。",
                 "note_kind": "image_text",
             },
@@ -447,7 +447,9 @@ class TestImageTextLearningNote:
         note = build_note_md(item, fm)
         assert "学习笔记" in note
         assert "学习总结" in note
-        assert "【图片 1】" not in note
+        assert "## 图文语境" in note
+        assert "![图 1](/static/img.jpg)" in note
+        assert note.index("学习笔记") < note.index("图文语境")
 
     def test_build_body_prefers_source_md_raw(self) -> None:
         """_build_body 对 image 类型优先取 source_md_raw（原始文本），而非合成后 markdown。"""
@@ -487,12 +489,12 @@ class TestImageTextLearningNote:
         assert "![" not in note_body, "文字型图片笔记不应插图"
 
     def test_assemble_image_note_uses_note_body(self, ws_root: Path) -> None:
-        """assemble_item_note 对有 note_body 的 image item，note.md 应含学习笔记内容。"""
+        """assemble_item_note 对图文 item，note.md 应含学习笔记和图文混排内容。"""
         item = _make_item(
             item_id="img-learning",
             item_type="image",
             results={
-                "markdown": "合成后 markdown（含图片引用）",
+                "markdown": "![示例图](/static/workspaces/ws-01/image/01.jpg)\n\n合成后 markdown（含图片引用）",
                 "source_md_raw": "原始正文",
                 "note_body": "# 学习笔记\n\n## 一句话结论\n\n小红书信息卡片的学习价值。",
                 "note_kind": "image_text",
@@ -505,5 +507,7 @@ class TestImageTextLearningNote:
         # note.md 应含学习笔记
         assert "学习笔记" in note_content
         assert "学习价值" in note_content
+        assert "示例图" in note_content
+        assert "合成后 markdown" in note_content
         # source.md 应含原始文本
         assert "原始正文" in source_content

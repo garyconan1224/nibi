@@ -18,6 +18,140 @@ from shared.config import DATA_DIR
 from shared.settings_store import load_settings
 
 
+def _is_image_text_item(item: WorkspaceItem) -> bool:
+    results = item.results or {}
+    return item.type == "image" and results.get("note_kind") == "image_text"
+
+
+def _image_text_material(item: WorkspaceItem) -> Tuple[str, str, str]:
+    """Return source text, composed markdown, and image notes for image-text items."""
+    results = item.results or {}
+    source_text = str(
+        results.get("source_md_raw")
+        or results.get("note_body")
+        or results.get("content")
+        or ""
+    ).strip()
+    composed_md = str(results.get("markdown") or "").strip()
+    image_lines: List[str] = []
+    for info in results.get("image_infos") or []:
+        if not isinstance(info, dict):
+            continue
+        idx = int(info.get("idx") or len(image_lines) + 1)
+        desc = str(info.get("description") or "").strip()
+        ocr = str(info.get("ocr_text") or "").strip()
+        static_url = str(info.get("static_url") or "").strip()
+        parts = [f"图 {idx}"]
+        if static_url:
+            parts.append(static_url)
+        if desc:
+            parts.append(f"理解：{desc}")
+        if ocr:
+            parts.append(f"OCR：{ocr}")
+        if len(parts) > 1:
+            image_lines.append(" | ".join(parts))
+    return source_text, composed_md, "\n".join(image_lines)
+
+
+def _build_image_text_standard_prompt(
+    item: WorkspaceItem,
+    background: str = "",
+) -> Tuple[str, str]:
+    """Build a note-summary prompt for image-text posts, separate from video transcript prompts."""
+    source_text, composed_md, image_notes = _image_text_material(item)
+    system_prompt = (
+        "你是一名图文笔记整理专家。请把一篇图文平台笔记整理成可读、可复用的中文学习笔记。\n"
+        "你必须同时参考原文、图片理解和图文混排语境；不要按视频转写、字幕或时间轴来写。\n"
+        "输出 Markdown，重点是观点提炼、结构梳理、图片补充的信息价值和可行动 takeaway。\n"
+        "不要添加 [mm:ss] 这类视频时间戳，也不要编造原文没有的信息。"
+    )
+    sections: List[str] = []
+    if background.strip():
+        sections.append(f"【背景信息】\n{background.strip()}")
+    if source_text:
+        sections.append(f"【原文】\n{source_text}")
+    if composed_md:
+        sections.append(f"【图文语境】\n{composed_md}")
+    if image_notes:
+        sections.append(f"【图片理解】\n{image_notes}")
+    material = "\n\n".join(sections).strip()
+    user_prompt = (
+        "请基于以下图文材料生成一篇标准总结。要求：\n"
+        "1. 开头用 2-3 句概括这篇图文真正想表达什么。\n"
+        "2. 用 `##` 分成 2-4 个主题，不要写时间点。\n"
+        "3. 每个主题说明：原文观点是什么、图片补充了什么、对读者有什么启发。\n"
+        "4. 保留关键概念、工具名、标签里的有效信息；过滤点赞关注等平台话术。\n"
+        "5. 结尾写 `## 可带走的结论`，给 3-5 条具体 takeaway。\n\n"
+        f"{material}"
+    )
+    return system_prompt, user_prompt
+
+
+def _image_text_as_plain_text(item: WorkspaceItem) -> str:
+    source_text, composed_md, image_notes = _image_text_material(item)
+    return "\n\n".join(part for part in (source_text, composed_md, image_notes) if part.strip())
+
+
+def _summary_source_text(item: WorkspaceItem) -> str:
+    results = item.results or {}
+    if _is_image_text_item(item):
+        return _image_text_as_plain_text(item)
+    raw_transcript = results.get("transcript", "")
+    if isinstance(raw_transcript, list):
+        raw_transcript = " ".join(
+            seg.get("text", "") for seg in raw_transcript if isinstance(seg, dict)
+        )
+    return str(
+        raw_transcript
+        or results.get("content")
+        or results.get("summary")
+        or results.get("note_body")
+        or results.get("markdown")
+        or ""
+    ).strip()
+
+
+def _build_tool_recommendation_prompt(
+    item: WorkspaceItem,
+    background: str = "",
+) -> Tuple[str, str]:
+    """Build a no-image tool recommendation summary prompt."""
+    source_text, composed_md, image_notes = _image_text_material(item)
+    if not (source_text or composed_md or image_notes):
+        source_text = _summary_source_text(item)
+
+    system_prompt = (
+        "你是一名工具推荐笔记整理专家。请把文字型图文、工具截图、OCR 文本和原文说明，"
+        "整理成一篇能帮助读者判断是否值得尝试的工具推荐总结。\n"
+        "严格要求：不要插入图片 Markdown，不要输出图片链接，不要写视频时间戳。"
+        "如果图片主要是文字，请把图中文字提炼成信息和判断，而不是描述图片本身。"
+    )
+    sections: List[str] = []
+    if background.strip():
+        sections.append(f"【背景信息】\n{background.strip()}")
+    if source_text:
+        sections.append(f"【原文/正文】\n{source_text}")
+    if composed_md:
+        sections.append(f"【图文语境】\n{composed_md}")
+    if image_notes:
+        sections.append(f"【图片文字与理解】\n{image_notes}")
+    material = "\n\n".join(sections).strip()
+    user_prompt = (
+        "请基于以下材料生成「工具推荐」总结。输出 Markdown，按这个结构写：\n"
+        "1. `## 一句话判断`：这个工具是什么，最值得关注的价值是什么。\n"
+        "2. `## 解决的问题`：它试图解决什么具体痛点。\n"
+        "3. `## 核心功能与亮点`：从原文和图片文字中提炼功能，不要贴图。\n"
+        "4. `## 适合谁使用`：列出 2-4 类适用人群或场景。\n"
+        "5. `## 使用方式或工作流`：如果材料里有步骤/入口/流程，就整理出来；没有就写“材料未明确”。\n"
+        "6. `## 局限与注意`：只基于材料指出可能限制、缺失信息或需要进一步确认的点。\n"
+        "7. `## 是否值得尝试`：给出简短判断和下一步行动。\n\n"
+        "注意：过滤点赞关注、话题标签等平台话术；不要编造价格、官网、下载地址或功能。"
+        "如果材料里出现多个工具，用表格比较；如果只有一个工具，不要强行做表格。\n\n"
+        f"{material}"
+    )
+    return system_prompt, user_prompt
+
+
 def build_prompt(
     item: WorkspaceItem,
     template_id: str,
@@ -31,6 +165,11 @@ def build_prompt(
     standard 模板额外注入「关键帧清单」（若有截帧数据）。
     embed_frames=False 时跳过帧注入；max_embed_frames>0 时限制帧数。
     """
+    if template_id == "tool_recommendation":
+        return _build_tool_recommendation_prompt(item, background)
+    if _is_image_text_item(item) and template_id == "standard":
+        return _build_image_text_standard_prompt(item, background)
+
     tpl = get_template(template_id)
     raw_transcript = (item.results or {}).get("transcript", "")
     seg_list = raw_transcript if isinstance(raw_transcript, list) else None
@@ -45,6 +184,8 @@ def build_prompt(
         plain_text = (item.results or {}).get("content", "")
     if not plain_text.strip():
         plain_text = (item.results or {}).get("summary", "")
+    if not plain_text.strip() and _is_image_text_item(item):
+        plain_text = _image_text_as_plain_text(item)
 
     # standard 额外用「[mm:ss] 文字」分段版本喂 LLM，使其能在 ## 章节标题后标注
     # 真实时间戳；其他模板维持纯文本，零影响。
@@ -68,7 +209,7 @@ def build_prompt(
     user_prompt = tpl.user_prompt.format(transcript=transcript)
 
     # R3.6: standard 模板注入「内容画像」元数据（转写字数 + 视频时长）
-    if template_id == "standard":
+    if template_id == "standard" and not _is_image_text_item(item):
         char_count = len(plain_text)
         # 从 transcript_segments 最后一段的 t_sec 推算视频大致时长
         duration_sec = 0
@@ -93,7 +234,7 @@ def build_prompt(
     # R3.11: embed_frames=False 时跳过
     # R3.16: max_embed_frames=0 不再表示「无限」（那会把所有帧塞进 prompt → 图太多），
     #        改为按时长自适应封顶；_collect_frames 已过价值闸门+去重，再按 cap 均匀采样。
-    if template_id == "standard" and embed_frames:
+    if template_id == "standard" and embed_frames and not _is_image_text_item(item):
         frames = _collect_frames(item)  # 已过价值闸门 + 去重，idx 连续
         cap = max_embed_frames if max_embed_frames > 0 else _adaptive_frame_cap(
             duration_sec, len(frames)
@@ -490,7 +631,11 @@ def generate_summary(
 
         # 用标题/背景/内容前 200 字构造搜索关键词
         title = (item.results or {}).get("title") or ""
-        transcript = (item.results or {}).get("transcript", "")
+        transcript = (
+            _image_text_as_plain_text(item)
+            if _is_image_text_item(item)
+            else (item.results or {}).get("transcript", "")
+        )
         if isinstance(transcript, list):
             transcript = " ".join(
                 seg.get("text", "") for seg in transcript if isinstance(seg, dict)

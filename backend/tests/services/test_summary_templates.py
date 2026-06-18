@@ -8,7 +8,7 @@ def test_all_template_ids_loadable():
     expected_ids = [
         "concise", "detailed", "quotes", "meeting",
         "xhs", "longform", "lecture", "interview", "shownotes",
-        "oral", "steps", "outline", "qa", "actions", "standard",
+        "oral", "steps", "outline", "qa", "actions", "tool_recommendation", "standard",
     ]
     assert list_template_ids() == expected_ids
     for tid in expected_ids:
