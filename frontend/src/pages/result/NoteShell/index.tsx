@@ -17,7 +17,7 @@ import type { ReactElement, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowLeft, BookOpenCheck, Check, ChevronDown, ChevronRight, Download, FileCode, FileDown, FileText, FileType, Image, List, Presentation, RefreshCw, Sparkles, Subtitles } from 'lucide-react'
+import { ArrowLeft, BookOpenCheck, Brain, Check, ChevronDown, ChevronRight, Download, FileCode, FileDown, FileText, FileType, Image, List, Network, Presentation, RefreshCw, Sparkles, Subtitles } from 'lucide-react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers, Decoration, ViewPlugin, MatchDecorator, type ViewUpdate } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
@@ -27,7 +27,7 @@ import { toast } from 'sonner'
 import { downloadSubtitles, exportItemNoteObsidian, getItemNote, putItemNote } from '@/services/workspaces'
 import type { VideoResultTranscriptLine } from '@/services/workspaces'
 import type { ItemNote } from '@/types/workspace'
-import { listSummaries, type ItemSummary } from '@/services/summaries'
+import { createSummary, listSummaries, type ItemSummary } from '@/services/summaries'
 import { TS_RE, parseTs } from '@/pages/results/LearningNotesPage/HtmlView'
 import { Badge } from '@/components/ui/badge'
 import { SYSTEM_TAG_DIMENSIONS } from '@/constants/tagDimensions'
@@ -37,6 +37,7 @@ import LNVideoPanel, { type LNVideoPanelHandle } from '@/pages/results/LearningN
 import LNTranscriptPanel from '@/pages/results/LearningNotesPage/LNTranscriptPanel'
 import '@/pages/results/LearningNotesPage/learning-notes.css'
 import { SummariesTab } from '@/components/SummariesTab'
+import { NewSummaryModal } from '@/components/NewSummaryModal'
 import NoteChatDrawer from '@/components/NoteChatDrawer'
 import { SourceMdModal } from './SourceMdModal'
 import { FloatingAskAi } from './FloatingAskAi'
@@ -568,6 +569,14 @@ export default function NoteShell() {
   const [tagsOpen, setTagsOpen] = useState(true)
   const [chatOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
+  // VN4.3 AI 工具下拉
+  const [aiToolsOpen, setAiToolsOpen] = useState(false)
+  const aiToolsDropRef = useRef<HTMLDivElement>(null)
+  // 新建总结（复用 NewSummaryModal）
+  const [showNewSummaryModal, setShowNewSummaryModal] = useState(false)
+  const [creatingSummary, setCreatingSummary] = useState(false)
+  // 原文对照面板 ref（用于聚焦高亮）
+  const transcriptPanelRef = useRef<HTMLDivElement>(null)
 
   // R1.3 + R2.1: 视图模式 + 保存状态（兼容三值 + 窄屏降级 compare → wysiwyg）
   const isWide = useMediaQuery('(min-width: 1024px)')
@@ -632,6 +641,18 @@ export default function NoteShell() {
     document.addEventListener('mousedown', handle)
     return () => document.removeEventListener('mousedown', handle)
   }, [versionDropOpen])
+
+  // 点击外部关闭 AI 工具下拉
+  useEffect(() => {
+    if (!aiToolsOpen) return
+    const handle = (e: MouseEvent) => {
+      if (aiToolsDropRef.current && !aiToolsDropRef.current.contains(e.target as Node)) {
+        setAiToolsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [aiToolsOpen])
 
   // 图文笔记：图片索引 + 加载错误
   const [selectedImageIdx, setSelectedImageIdx] = useState(0)
@@ -787,6 +808,45 @@ export default function NoteShell() {
       toast.error('原文对照导出失败，请重试')
     }
   }, [workspaceId, itemId])
+
+  // VN4.3 新建总结（从 AI 工具菜单触发，复用 NewSummaryModal）
+  const handleCreateSummary = useCallback(async (opts: {
+    template: string; background: string; providerId: string; model: string; searchWeb: boolean
+  }) => {
+    setShowNewSummaryModal(false)
+    setCreatingSummary(true)
+    try {
+      const s = await createSummary(workspaceId, itemId, opts.template, opts.background, {
+        provider_id: opts.providerId,
+        model: opts.model,
+        search_web: opts.searchWeb,
+      })
+      toast.success(`v${s.version} 总结生成完成`)
+      refreshSummaries()
+    } catch (err: unknown) {
+      const axiosData = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      if (axiosData && axiosData.includes('chat model')) {
+        toast.error('请先在设置中配置 LLM 模型', {
+          action: { label: '去设置', onClick: () => navigate('/settings/models') },
+        })
+      } else {
+        const msg = err instanceof Error ? err.message : '生成失败'
+        toast.error(msg)
+      }
+    } finally {
+      setCreatingSummary(false)
+    }
+  }, [workspaceId, itemId, refreshSummaries, navigate])
+
+  // VN4.3 原文对照聚焦：滚动到左列 transcript 面板并短暂高亮
+  const handleFocusTranscript = useCallback(() => {
+    const panel = transcriptPanelRef.current
+    if (!panel) return
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    panel.style.transition = 'box-shadow .2s'
+    panel.style.boxShadow = '0 0 0 2px var(--accent-2)'
+    setTimeout(() => { panel.style.boxShadow = '' }, 1500)
+  }, [])
 
   // ─── loading / error ───
   if (loading) {
@@ -986,6 +1046,68 @@ export default function NoteShell() {
             </div>
           )}
         </div>
+
+        {/* VN4.3 AI 工具（视频+图文共用） */}
+        <div ref={aiToolsDropRef} style={{ position: 'relative' }}>
+          <button
+            className="btn-ghost"
+            onClick={() => setAiToolsOpen((v) => !v)}
+            style={{ height: 28, padding: '0 10px', fontSize: 12 }}
+            title="AI 工具"
+          >
+            <Brain size={13} /> AI 工具
+            <ChevronDown size={11} style={{ marginLeft: 2 }} />
+          </button>
+          {aiToolsOpen && (
+            <div
+              style={{
+                position: 'absolute', right: 0, top: 34, zIndex: 20,
+                minWidth: 160, padding: '4px',
+                border: '1px solid var(--line)',
+                borderRadius: 'var(--radius-sm)',
+                background: 'var(--bg)',
+                boxShadow: 'var(--shadow-md)',
+              }}
+            >
+              {isVideoNote && (
+                <button
+                  className="btn-ghost"
+                  onClick={() => { handleFocusTranscript(); setAiToolsOpen(false) }}
+                  style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
+                >
+                  <Subtitles size={13} /> 原文对照
+                </button>
+              )}
+              <button
+                className="btn-ghost"
+                onClick={() => { setShowNewSummaryModal(true); setAiToolsOpen(false) }}
+                style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
+              >
+                <RefreshCw size={13} /> 重新生成
+              </button>
+              {/* ── 占位项（灰显 disabled） ── */}
+              {[
+                { icon: <Network size={13} />, label: '思维导图' },
+                { icon: <Image size={13} />, label: '总结海报' },
+              ].map((item) => (
+                <button
+                  key={item.label}
+                  disabled
+                  title="敬请期待"
+                  style={{
+                    width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12,
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    background: 'none', border: 'none', cursor: 'not-allowed',
+                    color: 'var(--ink-3)', opacity: 0.45,
+                  }}
+                >
+                  {item.icon} {item.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <Badge variant="outline" style={{ fontSize: 10 }}>
           <FileText size={10} /> NoteShell
         </Badge>
@@ -1039,7 +1161,7 @@ export default function NoteShell() {
             </div>
             {/* 字幕区 — 独立挂载，不受中列 re-render 影响 */}
             {Array.isArray(note.transcript) && (note.transcript as VideoResultTranscriptLine[]).length > 0 ? (
-              <div style={{ flex: 1, overflowY: 'auto', borderTop: '1px solid var(--line)' }}>
+              <div ref={transcriptPanelRef} style={{ flex: 1, overflowY: 'auto', borderTop: '1px solid var(--line)' }}>
                 <LNTranscriptPanel
                   transcript={note.transcript as VideoResultTranscriptLine[]}
                   currentTime={currentTime}
@@ -1338,6 +1460,15 @@ export default function NoteShell() {
         sourceMd={note.source_md ?? ''}
         onClose={() => setSourceModalOpen(false)}
       />
+
+      {/* VN4.3 新建/重新生成总结弹窗（从 AI 工具菜单触发） */}
+      {showNewSummaryModal && (
+        <NewSummaryModal
+          creating={creatingSummary}
+          onSubmit={handleCreateSummary}
+          onClose={() => setShowNewSummaryModal(false)}
+        />
+      )}
     </div>
   )
 }
