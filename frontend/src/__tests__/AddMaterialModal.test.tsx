@@ -73,12 +73,10 @@ describe('AddMaterialModal', () => {
       />,
     )
 
-    expect(screen.getByText('② 选择任务')).toBeTruthy()
-    expect(screen.getByText('③ 笔记类型')).toBeTruthy()
-    expect(screen.getByRole('button', { name: /笔记 下载/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /复刻分析/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /竞品分析/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /资料收藏/ })).toBeTruthy()
+    expect(screen.getByText('② 生成设置')).toBeTruthy()
+    expect(screen.getByText('③ 输出与归类')).toBeTruthy()
+    expect(screen.getByText('test video')).toBeTruthy()
+    expect(screen.getByText('链接有效')).toBeTruthy()
     expect(screen.getByRole('button', { name: /开始生成/ })).toBeTruthy()
     expect(screen.queryByText(/分析范围/)).toBeNull()
     expect(screen.queryByText(/勾选分析任务/)).toBeNull()
@@ -123,6 +121,7 @@ describe('AddMaterialModal', () => {
         '',
         'note',
         'image_text',
+        { diarize: false, template_id: 'standard' },
       )
     })
     expect(addWorkspaceItemMock).not.toHaveBeenCalled()
@@ -166,11 +165,12 @@ describe('AddMaterialModal', () => {
         '',
         'note',
         'auto',
+        { diarize: false, template_id: 'standard' },
       )
     })
   })
 
-  it('占位任务可点击提示但不会提交任务', () => {
+  it('占位任务不会提交任务', () => {
     render(
       <AddMaterialModal
         open={true}
@@ -180,14 +180,10 @@ describe('AddMaterialModal', () => {
       />,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /复刻分析/ }))
-    const unsupportedButtons = screen.getAllByRole('button', { name: /即将支持/ })
-    fireEvent.click(unsupportedButtons[unsupportedButtons.length - 1])
-
     expect(generateNoteMock).not.toHaveBeenCalled()
   })
 
-  it('内部输入链接后自动嗅探并展示识别结果', async () => {
+  it('内部输入链接后自动嗅探并展示视频卡', async () => {
     sniffUrlMock.mockResolvedValue({
       primary_type: 'text',
       possible_types: ['text'],
@@ -210,7 +206,8 @@ describe('AddMaterialModal', () => {
     })
 
     await waitFor(() => {
-      expect(screen.getByText(/已识别为 文字 · 文章标题/)).toBeTruthy()
+      expect(screen.getByText('文章标题')).toBeTruthy()
+      expect(screen.getByText('链接有效')).toBeTruthy()
     })
   })
 })
