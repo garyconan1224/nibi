@@ -422,8 +422,20 @@ export default function ProcessingPage() {
             </div>
           )}
 
+          {/* AWAITING_CONFIRM: 等待用户确认音乐模式 */}
+          {status === 'AWAITING_CONFIRM' && (
+            <div style={{ padding: '20px 24px' }}>
+              <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>
+                等待确认
+              </div>
+              <p style={{ fontSize: 13, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+                检测到该内容可能是音乐，需要你确认后继续分析。请在弹窗中操作。
+              </p>
+            </div>
+          )}
+
           {/* Step progress (running / success) */}
-          {!isFailed && !isCancelled && (
+          {!isFailed && !isCancelled && status !== 'AWAITING_CONFIRM' && (
             <>
               {/* VN3: 简洁处理中 — 5 步进度 + 预计剩余 + 友好提示 */}
               <div style={{ padding: '20px 24px 8px' }}>
@@ -438,6 +450,7 @@ export default function ProcessingPage() {
                 <StepProgress
                   currentStatus={status}
                   progress={progress}
+                  isImageNote={isImageNote}
                 />
                 <div style={{ fontSize: 12, color: 'var(--ink-4)', marginTop: 12, lineHeight: 1.5 }}>
                   {isSuccess

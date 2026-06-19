@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { deriveSteps } from '@/pages/result/ProcessingPage/StepProgress'
 
 const STEP_IDS = ['PENDING', 'DOWNLOAD', 'TRANSCRIBE', 'ANALYZE_NOTE', 'SUCCESS']
+const STEP_IDS_NO_ASR = ['PENDING', 'DOWNLOAD', 'ANALYZE_NOTE', 'SUCCESS']
 
 describe('deriveSteps', () => {
+  // ── 基本 5 步映射（hasTranscriptStep=true，默认） ──
+
   it('5 步顺序固定：PENDING → DOWNLOAD → TRANSCRIBE → ANALYZE_NOTE → SUCCESS', () => {
     const steps = deriveSteps('PENDING', 0)
     expect(steps.map(s => s.id)).toEqual(STEP_IDS)
@@ -72,6 +75,47 @@ describe('deriveSteps', () => {
     const steps = deriveSteps('UNKNOWN', 0.5)
     expect(steps[0]).toMatchObject({ id: 'PENDING', state: 'running', pct: 0.5 })
     steps.slice(1).forEach(s => {
+      expect(s.state).toBe('queued')
+      expect(s.pct).toBe(0)
+    })
+  })
+
+  // ── PROBE 映射：归入「下载」步骤，不回退 PENDING ──
+
+  it('PROBE → 下载 running，不应落回 PENDING', () => {
+    const steps = deriveSteps('PROBE', 0.06)
+    expect(steps[0]).toMatchObject({ id: 'PENDING', state: 'done', pct: 1 })
+    expect(steps[1]).toMatchObject({ id: 'DOWNLOAD', state: 'running', pct: 0.06 })
+    expect(steps[2]).toMatchObject({ id: 'TRANSCRIBE', state: 'queued', pct: 0 })
+  })
+
+  // ── 无 ASR 流程（hasTranscriptStep=false，图片笔记等） ──
+
+  it('hasTranscriptStep=false → 产出 4 步，不含 TRANSCRIBE', () => {
+    const steps = deriveSteps('PENDING', 0, { hasTranscriptStep: false })
+    expect(steps.map(s => s.id)).toEqual(STEP_IDS_NO_ASR)
+  })
+
+  it('hasTranscriptStep=false + VLM → 下载 done，生成笔记 running，TRANSCRIBE 不出现', () => {
+    const steps = deriveSteps('VLM', 0.6, { hasTranscriptStep: false })
+    expect(steps.map(s => s.id)).toEqual(STEP_IDS_NO_ASR)
+    expect(steps[0]).toMatchObject({ id: 'PENDING', state: 'done', pct: 1 })
+    expect(steps[1]).toMatchObject({ id: 'DOWNLOAD', state: 'done', pct: 1 })
+    expect(steps[2]).toMatchObject({ id: 'ANALYZE_NOTE', state: 'running', pct: 0.6 })
+    expect(steps[3]).toMatchObject({ id: 'SUCCESS', state: 'queued', pct: 0 })
+  })
+
+  it('hasTranscriptStep=false + SUM → 下载 done，生成笔记 running', () => {
+    const steps = deriveSteps('SUM', 0.9, { hasTranscriptStep: false })
+    expect(steps.map(s => s.id)).toEqual(STEP_IDS_NO_ASR)
+    expect(steps[2]).toMatchObject({ id: 'ANALYZE_NOTE', state: 'running', pct: 0.9 })
+  })
+
+  // ── AWAITING_CONFIRM：deriveSteps 不处理，由 UI 层单独分支 ──
+
+  it('AWAITING_CONFIRM → 全部 queued（UI 层应单独处理此状态，不走普通进度条）', () => {
+    const steps = deriveSteps('AWAITING_CONFIRM', 0)
+    steps.forEach(s => {
       expect(s.state).toBe('queued')
       expect(s.pct).toBe(0)
     })
