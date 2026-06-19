@@ -41,7 +41,7 @@ export async function createSummary(
       model: options.model ?? '',
       search_web: options.search_web ?? false,
     },
-    { timeout: 120_000 },  // LLM 调用可能慢
+    { timeout: 180_000 },  // 强模型更慢，给 3 分钟
   )
   return data
 }

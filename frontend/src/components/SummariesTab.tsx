@@ -6,7 +6,7 @@
  * + 新建 → NewSummaryModal 弹窗。
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -23,6 +23,7 @@ import {
 } from '@/services/summaries'
 import { getItemNote } from '@/services/workspaces'
 
+import { flattenText, MarkdownToc, slugify } from './MarkdownToc'
 import { NewSummaryModal } from './NewSummaryModal'
 
 import './summaries-tab.css'
@@ -49,6 +50,7 @@ const TEMPLATE_LABEL_MAP: Record<string, string> = {
   qa: '问答卡(Anki)',
   actions: '行动清单',
   tool_recommendation: '工具推荐',
+  science_popularization: '知识科普',
   standard: '标准总结',
 }
 
@@ -93,6 +95,8 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
   // 改名
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
+
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   /* ── 加载列表 ────────────────────────────────────────── */
 
@@ -473,8 +477,15 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
                 {selected.model_used && ` · ${selected.model_used}`}
               </span>
             </div>
-            <div className="sm-main-content">
-              <ReactMarkdown remarkPlugins={remarkPlugins}>
+            <MarkdownToc markdown={selected.content_md} scrollRef={scrollRef} />
+            <div className="sm-main-content" ref={scrollRef}>
+              <ReactMarkdown
+                remarkPlugins={remarkPlugins}
+                components={{
+                  h2: ({ children, ...props }) => <h2 id={slugify(flattenText(children))} {...props}>{children}</h2>,
+                  h3: ({ children, ...props }) => <h3 id={slugify(flattenText(children))} {...props}>{children}</h3>,
+                }}
+              >
                 {selected.content_md}
               </ReactMarkdown>
             </div>

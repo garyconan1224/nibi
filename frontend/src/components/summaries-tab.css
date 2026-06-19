@@ -234,6 +234,7 @@
   padding: 16px 20px;
   font-size: 14px;
   line-height: 1.7;
+  scroll-behavior: smooth;
 }
 
 .sm-main-content h1 { font-size: 18px; font-weight: 700; margin: 12px 0 8px; }
@@ -244,10 +245,35 @@
 .sm-main-content li { line-height: 1.6; }
 .sm-main-content blockquote {
   border-left: 3px solid var(--accent-warm, var(--accent-pink));
-  padding-left: 12px;
+  background: var(--bg-elev, #f8f6f4);
+  padding: 10px 14px;
   margin: 8px 0;
   color: var(--ink-3);
+  border-radius: 0 var(--radius-sm, 6px) var(--radius-sm, 6px) 0;
 }
+
+/* Markdown 表格 */
+.sm-main-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 13px;
+}
+.sm-main-content th,
+.sm-main-content td {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  text-align: left;
+}
+.sm-main-content th {
+  background: var(--bg-sunken);
+  font-weight: 600;
+  color: var(--ink);
+}
+.sm-main-content h1, .sm-main-content h2, .sm-main-content h3 {
+  scroll-margin-top: 12px;
+}
+
 .sm-main-content pre {
   background: var(--bg-sunken);
   padding: 10px;
@@ -617,4 +643,57 @@
 
 @keyframes sm-spin {
   to { transform: rotate(360deg); }
+}
+
+/* ── 目录 TOC ──────────────────────────────────── */
+
+.sm-toc {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-elev);
+  flex-shrink: 0;
+}
+
+.sm-toc-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.sm-toc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.sm-toc-item {
+  font-size: 13px;
+}
+
+.sm-toc-item a {
+  color: var(--ink-2);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.sm-toc-item a:hover {
+  color: var(--accent-2);
+}
+
+.sm-toc-h3 {
+  padding-left: 12px;
+}
+
+.sm-toc-item[data-active] {
+  color: var(--ink);
+}
+
+.sm-toc-item[data-active] a {
+  color: var(--ink);
+  font-weight: 600;
 }

@@ -167,6 +167,197 @@ def _build_tool_recommendation_prompt(
     return system_prompt, user_prompt
 
 
+def _build_image_text_tutorial_prompt(
+    item: WorkspaceItem,
+    background: str = "",
+) -> Tuple[str, str]:
+    """Build a tutorial/steps summary prompt for image-text items, based on source.md."""
+    results = item.results or {}
+    source_md = str(
+        results.get("source_md_raw")
+        or results.get("source_text_enriched")
+        or results.get("content")
+        or results.get("note_body")
+        or ""
+    ).strip()
+
+    system_prompt = (
+        "你是教程笔记整理专家。请基于 source.md 材料，"
+        "整理成一篇可照着做的教程式总结。\n"
+        "严格要求：\n"
+        "1. 不要插入图片 Markdown，不要输出图片链接，不要写视频时间戳。\n"
+        "2. 正文不能出现「OCR」「图片描述」「视觉元素」等材料调试词。\n"
+        "3. 如果图片主要是文字，请把图中文字提炼成操作步骤，而不是描述图片本身。\n"
+        "4. 材料中没有明确的信息不要编造，缺的步骤写「材料未明确」。"
+    )
+    sections: List[str] = []
+    if background.strip():
+        sections.append(f"【背景信息】\n{background.strip()}")
+    if source_md:
+        sections.append(f"【source.md 材料】\n{source_md[:12000]}")
+    material = "\n\n".join(sections).strip()
+    user_prompt = (
+        "请基于 source.md 材料生成「步骤教程」总结。输出 Markdown，按这个结构写：\n"
+        "1. `## 🎯 学完你将掌握`：要点列表，学习者视角的收获。\n"
+        "2. `## 🛠️ 前置条件 / 所需工具`：**有多个工具/要求时用 Markdown 表格**（工具 | 版本/要求）；只有一个时用列表。\n"
+        "3. `## 操作步骤`：有序 Step 编号，可照做；步骤多时分「### 基础操作」和「### 进阶操作」两层。\n"
+        "4. `## 💡 关键提示`：用 `>` blockquote 写 tips / 替代方案。\n"
+        "5. `## 🔧 常见坑`：列出易踩的坑和解决办法。\n"
+        "6. `## ✅ 验收 / 测试方法`：怎么确认做对了。\n"
+        "7. `## 可带走的结论`：3-5 条核心 takeaway。\n\n"
+        "注意：材料中没有明确的步骤不要编造，写「材料未明确」；过滤点赞关注等平台话术。\n\n"
+        f"{material}"
+    )
+    return system_prompt, user_prompt
+
+
+def _build_image_text_science_prompt(
+    item: WorkspaceItem,
+    background: str = "",
+) -> Tuple[str, str]:
+    """Build a science popularization summary prompt for image-text items, based on source.md."""
+    results = item.results or {}
+    source_md = str(
+        results.get("source_md_raw")
+        or results.get("source_text_enriched")
+        or results.get("content")
+        or results.get("note_body")
+        or ""
+    ).strip()
+
+    system_prompt = (
+        "你是知识科普笔记整理专家。请基于 source.md 材料，"
+        "整理成一篇通俗易懂的科普式总结。\n"
+        "严格要求：\n"
+        "1. 不要插入图片 Markdown，不要输出图片链接，不要写视频时间戳。\n"
+        "2. 正文不能出现「OCR」「图片描述」「视觉元素」等材料调试词。\n"
+        "3. 如果图片主要是文字，请把图中文字提炼成知识点，而不是描述图片本身。\n"
+        "4. 把专业术语用白话解释一遍，确保非专业读者也能理解。"
+    )
+    sections: List[str] = []
+    if background.strip():
+        sections.append(f"【背景信息】\n{background.strip()}")
+    if source_md:
+        sections.append(f"【source.md 材料】\n{source_md[:12000]}")
+    material = "\n\n".join(sections).strip()
+    user_prompt = (
+        "请基于 source.md 材料生成「知识科普」总结。输出 Markdown，按这个结构写：\n"
+        "1. `## 这篇在讲什么`：2-3 句通俗概括核心知识点。\n"
+        "2. `## 核心概念`：用表格或列表整理关键概念（概念 | 一句话解释）。\n"
+        "3. `## 原理或机制`：拆解背后的逻辑或原理，用类比让读者更容易理解。\n"
+        "4. `## 有什么用`：这些知识在实际生活/工作中如何应用。\n"
+        "5. `## 常见误解`：用 `>` blockquote 列出常见误区和正确理解。\n"
+        "6. `## 延伸阅读方向`：给出 2-3 个可以进一步了解的方向。\n\n"
+        "注意：过滤点赞关注等平台话术；用通俗语言，避免堆砌术语。\n\n"
+        f"{material}"
+    )
+    return system_prompt, user_prompt
+
+
+def build_image_text_note_prompt(
+    source_md: str,
+    title: str,
+    content_category: str,
+) -> Tuple[str, str]:
+    """为 pipeline_tasks._generate_image_text_learning_note 构造 prompt。
+
+    根据 content_category 选择模板：tutorial / tool_recommendation / science_popularization / unknown(=standard)。
+    复用已有模板的结构，不重写。
+    """
+    body = source_md[:12000]
+
+    if content_category == "tutorial":
+        sys_prompt = (
+            "你是教程笔记整理专家。请基于 source.md 材料，"
+            "整理成一篇可照着做的教程式总结。\n"
+            "严格要求：\n"
+            "1. 只基于 source.md 内容做总结，不要编造原文没有的信息。\n"
+            "2. 正文不能出现「OCR」「图片描述」「视觉元素」等材料调试词。\n"
+            "3. 不要逐张描述图片外观、色调、构图、风格。\n"
+            "4. 材料中没有明确的信息不要编造，缺的步骤写「材料未明确」。"
+        )
+        user_prompt = (
+            f"# 标题\n{title}\n\n"
+            f"# source.md 材料\n{body}\n\n"
+            "请基于 source.md 材料生成「步骤教程」总结。输出 Markdown，按这个结构写：\n"
+            "1. `## 🎯 学完你将掌握`：要点列表，学习者视角的收获。\n"
+            "2. `## 🛠️ 前置条件 / 所需工具`：**有多个工具/要求时用 Markdown 表格**（工具 | 版本/要求）；只有一个时用列表。\n"
+            "3. `## 操作步骤`：有序 Step 编号，可照做；步骤多时分「### 基础操作」和「### 进阶操作」两层。\n"
+            "4. `## 💡 关键提示`：用 `>` blockquote 写 tips / 替代方案。\n"
+            "5. `## 🔧 常见坑`：列出易踩的坑和解决办法。\n"
+            "6. `## ✅ 验收 / 测试方法`：怎么确认做对了。\n"
+            "7. `## 可带走的结论`：3-5 条核心 takeaway。\n\n"
+            "注意：材料中没有明确的步骤不要编造，写「材料未明确」；过滤点赞关注等平台话术。"
+        )
+    elif content_category == "tool_recommendation":
+        sys_prompt = (
+            "你是工具推荐笔记整理专家。请基于 source.md 材料，"
+            "整理成一篇能帮助读者判断是否值得尝试的工具推荐总结。\n"
+            "严格要求：\n"
+            "1. 只基于 source.md 内容做总结，不要编造原文没有的信息。\n"
+            "2. 正文不能出现「OCR」「图片描述」「视觉元素」等材料调试词。\n"
+            "3. 不要逐张描述图片外观、色调、构图、风格。"
+        )
+        user_prompt = (
+            f"# 标题\n{title}\n\n"
+            f"# source.md 材料\n{body}\n\n"
+            "请基于 source.md 材料生成「工具推荐」总结。输出 Markdown，按这个结构写：\n"
+            "1. `## 一句话判断`：这个工具是什么，最值得关注的价值是什么。\n"
+            "2. `## 解决的问题`：它试图解决什么具体痛点。\n"
+            "3. `## 核心功能与亮点`：从材料中提炼功能，不要贴图。\n"
+            "4. `## 适合谁使用`：列出 2-4 类适用人群或场景。\n"
+            "5. `## 使用方式或工作流`：如果材料里有步骤/入口/流程，就整理出来；没有就写「材料未明确」。\n"
+            "6. `## 局限与注意`：只基于材料指出可能限制、缺失信息或需要进一步确认的点。\n"
+            "7. `## 是否值得尝试`：给出简短判断和下一步行动。\n\n"
+            "注意：过滤点赞关注、话题标签等平台话术；不要编造价格、官网、下载地址或功能。"
+            "如果材料里出现多个工具，用表格比较；如果只有一个工具，不要强行做表格。"
+        )
+    elif content_category == "science_popularization":
+        sys_prompt = (
+            "你是知识科普笔记整理专家。请基于 source.md 材料，"
+            "整理成一篇通俗易懂的科普式总结。\n"
+            "严格要求：\n"
+            "1. 只基于 source.md 内容做总结，不要编造原文没有的信息。\n"
+            "2. 正文不能出现「OCR」「图片描述」「视觉元素」等材料调试词。\n"
+            "3. 不要逐张描述图片外观、色调、构图、风格。\n"
+            "4. 把专业术语用白话解释一遍，确保非专业读者也能理解。"
+        )
+        user_prompt = (
+            f"# 标题\n{title}\n\n"
+            f"# source.md 材料\n{body}\n\n"
+            "请基于 source.md 材料生成「知识科普」总结。输出 Markdown，按这个结构写：\n"
+            "1. `## 这篇在讲什么`：2-3 句通俗概括核心知识点。\n"
+            "2. `## 核心概念`：用表格或列表整理关键概念（概念 | 一句话解释）。\n"
+            "3. `## 原理或机制`：拆解背后的逻辑或原理，用类比让读者更容易理解。\n"
+            "4. `## 有什么用`：这些知识在实际生活/工作中如何应用。\n"
+            "5. `## 常见误解`：用 `>` blockquote 列出常见误区和正确理解。\n"
+            "6. `## 延伸阅读方向`：给出 2-3 个可以进一步了解的方向。\n\n"
+            "注意：过滤点赞关注等平台话术；用通俗语言，避免堆砌术语。"
+        )
+    else:
+        # unknown → 标准总结
+        sys_prompt = (
+            "你是图文笔记整理专家。任务：基于 source.md 材料生成标准总结笔记。\n"
+            "严格规则：\n"
+            "1. 只基于 source.md 内容做总结，不要编造原文没有的信息。\n"
+            "2. 正文不能出现「图1 显示」「OCR」「图片描述」「视觉元素列表」等材料层调试词。\n"
+            "3. 不要逐张描述图片外观、色调、构图、风格。\n"
+            "4. 不要保留营销 CTA、话题标签、关注引导，除非它们对理解内容有价值。\n"
+            "5. 不要添加 [mm:ss] 这类视频时间戳。\n"
+            "6. 如果内容明显是教程/工作流，可以组织成「掌握什么 / 前置条件 / 核心步骤 / 常见坑 / 验收方法」。\n"
+            "7. 否则用「## 观点」「## 方法」「## 可带走的结论」等通用结构。\n"
+            "8. 结尾给 3-5 条具体 takeaway。\n"
+            "9. 只输出 Markdown，不要解释。"
+        )
+        user_prompt = (
+            f"# 标题\n{title}\n\n"
+            f"# source.md 材料\n{body}\n\n"
+            "请基于 source.md 生成标准总结 Markdown："
+        )
+
+    return sys_prompt, user_prompt
+
+
 def build_prompt(
     item: WorkspaceItem,
     template_id: str,
@@ -182,6 +373,10 @@ def build_prompt(
     """
     if template_id == "tool_recommendation":
         return _build_tool_recommendation_prompt(item, background)
+    if _is_image_text_item(item) and template_id in ("steps", "tutorial"):
+        return _build_image_text_tutorial_prompt(item, background)
+    if _is_image_text_item(item) and template_id == "science_popularization":
+        return _build_image_text_science_prompt(item, background)
     if _is_image_text_item(item) and template_id == "standard":
         return _build_image_text_standard_prompt(item, background)
 

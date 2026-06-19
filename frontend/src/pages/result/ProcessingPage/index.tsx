@@ -68,8 +68,7 @@ export default function ProcessingPage() {
   const workspaceId =
     state?.workspaceId ??
     (taskPayload.workspace_id as string | undefined) ??
-    (taskResult.workspace_id as string | undefined) ??
-    task?.project_id
+    (taskResult.workspace_id as string | undefined)
   const itemId =
     state?.itemId ??
     (taskPayload.item_id as string | undefined) ??
@@ -349,14 +348,13 @@ export default function ProcessingPage() {
                   className="btn btn-primary"
                   onClick={() => {
                     if (!isSuccess) return
-                    const wid = workspaceId ?? 'default'
-                    if (itemId) {
+                    if (itemId && workspaceId) {
                       // NI.2: note task 完成后直接进 NoteShell
                       const isNote = (state?.taskType ?? taskType) === 'note'
                       navigate(
                         isNote
-                          ? `/workspaces/${wid}/items/${itemId}/note`
-                          : `/workspaces/${wid}/items/${itemId}/overview`,
+                          ? `/workspaces/${workspaceId}/items/${itemId}/note`
+                          : `/workspaces/${workspaceId}/items/${itemId}/overview`,
                       )
                     } else {
                       // 兜底：跳转到资料库，用户可从那里找到结果

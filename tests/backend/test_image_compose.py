@@ -212,8 +212,7 @@ class TestGenerateImageTextLearningNote:
 
         settings = SimpleNamespace(openai_api_key="sk-test", text_model="gpt-4o")
         result = _generate_image_text_learning_note(
-            source_text="这是一段足够长的图文原始内容，用于验证超时后仍然可以生成兜底学习笔记。",
-            image_infos=_IMAGE_INFOS,
+            source_md="这是一段足够长的图文原始内容，用于验证超时后仍然可以生成兜底学习笔记。",
             title="图文标题",
             settings=settings,
             payload={"image_text_llm_timeout_sec": 0.01},

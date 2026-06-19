@@ -1887,13 +1887,30 @@ def _image_intermediate_patch(
 
 
 _TOOL_SIGNALS: frozenset[str] = frozenset({
-    "工具", "App", "app", "应用", "软件", "插件", "网站",
-    "推荐", "支持", "功能", "工作流", "Markdown", "markdown",
-    "Obsidian", "导出", "记录", "转写", "效率",
+    "App", "app", "应用", "软件", "插件", "网站",
+    "推荐", "工作流", "Markdown", "markdown",
+    "Obsidian", "导出", "转写", "效率",
     "iOS", "Mac", "Windows", "Android", "浏览器",
-    "下载", "扩展", "自动化", "模板", "同步",
-    "笔记", "AI", "Notion", "飞书", "WPS", "Office",
-    "截图", "OCR", "搜索", "翻译", "整理", "收集",
+    "下载", "扩展", "自动化",
+    "Notion", "飞书", "WPS", "Office",
+    "截图", "OCR", "翻译", "整理", "收集",
+    "插件", "一键", "神器", "必装", "强推",
+    "下载地址", "官网", "免费版", "付费", "订阅",
+})
+
+_TUTORIAL_SIGNALS: frozenset[str] = frozenset({
+    "步骤", "教程", "第一步", "第二步", "第三步",
+    "如何", "怎么做", "操作", "配置", "安装", "设置",
+    "流程", "指南", "手把手", "Step", "step",
+})
+
+_SCIENCE_POPULARIZATION_SIGNALS: frozenset[str] = frozenset({
+    "原理", "机制", "科普", "是什么", "为什么",
+    "科学", "物理", "化学", "生物", "数学",
+    "理论", "概念", "定义", "规律", "定律",
+    "实验", "研究", "论文", "发现", "现象",
+    "宇宙", "进化", "量子", "基因", "神经",
+    "大脑", "心理", "认知", "算法", "逻辑",
 })
 
 
@@ -1903,9 +1920,10 @@ def _classify_image_text_content(
     image_infos: List[Dict[str, Any]],
     note_body: str,
 ) -> None:
-    """轻量图文内容分类：识别 tool_recommendation vs unknown，写入 result。
+    """轻量图文内容分类：识别 tutorial / tool_recommendation / science_popularization / unknown，写入 result。
 
     优先使用 source.md / source_text_enriched，其次才看 image_infos。
+    tutorial 信号优先级最高（互斥）。
     """
     if result.get("content_category"):
         return  # 已有分类（重试等），不覆盖
@@ -1921,21 +1939,67 @@ def _classify_image_text_content(
             texts.append(str(info.get("extracted_text") or info.get("description") or ""))
     blob = "\n".join(texts)
 
-    hit = sum(1 for w in _TOOL_SIGNALS if w in blob)
-    if hit >= 3:
+    # 教程信号优先（互斥：命中教程就不再判其他类型）
+    tutorial_hit = sum(1 for w in _TUTORIAL_SIGNALS if w in blob)
+    if tutorial_hit >= 3:
+        result["content_category"] = "tutorial"
+        result["default_summary_template"] = "steps"
+        return
+
+    tool_hit = sum(1 for w in _TOOL_SIGNALS if w in blob)
+    if tool_hit >= 4:
         result["content_category"] = "tool_recommendation"
         result["default_summary_template"] = "tool_recommendation"
-    else:
-        result["content_category"] = "unknown"
+        return
+
+    science_hit = sum(1 for w in _SCIENCE_POPULARIZATION_SIGNALS if w in blob)
+    if science_hit >= 4:
+        result["content_category"] = "science_popularization"
+        result["default_summary_template"] = "science_popularization"
+        return
+
+    result["content_category"] = "unknown"
+    result["default_summary_template"] = "standard"
+
+
+def _classify_from_source(
+    raw_source_text: str,
+    source_text_enriched: str,
+    image_infos: List[Dict[str, Any]],
+) -> str:
+    """提前分类（仅基于 source 材料，不含 note_body），用于 note 正文生成时选择模板。
+
+    返回 content_category 字符串。
+    """
+    texts: List[str] = [raw_source_text, source_text_enriched]
+    for info in image_infos:
+        if isinstance(info, dict):
+            texts.append(str(info.get("content_summary") or ""))
+            texts.append(str(info.get("extracted_text") or info.get("description") or ""))
+    blob = "\n".join(texts)
+
+    tutorial_hit = sum(1 for w in _TUTORIAL_SIGNALS if w in blob)
+    if tutorial_hit >= 3:
+        return "tutorial"
+
+    tool_hit = sum(1 for w in _TOOL_SIGNALS if w in blob)
+    if tool_hit >= 4:
+        return "tool_recommendation"
+
+    science_hit = sum(1 for w in _SCIENCE_POPULARIZATION_SIGNALS if w in blob)
+    if science_hit >= 4:
+        return "science_popularization"
+
+    return "unknown"
 
 
 def _image_text_llm_timeout_sec(payload: Dict[str, Any]) -> float:
     """Return the bounded wait time for image-text note LLM calls."""
-    raw = payload.get("image_text_llm_timeout_sec", 45)
+    raw = payload.get("image_text_llm_timeout_sec", 90)
     try:
         timeout = float(raw)
     except (TypeError, ValueError):
-        timeout = 45.0
+        timeout = 90.0
     return max(0.01, min(timeout, 120.0))
 
 
@@ -2094,8 +2158,9 @@ def _generate_image_text_learning_note(
     settings: Any,
     payload: Dict[str, Any],
     log: Callable[[str], None],
+    content_category: str = "unknown",
 ) -> str:
-    """图文笔记：基于 source.md 生成标准总结笔记。
+    """图文笔记：基于 source.md 生成总结笔记，按 content_category 路由模板。
 
     source_md 是 VLM 逐图理解后构建的结构化源材料（Markdown），包含原始文字和图片转化内容。
     note.md 只基于 source.md 做总结，不允许直接逐图描述 image_infos。
@@ -2124,36 +2189,18 @@ def _generate_image_text_learning_note(
         log(f"⚠️  LLM 初始化失败，跳过学习笔记生成：{exc}")
         return ""
 
-    # ── 基于 source.md 构造 prompt ──
-    # source_md 已是结构化 Markdown（原始文字 + VLM 转化内容），直接作为唯一依据。
-    body = source_md[:12000]
+    # ── 按 content_category 选择 prompt 模板 ──
+    from backend.app.services.summary_generator import build_image_text_note_prompt
 
-    # 判断内容是否明显是教程/工作流（用于 prompt 结构选择）
-    _WORKFLOW_SIGNALS = {"步骤", "教程", "操作", "流程", "工作流", "方法", "怎么", "如何"}
-    is_workflow_hint = any(s in body for s in _WORKFLOW_SIGNALS)
-
-    sys_prompt = (
-        "你是图文笔记整理专家。任务：基于 source.md 材料生成标准总结笔记。\n"
-        "严格规则：\n"
-        "1. 只基于 source.md 内容做总结，不要编造原文没有的信息。\n"
-        "2. 正文不能出现「图1 显示」「OCR」「图片描述」「视觉元素列表」等材料层调试词。\n"
-        "3. 不要逐张描述图片外观、色调、构图、风格。\n"
-        "4. 不要保留营销 CTA、话题标签、关注引导，除非它们对理解内容有价值。\n"
-        "5. 不要添加 [mm:ss] 这类视频时间戳。\n"
-        "6. 如果内容明显是教程/工作流，可以组织成「掌握什么 / 前置条件 / 核心步骤 / 常见坑 / 验收方法」。\n"
-        "7. 否则用「## 观点」「## 方法」「## 可带走的结论」等通用结构。\n"
-        "8. 结尾给 3-5 条具体 takeaway。\n"
-        "9. 只输出 Markdown，不要解释。"
-    )
-
-    user_prompt = (
-        f"# 标题\n{title}\n\n"
-        f"# source.md 材料\n{body}\n\n"
-        "请基于 source.md 生成标准总结 Markdown："
-    )
+    sys_prompt, user_prompt = build_image_text_note_prompt(source_md, title, content_category)
+    label = {
+        "tutorial": "教程",
+        "tool_recommendation": "工具推荐",
+        "science_popularization": "知识科普",
+    }.get(content_category, "标准")
 
     timeout_sec = _image_text_llm_timeout_sec(payload)
-    log(f"⏳ 标准总结生成中，最多等待 {timeout_sec:g}s")
+    log(f"⏳ {label}总结生成中（类型={content_category}），最多等待 {timeout_sec:g}s")
     try:
         raw = _chat_with_timeout(
             provider,
@@ -2167,15 +2214,15 @@ def _generate_image_text_learning_note(
                 max_tokens=4096,
             ),
             timeout_sec=timeout_sec,
-            label="标准总结生成",
+            label=f"{label}总结生成",
         )
         note = raw.strip()
         if note and len(note) > 80:
-            log(f"✅ 标准总结生成完成，{len(note)} 字")
+            log(f"✅ {label}总结生成完成，{len(note)} 字")
             return note
-        log("⚠️  标准总结 LLM 返回过短，回退到纯文本提炼")
+        log("⚠️  LLM 返回过短，回退到纯文本提炼")
     except Exception as exc:
-        log(f"⚠️  标准总结生成失败，回退到纯文本提炼：{exc}")
+        log(f"⚠️  {label}总结生成失败，回退到纯文本提炼：{exc}")
 
     return _fallback_learning_note(source_text=source_md, title=title, log=log)
 
@@ -2467,11 +2514,14 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                     if img.get("content_summary"):
                         img_sections.append(f"> {img['content_summary']}")
 
-            images_source_text = "\n\n".join(img_sections)
+            images_source_text = "\n\n".join(
+                s.replace("\t", " ") for s in img_sections
+            )
+            _raw_clean = raw_source_text.replace("\t", " ") if raw_source_text else ""
             source_text_from_download = (
-                f"{raw_source_text}\n\n---\n\n{images_source_text}"
-                if raw_source_text and images_source_text
-                else images_source_text or raw_source_text
+                f"{_raw_clean}\n\n---\n\n{images_source_text}"
+                if _raw_clean and images_source_text
+                else images_source_text or _raw_clean
             )
 
         # ── 质量闸门：全部 VLM 失败时不能生成假成功 ──
@@ -2489,13 +2539,18 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         # ── 3.7. 图文标准总结生成（基于 source.md）──────────────────
         # note_body 用于 note.md 默认正文（标准总结），source.md 作为唯一依据。
         if "note" in steps and api_key:
-            runner.set_progress(task_id, 0.45, "生成图文标准总结中...")
+            # 提前分类（仅 source 材料，不含 note_body），用于选择 note 正文模板
+            early_category = _classify_from_source(
+                raw_source_text, source_text_from_download, image_infos,
+            )
+            runner.set_progress(task_id, 0.45, f"生成图文{early_category}总结中...")
             image_text_note_body = _generate_image_text_learning_note(
                 source_md=source_text_from_download,
                 title=_source_title,
                 settings=load_settings(),
                 payload=payload,
                 log=_log_img,
+                content_category=early_category,
             )
             if image_text_note_body:
                 note_body = image_text_note_body
@@ -2914,8 +2969,9 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     if note_kind == "image_text" and image_infos:
         result["image_infos"] = image_infos
     # image_text 分支：保存原始文本（供 source.md 显示原始依据，不受 _compose 覆盖）
+    # tab 会让 source.md 段间出现缩进噪声，统一替换为空格（与 source_text_enriched 清理对齐）
     if note_kind == "image_text" and raw_source_text:
-        result["source_md_raw"] = raw_source_text
+        result["source_md_raw"] = raw_source_text.replace("\t", " ")
     # image_text 分支：保存 VLM 理解后的富文本（含图片理解结果，供学习笔记生成和前端参考）
     if note_kind == "image_text" and source_text_from_download and source_text_from_download != raw_source_text:
         result["source_text_enriched"] = source_text_from_download

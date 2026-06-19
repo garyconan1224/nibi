@@ -1814,7 +1814,36 @@ class TestClassifyImageTextContent:
         _classify_image_text_content(result, raw_source, image_infos, note_body)
 
         assert result["content_category"] == "unknown"
-        assert "default_summary_template" not in result
+        assert result["default_summary_template"] == "standard"
+
+    def test_tutorial_detected(self) -> None:
+        from backend.app.services.pipeline_tasks import _classify_image_text_content
+
+        result: dict = {}
+        raw_source = "如何配置 Python 虚拟环境：第一步安装依赖，第二步设置路径"
+        image_infos = [
+            {"content_summary": "教程：操作步骤详解"},
+        ]
+        note_body = "配置完成后，检查安装是否成功"
+
+        _classify_image_text_content(result, raw_source, image_infos, note_body)
+
+        assert result["content_category"] == "tutorial"
+        assert result["default_summary_template"] == "steps"
+
+    def test_tutorial_takes_priority_over_tool(self) -> None:
+        from backend.app.services.pipeline_tasks import _classify_image_text_content
+
+        result: dict = {}
+        # 包含工具信号，但教程信号更强
+        raw_source = "如何安装 Obsidian：第一步下载软件，第二步配置插件，第三步设置同步"
+        image_infos: list = []
+        note_body = "按照教程步骤操作即可"
+
+        _classify_image_text_content(result, raw_source, image_infos, note_body)
+
+        assert result["content_category"] == "tutorial"
+        assert result["default_summary_template"] == "steps"
 
     def test_does_not_overwrite_existing(self) -> None:
         from backend.app.services.pipeline_tasks import _classify_image_text_content
@@ -1822,6 +1851,100 @@ class TestClassifyImageTextContent:
         result: dict = {"content_category": "existing"}
         _classify_image_text_content(result, "", [], "")
         assert result["content_category"] == "existing"
+
+    def test_science_popularization_detected(self) -> None:
+        from backend.app.services.pipeline_tasks import _classify_image_text_content
+
+        result: dict = {}
+        raw_source = (
+            "量子力学的基本原理：波函数描述粒子状态，薛定谔方程决定演化，"
+            "测量导致坍缩，叠加态是核心概念，实验验证了理论预测"
+        )
+        image_infos = [
+            {"content_summary": "量子物理科普图解，展示双缝实验现象"},
+        ]
+        note_body = "量子纠缠现象在通信领域有重要应用"
+
+        _classify_image_text_content(result, raw_source, image_infos, note_body)
+
+        assert result["content_category"] == "science_popularization"
+        assert result["default_summary_template"] == "science_popularization"
+
+    def test_tutorial_takes_priority_over_science(self) -> None:
+        from backend.app.services.pipeline_tasks import _classify_image_text_content
+
+        result: dict = {}
+        raw_source = "如何理解量子力学：第一步学习基础概念，第二步做实验，第三步验证理论"
+        image_infos: list = []
+        note_body = "按照教程步骤操作即可"
+
+        _classify_image_text_content(result, raw_source, image_infos, note_body)
+
+        assert result["content_category"] == "tutorial"
+
+    def test_science_priority_over_unknown(self) -> None:
+        from backend.app.services.pipeline_tasks import _classify_image_text_content
+
+        result: dict = {}
+        raw_source = "基因编辑技术的原理与应用，CRISPR 实验发现新规律"
+        image_infos: list = []
+        note_body = "基因突变导致遗传变异，生物进化论解释物种起源"
+
+        _classify_image_text_content(result, raw_source, image_infos, note_body)
+
+        assert result["content_category"] == "science_popularization"
+
+
+class TestClassifyFromSource:
+    """提前分类（仅基于 source 材料，不含 note_body）。"""
+
+    def test_returns_tutorial(self) -> None:
+        from backend.app.services.pipeline_tasks import _classify_from_source
+
+        raw = "如何配置 Python：第一步安装依赖，第二步设置路径，第三步验证"
+        enriched = ""
+        infos: list = []
+
+        assert _classify_from_source(raw, enriched, infos) == "tutorial"
+
+    def test_returns_tool_recommendation(self) -> None:
+        from backend.app.services.pipeline_tasks import _classify_from_source
+
+        raw = "推荐一个效率工具 App，支持 Markdown 导出，iOS Mac 都能用"
+        enriched = ""
+        infos: list = []
+
+        assert _classify_from_source(raw, enriched, infos) == "tool_recommendation"
+
+    def test_returns_science_popularization(self) -> None:
+        from backend.app.services.pipeline_tasks import _classify_from_source
+
+        raw = "宇宙大爆炸理论：物理学家发现星系红移现象，实验研究验证了理论预测"
+        enriched = ""
+        infos: list = []
+
+        assert _classify_from_source(raw, enriched, infos) == "science_popularization"
+
+    def test_returns_unknown_when_few_signals(self) -> None:
+        from backend.app.services.pipeline_tasks import _classify_from_source
+
+        raw = "今天天气很好"
+        enriched = ""
+        infos: list = []
+
+        assert _classify_from_source(raw, enriched, infos) == "unknown"
+
+    def test_uses_image_infos_as_supplement(self) -> None:
+        from backend.app.services.pipeline_tasks import _classify_from_source
+
+        raw = "一些文字内容"
+        enriched = ""
+        infos = [
+            {"content_summary": "教程操作步骤详解"},
+            {"extracted_text": "第一步打开设置，第二步配置参数"},
+        ]
+
+        assert _classify_from_source(raw, enriched, infos) == "tutorial"
 
 
 # ── VLM-first 图片笔记：逐图理解 → 分类 → 总结 ─────────────────────────────

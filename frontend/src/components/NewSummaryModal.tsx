@@ -31,6 +31,7 @@ const MORE_GROUPS: { label: string; items: { value: string; label: string }[] }[
     { value: 'detailed', label: '详细要点' },
     { value: 'outline', label: '大纲' },
     { value: 'qa', label: '问答卡(Anki)' },
+    { value: 'science_popularization', label: '知识科普' },
   ]},
   { label: '创作改写', items: [
     { value: 'longform', label: '公众号长文' },

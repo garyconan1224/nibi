@@ -3,13 +3,13 @@ title: Track K · 添加链接意图分流 + 图文默认总结路由
 status: ready
 owner: Claude 桌面定方案 -> 小米 v2.5pro 终端执行 -> Codex 审查
 created: 2026-06-18
-scope: AddMaterialModal 添加链接入口、note task payload、图文内容分类、默认总结模板推荐
+scope: AddMaterialModal 添加链接入口、note task payload、图文源 MD 还原、基于源 MD 的标准总结、默认总结模板推荐
 non_goals: 不实现复刻分析完整流程、不改数据库 schema、不拆 NoteShell 产品页、不做音频/视频结果页重构
 ---
 
 # Track K · 添加链接意图分流 + 图文默认总结路由
 
-> 本计划只解决一件事：用户添加链接后，先选择“要做什么”，再进入对应设置；选择“笔记”后，再按视频笔记 / 图文笔记 / 音频笔记分流。图文笔记完成后自动识别内容类型，给出合适的默认总结方式。
+> 本计划只解决一件事：用户添加链接后，先选择“要做什么”，再进入对应设置；选择“笔记”后，再按视频笔记 / 图文笔记 / 音频笔记分流。图文笔记完成后先把图片和原文还原成可读的 `source.md`，再基于 `source.md` 生成标准总结正文，并给出合适的默认总结方式。
 >
 > 当前第一版只把“笔记”链路做实；“复刻分析 / 竞品分析 / 资料收藏”等入口先做占位，不启动任务。
 
@@ -27,7 +27,7 @@ non_goals: 不实现复刻分析完整流程、不改数据库 schema、不拆 N
 
 1. 用户添加链接时，产品意图不清楚：同一个链接可能是“学习笔记”、也可能是“复刻分析”。
 2. 选择“笔记”后，视频 / 图文 / 音频的设置混在一起，图文也会看到视频化的配图/截帧语义。
-3. 图文笔记里的总结需要先识别内容类型：工具推荐、教程、观点、清单、产品推荐等，不应该默认套视频标准总结。
+3. 图文笔记里的首要任务不是逐图描述，而是先把文字型图片、混合型图片、演示型图片里的有效信息还原成 `source.md`，再基于源 MD 做标准总结。
 4. 当前已经新增 `tool_recommendation` 总结模板，但还没有把它接成图文默认推荐。
 
 ---
@@ -270,8 +270,13 @@ unknown
 
 输入材料：
 
+- `source_text_enriched` / `source.md`（优先）
 - `source_md_raw`
 - `markdown`
+- `image_infos[].extracted_text`
+- `image_infos[].content_summary`
+- `image_infos[].action_steps`
+- `image_infos[].visual_elements`
 - `image_infos[].description`
 - `image_infos[].ocr_text`
 
@@ -298,7 +303,43 @@ result["content_category"] = category
 result["default_summary_template"] = default_template
 ```
 
-### 4.3 后续可扩展分类
+### 4.3 图文源 MD 还原与标准总结链路
+
+更正后的图文笔记主链路必须是：
+
+```text
+原始文字 + 图片
+  -> VLM 逐图理解
+  -> 生成 source.md / source_text_enriched
+  -> 基于 source.md 做标准总结
+  -> 写入 note.md / note_body
+```
+
+职责边界：
+
+| 产物 | 职责 | 不应包含 |
+|---|---|---|
+| `image_infos` | 单图结构化理解结果，供组装 source.md 使用 | 面向用户的最终总结 |
+| `source.md` / `source_text_enriched` | 源材料还原层；尽量完整承载图片文字、步骤、表格、关键视觉信息 | 大段总结判断、泛泛学习心得 |
+| `note.md` / `note_body` | 基于 `source.md` 的标准总结层；面向阅读和复用 | `图1/OCR/图片描述/视觉元素列表` 这类材料调试痕迹 |
+
+图片进入 `source.md` 的规则：
+
+1. 文字型图片：把图片文字转为 Markdown 正文、标题、列表或表格；不要插入原图。
+2. 混合型图片：文字部分转 Markdown；图标、流程、界面状态等视觉信息只保留对理解有价值的说明。
+3. 演示型 / 流程型图片：能用文字表达清楚的，转成步骤；位置关系、界面状态、箭头流程不可替代时，在对应段落保留图片引用。
+4. 图标 / Logo / 装饰图：默认跳过；只有它承载产品名、按钮状态、关键入口时才写入源 MD。
+5. 表格 / 对比图：优先还原成 Markdown 表格；还原不了完整结构时，保留关键行列和图片引用。
+
+`note.md` 生成规则：
+
+1. `note_body` 必须以 `source.md` / `source_text_enriched` 为主输入，而不是重新逐图描述 `image_infos`。
+2. `image_infos` 可以作为补充上下文，但 prompt 必须要求模型把它们融合进 `source.md` 语义，不允许输出“图 1 显示……”这类逐图描述。
+3. 图文默认总结应使用图文专用 standard prompt，不走视频 standard 的时间戳规则。
+4. 内容分类可以作为总结风格提示，但不能跳过源 MD 还原。例如工具推荐、教程、清单都应先有源 MD，再生成总结。
+5. 如果 `source.md` 为空且图片 VLM 也没有提取到有效内容，任务应失败或明确提示“缺少可总结内容”，不能产出空 note。
+
+### 4.4 后续可扩展分类
 
 先不实现，但保留枚举位置：
 
@@ -446,7 +487,7 @@ git log --oneline -5
 完成后跑相关测试，提交一个 commit。
 最后回复：改了哪些文件、测试结果、commit hash，并给出可复制给 Codex 的审查提示词。
 
-任务：Track K 添加链接意图分流 + 图文默认总结路由第一版
+任务：Track K 添加链接意图分流 + 图文源 MD 还原 + 基于源 MD 的标准总结
 
 目标：
 1. AddMaterialModal 从“直接生成笔记”改成三层：
@@ -458,18 +499,31 @@ git log --oneline -5
    - intent: "note"
    - note_media_kind: "auto" | "video" | "image_text" | "audio" | "text"
 4. 后端 GenerateNoteRequest 接收 intent/note_media_kind，并写入 task payload。用户选择 image_text/video/audio 时，note task 应记录该选择，auto 时沿用现有 sniff/probe。
-5. 图文 note task 完成后做轻量内容分类。第一版只识别：
+5. 图文 note task 的主链路改成“先还原 source.md，再基于 source.md 总结”：
+   - 原始文字 + 图片
+   - VLM 逐图理解
+   - 生成 source.md / source_text_enriched
+   - 基于 source.md 生成标准总结 note.md / note_body
+6. 图文图片处理规则：
+   - 文字型图片：把图片文字转成 Markdown 正文、标题、列表或表格，写入 source.md；不要在 note.md 里描述“图片上有文字”。
+   - 混合型图片：文字转 Markdown；图标、流程、界面状态只保留对理解有价值的说明。
+   - 演示型/流程型图片：能转文字的转成步骤；位置关系、界面状态、箭头流程不可替代时，在 source.md 对应段落保留图片引用。
+   - 表格/对比图：优先还原为 Markdown 表格；结构不完整时保留关键行列和图片引用。
+   - Logo/装饰图：默认跳过，除非承载产品名、按钮入口、关键状态。
+7. note.md / note_body 只能基于 source.md 做标准总结，不允许直接逐图描述 image_infos。最终正文不应该出现“图1 显示 / OCR / 图片描述 / 视觉元素列表”这类材料层痕迹。
+8. 图文 standard 总结必须是图文专用，不要套视频 standard 的时间戳规则；如果内容明显是教程/工作流，可以在 standard prompt 里组织成“掌握什么 / 前置条件 / 核心步骤 / 常见坑 / 验收方法”这类结构，但仍然必须基于 source.md。
+9. 图文 note task 完成后做轻量内容分类。第一版只识别：
    - tool_recommendation
    - unknown
-6. 工具推荐识别依据：source_md_raw、markdown、image_infos.description、image_infos.ocr_text 中出现工具/App/应用/软件/插件/网站/推荐/支持/功能/工作流/Markdown/Obsidian/导出/记录/转写/效率/iOS/Mac/Windows 等信号。
-7. 识别为工具推荐时，结果里写入：
+10. 工具推荐识别依据应优先使用 source.md / source_text_enriched，其次才看 image_infos。关键词包括工具/App/应用/软件/插件/网站/推荐/支持/功能/工作流/Markdown/Obsidian/导出/记录/转写/效率/iOS/Mac/Windows 等信号。
+11. 识别为工具推荐时，结果里写入：
    - content_category = "tool_recommendation"
    - default_summary_template = "tool_recommendation"
-8. NoteShell 的 note API 暴露 summary_hint：
+12. NoteShell 的 note API 暴露 summary_hint：
    - content_category
    - default_template
-9. NewSummaryModal 支持 defaultTemplate；当 default_template=tool_recommendation 时，打开“新建总结”默认选中“工具推荐”。
-10. UI 动画只用 CSS transition，不引入新依赖。展开/切换用轻微 fade + slide，尊重 prefers-reduced-motion。
+13. NewSummaryModal 支持 defaultTemplate；当 default_template=tool_recommendation 时，打开“新建总结”默认选中“工具推荐”。
+14. UI 动画只用 CSS transition，不引入新依赖。展开/切换用轻微 fade + slide，尊重 prefers-reduced-motion。
 
 建议涉及文件：
 - frontend/src/components/workspace/AddMaterialModal.tsx
@@ -494,15 +548,21 @@ git log --oneline -5
 - 不引入动画库或新依赖。
 - 不破坏视频 standard 总结时间戳行为。
 - 不覆盖用户手动编辑过的 note.md。
+- 不让 VLM 逐图分析结果直接变成最终 note.md。
+- 不在 note.md 输出“图1/OCR/图片描述/视觉元素”这类材料调试文本。
 
 验收标准：
 1. pnpm build 通过。
 2. AddMaterialModal 测试通过。
 3. generate-note 后端测试通过，payload 包含 intent/note_media_kind/workspace_id/item_id。
-4. 图文工具推荐类任务 result 包含 content_category/default_summary_template。
-5. Note API 返回 summary_hint。
-6. 新建总结弹窗默认选中“工具推荐”。
-7. 生成工具推荐总结时不插图、不写时间点。
+4. 图文任务 result 保存 source_text_enriched 或等价字段；导出的/落盘的 source.md 能看到图片文字、步骤、表格等源材料还原结果。
+5. note_body / note.md 基于 source.md 做标准总结，正文不出现逐图描述、OCR 调试词、图片分类标签。
+6. 文字型图片内容能进入 source.md，并进一步影响 note.md 总结。
+7. 演示型/流程型图片能转成步骤；不可替代图片才保留图片引用。
+8. 图文工具推荐类任务 result 包含 content_category/default_summary_template。
+9. Note API 返回 summary_hint。
+10. 新建总结弹窗默认选中“工具推荐”。
+11. 生成工具推荐总结时不插图、不写时间点。
 ```
 
 ---
@@ -515,18 +575,21 @@ git log --oneline -5
 结论第一行写：通过 / 不通过 / 需要补充验证。
 
 任务目标：
-AddMaterialModal 添加链接后先选择任务意图；选择“笔记”后再选择视频/图文/音频笔记；图文笔记完成后识别工具推荐类内容，并默认推荐 tool_recommendation 总结模板。
+AddMaterialModal 添加链接后先选择任务意图；选择“笔记”后再选择视频/图文/音频笔记；图文笔记必须先把原文和图片还原成 source.md，再基于 source.md 生成标准总结 note.md；图文工具推荐类内容仍需默认推荐 tool_recommendation 总结模板。
 
 重点审查：
 1. UI 是否按三层结构实现，复刻分析/竞品分析/资料收藏是否只是占位且不会提交任务。
 2. generate-note 是否透传并持久记录 intent/note_media_kind，且没有破坏现有自动识别。
-3. 图文工具推荐分类是否写入 content_category/default_summary_template，Note API 是否暴露 summary_hint。
-4. NewSummaryModal 是否默认选中后端推荐模板，且用户手动切换模板不会被覆盖。
-5. 视频 standard 总结时间戳行为是否未回退。
+3. 图文 image_text 链路是否先生成 source.md / source_text_enriched，且其中包含图片文字、步骤、表格、关键视觉信息的源材料还原。
+4. note.md / note_body 是否基于 source.md 做标准总结，而不是逐图描述 image_infos；正文不应出现“图1/OCR/图片描述/视觉元素列表”等材料调试痕迹。
+5. 文字型图片是否转文字进入 source.md；演示型/流程型图片是否转步骤，只有不可替代时才保留图片引用。
+6. 图文工具推荐分类是否优先基于 source.md 写入 content_category/default_summary_template，Note API 是否暴露 summary_hint。
+7. NewSummaryModal 是否默认选中后端推荐模板，且用户手动切换模板不会被覆盖。
+8. 视频 standard 总结时间戳行为是否未回退。
 
 建议验证：
 - pnpm build
 - frontend AddMaterialModal 相关测试
 - backend summary_generator / generate_note / image_text pipeline 相关 pytest
+- 构造或使用真实图文任务，检查 source.md 和 note.md 的职责边界：source.md 是源材料，note.md 是总结
 ```
-

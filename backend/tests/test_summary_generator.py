@@ -414,3 +414,46 @@ class TestPostprocessFrames:
         md = "# 标题\n\n正文内容"
         result = _postprocess_frames(md, [{"idx": 0, "sec": 0, "desc": "a", "image_path": "/static/x.jpg"}])
         assert result == md
+
+
+# ── build_image_text_note_prompt ──────────────────────────────────────
+
+class TestBuildImageTextNotePrompt:
+    """build_image_text_note_prompt 按 content_category 路由模板。"""
+
+    def test_tutorial_uses_tutorial_template(self) -> None:
+        from backend.app.services.summary_generator import build_image_text_note_prompt
+
+        sys_p, usr_p = build_image_text_note_prompt("source content", "标题", "tutorial")
+        assert "教程" in sys_p
+        assert "🎯" in usr_p or "操作步骤" in usr_p
+
+    def test_tool_recommendation_uses_tool_template(self) -> None:
+        from backend.app.services.summary_generator import build_image_text_note_prompt
+
+        sys_p, usr_p = build_image_text_note_prompt("source content", "标题", "tool_recommendation")
+        assert "工具推荐" in sys_p
+        assert "一句话判断" in usr_p
+
+    def test_science_popularization_uses_science_template(self) -> None:
+        from backend.app.services.summary_generator import build_image_text_note_prompt
+
+        sys_p, usr_p = build_image_text_note_prompt("source content", "标题", "science_popularization")
+        assert "科普" in sys_p
+        assert "核心概念" in usr_p
+
+    def test_unknown_defaults_to_standard(self) -> None:
+        from backend.app.services.summary_generator import build_image_text_note_prompt
+
+        sys_p, usr_p = build_image_text_note_prompt("source content", "标题", "unknown")
+        assert "标准总结" in sys_p
+        assert "source.md 材料" in usr_p
+
+    def test_source_md_truncated_to_12000(self) -> None:
+        from backend.app.services.summary_generator import build_image_text_note_prompt
+
+        long_source = "x" * 20000
+        _, usr_p = build_image_text_note_prompt(long_source, "标题", "unknown")
+        # source content 应被截断到 12000 字符
+        assert "x" * 12000 in usr_p
+        assert "x" * 15000 not in usr_p

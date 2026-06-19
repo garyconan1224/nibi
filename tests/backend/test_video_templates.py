@@ -37,7 +37,7 @@ def test_get_all_templates_includes_builtins(client: TestClient) -> None:
     names = {t["name"] for t in data}
     assert names >= {"教程", "Vlog", "访谈", "影视点评", "产品评测", "其它"}
     builtins = [t for t in data if t["is_builtin"]]
-    assert len(builtins) == 6
+    assert len(builtins) == 9
 
 
 def test_create_and_get_custom_template(client: TestClient) -> None:
