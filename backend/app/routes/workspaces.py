@@ -591,6 +591,18 @@ class GenerateNoteRequest(BaseModel):
         default="auto",
         description="笔记子类型：auto / video / image_text / audio / text",
     )
+    summary_template: str = Field(
+        default="standard",
+        description="笔记风格模板 ID（对应 summary_templates.py 中的模板）",
+    )
+    diarize: bool = Field(
+        default=False,
+        description="是否区分发言人（VN5 启用；当前仅记录到 task payload）",
+    )
+    user_notes: str = Field(
+        default="",
+        description="用户补充说明，生成时附加给模型的上下文",
+    )
 
 
 class PreflightSaveRequest(BaseModel):
@@ -1958,6 +1970,11 @@ def generate_note(workspace_id: str, req: GenerateNoteRequest) -> Dict[str, Any]
     # 意图分流：记录用户选择的任务意图和笔记子类型
     _task_payload["intent"] = req.intent or "note"
     _task_payload["note_media_kind"] = req.note_media_kind or "auto"
+    # VN2: 透传笔记风格/发言人区分/用户补充说明（VN5 前后端联调时消费）
+    _task_payload["summary_template"] = req.summary_template
+    _task_payload["diarize"] = req.diarize
+    if req.user_notes.strip():
+        _task_payload["user_notes"] = req.user_notes.strip()
     try:
         _s = load_settings()
         for _p in _s.providers:

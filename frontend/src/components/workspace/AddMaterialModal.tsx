@@ -57,15 +57,7 @@ interface AddMaterialModalProps {
   onFineTune?: (staged: StagedConfig) => void
 }
 
-type TaskIntent = 'note' | 'replica' | 'competitive' | 'collect'
 type NoteMediaKind = 'auto' | 'video' | 'image_text' | 'audio'
-
-const TASK_CARDS: { value: TaskIntent; label: string; desc: string; available: boolean }[] = [
-  { value: 'note', label: '笔记', desc: '下载 · 转写 · 整理成笔记', available: true },
-  { value: 'replica', label: '复刻分析', desc: '拆解内容结构与表达策略', available: false },
-  { value: 'competitive', label: '竞品分析', desc: '横向对比同类内容', available: false },
-  { value: 'collect', label: '资料收藏', desc: '归档素材供日后检索', available: false },
-]
 
 const NOTE_TYPE_CARDS: { value: NoteMediaKind; label: string; desc: string }[] = [
   { value: 'auto', label: '自动识别', desc: '由系统判断笔记类型' },
@@ -129,7 +121,6 @@ export function AddMaterialModal({
   const [internalUrl, setInternalUrl] = useState('')
   const [internalSniff, setInternalSniff] = useState<SniffResult | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [selectedTask, setSelectedTask] = useState<TaskIntent>('note')
   const [selectedNoteType, setSelectedNoteType] = useState<NoteMediaKind>('auto')
   const [embedFrames, setEmbedFrames] = useState(false) // R4.7: 默认关，检测到视觉模型后自动开
   const [selectedVisionModel, setSelectedVisionModel] = useState('') // 空=用系统默认
@@ -236,12 +227,6 @@ export function AddMaterialModal({
       setError('请先输入素材链接')
       return
     }
-    // 占位任务：只 toast，不提交
-    const taskMeta = TASK_CARDS.find(c => c.value === selectedTask)
-    if (taskMeta && !taskMeta.available) {
-      toast.info(`「${taskMeta.label}」即将支持，敬请期待`)
-      return
-    }
     setSubmitting(true)
     setError(null)
 
@@ -260,8 +245,8 @@ export function AddMaterialModal({
       const result = await generateNote(
         wsId, effectiveUrl, effectiveSniff?.title ?? undefined,
         embedFrames, 'vision', effInterval, effVisionModel,
-        selectedTask, selectedNoteType,
-        { diarize: diarizeOn, template_id: noteStyle },
+        'note', selectedNoteType,
+        { diarize: diarizeOn, summary_template: noteStyle, user_notes: userNotes },
       )
       toast.success('笔记生成中', { description: `${result.item_type} · ${effectiveUrl}` })
 
@@ -379,8 +364,6 @@ export function AddMaterialModal({
           {/* ② 生成设置 */}
           <div className="m-section">
             <div className="eyebrow" style={{ marginBottom: 10 }}>② 生成设置</div>
-            {selectedTask === 'note' && (
-              <>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
                   {NOTE_TYPE_CARDS.map(card => {
                     const active = selectedNoteType === card.value
@@ -519,8 +502,6 @@ export function AddMaterialModal({
                     />
                   </div>
                 </div>
-              </>
-            )}
           </div>
 
           {/* ③ 输出与归类 */}
@@ -546,8 +527,8 @@ export function AddMaterialModal({
         <div className="m-foot">
           <span className="mono modal-foot-status">
             <span className="chip-dot" style={{ marginRight: 6 }} />
-            {TASK_CARDS.find(c => c.value === selectedTask)?.label ?? '笔记'}
-            {selectedTask === 'note' && selectedNoteType !== 'auto'
+            笔记
+            {selectedNoteType !== 'auto'
               ? ` · ${NOTE_TYPE_CARDS.find(c => c.value === selectedNoteType)?.label ?? ''}`
               : ''}
           </span>
@@ -557,14 +538,14 @@ export function AddMaterialModal({
               className="btn btn-primary"
               onClick={handleGenerateNote}
               disabled={!effectiveUrl || submitting}
-              title={TASK_CARDS.find(c => c.value === selectedTask)?.available ? '开始生成' : '即将支持'}
+              title="开始生成"
             >
               {submitting ? (
                 '处理中…'
               ) : (
                 <>
                   <Wand2 size={14} />
-                  {TASK_CARDS.find(c => c.value === selectedTask)?.available ? '开始生成' : '即将支持'}
+                  开始生成
                 </>
               )}
             </button>

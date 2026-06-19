@@ -156,6 +156,19 @@ TEMPLATES: dict[str, SummaryTemplate] = {
         user_prompt="请为以下工具推荐材料生成总结：\n\n{transcript}",
         output_format="markdown",
     ),
+    "science_popularization": SummaryTemplate(
+        id="science_popularization",
+        label="知识科普",
+        desc="通俗易懂的科普式总结，核心概念 + 原理 + 应用",
+        use_case="知识科普",
+        system_prompt=(
+            "你是一名知识科普笔记整理专家。请把内容整理成一篇通俗易懂的科普式总结，"
+            "用白话解释专业术语，用类比帮助理解，确保非专业读者也能看懂。"
+            "不要插入图片，不要写视频时间戳。"
+        ),
+        user_prompt="请为以下内容生成知识科普总结：\n\n{transcript}",
+        output_format="markdown",
+    ),
     "standard": SummaryTemplate(
         id="standard",
         label="标准总结",

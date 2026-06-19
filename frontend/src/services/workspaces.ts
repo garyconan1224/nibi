@@ -238,7 +238,7 @@ export async function generateNote(
   visionModel: string = '',
   intent: string = 'note',
   noteMediaKind: string = 'auto',
-  extra?: { diarize?: boolean; template_id?: string },
+  extra?: { diarize?: boolean; summary_template?: string; user_notes?: string },
 ): Promise<GenerateNoteResponse> {
   const res = await http.post<GenerateNoteResponse>(
     `${BASE}/${workspaceId}/items/generate-note`,

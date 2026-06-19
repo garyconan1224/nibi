@@ -121,7 +121,7 @@ describe('AddMaterialModal', () => {
         '',
         'note',
         'image_text',
-        { diarize: false, template_id: 'standard' },
+        { diarize: false, summary_template: 'standard', user_notes: '' },
       )
     })
     expect(addWorkspaceItemMock).not.toHaveBeenCalled()
@@ -165,7 +165,7 @@ describe('AddMaterialModal', () => {
         '',
         'note',
         'auto',
-        { diarize: false, template_id: 'standard' },
+        { diarize: false, summary_template: 'standard', user_notes: '' },
       )
     })
   })

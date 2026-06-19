@@ -4,11 +4,12 @@ from backend.app.services.summary_templates import TEMPLATES, get_template, list
 
 
 def test_all_template_ids_loadable():
-    """15 个模板 id 都能加载（R3.1 新增 standard）。"""
+    """16 个模板 id 都能加载（R3.1 新增 standard，VN2 新增 science_popularization）。"""
     expected_ids = [
         "concise", "detailed", "quotes", "meeting",
         "xhs", "longform", "lecture", "interview", "shownotes",
-        "oral", "steps", "outline", "qa", "actions", "tool_recommendation", "standard",
+        "oral", "steps", "outline", "qa", "actions", "tool_recommendation",
+        "science_popularization", "standard",
     ]
     assert list_template_ids() == expected_ids
     for tid in expected_ids:
