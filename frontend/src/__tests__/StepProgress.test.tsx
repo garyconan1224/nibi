@@ -1,51 +1,79 @@
 import { describe, expect, it } from 'vitest'
 import { deriveSteps } from '@/pages/result/ProcessingPage/StepProgress'
 
+const STEP_IDS = ['PENDING', 'DOWNLOAD', 'TRANSCRIBE', 'ANALYZE_NOTE', 'SUCCESS']
+
 describe('deriveSteps', () => {
-  it('currentStatus=DOWNLOAD, progress=1.0, taskType=video → DOWNLOAD done，其余 queued', () => {
-    const steps = deriveSteps('DOWNLOAD', 1.0, 'video')
-    const downloadStep = steps.find((s) => s.id === 'DOWNLOAD')
-    const otherSteps = steps.filter((s) => s.id !== 'DOWNLOAD')
+  it('5 步顺序固定：PENDING → DOWNLOAD → TRANSCRIBE → ANALYZE_NOTE → SUCCESS', () => {
+    const steps = deriveSteps('PENDING', 0)
+    expect(steps.map(s => s.id)).toEqual(STEP_IDS)
+  })
 
-    expect(downloadStep?.state).toBe('done')
-    expect(downloadStep?.pct).toBe(1)
-    otherSteps.forEach((step) => {
-      expect(step.state).toBe('queued')
-      expect(step.pct).toBe(0)
+  it('PENDING, progress=0 → 排队 running，其余 queued', () => {
+    const steps = deriveSteps('PENDING', 0)
+    expect(steps[0]).toMatchObject({ id: 'PENDING', state: 'running', pct: 0 })
+    steps.slice(1).forEach(s => {
+      expect(s.state).toBe('queued')
+      expect(s.pct).toBe(0)
     })
   })
 
-  it('currentStatus=SUCCESS, progress=1.0, taskType=analyze → 全部 done（终端任务类型）', () => {
-    const steps = deriveSteps('SUCCESS', 1.0, 'analyze')
-
-    steps.forEach((step) => {
-      expect(step.state).toBe('done')
-      expect(step.pct).toBe(1)
+  it('DOWNLOAD, progress=0.05 → 排队 done，下载 running(pct=0.05)', () => {
+    const steps = deriveSteps('DOWNLOAD', 0.05)
+    expect(steps[0]).toMatchObject({ id: 'PENDING', state: 'done', pct: 1 })
+    expect(steps[1]).toMatchObject({ id: 'DOWNLOAD', state: 'running', pct: 0.05 })
+    steps.slice(2).forEach(s => {
+      expect(s.state).toBe('queued')
+      expect(s.pct).toBe(0)
     })
   })
 
-  it('currentStatus=SUCCESS, progress=1.0, taskType=download → 全部 queued（非终端任务类型）', () => {
-    const steps = deriveSteps('SUCCESS', 1.0, 'download')
+  it('ASR, progress=0.25 → 排队+下载 done，转录 running(pct=0.25)', () => {
+    const steps = deriveSteps('ASR', 0.25)
+    expect(steps[0]).toMatchObject({ id: 'PENDING', state: 'done', pct: 1 })
+    expect(steps[1]).toMatchObject({ id: 'DOWNLOAD', state: 'done', pct: 1 })
+    expect(steps[2]).toMatchObject({ id: 'TRANSCRIBE', state: 'running', pct: 0.25 })
+    expect(steps[3]).toMatchObject({ id: 'ANALYZE_NOTE', state: 'queued', pct: 0 })
+    expect(steps[4]).toMatchObject({ id: 'SUCCESS', state: 'queued', pct: 0 })
+  })
 
-    steps.forEach((step) => {
-      expect(step.state).toBe('queued')
-      expect(step.pct).toBe(0)
+  it('SUM(note task), progress=0.8 → 排队+下载+转录 done，生成笔记 running(pct=0.8)', () => {
+    const steps = deriveSteps('SUM', 0.8)
+    expect(steps.slice(0, 3).map(s => s.state)).toEqual(['done', 'done', 'done'])
+    expect(steps[3]).toMatchObject({ id: 'ANALYZE_NOTE', state: 'running', pct: 0.8 })
+    expect(steps[4]).toMatchObject({ id: 'SUCCESS', state: 'queued', pct: 0 })
+  })
+
+  it('SUCCESS, progress=1.0 → 全部 done', () => {
+    const steps = deriveSteps('SUCCESS', 1.0)
+    steps.forEach(s => {
+      expect(s.state).toBe('done')
+      expect(s.pct).toBe(1)
     })
   })
 
-  it('currentStatus=UNKNOWN_STAGE, progress=0.5, taskType=video → 全部 queued', () => {
-    const steps = deriveSteps('UNKNOWN_STAGE', 0.5, 'video')
-
-    steps.forEach((step) => {
-      expect(step.state).toBe('queued')
-      expect(step.pct).toBe(0)
+  it('FAILED → 全部 queued', () => {
+    const steps = deriveSteps('FAILED', 0.5)
+    steps.forEach(s => {
+      expect(s.state).toBe('queued')
+      expect(s.pct).toBe(0)
     })
   })
 
-  it('taskType=note 显示完整视频笔记步骤', () => {
-    const steps = deriveSteps('ASR', 0.35, 'note')
-    const ids = steps.map((s) => s.id)
+  it('CANCELLED → 全部 queued', () => {
+    const steps = deriveSteps('CANCELLED', 0.5)
+    steps.forEach(s => {
+      expect(s.state).toBe('queued')
+      expect(s.pct).toBe(0)
+    })
+  })
 
-    expect(ids).toEqual(['DOWNLOAD', 'ASR', 'FRAMES', 'VLM', 'SUM'])
+  it('未知状态 → 排队 running', () => {
+    const steps = deriveSteps('UNKNOWN', 0.5)
+    expect(steps[0]).toMatchObject({ id: 'PENDING', state: 'running', pct: 0.5 })
+    steps.slice(1).forEach(s => {
+      expect(s.state).toBe('queued')
+      expect(s.pct).toBe(0)
+    })
   })
 })

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { AlertTriangle, ArrowRight, Music, RotateCcw, X } from 'lucide-react'
+import { AlertTriangle, ArrowRight, ChevronDown, ChevronUp, Music, RotateCcw, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { useTaskStore } from '@/store/taskStore'
@@ -131,6 +131,7 @@ export default function ProcessingPage() {
 
   // R18.1.3: 任务失败弹窗
   const [showFailModal, setShowFailModal] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const prevStatusRef = useRef(status)
   useEffect(() => {
     // 状态刚变为 FAILED 时自动弹窗
@@ -198,9 +199,6 @@ export default function ProcessingPage() {
   // 图文笔记检测：result.note_kind（任务完成后）或 payload.kind_hint（下载阶段）
   const isImageNote = (result.note_kind as string) === 'image_text'
     || (payload.kind_hint as string) === 'image_text'
-  // R4.7: 从 payload 读取配图开关（note task 专属）
-  const preflight = (payload.preflight ?? {}) as Record<string, unknown>
-  const embedFrames: boolean = preflight.embed_frames !== false // 默认 true
   // R13.2/R18.1 标题/封面/时长来源优先级：result（直接来源）→ payload（从 download 继承）→ fallback
   const resultAudio = result.audio as Record<string, unknown> | undefined
   const url =
@@ -426,23 +424,53 @@ export default function ProcessingPage() {
 
           {/* Step progress (running / success) */}
           {!isFailed && !isCancelled && (
-            <StepProgress
-              currentStatus={status}
-              progress={progress}
-              taskType={taskType}
-              taskLogs={logs}
-              embedFrames={embedFrames}
-              isImageNote={isImageNote}
-            />
+            <>
+              {/* VN3: 简洁处理中 — 5 步进度 + 预计剩余 + 友好提示 */}
+              <div style={{ padding: '20px 24px 8px' }}>
+                <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>{isSuccess ? '生成完成 ✓' : '正在生成笔记...'}</span>
+                  {etaSec > 0 && !isSuccess && (
+                    <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--ink-3)' }}>
+                      预计剩余 {etaSec}s
+                    </span>
+                  )}
+                </div>
+                <StepProgress
+                  currentStatus={status}
+                  progress={progress}
+                />
+                <div style={{ fontSize: 12, color: 'var(--ink-4)', marginTop: 12, lineHeight: 1.5 }}>
+                  {isSuccess
+                    ? '笔记已生成完毕，点击查看结果。'
+                    : '正在为你处理内容，完成后会自动跳转，请耐心等待。'}
+                </div>
+              </div>
+
+              {/* 高级详情折叠块：LiveLog / 下载速度 / 资源指标 */}
+              <div style={{ padding: '8px 24px 20px' }}>
+                <button
+                  onClick={() => setShowAdvanced(prev => !prev)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    fontSize: 12, color: 'var(--ink-3)', cursor: 'pointer',
+                    background: 'none', border: 'none', padding: 0,
+                  }}
+                >
+                  {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  {showAdvanced ? '收起详情' : '高级详情'}
+                </button>
+                {showAdvanced && (
+                  <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <SystemResourceCard etaSec={etaSec} />
+                    <TasksCard currentTaskId={taskId} />
+                    <LiveLog logs={logs} />
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
 
-        {/* Sidebar */}
-        <aside className="proc-side">
-          <SystemResourceCard etaSec={etaSec} />
-          <TasksCard currentTaskId={taskId} />
-          <LiveLog logs={logs} />
-        </aside>
       </div>
 
       {/* A3: VAD 无人声 → 音乐模式确认弹窗 */}
