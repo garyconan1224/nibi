@@ -17,14 +17,14 @@ import type { ReactElement, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowLeft, BookOpenCheck, Check, ChevronDown, ChevronRight, Download, FileCode, FileText, List, RefreshCw } from 'lucide-react'
+import { ArrowLeft, BookOpenCheck, Check, ChevronDown, ChevronRight, Download, FileCode, FileDown, FileText, FileType, Image, List, Presentation, RefreshCw, Sparkles, Subtitles } from 'lucide-react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers, Decoration, ViewPlugin, MatchDecorator, type ViewUpdate } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown as cmMarkdown } from '@codemirror/lang-markdown'
 import { toast } from 'sonner'
 
-import { exportItemNoteObsidian, getItemNote, putItemNote } from '@/services/workspaces'
+import { downloadSubtitles, exportItemNoteObsidian, getItemNote, putItemNote } from '@/services/workspaces'
 import type { VideoResultTranscriptLine } from '@/services/workspaces'
 import type { ItemNote } from '@/types/workspace'
 import { listSummaries, type ItemSummary } from '@/services/summaries'
@@ -778,6 +778,16 @@ export default function NoteShell() {
     }
   }, [workspaceId, itemId, note])
 
+  const handleExportTranscript = useCallback(async () => {
+    try {
+      await downloadSubtitles(workspaceId, itemId, 'srt', true)
+      setExportOpen(false)
+    } catch (err) {
+      console.error('原文对照导出失败:', err)
+      toast.error('原文对照导出失败，请重试')
+    }
+  }, [workspaceId, itemId])
+
   // ─── loading / error ───
   if (loading) {
     return (
@@ -942,6 +952,37 @@ export default function NoteShell() {
               >
                 <BookOpenCheck size={13} /> Obsidian 包
               </button>
+              {isVideoNote && (
+                <button
+                  className="btn-ghost"
+                  onClick={() => void handleExportTranscript()}
+                  style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
+                >
+                  <Subtitles size={13} /> 原文对照（txt）
+                </button>
+              )}
+              {/* ── 占位导出项（灰显 disabled） ── */}
+              {[
+                { icon: <FileDown size={13} />, label: 'PDF' },
+                { icon: <FileType size={13} />, label: 'Word' },
+                { icon: <Image size={13} />, label: '长图' },
+                { icon: <Presentation size={13} />, label: 'PPT' },
+                { icon: <Sparkles size={13} />, label: '沉浸式笔记' },
+              ].map((item) => (
+                <button
+                  key={item.label}
+                  disabled
+                  title="敬请期待"
+                  style={{
+                    width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12,
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    background: 'none', border: 'none', cursor: 'not-allowed',
+                    color: 'var(--ink-3)', opacity: 0.45,
+                  }}
+                >
+                  {item.icon} {item.label}
+                </button>
+              ))}
             </div>
           )}
         </div>
