@@ -17,7 +17,7 @@ import type { ReactElement, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowLeft, BookOpenCheck, ChevronDown, ChevronRight, Download, FileCode, FileText, RefreshCw } from 'lucide-react'
+import { ArrowLeft, BookOpenCheck, Check, ChevronDown, ChevronRight, Download, FileCode, FileText, List, RefreshCw } from 'lucide-react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers, Decoration, ViewPlugin, MatchDecorator, type ViewUpdate } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
@@ -27,7 +27,7 @@ import { toast } from 'sonner'
 import { exportItemNoteObsidian, getItemNote, putItemNote } from '@/services/workspaces'
 import type { VideoResultTranscriptLine } from '@/services/workspaces'
 import type { ItemNote } from '@/types/workspace'
-import type { ItemSummary } from '@/services/summaries'
+import { listSummaries, type ItemSummary } from '@/services/summaries'
 import { TS_RE, parseTs } from '@/pages/results/LearningNotesPage/HtmlView'
 import { Badge } from '@/components/ui/badge'
 import { SYSTEM_TAG_DIMENSIONS } from '@/constants/tagDimensions'
@@ -516,10 +516,11 @@ interface SummariesPanelProps {
   /** 外部受控开关（可选）；不传则内部自管 */
   open?: boolean
   onToggle?: () => void
+  onRefresh?: () => void
 }
 
 /** 总结风格面板（可折叠），内嵌 SummariesTab。 */
-function SummariesPanel({ workspaceId, itemId, onApplyToNote, open: controlledOpen, onToggle }: SummariesPanelProps) {
+function SummariesPanel({ workspaceId, itemId, onApplyToNote, open: controlledOpen, onToggle, onRefresh }: SummariesPanelProps) {
   const [internalOpen, setInternalOpen] = useState(false)
   const open = controlledOpen ?? internalOpen
   const toggle = onToggle ?? (() => setInternalOpen((v) => !v))
@@ -544,6 +545,7 @@ function SummariesPanel({ workspaceId, itemId, onApplyToNote, open: controlledOp
             workspaceId={workspaceId}
             itemId={itemId}
             onApplyToNote={onApplyToNote}
+            onRefresh={onRefresh}
           />
         </div>
       )}
@@ -604,6 +606,33 @@ export default function NoteShell() {
   const [summariesOpen, setSummariesOpen] = useState(false)
   const [sourceModalOpen, setSourceModalOpen] = useState(false)
   const [activeSummaryId, setActiveSummaryId] = useState<string | undefined>(undefined)
+  // VN4.1 版本下拉
+  const [summaries, setSummaries] = useState<ItemSummary[]>([])
+  const [summariesVersion, setSummariesVersion] = useState(0)
+  const [versionDropOpen, setVersionDropOpen] = useState(false)
+  const versionDropRef = useRef<HTMLDivElement>(null)
+  const refreshSummaries = useCallback(() => setSummariesVersion((v) => v + 1), [])
+
+  useEffect(() => {
+    let cancelled = false
+    listSummaries(workspaceId, itemId)
+      .then((data) => { if (!cancelled) setSummaries(data) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [workspaceId, itemId, activeSummaryId, summariesVersion])
+
+  // 点击外部关闭版本下拉
+  useEffect(() => {
+    if (!versionDropOpen) return
+    const handle = (e: MouseEvent) => {
+      if (versionDropRef.current && !versionDropRef.current.contains(e.target as Node)) {
+        setVersionDropOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [versionDropOpen])
+
   // 图文笔记：图片索引 + 加载错误
   const [selectedImageIdx, setSelectedImageIdx] = useState(0)
   const [imageLoadError, setImageLoadError] = useState<Record<number, boolean>>({})
@@ -821,6 +850,59 @@ export default function NoteShell() {
 
         <div style={{ flex: 1 }} />
 
+        {/* VN4.1 版本下拉（视频+图文共用） */}
+        {summaries.length > 0 && (
+          <div ref={versionDropRef} style={{ position: 'relative' }}>
+            <button
+              className="btn-ghost"
+              onClick={() => setVersionDropOpen((v) => !v)}
+              style={{
+                height: 28, padding: '0 10px', fontSize: 12,
+                color: activeSummaryId ? 'var(--accent-2)' : undefined,
+              }}
+              title="切换总结版本"
+            >
+              <List size={13} /> 版本{activeSummaryId ? (() => { const s = summaries.find(x => x.summary_id === activeSummaryId); return s ? ` · v${s.version}` : '' })() : ''}
+              <ChevronDown size={11} style={{ marginLeft: 2 }} />
+            </button>
+            {versionDropOpen && (
+              <div
+                style={{
+                  position: 'absolute', right: 0, top: 34, zIndex: 20,
+                  minWidth: 200, maxHeight: 240, overflowY: 'auto',
+                  padding: '4px',
+                  border: '1px solid var(--line)',
+                  borderRadius: 'var(--radius-sm)',
+                  background: 'var(--bg)',
+                  boxShadow: 'var(--shadow-md)',
+                }}
+              >
+                {summaries.map((s) => {
+                  const isActive = s.summary_id === activeSummaryId
+                  const label = s.name || `v${s.version}`
+                  return (
+                    <button
+                      key={s.summary_id}
+                      className="btn-ghost"
+                      onClick={() => { handleApplyToNote(s); setVersionDropOpen(false) }}
+                      style={{
+                        width: '100%', justifyContent: 'flex-start', height: 30,
+                        padding: '0 10px', fontSize: 12,
+                        color: isActive ? 'var(--accent-2)' : undefined,
+                        fontWeight: isActive ? 600 : undefined,
+                      }}
+                    >
+                      {isActive && <Check size={12} style={{ marginRight: 6, flexShrink: 0 }} />}
+                      <span style={{ marginRight: 6 }}>{label}</span>
+                      <span style={{ color: 'var(--ink-3)', fontSize: 10 }}>{s.template}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 导出（所有类型都在顶栏右上角） */}
         <div style={{ position: 'relative' }}>
           <button
@@ -1007,6 +1089,7 @@ export default function NoteShell() {
                     itemId={itemId}
                     onApplyToNote={handleApplyToNote}
                     activeSummaryId={activeSummaryId}
+                    onRefresh={refreshSummaries}
                   />
                 </div>
               )}
@@ -1191,6 +1274,7 @@ export default function NoteShell() {
               workspaceId={workspaceId}
               itemId={itemId}
               onApplyToNote={handleApplyToNote}
+              onRefresh={refreshSummaries}
             />
             <SourcePanel sourceMd={note.source_md} />
           </div>

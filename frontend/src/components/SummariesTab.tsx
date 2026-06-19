@@ -71,11 +71,13 @@ interface SummariesTabProps {
   itemId: string
   onApplyToNote?: (summary: ItemSummary) => void
   activeSummaryId?: string
+  /** create/delete/rename 后通知父组件同步 summaries 列表 */
+  onRefresh?: () => void
 }
 
 /* ── 主组件 ────────────────────────────────────────────── */
 
-export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummaryId }: SummariesTabProps) {
+export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummaryId, onRefresh }: SummariesTabProps) {
   const navigate = useNavigate()
   const [summaries, setSummaries] = useState<ItemSummary[]>([])
   const [loading, setLoading] = useState(true)
@@ -153,6 +155,7 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
       })
       toast.success(`${templateLabel(s.template)} v${s.version} 生成完成`)
       await refresh()
+      onRefresh?.()
       setSelected(s)
     } catch (err: unknown) {
       const axiosData = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
@@ -180,6 +183,7 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
           setSelected(null)
         }
         await refresh()
+        onRefresh?.()
       } catch {
         toast.error('删除失败')
       }
@@ -203,6 +207,7 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
         setSelected((prev) => (prev ? { ...prev, name: updated.name } : prev))
       }
       toast.success('已改名')
+      onRefresh?.()
     } catch {
       toast.error('改名失败')
     } finally {
