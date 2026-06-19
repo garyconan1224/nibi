@@ -323,6 +323,14 @@
 - [x] **K·9** NoteShell 视频笔记布局/交互细化 7 点：导出回顶栏 + 视图切换移中列 + 视频默认富文本 + 问AI悬浮泡泡 + 源md弹层 + 总结点选替换+版本高亮 — `b78a409` `e2f681b` `308c317`
 - [x] **K·蓝图对照**（2026-06-07）用户手绘流程/UI 图 → 一比一蓝图 [`docs/plans/track-K-note-flow-blueprint.md`](plans/track-K-note-flow-blueprint.md)（疑点①②③⑤已确认；④图片/图文暂缓）。**2026-06-11 代码调查确认：阶段 A–E + R1–R4 + 9.x 布局 + segment_refiner + R3 全部已落地，差距清单清零。**
 
+**Track K · 视频笔记体验改造（对标 BiliNote，2026-06-19 规划）**：把 BiliNote 顺滑流程叠加到 Nibi 可编辑 NoteShell。详细计划 + mimo 开工卡：[`docs/plans/track-K-video-note-experience-upgrade.md`](plans/track-K-video-note-experience-upgrade.md)。边界：不迁移 workspace/item、不改 schema、不装新依赖。
+- [x] **K·VN1** 合集语义 + 侧栏 + 合集浏览页（文案改名 + 新增 CollectionsPage 复用 library API）— `38041d5` `9fd86c2`（Codex 通过：error 态/重试/真实数据 ✓，build+133 测试 ✓）
+- [x] **K·VN2** 新建视频笔记弹窗：三段式 + 即时视频卡（复用 sniffUrl/probeDuration）+ 发言人开关/风格/合集 — `68ca0cd` `aee22cd`（为接风格下拉/payload 补了少量后端：summary_templates 列表 + workspaces payload 字段）
+- [x] **K·VN3** 处理中页简洁化 + 5 步状态映射（download/transcribe/analyze+note）+ 高级详情折叠 + 错误/取消/重试 — `7778f32` `f051e8a`（Codex 修复轮：PROBE/AWAITING_CONFIRM；9 测试覆盖 5 步，干净 worktree 验证）
+- [ ] **K·VN4** 结果页工具栏：版本快切（复用 list_summaries）+ 导出菜单接线/占位 + AI 工具菜单 + 视频 banner
+- [ ] **K·VN5** 原文对照说话人模式（条件式降级）+ 顶部直接导出（接 format/with_speaker）+ 后端 speaker 透传
+- [ ] **K·VN6** 教程 contract 调优（lecture/steps 输出结构）+ 全链路回归
+
 ---
 
 ## 归档说明

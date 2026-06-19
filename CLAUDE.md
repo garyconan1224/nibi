@@ -91,6 +91,7 @@ git log --oneline -5             # 对账铁律：phase 文档不是事实来源
 - ❌ 不要在不告知用户的情况下修改 git 历史（rebase、amend 主线 commit 等）。
 - ❌ 不要主动 `git push origin`（开源前暂缓所有 push，详见 [`docs/rules/git-workflow.md`](docs/rules/git-workflow.md) §push）。
 - ❌ 不要在 `docs/archive/`、`docs/conversation-inputs/` 目录搜索/读取（归档，已废弃）。
+- ❌ 不要在脏工作树上验证「单个 commit 能否过审」——未提交改动会掩盖 commit 自身破损（2026-06-19 踩坑：脏树测试全绿，干净树才暴露 commit 残缺）。先 commit/stash 或开干净 worktree 再跑测试；报告的文件名须与 `git diff` 实际一致。详见 [`docs/rules/agent-roles.md`](docs/rules/agent-roles.md) §7。
 
 ---
 

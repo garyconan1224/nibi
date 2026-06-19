@@ -44,8 +44,8 @@ git status --short --branch
 git log --oneline -5
 
 只读和本任务直接相关的文件；超过 300 行的文件先 rg 定位再 sed 片段读取。
-完成后跑相关测试，提交一个 commit。
-最后回复：改了哪些文件、测试结果、commit hash，并给出可复制给 Codex 的审查提示词。
+完成后跑相关测试，提交一个 commit。核对该 commit 能否过审，要在干净 checkout/worktree 上跑（先 stash 隔离其它未提交改动，见 §7）。
+最后回复：改了哪些文件（文件名须与 git diff 实际一致）、测试结果、commit hash，并给出可复制给 Codex 的审查提示词。
 
 任务：
 <这里写清楚目标、涉及文件/接口、验收标准、禁止事项>
@@ -93,3 +93,12 @@ Codex 审查时按这个输出：
 建议下一步：
 - <只给一个最小下一步>
 ```
+
+## 7. 验证纪律（干净 checkout 铁律，2026-06-19 踩坑后新增）
+
+> 事故：小米在脏工作树上跑测试，未提交的改动恰好补上了 commit 缺的部分，测试全绿掩盖了 commit 自身的破损；干净 checkout 才暴露残缺。
+
+1. **核对「单个 commit 能否过审」必须在干净环境跑**：先把本任务改动 commit，再 `git stash` 或开新 worktree（`git worktree add`）隔离其它未提交文件，在该干净状态跑测试/构建。脏工作树的「全绿」不算数。
+2. 主工作区长期并行多条线、长期有未提交改动时尤其要隔离——别让别的线的代码替你的 commit 兜底。
+3. **报告文件名/路径必须与 `git show --stat <hash>` 实际一致**：不要凭记忆写（曾把 `AddMaterialModal` 写成 `NewSummaryModal`、`workspaces.ts` 写成 `summaries.ts`），否则 Codex 对不上 diff。
+4. Codex 审查方默认在干净 checkout / 临时 worktree 上验证目标 commit，不在提交者的脏工作区里验。
