@@ -266,8 +266,8 @@ export default function LibraryPage() {
 
   const statLabel =
     showWorkspace && typeFilters.length === 0
-      ? `${filteredWorkspaces?.length ?? 0} WORKSPACES`
-      : `${filteredItems.length} ITEMS`
+      ? `${filteredWorkspaces?.length ?? 0} 合集`
+      : `${filteredItems.length} 笔记`
 
   const handleOpenItem = useCallback((item: LibraryItem) => {
     if (item.status === 'done') {

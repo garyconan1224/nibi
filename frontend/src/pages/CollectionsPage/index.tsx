@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FolderOpen, Inbox } from 'lucide-react'
+import { FolderOpen, Inbox, AlertCircle } from 'lucide-react'
 import { fetchLibrary, type LibraryResponse } from '@/services/library'
 import '@/pages/LibraryPage/library.css'
 
@@ -31,12 +31,18 @@ function CollectionsPage() {
   const navigate = useNavigate()
   const [data, setData] = useState<LibraryResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true)
+    setError(null)
     fetchLibrary()
       .then(setData)
+      .catch(() => setError('加载合集失败，请确认后端已启动后重试。'))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => { load() }, [load])
 
   const workspaces = data?.workspaces ?? []
   const items = data?.items ?? []
@@ -59,6 +65,21 @@ function CollectionsPage() {
       {loading ? (
         <div className="empty-state">
           <div className="spinner" />
+        </div>
+      ) : error ? (
+        <div className="empty-state">
+          <div className="empty-state-icon">
+            <AlertCircle size={28} strokeWidth={1.5} style={{ color: 'var(--accent-pink)' }} />
+          </div>
+          <div className="empty-state-title">加载失败</div>
+          <div className="empty-state-desc">{error}</div>
+          <button
+            className="btn btn-primary"
+            style={{ marginTop: 16, fontSize: 13, height: 34 }}
+            onClick={load}
+          >
+            重试
+          </button>
         </div>
       ) : workspaces.length === 0 && ungroupedCount === 0 ? (
         <div className="empty-state">
