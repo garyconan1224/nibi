@@ -177,15 +177,15 @@ export default function LibraryPage() {
 
   const handleDeleteWorkspace = useCallback(async (wsId: string) => {
     const ws = data?.workspaces.find((w) => w.workspace_id === wsId)
-    const label = ws?.name || '未命名工作空间'
-    const ok = window.confirm(`确定删除工作空间「${label}」？`)
+    const label = ws?.name || '未命名合集'
+    const ok = window.confirm(`确定删除合集「${label}」？`)
     if (!ok) return
     try {
       await deleteWorkspace(wsId)
-      toast.success(`已删除工作空间「${label}」`)
+      toast.success(`已删除合集「${label}」`)
       load()
     } catch {
-      toast.error('删除工作空间失败，请重试')
+      toast.error('删除合集失败，请重试')
     }
   }, [data, load])
 
@@ -228,7 +228,7 @@ export default function LibraryPage() {
       (it) => it.type === 'image' && selectedSet.has(selectionKey(it.workspace_id, it.item_id)),
     )
     if (imageItems.length === 0) {
-      toast.error('请选择图片素材（仅图片支持批量分析）')
+      toast.error('请选择图片笔记（仅图片支持批量分析）')
       return
     }
     setAnalyzing(true)
@@ -274,7 +274,7 @@ export default function LibraryPage() {
       navigate(resolveItemRoute(item.workspace_id, item))
     } else {
       // 未完成 → 不进结果页，提示用户
-      toast.info('该素材尚在分析中，请从任务面板查看进度')
+      toast.info('该笔记尚在分析中，请从任务面板查看进度')
     }
   }, [navigate])
 
@@ -311,7 +311,7 @@ export default function LibraryPage() {
               lineHeight: 1.55,
             }}
           >
-            横切所有工作空间的素材池。按类型筛、按时长/状态排，找到该用的那一个。
+            横切所有合集的笔记池。按类型筛、按时长/状态排，找到该用的那一个。
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -352,7 +352,7 @@ export default function LibraryPage() {
                     }}
                     onClick={handleBatchAnalyze}
                     disabled={analyzing || selectedSet.size === 0}
-                    title="仅对选中的图片素材触发分析（按已存配置），进度见右上角任务队列"
+                    title="仅对选中的图片笔记触发分析（按已存配置），进度见右上角任务队列"
                   >
                     <Sparkles size={13} />
                     {analyzing ? '分析中…' : '批量分析'}
@@ -377,7 +377,7 @@ export default function LibraryPage() {
             className="btn btn-primary"
             style={{ height: 32, fontSize: 12 }}
             onClick={() => navigate('/')}
-            title="去工作台新建工作空间"
+            title="去工作台新建合集"
           >
             <Plus size={14} />
             导入
@@ -412,7 +412,7 @@ export default function LibraryPage() {
             <>
               {typeFilters.length > 0 && (
                 <div className="eyebrow" style={{ marginBottom: 12, marginTop: 4 }}>
-                  工作空间 · {filteredWorkspaces.length}
+                  合集 · {filteredWorkspaces.length}
                 </div>
               )}
               <div
@@ -444,7 +444,7 @@ export default function LibraryPage() {
             <>
               {showWorkspace && typeFilters.length > 0 && filteredItems.length > 0 && (
                 <div className="eyebrow" style={{ marginBottom: 12 }}>
-                  素材 · {filteredItems.length}
+                  笔记 · {filteredItems.length}
                 </div>
               )}
               {filteredItems.length === 0 ? (
@@ -454,12 +454,12 @@ export default function LibraryPage() {
                   </div>
                   <div className="empty-state-title">
                     {showAll && data.items.length === 0
-                      ? '暂无素材'
-                      : '没有匹配的素材'}
+                      ? '暂无笔记'
+                      : '没有匹配的笔记'}
                   </div>
                   <div className="empty-state-desc">
                     {showAll && data.items.length === 0
-                      ? '去工作台添加素材，或粘贴一个链接开始吧'
+                      ? '去工作台添加笔记，或粘贴一个链接开始吧'
                       : '试试切换筛选条件或清除 chip'}
                   </div>
                 </div>
@@ -498,9 +498,9 @@ export default function LibraryPage() {
                 <div className="empty-state-icon">
                   <Filter size={24} strokeWidth={1.5} />
                 </div>
-                <div className="empty-state-title">没有工作空间</div>
+                <div className="empty-state-title">没有合集</div>
                 <div className="empty-state-desc">
-                  还没有创建任何工作空间，去首页导入素材开始吧
+                  还没有创建任何合集，去首页导入笔记开始吧
                 </div>
               </div>
             )}

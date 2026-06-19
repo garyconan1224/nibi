@@ -37,6 +37,7 @@ const WorkbenchPage = lazy(() => import('@/pages/WorkbenchPage/index'))
 const ProcessingPage = lazy(() => import('@/pages/result/ProcessingPage/index'))
 const StoryboardPage = lazy(() => import('@/pages/StoryboardPage/index'))
 const LibraryPage = lazy(() => import('@/pages/LibraryPage/index'))
+const CollectionsPage = lazy(() => import('@/pages/CollectionsPage/index'))
 const NoteShell = lazy(() => import('@/pages/result/NoteShell/index'))
 
 // 懒加载 fallback：保持极简，避免把额外依赖拉进主 chunk
@@ -61,6 +62,7 @@ export const router = createBrowserRouter([
       { path: 'favorites', element: withSuspense(<FavoritesPage />) },
       { path: 'search', element: withSuspense(<SearchPage />) },
       { path: 'library', element: withSuspense(<LibraryPage />) },
+      { path: 'collections', element: withSuspense(<CollectionsPage />) },
       { path: 'workspaces/:id', element: withSuspense(<TaskboardPage />) },
       {
         path: 'workspaces/:workspaceId/items/:itemId/overview',

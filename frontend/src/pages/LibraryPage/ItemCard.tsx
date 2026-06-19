@@ -43,7 +43,7 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
       if (tid) {
         navigate(`/processing/${tid}`)
       } else {
-        toast.info('该素材尚在分析中，请从任务面板查看进度')
+        toast.info('该笔记尚在分析中，请从任务面板查看进度')
       }
     }
   }

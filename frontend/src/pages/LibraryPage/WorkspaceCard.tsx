@@ -138,7 +138,7 @@ export function WorkspaceCard({ workspace, items, selectMode, selected, onToggle
               marginTop: 6,
               display: 'flex', gap: 8, flexWrap: 'wrap',
             }}>
-              <span>{total} 个素材</span>
+              <span>{total} 个笔记</span>
               {workspace.updated_at && (
                 <>
                   <span style={{ opacity: 0.4 }}>·</span>

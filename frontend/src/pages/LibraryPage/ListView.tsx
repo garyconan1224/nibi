@@ -57,7 +57,7 @@ export function ListView({ items, selectMode, selectedSet, selectionKey, onToggl
             <th style={{ ...TH, width: 80 }}>类型</th>
             <th style={{ ...TH, width: 110 }}>状态</th>
             <th style={{ ...TH, width: 80 }}>时长</th>
-            <th style={{ ...TH, width: 160 }}>工作空间</th>
+            <th style={{ ...TH, width: 160 }}>合集</th>
             <th style={{ ...TH, width: 100 }}>创建时间</th>
             <th style={{ ...TH, width: 40 }}></th>
           </tr>
