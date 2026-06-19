@@ -1224,6 +1224,7 @@ export default function NoteShell() {
                         itemId={itemId}
                         onApplyToNote={handleApplyToNote}
                         activeSummaryId={activeSummaryId}
+                        onRefresh={refreshSummaries}
                       />
                     </div>
                   )}
