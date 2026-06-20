@@ -134,14 +134,14 @@ export default function WorkspaceList() {
       {/* 顶部：标题 + 新建 */}
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">知识库</h1>
+          <h1 className="text-2xl font-semibold">合集</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            每个知识库可装多种素材（笔记 / 视频 / 音频 / 图片），共享同一个 LLM 上下文。
+            每个合集可装多种素材（笔记 / 视频 / 音频 / 图片），共享同一个 LLM 上下文。
           </p>
         </div>
         <Button onClick={() => setCreateOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          新建知识库
+          新建合集
         </Button>
       </header>
 
@@ -167,19 +167,19 @@ export default function WorkspaceList() {
       ) : items.length === 0 ? (
         <EmptyState
           illustration={<FolderOpen className="size-6" />}
-          title="还没有知识库"
-          description="新建一个知识库，开始添加笔记/视频/音频/图片素材并分析。"
+          title="还没有合集"
+          description="新建一个合集，开始添加笔记/视频/音频/图片素材并分析。"
           action={
             <Button onClick={() => setCreateOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
-              新建知识库
+              新建合集
             </Button>
           }
         />
       ) : filteredItems.length === 0 ? (
         <EmptyState
           illustration={<FolderOpen className="size-6" />}
-          title="没有匹配的知识库"
+          title="没有匹配的合集"
           description="当前筛选条件下没有素材命中。试着清除一些维度或调整自定义关键词。"
           action={
             <Button variant="outline" onClick={() => setFilter({ dimensions: {}, customQuery: '' })}>
@@ -204,13 +204,13 @@ export default function WorkspaceList() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>新建知识库</DialogTitle>
+            <DialogTitle>新建合集</DialogTitle>
             <DialogDescription>
               先取个名字，例如「参考素材 - 某创作者风格」。后续可在详情页添加素材和配置。
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2">
-            <Label htmlFor="ws-name">知识库名称</Label>
+            <Label htmlFor="ws-name">合集名称</Label>
             <Input
               id="ws-name"
               autoFocus
@@ -248,7 +248,7 @@ export default function WorkspaceList() {
           <AlertDialogHeader>
             <AlertDialogTitle>确认删除？</AlertDialogTitle>
             <AlertDialogDescription>
-              将永久删除知识库「{deleteTarget?.name}」及其内所有素材的引用。此操作不可撤销。
+              将永久删除合集「{deleteTarget?.name}」及其内所有素材的引用。此操作不可撤销。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -286,7 +286,7 @@ function WorkspaceCard({ workspace, onOpen, onDelete }: WorkspaceCardProps) {
         <button
           type="button"
           className="ml-2 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-          aria-label="删除知识库"
+          aria-label="删除合集"
           onClick={(e) => {
             e.stopPropagation()
             onDelete()

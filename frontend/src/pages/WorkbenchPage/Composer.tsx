@@ -52,7 +52,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
   // Fetch workspaces on mount
   useEffect(() => {
     listWorkspaces().then(setWorkspaces).catch(() => {
-      toast.error('加载知识库列表失败，请检查后端是否已启动')
+      toast.error('加载合集列表失败，请检查后端是否已启动')
     })
   }, [])
 
@@ -86,15 +86,15 @@ export function Composer({ onTaskCreated }: ComposerProps) {
     setWorkspaceSel((s) => s.filter((x) => x !== id)), [])
 
   const handleNewWorkspace = useCallback(async () => {
-    const name = wsQuery.trim() || '新知识库'
+    const name = wsQuery.trim() || '新合集'
     try {
       const created = await createWorkspace({ name })
       setWorkspaces((prev) => [...prev, created])
       setWorkspaceSel((s) => [...s, created.workspace_id])
       setWsQuery('')
-      toast.success(`知识库「${name}」已创建`)
+      toast.success(`合集「${name}」已创建`)
     } catch {
-      toast.error('创建知识库失败')
+      toast.error('创建合集失败')
     }
   }, [wsQuery])
 
@@ -148,7 +148,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
     setUploading(true)
     try {
       const ws = await autoCreateWorkspace({ hint_text: file.name })
-      toast.info(`已自动创建知识库「${ws.name}」`)
+      toast.info(`已自动创建合集「${ws.name}」`)
       const updated = await uploadWorkspaceItem(ws.workspace_id, file, {
         name: file.name,
       })
@@ -179,7 +179,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
     setUploadOpen(false)
     setUrl('')
     listWorkspaces().then(setWorkspaces).catch(() => {
-      toast.error('刷新知识库列表失败')
+      toast.error('刷新合集列表失败')
     })
     onTaskCreated?.()
   }
@@ -237,9 +237,9 @@ export function Composer({ onTaskCreated }: ComposerProps) {
 
       {/* Workspace assignment row */}
       <div className="composer-projects">
-        <span className="pp-label">归入知识库</span>
+        <span className="pp-label">归入合集</span>
 
-        {workspaceSel.length === 0 && <span className="pp-none">未选知识库 · 提交时自动创建</span>}
+        {workspaceSel.length === 0 && <span className="pp-none">未选合集 · 提交时自动创建</span>}
 
         {workspaceSel.map((id) => {
           const ws = wsById[id]
@@ -258,7 +258,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
 
         <button className="pp-add" onClick={() => setWsOpen((o) => !o)}>
           <Layers size={11} />
-          {workspaceSel.length ? '继续添加' : '选择知识库'}
+          {workspaceSel.length ? '继续添加' : '选择合集'}
         </button>
 
         <span
@@ -268,9 +268,9 @@ export function Composer({ onTaskCreated }: ComposerProps) {
             color: 'var(--ink-4)',
             fontFamily: 'var(--mono)',
           }}
-          title="一个内容可同时归入多个知识库"
+          title="一个内容可同时归入多个合集"
         >
-          可多选 · 一个内容可归入多个知识库
+          可多选 · 一个内容可归入多个合集
         </span>
 
         {wsOpen && (
@@ -279,7 +279,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
               <Search size={14} />
               <input
                 autoFocus
-                placeholder="搜索知识库..."
+                placeholder="搜索合集..."
                 value={wsQuery}
                 onChange={(e) => setWsQuery(e.target.value)}
               />
@@ -305,7 +305,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
                     fontFamily: 'var(--mono)',
                   }}
                 >
-                  无匹配知识库
+                  无匹配合集
                 </div>
               )}
               {filteredWs.map((ws) => {
@@ -345,7 +345,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
                 onClick={handleNewWorkspace}
               >
                 <Plus size={11} />
-                新建知识库{wsQuery ? ` "${wsQuery}"` : ''}
+                新建合集{wsQuery ? ` "${wsQuery}"` : ''}
               </button>
               <button className="pp-done" onClick={() => setWsOpen(false)}>
                 完成
