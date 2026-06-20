@@ -453,9 +453,17 @@
   font-weight: 600;
   border: none;
   cursor: pointer;
-  transition: all 160ms ease;
+  transition: background 140ms ease, color 140ms ease, transform 100ms ease, box-shadow 140ms ease;
 }
 .wb-btn-run:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.wb-btn-run:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--accent-warm);
+}
+.wb-btn-run:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
 .wb-btn-run .iconwrap {
   width: 28px;
   height: 28px;
