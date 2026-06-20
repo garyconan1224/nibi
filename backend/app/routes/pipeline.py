@@ -34,6 +34,20 @@ class TaskCreateRequest(BaseModel):
     )
 
 
+# 轻量列表也需要的 result 展示字段白名单（封面/标题/类型/时长）——卡片渲染必需，体积小。
+# 完整 result（含总结 md / 转录 / 分镜）仍只在 include_result=True 或详情接口返回。
+_LIST_RESULT_DISPLAY_KEYS = (
+    "video_title",
+    "video_thumbnail_url",
+    "cover_thumbnail",
+    "video_duration",
+    "video_uploader",
+    "note_kind",
+    "project_id",
+    "audio",
+)
+
+
 @router.get("/tasks")
 def list_tasks(
     project_id: Optional[str] = None,
@@ -41,14 +55,27 @@ def list_tasks(
     include_result: bool = False,
     limit: int = 50,
 ) -> List[Dict[str, Any]]:
-    """列出任务，支持轻量模式（默认不含日志和结果，最多 50 条）。"""
+    """列出任务，支持轻量模式（默认不含日志和完整结果，最多 50 条）。
+
+    轻量模式（include_result=False）仍注入 result 展示字段白名单（封面/标题/类型/时长），
+    供首页「最近任务」「浮动队列」卡片渲染——否则往期已完成任务在列表里没有封面，
+    要点进详情接口才补得到（用户反馈：最近任务卡无封面、点进才有）。
+    """
     all_recs = _store.list_all()
     if project_id:
         all_recs = [r for r in all_recs if r.project_id == project_id]
     all_recs.sort(key=lambda r: r.created_at, reverse=True)
     if limit > 0:
         all_recs = all_recs[:limit]
-    return [r.to_dict(include_logs=include_logs, include_result=include_result) for r in all_recs]
+
+    out: List[Dict[str, Any]] = []
+    for r in all_recs:
+        d = r.to_dict(include_logs=include_logs, include_result=include_result)
+        if not include_result:
+            src = r.result or {}
+            d["result"] = {k: src[k] for k in _LIST_RESULT_DISPLAY_KEYS if k in src}
+        out.append(d)
+    return out
 
 
 @router.post("/tasks")

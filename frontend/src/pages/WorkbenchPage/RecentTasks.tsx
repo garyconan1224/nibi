@@ -21,6 +21,21 @@ const TYPE_ICON = {
   text:  FileText,
 }
 
+function titleFromFilename(filename: unknown): string {
+  const raw = typeof filename === 'string' ? filename.trim() : ''
+  if (!raw) return ''
+  const name = raw.split('/').pop() || raw
+  return name.replace(/\.[^.]+$/, '')
+}
+
+// 音频任务没有 video_thumbnail_url，封面是 PROBE 阶段落在 static 下的同名 jpg（与 TasksCard 一致）
+function audioThumbnailFromResult(result: Record<string, unknown>, audio?: Record<string, unknown>): string {
+  const projectId = typeof result.project_id === 'string' ? result.project_id.trim() : ''
+  const filename = typeof audio?.filename === 'string' ? audio.filename.trim() : ''
+  if (!projectId || !filename) return ''
+  return `/static/workspaces/${projectId}/audio/${titleFromFilename(filename)}.jpg`
+}
+
 function taskToCard(t: TaskRecord): TaskCard {
   const payload = (t.payload ?? {}) as Record<string, unknown>
   const result = (t.result ?? {}) as Record<string, unknown>
@@ -41,8 +56,12 @@ function taskToCard(t: TaskRecord): TaskCard {
       ? (url.length > 50 ? url.slice(0, 47) + '...' : url)
       : getStatusText(t.status)
 
-  // 真实封面（PROBE 后已是 static URL，可直接用）
-  const thumb = (result.video_thumbnail_url || result.cover_thumbnail || '') as string
+  // 真实封面（PROBE 后已是 static URL，可直接用）；音频走同名 jpg 派生
+  const resultAudio = result.audio as Record<string, unknown> | undefined
+  const thumb = (result.video_thumbnail_url
+    || result.cover_thumbnail
+    || audioThumbnailFromResult(result, resultAudio)
+    || '') as string
 
   // 真实类型
   const noteKind = result.note_kind as string | undefined
