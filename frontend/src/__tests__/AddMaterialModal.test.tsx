@@ -74,7 +74,7 @@ describe('AddMaterialModal', () => {
     )
 
     expect(screen.getByText('② 生成设置')).toBeTruthy()
-    expect(screen.getByText('③ 输出与归类')).toBeTruthy()
+    expect(screen.getByText('③ 输出')).toBeTruthy()
     expect(screen.getByText('test video')).toBeTruthy()
     expect(screen.getByText('链接有效')).toBeTruthy()
     expect(screen.getByRole('button', { name: /开始生成/ })).toBeTruthy()

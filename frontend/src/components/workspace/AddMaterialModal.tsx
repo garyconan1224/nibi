@@ -328,7 +328,12 @@ export function AddMaterialModal({
               <div className="sniff-card">
                 <div className="sniff-thumb">
                   {effectiveSniff.thumbnail ? (
-                    <img src={effectiveSniff.thumbnail} alt="" />
+                    <img
+                      src={effectiveSniff.thumbnail}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                    />
                   ) : (
                     <ImageIcon size={20} style={{ color: 'var(--ink-3)' }} />
                   )}
@@ -490,16 +495,10 @@ export function AddMaterialModal({
                 </div>
           </div>
 
-          {/* ③ 输出与归类 */}
+          {/* ③ 输出 */}
           <div className="m-section">
-            <div className="eyebrow" style={{ marginBottom: 10 }}>③ 输出与归类</div>
+            <div className="eyebrow" style={{ marginBottom: 10 }}>③ 输出</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div className="output-row">
-                <div className="output-row-text">
-                  <span className="gen-field-label">存入合集</span>
-                  <span className="kw" style={{ fontSize: 11 }}>{workspaceSummary}</span>
-                </div>
-              </div>
               <div className="output-row" data-disabled="true">
                 <div className="output-row-text">
                   <span className="gen-field-label">导出预设</span>
