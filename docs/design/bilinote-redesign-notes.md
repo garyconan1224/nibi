@@ -32,11 +32,15 @@
 - VN4.1 顶栏版本下拉(`902da70`,`e7dbf73`) / VN4.2 导出菜单(`75bfadb`) / VN4.3 AI 工具菜单(`e1030e3`)
 - 规划文档(`175caae`) / summary presentation(`9434b30`)
 
-**未 commit（工作树，待用户看顺眼再提交）**：
-- 处理页精致化 → 水平 stepper：`StepProgress.tsx` / `processing.css` / `ProcessingPage`（5 步区居中 + 自动跳转）/ `FloatingTaskQueue`（处理页隐藏 —— 本轮要改回悬浮）
+**2026-06-20 已 commit（main）**：
+- `7523a2b` 处理页水平 stepper + **处理↔结果原地融合**（B'：note 完成在任务页 `/processing/:taskId` 内直接渲染 NoteShell、不跳页；NoteShell 支持外部传 ws/item）
+- `d360a70` 首页最近任务卡真实化（真封面 cover_thumbnail + 点击进任务页 + 真标题 video_title/真类型）
+- `9986675` 弹窗「合集」文案对齐 + `.m-section` 分组卡片化（起步）
 
-**待办**：
-- [进行中] 处理页：删系统资源、任务恢复悬浮
-- 添加链接弹窗大胆改（对标图2）
-- 架构探讨（BiliNote 工作台 vs Nibi 多内容）
-- 整体布局比例（该大该小）
+**架构已定**：Q1=b（笔记线保持「点击进页」分页，不做常驻列表+主区）/ Q2=a（处理↔结果原地，已实现 = B'）。
+
+**待办（第 3 步「整体视觉大胆升级」，建议新会话系统做）**：
+- 添加素材弹窗**视觉细节大改**（对标 BiliNote 图2，大胆；弹窗 css 在 `design-tokens.css` 257–563）
+- **全局按钮 + 动画/框**升级（落点 `design-tokens.css`，影响全局，谨慎分批）
+- **首页 WorkbenchPage** 优化
+- 新会话**读本文档即可无缝接上**；视觉用 Nibi 自己的 token，对标布局/流程但不照搬 BiliNote 配色
