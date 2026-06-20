@@ -325,20 +325,20 @@ export function AddMaterialModal({
               </div>
             )}
             {effectiveSniff && (
-              <div style={{ display: 'flex', gap: 12, marginTop: 8, padding: 10, borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg)' }}>
-                <div style={{ width: 96, height: 64, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: 'var(--surface-2, #f3f4f6)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+              <div className="sniff-card">
+                <div className="sniff-thumb">
                   {effectiveSniff.thumbnail ? (
-                    <img src={effectiveSniff.thumbnail} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={effectiveSniff.thumbnail} alt="" />
                   ) : (
                     <ImageIcon size={20} style={{ color: 'var(--ink-3)' }} />
                   )}
-                  <PlayCircle size={22} style={{ position: 'absolute', color: 'rgba(255,255,255,0.85)', filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.4))' }} />
+                  <PlayCircle size={22} className="sniff-play" />
                 </div>
-                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div className="sniff-meta">
+                  <div className="sniff-title">
                     {effectiveSniff.title || '已识别视频'}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <div className="sniff-tags">
                     {effectiveSniff.platform && (
                       <span className="kw" style={{ fontSize: 11 }}>{effectiveSniff.platform}</span>
                     )}
@@ -347,7 +347,7 @@ export function AddMaterialModal({
                         <Clock size={11} /> {formatDuration(videoDuration)}
                       </span>
                     )}
-                    <span style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 3, color: 'var(--green-600, #16a34a)' }}>
+                    <span className="sniff-ok">
                       <CheckCircle2 size={11} /> 链接有效
                     </span>
                   </div>
@@ -364,31 +364,26 @@ export function AddMaterialModal({
           {/* ② 生成设置 */}
           <div className="m-section">
             <div className="eyebrow" style={{ marginBottom: 10 }}>② 生成设置</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }}>
+                <div className="note-type-grid">
                   {NOTE_TYPE_CARDS.map(card => {
                     const active = selectedNoteType === card.value
                     return (
                       <button
                         key={card.value}
                         type="button"
+                        className="note-type-card"
+                        data-active={active}
                         onClick={() => setSelectedNoteType(card.value)}
-                        style={{
-                          textAlign: 'left', padding: '10px 12px', borderRadius: 10,
-                          cursor: 'pointer',
-                          border: active ? '2px solid var(--accent-warm)' : '1px solid var(--line)',
-                          background: active ? 'rgba(255,184,76,0.08)' : 'var(--bg)',
-                          transition: 'border-color .15s, background .15s',
-                        }}
                       >
-                        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 2 }}>{card.label}</div>
-                        <div className="kw" style={{ fontSize: 10 }}>{card.desc}</div>
+                        <div className="ntc-l">{card.label}</div>
+                        <div className="ntc-d">{card.desc}</div>
                       </button>
                     )
                   })}
                 </div>
                 <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <span className="mono" style={{ fontSize: 12 }}>笔记风格</span>
+                  <div className="gen-field">
+                    <span className="gen-field-label">笔记风格</span>
                     <Select value={noteStyle} onValueChange={setNoteStyle}>
                       <SelectTrigger style={{ fontSize: 13 }}>
                         <SelectValue placeholder="选择风格" />
@@ -400,16 +395,16 @@ export function AddMaterialModal({
                       </SelectContent>
                     </Select>
                   </div>
-                  <label htmlFor="add-material-embed" style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                  <label htmlFor="add-material-embed" className="gen-toggle">
                     <Switch id="add-material-embed" checked={embedFrames} onCheckedChange={(v) => { userToggledRef.current = true; setEmbedFrames(v) }} />
-                    <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span className="mono" style={{ fontSize: 12 }}>笔记里配图</span>
+                    <span className="gen-toggle-text">
+                      <span className="gen-field-label">笔记里配图</span>
                       <span className="kw" style={{ fontSize: 11 }}>打开＝带图笔记（自动挑有信息的画面）；关闭＝纯文字笔记</span>
                     </span>
                   </label>
                   {embedFrames && visionModels.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <span className="mono" style={{ fontSize: 12 }}>视觉模型</span>
+                    <div className="gen-field">
+                      <span className="gen-field-label">视觉模型</span>
                       <Select value={selectedVisionModel} onValueChange={setSelectedVisionModel}>
                         <SelectTrigger style={{ fontSize: 13 }}>
                           <SelectValue placeholder="系统默认" />
@@ -434,41 +429,32 @@ export function AddMaterialModal({
                     const autoInterval = computeAutoInterval(videoDuration)
                     const autoFrames = estimateFrames(videoDuration, autoInterval)
                     const manualFrames = estimateFrames(videoDuration, frameInterval)
-                    const cardBase = {
-                      textAlign: 'left' as const, padding: '12px 14px', borderRadius: 10,
-                      cursor: 'pointer', background: 'var(--bg)',
-                    }
-                    const sel = (on: boolean) => ({
-                      ...cardBase,
-                      border: on ? '2px solid var(--accent-warm)' : '1px solid var(--line)',
-                      background: on ? 'rgba(255,184,76,0.08)' : 'var(--bg)',
-                    })
                     return (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        <span className="mono" style={{ fontSize: 12 }}>取画面</span>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                          <div onClick={() => setCaptureMode('auto')} style={sel(captureMode === 'auto')}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <div className="gen-field">
+                        <span className="gen-field-label">取画面</span>
+                        <div className="gen-card-grid">
+                          <div className="gen-card" data-on={captureMode === 'auto'} onClick={() => setCaptureMode('auto')}>
+                            <div className="gen-card-head">
                               <Wand2 size={15} style={{ color: 'var(--accent-warm)' }} />
-                              <span style={{ fontSize: 13, fontWeight: 600 }}>智能</span>
+                              <span className="gen-card-title">智能</span>
                             </div>
                             <div className="kw" style={{ fontSize: 11 }}>按时长自动</div>
                             <div className="kw" style={{ fontSize: 11, marginTop: 4 }}>
                               {videoDuration > 0 ? `每 ${autoInterval} 秒 · 约 ${autoFrames} 张` : '识别后显示'}
                             </div>
                           </div>
-                          <div onClick={() => setCaptureMode('manual')} style={sel(captureMode === 'manual')}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                          <div className="gen-card" data-on={captureMode === 'manual'} onClick={() => setCaptureMode('manual')}>
+                            <div className="gen-card-head">
                               <Settings2 size={15} style={{ color: captureMode === 'manual' ? 'var(--accent-warm)' : 'var(--ink-3)' }} />
-                              <span style={{ fontSize: 13, fontWeight: 600 }}>手动</span>
+                              <span className="gen-card-title">手动</span>
                             </div>
                             <div className="kw" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
                               每隔
                               <input
+                                className="gen-num-input"
                                 type="number" min={1} max={60} value={frameInterval}
                                 onClick={(e) => e.stopPropagation()}
                                 onChange={(e) => setFrameInterval(Number(e.target.value) || 5)}
-                                style={{ fontSize: 11, width: 42, padding: '1px 4px', borderRadius: 4, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--ink-1)' }}
                               />
                               秒
                             </div>
@@ -485,15 +471,15 @@ export function AddMaterialModal({
                       </div>
                     )
                   })()}
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                  <label className="gen-toggle">
                     <Switch checked={diarizeOn} onCheckedChange={setDiarizeOn} />
-                    <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span className="mono" style={{ fontSize: 12 }}>区分发言人</span>
+                    <span className="gen-toggle-text">
+                      <span className="gen-field-label">区分发言人</span>
                       <span className="kw" style={{ fontSize: 11 }}>开启后在转写中标注不同说话人（实验功能）</span>
                     </span>
                   </label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <span className="mono" style={{ fontSize: 12 }}>补充说明</span>
+                  <div className="gen-field">
+                    <span className="gen-field-label">补充说明</span>
                     <Textarea
                       value={userNotes}
                       onChange={(e) => setUserNotes(e.target.value)}
@@ -508,15 +494,15 @@ export function AddMaterialModal({
           <div className="m-section">
             <div className="eyebrow" style={{ marginBottom: 10 }}>③ 输出与归类</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg)' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <span className="mono" style={{ fontSize: 12 }}>存入合集</span>
+              <div className="output-row">
+                <div className="output-row-text">
+                  <span className="gen-field-label">存入合集</span>
                   <span className="kw" style={{ fontSize: 11 }}>{workspaceSummary}</span>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--line)', background: 'var(--bg)', opacity: 0.5 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <span className="mono" style={{ fontSize: 12 }}>导出预设</span>
+              <div className="output-row" data-disabled="true">
+                <div className="output-row-text">
+                  <span className="gen-field-label">导出预设</span>
                   <span className="kw" style={{ fontSize: 11 }}>生成后在结果页导出</span>
                 </div>
               </div>
