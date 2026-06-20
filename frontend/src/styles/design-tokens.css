@@ -269,7 +269,16 @@
   gap: 24px;
 }
 
-.m-section {}
+.m-section {
+  padding: 18px 20px;
+  border-radius: 14px;
+  background: var(--bg-sunken);
+  border: 1px solid var(--line);
+  transition: border-color 200ms ease;
+}
+.m-section:focus-within {
+  border-color: color-mix(in srgb, var(--accent-2) 40%, var(--line));
+}
 
 .m-foot {
   display: flex;

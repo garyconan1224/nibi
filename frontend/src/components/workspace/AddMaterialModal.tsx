@@ -162,10 +162,10 @@ export function AddMaterialModal({
   const effectiveSniff = sniffResult ?? internalSniff
   const workspaceSummary =
     workspaceIds.length > 1
-      ? `${workspaceIds.length} 个工作空间`
+      ? `${workspaceIds.length} 个合集`
       : workspaceIds.length === 1
-        ? '当前工作空间'
-        : '未选择工作空间'
+        ? '当前合集'
+        : '未选择合集'
   const sourceSummary = effectiveSniff?.title
     ? `${effectiveSniff.platform ?? '未知平台'} · ${effectiveSniff.title}`
     : effectiveUrl
@@ -235,7 +235,7 @@ export function AddMaterialModal({
       if (!wsId) {
         const ws = await autoCreateWorkspace({ hint_url: effectiveUrl })
         wsId = ws.workspace_id
-        toast.info(`已自动创建工作空间「${ws.name}」`)
+        toast.info(`已自动创建合集「${ws.name}」`)
       }
 
       // SniffResult 暂无 duration 字段，智能档兜底默认 10 秒
