@@ -1,4 +1,5 @@
 import { ArrowRight, Film, Mic, Image, FileText } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useTaskStore } from '@/store/taskStore'
 import { usePipelineTasks } from '@/hooks/usePipelineTasks'
 import { isTaskTerminal, getStatusText } from '@/types/task'
@@ -21,6 +22,9 @@ const TYPE_ICON = {
 }
 
 function taskToCard(t: TaskRecord): TaskCard {
+  const payload = (t.payload ?? {}) as Record<string, unknown>
+  const result = (t.result ?? {}) as Record<string, unknown>
+
   let state: TaskCard['state'] = 'queued'
   if (t.status === 'SUCCESS') state = 'done'
   else if (t.status === 'FAILED') state = 'error'
@@ -28,17 +32,30 @@ function taskToCard(t: TaskRecord): TaskCard {
   else if (isTaskTerminal(t.status)) state = 'done'
   else state = 'running'
 
-  const url = (t.payload as Record<string, unknown>).url as string | undefined
-  const title = url
-    ? (url.length > 50 ? url.slice(0, 47) + '...' : url)
-    : getStatusText(t.status)
+  // 真实标题：视频标题 > url 截断 > 状态文案
+  const url = payload.url as string | undefined
+  const videoTitle = (result.video_title || payload.video_title) as string | undefined
+  const title = videoTitle?.trim()
+    ? videoTitle
+    : url
+      ? (url.length > 50 ? url.slice(0, 47) + '...' : url)
+      : getStatusText(t.status)
+
+  // 真实封面（PROBE 后已是 static URL，可直接用）
+  const thumb = (result.video_thumbnail_url || result.cover_thumbnail || '') as string
+
+  // 真实类型
+  const noteKind = result.note_kind as string | undefined
+  const type =
+    noteKind === 'image_text' ? 'image' : t.task_type === 'audio' ? 'audio' : 'video'
 
   return {
     id: t.task_id,
     title,
     src: t.task_type,
-    type: 'video',
+    type,
     state,
+    thumb,
   }
 }
 
@@ -47,6 +64,7 @@ interface RecentTasksProps {
 }
 
 export function RecentTasks({ tasks: tasksProp }: RecentTasksProps) {
+  const navigate = useNavigate()
   usePipelineTasks({ pollInterval: 5000 })
   const storeTasks = useTaskStore((s) => s.tasks)
   const tasks = tasksProp ?? storeTasks
@@ -82,9 +100,26 @@ export function RecentTasks({ tasks: tasksProp }: RecentTasksProps) {
         {cards.map((task) => {
           const Icon = TYPE_ICON[task.type as keyof typeof TYPE_ICON] ?? Film
           return (
-            <div key={task.id} className="ex-card">
+            <div
+              key={task.id}
+              className="ex-card"
+              onClick={() => navigate(`/processing/${task.id}`)}
+              style={{ cursor: 'pointer' }}
+            >
               <div className="ex-thumb">
-                <Icon size={28} />
+                {task.thumb ? (
+                  <img
+                    src={task.thumb}
+                    alt={task.title}
+                    referrerPolicy="no-referrer"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none'
+                    }}
+                  />
+                ) : (
+                  <Icon size={28} />
+                )}
                 <div
                   style={{
                     position: 'absolute',
