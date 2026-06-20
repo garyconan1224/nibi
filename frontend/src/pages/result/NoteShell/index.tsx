@@ -556,11 +556,10 @@ function SummariesPanel({ workspaceId, itemId, onApplyToNote, open: controlledOp
 
 /* ────────────────── NoteShell ────────────────── */
 
-export default function NoteShell() {
-  const { workspaceId = '', itemId = '' } = useParams<{
-    workspaceId: string
-    itemId: string
-  }>()
+export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { workspaceId?: string; itemId?: string } = {}) {
+  const params = useParams<{ workspaceId: string; itemId: string }>()
+  const workspaceId = propWs ?? params.workspaceId ?? ''
+  const itemId = propItem ?? params.itemId ?? ''
   const navigate = useNavigate()
 
   const [note, setNote] = useState<ItemNote | null>(null)

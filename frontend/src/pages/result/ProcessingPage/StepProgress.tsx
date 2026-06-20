@@ -85,34 +85,31 @@ export function StepProgress({ currentStatus, progress, isImageNote = false }: S
   const steps = deriveSteps(currentStatus, progress, { hasTranscriptStep: !isImageNote })
 
   return (
-    <div className="step-stream">
-      {steps.map((s) => {
+    <div className="step-rail">
+      {steps.map((s, idx) => {
         const Icon = s.icon
         return (
-          <div key={s.id} className="step-row" data-state={s.state}>
-            <div className="ico">
-              {s.state === 'done' ? (
-                <Check size={20} />
-              ) : s.state === 'running' ? (
-                <div className="spinner" />
-              ) : (
-                <Icon size={18} />
-              )}
+          <div key={s.id} className="step-node" data-state={s.state}>
+            <div className="node-top">
+              {idx > 0 && <span className="connector left" />}
+              <span className="dot">
+                {s.state === 'done' ? (
+                  <Check size={14} strokeWidth={3} />
+                ) : s.state === 'running' ? (
+                  <span className="ping" />
+                ) : (
+                  <Icon size={12} />
+                )}
+              </span>
+              {idx < steps.length - 1 && <span className="connector right" />}
             </div>
-            <div className="body">
-              <div className="hd">{s.name}</div>
-            </div>
-            <div className="progress">
-              <div className="pct">
-                {s.state === 'queued'
-                  ? '—'
-                  : s.state === 'done'
-                    ? '✓'
-                    : `${Math.round(s.pct * 100)}%`}
-              </div>
-              <div className="bar">
-                <div className="fill" style={{ width: `${s.pct * 100}%` }} />
-              </div>
+            <div className="node-label">{s.name}</div>
+            <div className="node-sub">
+              {s.state === 'running'
+                ? `${Math.round(s.pct * 100)}%`
+                : s.state === 'done'
+                  ? '完成'
+                  : ''}
             </div>
           </div>
         )

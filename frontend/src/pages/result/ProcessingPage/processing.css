@@ -230,150 +230,121 @@
   border-radius: 99px;
 }
 
-/* ─── Step stream ─── */
-.vm-processing-scope .step-stream {
-  flex: 1;
-  padding: 24px 32px;
+/* ─── Step rail (水平 stepper · 对标 BiliNote 图3) ─── */
+.vm-processing-scope .step-rail {
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
   gap: 0;
+  padding: 8px 4px 0;
+  opacity: 0;
+  animation: vm-step-in 520ms cubic-bezier(0.22, 1, 0.36, 1) 80ms forwards;
 }
 
-.vm-processing-scope .step-row {
-  display: grid;
-  grid-template-columns: 48px 1fr auto;
-  gap: 18px;
-  padding: 18px 0;
-  border-bottom: 1px dashed var(--line);
-  position: relative;
+@keyframes vm-step-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
 }
 
-.vm-processing-scope .step-row:last-child {
-  border-bottom: none;
-}
-
-.vm-processing-scope .step-row .ico {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  display: grid;
-  place-items: center;
-  background: var(--bg-sunken);
-  color: var(--ink-3);
-  position: relative;
-  transition: all 200ms ease;
-}
-
-.vm-processing-scope .step-row[data-state='running'] .ico {
-  background: var(--ink);
-  color: var(--bg);
-}
-
-.vm-processing-scope .step-row[data-state='done'] .ico {
-  background: var(--accent-green);
-  color: #fff;
-}
-
-.vm-processing-scope .step-row[data-state='queued'] .ico {
-  opacity: 0.5;
-}
-
-.vm-processing-scope .step-row .body {
+.vm-processing-scope .step-node {
+  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 11px;
 }
 
-.vm-processing-scope .step-row .body .hd {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 16px;
+.vm-processing-scope .step-node .node-top {
+  position: relative;
+  width: 100%;
+  height: 30px;
+  display: grid;
+  place-items: center;
+}
+
+.vm-processing-scope .step-node .dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 99px;
+  border: 2px solid var(--line);
+  background: var(--bg-elev);
+  display: grid;
+  place-items: center;
+  color: var(--ink-4);
+  position: relative;
+  z-index: 1;
+  transition: all 280ms ease;
+}
+.vm-processing-scope .step-node[data-state='done'] .dot {
+  background: var(--accent-2);
+  border-color: var(--accent-2);
+  color: #fff;
+}
+.vm-processing-scope .step-node[data-state='running'] .dot {
+  border-color: var(--accent-2);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent-2) 15%, transparent);
+}
+.vm-processing-scope .step-node[data-state='running'] .ping {
+  width: 9px;
+  height: 9px;
+  border-radius: 99px;
+  background: var(--accent-2);
+  animation: vm-pulse 1.3s ease-in-out infinite;
+}
+
+/* 连接线：dot 左右两段拼成贯穿轨道，已走过的变色 */
+.vm-processing-scope .step-node .connector {
+  position: absolute;
+  top: 50%;
+  height: 2px;
+  background: var(--line);
+  transform: translateY(-50%);
+  transition: background 360ms ease;
+}
+.vm-processing-scope .step-node .connector.left {
+  left: 0;
+  right: calc(50% + 17px);
+}
+.vm-processing-scope .step-node .connector.right {
+  left: calc(50% + 17px);
+  right: 0;
+}
+.vm-processing-scope .step-node[data-state='done'] .connector {
+  background: var(--accent-2);
+}
+.vm-processing-scope .step-node[data-state='running'] .connector.left {
+  background: var(--accent-2);
+}
+
+.vm-processing-scope .step-node .node-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: center;
+  letter-spacing: -0.01em;
+  transition: color 260ms ease;
+}
+.vm-processing-scope .step-node[data-state='queued'] .node-label {
+  color: var(--ink-4);
+  font-weight: 500;
+}
+.vm-processing-scope .step-node[data-state='running'] .node-label {
+  color: var(--accent-2);
+}
+
+.vm-processing-scope .step-node .node-sub {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-4);
+  min-height: 13px;
+}
+.vm-processing-scope .step-node[data-state='running'] .node-sub {
+  color: var(--accent-2);
   font-weight: 600;
 }
-
-.vm-processing-scope .step-row .body .hd .kbd {
-  font-family: var(--mono);
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 6px;
-  background: var(--bg-sunken);
-  color: var(--ink-3);
-}
-
-.vm-processing-scope .step-row .body .desc {
-  font-size: 13px;
-  color: var(--ink-3);
-  line-height: 1.5;
-}
-
-.vm-processing-scope .step-row .body .logs {
-  margin-top: 8px;
-  font-family: var(--mono);
-  font-size: 11.5px;
-  color: var(--ink-3);
-  padding: 10px 12px;
-  background: var(--bg-sunken);
-  border-radius: 8px;
-  max-height: 140px;
-  overflow: auto;
-}
-
-.vm-processing-scope .step-row .body .logs .ln {
-  padding: 1px 0;
-}
-
-.vm-processing-scope .step-row .body .logs .ln.ok {
+.vm-processing-scope .step-node[data-state='done'] .node-sub {
   color: var(--accent-green);
-}
-
-.vm-processing-scope .step-row .body .logs .ln.warn {
-  color: var(--accent-warm);
-}
-
-.vm-processing-scope .step-row .body .logs .ln.err {
-  color: var(--accent-pink);
-}
-
-.vm-processing-scope .step-row .progress {
-  min-width: 140px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-}
-
-.vm-processing-scope .step-row .progress .pct {
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--ink-3);
-}
-
-.vm-processing-scope .step-row[data-state='running'] .progress .pct {
-  color: var(--ink);
-}
-
-.vm-processing-scope .step-row[data-state='done'] .progress .pct {
-  color: var(--accent-green);
-}
-
-.vm-processing-scope .step-row .progress .bar {
-  width: 140px;
-  height: 3px;
-  border-radius: 99px;
-  background: var(--bg-sunken);
-  overflow: hidden;
-}
-
-.vm-processing-scope .step-row .progress .bar .fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent-pink), var(--accent-2), var(--accent-3));
-  transition: width 400ms ease;
-}
-
-.vm-processing-scope .step-row[data-state='done'] .progress .bar .fill {
-  background: var(--accent-green);
 }
 
 /* ─── Spinner ─── */

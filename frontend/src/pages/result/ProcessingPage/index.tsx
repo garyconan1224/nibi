@@ -20,10 +20,9 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { StepProgress } from './StepProgress'
-import SystemResourceCard from './SystemResourceCard'
 import { useGlobalEta } from '@/hooks/useGlobalEta'
-import TasksCard from './TasksCard'
 import { LiveLog } from './LiveLog'
+import NoteShell from '../NoteShell'
 
 import './processing.css'
 
@@ -252,6 +251,11 @@ export default function ProcessingPage() {
   // 全局 ETA：所有活跃任务的剩余时间之和，每秒递减
   const etaSec = useGlobalEta()
 
+  // 处理↔结果原地融合：note 任务完成 → 同一任务页内直接渲染结果（不跳页）
+  if (isSuccess && (state?.taskType ?? taskType) === 'note' && workspaceId && itemId) {
+    return <NoteShell workspaceId={workspaceId} itemId={itemId} />
+  }
+
   return (
     <div className="vm-processing-scope">
       <div className="proc-wrap">
@@ -381,7 +385,7 @@ export default function ProcessingPage() {
                       className="chip-dot"
                       style={{ background: 'var(--accent-green)' }}
                     />
-                    完成 · 点击查看结果
+                    完成 ✓ · 正在打开结果…
                   </span>
                 )}
               </div>
@@ -436,12 +440,12 @@ export default function ProcessingPage() {
           {!isFailed && !isCancelled && status !== 'AWAITING_CONFIRM' && (
             <>
               {/* VN3: 简洁处理中 — 5 步进度 + 预计剩余 + 友好提示 */}
-              <div style={{ padding: '20px 24px 8px' }}>
-                <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span>{isSuccess ? '生成完成 ✓' : '正在生成笔记...'}</span>
+              <div style={{ padding: '38px 40px 14px', textAlign: 'center' }}>
+                <div style={{ fontSize: 19, fontWeight: 700, marginBottom: 26, letterSpacing: '-0.01em' }}>
+                  {isSuccess ? '生成完成 ✓' : '正在生成笔记'}
                   {etaSec > 0 && !isSuccess && (
-                    <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--ink-3)' }}>
-                      预计剩余 {etaSec}s
+                    <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--ink-3)', marginLeft: 8 }}>
+                      · 预计还需 {etaSec}s
                     </span>
                   )}
                 </div>
@@ -450,10 +454,10 @@ export default function ProcessingPage() {
                   progress={progress}
                   isImageNote={isImageNote}
                 />
-                <div style={{ fontSize: 12, color: 'var(--ink-4)', marginTop: 12, lineHeight: 1.5 }}>
+                <div style={{ fontSize: 13, color: 'var(--ink-4)', marginTop: 24, lineHeight: 1.5 }}>
                   {isSuccess
-                    ? '笔记已生成完毕，点击查看结果。'
-                    : '正在为你处理内容，完成后会自动跳转，请耐心等待。'}
+                    ? '笔记已生成完毕，正在打开…'
+                    : '正在为你处理内容，完成后会自动进入结果页。'}
                 </div>
               </div>
 
@@ -471,9 +475,7 @@ export default function ProcessingPage() {
                   {showAdvanced ? '收起详情' : '高级详情'}
                 </button>
                 {showAdvanced && (
-                  <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <SystemResourceCard etaSec={etaSec} />
-                    <TasksCard currentTaskId={taskId} />
+                  <div style={{ marginTop: 12 }}>
                     <LiveLog logs={logs} />
                   </div>
                 )}
