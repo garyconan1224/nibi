@@ -868,9 +868,20 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     )
   }
 
+  // 从 source_url 域名派生平台名
+  function platformFromUrl(url: string): string {
+    const host = url.replace(/^https?:\/\//, '').split('/')[0].toLowerCase()
+    if (host.includes('bilibili')) return 'Bilibili'
+    if (host.includes('youtube') || host.includes('youtu.be')) return 'YouTube'
+    if (host.includes('douyin')) return '抖音'
+    if (host.includes('xiaohongshu')) return '小红书'
+    return '网页'
+  }
+
   // ─── 数据解构 ───
   const fm = (note.frontmatter ?? {}) as Record<string, unknown>
   const title = String(fm.title ?? '')
+  const sourceUrl = String(fm.source_url ?? '') || undefined
   const itemType = String(fm.type ?? 'text')
   const tags = (fm.tags ?? {}) as Record<string, unknown>
   const hasTags = tags && Object.keys(tags).length > 0
@@ -1137,7 +1148,39 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
 
       {/* ════════ 主内容区（视频笔记 = 三列 / 图文笔记 = 三列 / 其余 = 通用布局）════════ */}
       {isVideoNote ? (
-        /* ── 视频笔记三列布局（蓝图 §3.5）：左播放器+字幕 / 中正文 / 右操作 ── */
+        /* ── 视频笔记 banner + 三列布局 ── */
+        <>
+          {/* ── 视频 banner：标题 + 平台 + 原视频链接 ── */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '6px 20px',
+            borderBottom: '1px solid var(--line)',
+            background: 'var(--bg-sunken)',
+            flexShrink: 0,
+          }}>
+            <span style={{ fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {title}
+            </span>
+            {sourceUrl && (
+              <span className="kw mono" style={{ fontSize: 10, flexShrink: 0 }}>
+                {platformFromUrl(sourceUrl)}
+              </span>
+            )}
+            <div style={{ flex: 1 }} />
+            {sourceUrl && (
+              <a
+                className="btn-ghost"
+                href={sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{ height: 26, padding: '0 10px', fontSize: 12, flexShrink: 0 }}
+              >
+                原视频 ↗
+              </a>
+            )}
+          </div>
+
+        {/* ── 视频笔记三列布局（蓝图 §3.5）：左播放器+字幕 / 中正文 / 右操作 ── */}
         <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex', position: 'relative' }}>
 
           {/* ── 左列：视频播放器 + 实时字幕 ── */}
@@ -1258,6 +1301,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
             </div>
           </div>
         </div>
+        </>
       ) : isImageNote ? (
         /* ── 图文笔记三列布局：左图片浏览 / 中正文 / 右操作区 ── */
         (() => {
