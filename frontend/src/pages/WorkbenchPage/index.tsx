@@ -7,7 +7,7 @@ export default function WorkbenchPage() {
   return (
     <div className="workbench-scroll">
       <Hero />
-      <div style={{ maxWidth: 1040, margin: '0 auto', padding: '0 32px' }}>
+      <div className="wb-content">
         <Composer />
       </div>
       <RecentTasks />

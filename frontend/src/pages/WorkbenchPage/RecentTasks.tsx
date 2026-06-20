@@ -74,11 +74,11 @@ export function RecentTasks({ tasks: tasksProp }: RecentTasksProps) {
     return (
       <section className="examples">
         <div className="examples-head">
-          <h2 className="display" style={{ margin: 0, fontSize: 36 }}>
+          <h2 className="display rt-title">
             最近任务
           </h2>
         </div>
-        <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--ink-4)', fontSize: 13, fontFamily: 'var(--mono)' }}>
+        <div className="rt-empty">
           暂无任务 — 在上方粘贴链接开始解析
         </div>
       </section>
@@ -88,7 +88,7 @@ export function RecentTasks({ tasks: tasksProp }: RecentTasksProps) {
   return (
     <section className="examples">
       <div className="examples-head">
-        <h2 className="display" style={{ margin: 0, fontSize: 36 }}>
+        <h2 className="display rt-title">
           最近任务
         </h2>
         <button className="btn btn-ghost">
@@ -104,7 +104,6 @@ export function RecentTasks({ tasks: tasksProp }: RecentTasksProps) {
               key={task.id}
               className="ex-card"
               onClick={() => navigate(`/processing/${task.id}`)}
-              style={{ cursor: 'pointer' }}
             >
               <div className="ex-thumb">
                 {task.thumb ? (
@@ -120,30 +119,10 @@ export function RecentTasks({ tasks: tasksProp }: RecentTasksProps) {
                 ) : (
                   <Icon size={28} />
                 )}
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 8,
-                    left: 8,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 5,
-                    padding: '3px 8px',
-                    borderRadius: 99,
-                    background: 'rgba(0,0,0,0.65)',
-                    fontSize: 10,
-                    color: '#fff',
-                    fontFamily: 'var(--mono)',
-                  }}
-                >
+                <div className="rt-badge">
                   <span
-                    style={{
-                      width: 5,
-                      height: 5,
-                      borderRadius: 99,
-                      background: STATE_COLOR[task.state],
-                      flexShrink: 0,
-                    }}
+                    className="rt-status-dot"
+                    style={{ background: STATE_COLOR[task.state] }}
                   />
                   {task.state}
                 </div>

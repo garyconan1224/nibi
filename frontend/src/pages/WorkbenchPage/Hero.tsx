@@ -8,16 +8,8 @@ export function Hero({ backendUrl = '127.0.0.1:8000' }: HeroProps) {
       <div className="hero-eyebrow">
         <span className="hb-pill">v0.3 BETA</span>
         VidMirror ·{' '}
-        <span style={{ fontSize: 11, fontFamily: 'var(--mono)' }}>{backendUrl}</span>
-        <span
-          style={{
-            width: 4,
-            height: 4,
-            borderRadius: 99,
-            background: 'var(--accent-green)',
-            display: 'inline-block',
-          }}
-        />
+        <span className="hero-backend-url">{backendUrl}</span>
+        <span className="hero-status-dot" />
         本地版 · 无文件大小限制
       </div>
 

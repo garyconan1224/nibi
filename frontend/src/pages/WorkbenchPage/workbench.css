@@ -54,6 +54,21 @@
   max-width: 600px;
   margin: 0 0 44px;
 }
+.hero-backend-url { font-size: 11px; font-family: var(--mono); }
+.hero-status-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 99px;
+  background: var(--accent-green);
+  display: inline-block;
+}
+
+/* ─── Page content wrapper ─── */
+.wb-content {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
 
 /* ─── Composer card ─── */
 .composer {
@@ -514,6 +529,34 @@
 .ex-meta { padding: 12px 14px; }
 .ex-meta .ex-title { font-size: 13px; font-weight: 500; line-height: 1.3; margin-bottom: 4px; color: var(--ink); }
 .ex-meta .ex-sub { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); letter-spacing: 0.08em; }
+.rt-title { margin: 0; font-size: 36px; }
+.rt-empty {
+  padding: 32px 0;
+  text-align: center;
+  color: var(--ink-4);
+  font-size: 13px;
+  font-family: var(--mono);
+}
+.rt-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--ink) 65%, transparent);
+  font-size: 10px;
+  color: var(--bg);
+  font-family: var(--mono);
+}
+.rt-status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 99px;
+  flex-shrink: 0;
+}
 
 /* ─── Modal ─── */
 .wb-modal-backdrop {
