@@ -26,6 +26,7 @@ import {
   probeDuration,
   sniffUrl,
 } from '@/services/workspaces'
+import { fetchLinkPreview } from '@/services/linkPreview'
 import type {
   AnalysisScope,
   ItemType,
@@ -127,6 +128,7 @@ export function AddMaterialModal({
   const [frameInterval, setFrameInterval] = useState(5)
   const [captureMode, setCaptureMode] = useState<'auto' | 'manual'>('auto')
   const [videoDuration, setVideoDuration] = useState(0) // 探测到的视频时长（秒），0=未知
+  const [coverUrl, setCoverUrl] = useState('') // sniff 没给封面时，用 link-preview 补的封面
   const [error, setError] = useState<string | null>(null)
   const [sniffFailed, setSniffFailed] = useState(false)
   const [diarizeOn, setDiarizeOn] = useState(false)
@@ -221,6 +223,21 @@ export function AddMaterialModal({
       .catch(() => { if (!cancelled) setVideoDuration(0) })
     return () => { cancelled = true }
   }, [open, effectiveUrl, effectiveSniff?.primary_type])
+
+  // sniff 对已知平台（B站等）只做 O(1) 类型判断、不返回封面 → 用 link-preview 补封面
+  useEffect(() => {
+    setCoverUrl('')
+    if (!open || !effectiveUrl || !effectiveSniff || effectiveSniff.thumbnail) return
+    let cancelled = false
+    fetchLinkPreview(effectiveUrl)
+      .then((p) => {
+        if (cancelled || !p.image_url) return
+        // B站封面是协议相对 URL（//i1.hdslb.com/...），补 https 否则 localhost(http) 下加载失败
+        setCoverUrl(p.image_url.startsWith('//') ? `https:${p.image_url}` : p.image_url)
+      })
+      .catch(() => { /* link-preview 已内部兜底，忽略 */ })
+    return () => { cancelled = true }
+  }, [open, effectiveUrl, effectiveSniff, effectiveSniff?.thumbnail])
 
   const handleGenerateNote = async () => {
     if (!effectiveUrl) {
@@ -327,9 +344,9 @@ export function AddMaterialModal({
             {effectiveSniff && (
               <div className="sniff-card">
                 <div className="sniff-thumb">
-                  {effectiveSniff.thumbnail ? (
+                  {(effectiveSniff.thumbnail || coverUrl) ? (
                     <img
-                      src={effectiveSniff.thumbnail}
+                      src={effectiveSniff.thumbnail || coverUrl}
                       alt=""
                       referrerPolicy="no-referrer"
                       onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
