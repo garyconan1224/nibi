@@ -102,6 +102,16 @@ const TYPE_LABEL: Record<string, string> = {
   image: '图片',
 }
 
+// 从 source_url 域名派生视频平台显示名。
+export function platformLabelFromUrl(url: string): string {
+  const host = url.replace(/^https?:\/\//, '').split('/')[0].toLowerCase()
+  if (host.includes('bilibili')) return 'Bilibili'
+  if (host.includes('youtube') || host.includes('youtu.be')) return 'YouTube'
+  if (host.includes('douyin')) return '抖音'
+  if (host.includes('xiaohongshu') || host.includes('xhslink')) return '小红书'
+  return '网页'
+}
+
 const VIEW_MODE_KEY = 'nibi-note-view-mode'
 
 type ViewMode = 'edit' | 'compare' | 'wysiwyg'
@@ -868,16 +878,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     )
   }
 
-  // 从 source_url 域名派生平台名
-  function platformFromUrl(url: string): string {
-    const host = url.replace(/^https?:\/\//, '').split('/')[0].toLowerCase()
-    if (host.includes('bilibili')) return 'Bilibili'
-    if (host.includes('youtube') || host.includes('youtu.be')) return 'YouTube'
-    if (host.includes('douyin')) return '抖音'
-    if (host.includes('xiaohongshu')) return '小红书'
-    return '网页'
-  }
-
   // ─── 数据解构 ───
   const fm = (note.frontmatter ?? {}) as Record<string, unknown>
   const title = String(fm.title ?? '')
@@ -1163,7 +1163,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
             </span>
             {sourceUrl && (
               <span className="kw mono" style={{ fontSize: 10, flexShrink: 0 }}>
-                {platformFromUrl(sourceUrl)}
+                {platformLabelFromUrl(sourceUrl)}
               </span>
             )}
             <div style={{ flex: 1 }} />
