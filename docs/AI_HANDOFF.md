@@ -1,9 +1,11 @@
 # AI Handoff
 
-Last updated: 2026-06-17（**当前指针，给所有 AI 工具优先读取**）
+Last updated: 2026-06-21（**当前指针，给所有 AI 工具优先读取**）
 
 ## 当前事实
 
+- **BiliNote 视频笔记改造主线（VN1–VN6）全部完成（2026-06-21）**：合集语义 / 新建弹窗三段式 / 处理页 5 步 / 结果页工具栏+视频 banner / 说话人透传+条件式 tab / 教程·会议·任务模板 contract 升级。计划 `docs/plans/track-K-video-note-experience-upgrade.md`（status: done）。同会话另修首页 Composer 上移、识别视频封面、最近任务卡封面、workspace 命名统一为「合集」。
+- **结果页「占位」判断已勘误（2026-06-21 Claude 代码核实）**：下方「用户最新产品判断」称"只有视频完整、音频/图片/文本结果页占位"——**已过期失真**。实测 `AudioResultPage` / `ImageResultPage` / `TextResultPage` **均功能丰富、已注册路由、零占位/TODO 痕迹**（波形播放/说话人改名/逐句字幕编辑/字幕导出/正文编辑保存/联想·改写·翻译/版本栈/多文对比…）。原「Step 3 占位→可用」基本无事可做；真正可选的演进是把 NoteShell 统一笔记从 beta 升为默认入口（更大产品决策，未定）。
 - **Milkdown 图片渲染误报已勘误（2026-06-17，`7780f27`）**：`docs/plans/track-K-milkdown-image-render.md` 浏览器实锤复核，ProseMirror DOM img=7（抖音）/ img=4（B站②），非产品 bug，是 E2E 断言时机误报。已更新 E2E 报告，计划卡归档 done。
 - **Step 2 E2E 全流程回归已完成（2026-06-16～17）**：抖音（带图+不带图）、B站②（带图+不带图）、小红书（图文）三平台实测均通过；YouTube/本地视频未测（用户未提供素材）。报告 `docs/test-reports/e2e-2026-06-16.md`。~~已知遗留：时间戳 chip click seek 不生效（DOM 元素存在但 currentTime 不变）~~ → **已复核（2026-06-17）：产品正常，原失败为 E2E 脚本 JS 合成 click 误报（ProseMirror 需真实 mousedown→click 事件链，JS 合成 click 绕过了内部状态初始化）**。B站②带图 item workspaceId 完整 UUID：`26965fa0-f14e-490f-8413-6c8244f784ab`。
 - **Track K「E2E 收口 + 总结时间戳锚点」已合入 main（2026-06-16，`e6a76e2`→`5643a55`）**：Milkdown 集成后又做两批——①k-summary 标准总结在 `##`/`###` 标题嵌真实 `[mm:ss]` 跳转锚点（修全 00:00、6 模板精简、md源码视图也可点击跳转）；②E2E 测试测出的 7 个收口修复（转写时间戳 `[Xs]→[mm:ss]`、静态URL `quote` 编码修 hashtag 文件名 404、截图插入在 Milkdown 模式可用、问AI钮避让、gitignore 截图产物、补 `a4b8359` 漏改的测试断言）。后端 pytest 全绿 + 前端 build 通过。收口卡 `docs/plans/track-K-commit-e2e-fixes.md`。
@@ -15,8 +17,8 @@ Last updated: 2026-06-17（**当前指针，给所有 AI 工具优先读取**）
 
 ## 下一步候选（按优先级）
 
-1. **补测 YouTube / 本地视频**：用户补充素材后跑 E2E 剩余两个平台（各带图+不带图）。
-2. **Step 3：调查音频/图片/文本结果页现状**：原 #1 大方向，范围大、需让音频/图片/文本结果页从占位走向可用，**待 Claude 桌面调查三页现状再拆最小子修复任务**，不要放养开。
+1. **补测 YouTube / 本地视频**：用户补充素材后跑 E2E 剩余两个平台（各带图+不带图）。**当前唯一明确待办**，卡在素材。
+2. ~~Step 3：音频/图片/文本结果页从占位走向可用~~ → **已勘误（2026-06-21）：三页实际已丰富、非占位，此项基本无任务**。若要演进 = NoteShell 统一笔记 beta 升默认入口（更大决策，需用户先定）。
 
 ## 当前禁止事项
 
