@@ -5,6 +5,8 @@ import type { VideoResultTranscriptLine } from '@/services/workspaces'
 import { updateTranscriptSegment } from '@/services/workspaces'
 import { useLnEditorStore } from '@/store/lnEditorStore'
 
+type TranscriptMode = 'original' | 'speaker' | 'translated'
+
 interface LNTranscriptPanelProps {
   transcript: VideoResultTranscriptLine[]
   currentTime: number
@@ -34,6 +36,8 @@ export default function LNTranscriptPanel({
   itemId,
   onSaved,
 }: LNTranscriptPanelProps) {
+  const hasSpeaker = useMemo(() => transcript.some((l) => l.speaker), [transcript])
+  const [mode, setMode] = useState<TranscriptMode>('original')
   const activeIdx = useMemo(
     () => activeTranscriptIdx(transcript, currentTime),
     [transcript, currentTime],
@@ -106,9 +110,30 @@ export default function LNTranscriptPanel({
 
   return (
     <div className="ln-transcript-panel">
+      {/* 模式 tab 栏 */}
+      {hasSpeaker && (
+        <div className="ln-tr-mode-tabs">
+          {([
+            { key: 'original' as const, label: '原文' },
+            { key: 'speaker' as const, label: '说话人' },
+            { key: 'translated' as const, label: '译文' },
+          ]).map((t) => (
+            <button
+              key={t.key}
+              className="ln-tr-tab"
+              data-active={mode === t.key ? 'true' : undefined}
+              disabled={t.key === 'translated'}
+              onClick={() => setMode(t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
       {transcript.map((line, i) => {
         const isEditing = editingIdx === i
         const displayText = localEdits[i] ?? line.text
+        const speakerPrefix = mode === 'speaker' && line.speaker ? `[${line.speaker}] ` : ''
         return (
           <div
             key={`${line.t_sec}-${i}`}
@@ -137,7 +162,7 @@ export default function LNTranscriptPanel({
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (
-              <span className="ln-tr-text">{displayText}</span>
+              <span className="ln-tr-text">{speakerPrefix}{displayText}</span>
             )}
             <button
               className="ln-tr-quote"

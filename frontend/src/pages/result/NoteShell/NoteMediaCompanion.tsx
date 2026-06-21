@@ -20,6 +20,7 @@ interface TranscriptLine {
   t_sec: number
   t_str: string
   text: string
+  speaker?: string
 }
 
 interface NoteMediaCompanionProps {

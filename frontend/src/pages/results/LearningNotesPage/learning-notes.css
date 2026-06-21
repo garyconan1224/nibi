@@ -772,6 +772,37 @@
   font-weight: 500;
 }
 
+/* ── Mode tabs ─────────────────────────────── */
+.vm-ln-scope .ln-tr-mode-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 10px 0;
+}
+
+.vm-ln-scope .ln-tr-tab {
+  height: 28px;
+  padding: 0 11px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  border: 1px solid var(--line);
+  cursor: pointer;
+  background: var(--bg-elev);
+  color: var(--ink-4);
+  font-family: var(--sans);
+  transition: all 140ms;
+}
+
+.vm-ln-scope .ln-tr-tab[data-active="true"] {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+
+.vm-ln-scope .ln-tr-tab:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 /* ── Timestamp chip ──────────────────────────── */
 .ln-ts-chip {
   display: inline;
