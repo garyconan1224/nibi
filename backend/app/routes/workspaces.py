@@ -1830,23 +1830,41 @@ def _bridge_to_pipeline_payload(
                 payload["preflight"] = _pf
         return "note", payload
 
-    # local：直接走 analyze
-    # analyze 需要：api_key（后端从 settings 拿）、vision_model、text_model、
-    # video_basenames（限定要分析的本地视频）
-    # 本地文件必须用实际文件名，不能使用 item 显示名（显示名≠文件名会找不到视频）
+    # local：走 note pipeline（视频已在本地，note handler 跳过下载）— Bug #2 修复
     _local_fname = item.source_value.split("/")[-1]
-    payload = {
+    payload: Dict[str, Any] = {
+        "url": item.source_value,          # 满足 handle_note_task 的 url 非空校验；本地分支不用它下载
+        "source_type": "local",
         "video_basenames": [_local_fname or item.name],
+        "workspace_id": workspace.workspace_id,
     }
-    # 把 preflight 选的模型作为字符串透传——后端 handler 会做兜底
+    # 复用上方 url 分支同款 preflight 透传（保持一致）
+    bg = item.preflight.background_overrides or {}
+    for k in ("quality", "frame_mode", "frame_interval_sec", "max_frames", "enabled_steps", "prompt_style"):
+        if k in bg:
+            payload[k] = bg[k]
+    tasks = item.preflight.tasks or {}
+    _preflight = tasks.get("preflight")
+    if isinstance(_preflight, dict):
+        if _preflight.get("intent"):
+            payload["intent"] = _preflight["intent"]
+        if _preflight.get("background_for_recognition"):
+            payload["background_for_recognition"] = _preflight["background_for_recognition"]
+    _summary_cfg = tasks.get("summary")
+    if isinstance(_summary_cfg, dict):
+        _pf: Dict[str, Any] = payload.get("preflight") or {}
+        if "embed_frames" in _summary_cfg:
+            _pf["embed_frames"] = _summary_cfg["embed_frames"]
+        if "max_embed_frames" in _summary_cfg:
+            _pf["max_embed_frames"] = _summary_cfg["max_embed_frames"]
+        if _pf:
+            payload["preflight"] = _pf
     models = item.preflight.models or {}
     if models.get("vision"):
         payload["vision_model"] = models["vision"]
     if models.get("text"):
         payload["text_model"] = models["text"]
-    # N7/IP.9.3: 透传截帧子参数、视频文案总结路径和视频类型模板
-    _augment_video_analyze_payload(payload, item)
-    return "analyze", payload
+    return "note", payload
 
 
 @router.post("/{workspace_id}/items/{item_id}/start")

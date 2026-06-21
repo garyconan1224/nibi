@@ -1329,6 +1329,24 @@ def _download_note_source(
         }
     """
     log = lambda m: runner.append_log(task_id, m)
+    # Bug #2：本地视频/音频 → 已在工作空间，跳过下载（source_type 由 bridge 标记）
+    if payload.get("source_type") == "local":
+        videos = find_videos(project_video_dir)
+        _names = payload.get("video_basenames")
+        if isinstance(_names, list) and _names:
+            _allowed = {str(x) for x in _names}
+            videos = [v for v in videos if v.name in _allowed]
+        if not videos:
+            return {"ok": False, "kind_hint": "video", "error": f"本地视频未找到（{_names}）"}
+        _local_path = str(videos[0])
+        _ext = Path(_local_path).suffix.lower()
+        _kind = "audio" if _ext in {".mp3", ".wav", ".aac", ".flac", ".ogg", ".m4a", ".opus", ".wma"} else "video"
+        log(f"📁 本地{_kind} → 跳过下载：{Path(_local_path).name}")
+        return {
+            "ok": True, "kind_hint": _kind, "source_path": _local_path,
+            "content": "", "title": Path(_local_path).stem, "images": [],
+            "video_file": _local_path, "metadata": {},
+        }
     # b23.tv 短链在入口处统一解析为真实 URL，后续所有适配器用真实 URL 工作
     url = _resolve_b23_url(url)
     url_hint = _classify_note_url(url)
