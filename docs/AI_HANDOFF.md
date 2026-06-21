@@ -4,6 +4,7 @@ Last updated: 2026-06-21（**当前指针，给所有 AI 工具优先读取**）
 
 ## 当前事实
 
+- **本地视频 E2E 重测完成（2026-06-21 22:30）**：Bug #2 修复（commit `1225566`）经 Playwright 真实 UI 验证——路由修复生效（`/start` → `note` task），但 download 步骤暴露新 Bug #3：`_download_note_source` 本地分支查找 `{workspace_root}/videos/`，而上传文件在 `{workspace_root}/`（`pipeline_tasks.py:1334` vs `workspaces.py:1556`）。B/D 仍 ❌，需修 Bug #3 后再重测。报告 `docs/test-reports/e2e-2026-06-21.md`。
 - **BiliNote 视频笔记改造主线（VN1–VN6）全部完成（2026-06-21）**：合集语义 / 新建弹窗三段式 / 处理页 5 步 / 结果页工具栏+视频 banner / 说话人透传+条件式 tab / 教程·会议·任务模板 contract 升级。计划 `docs/plans/track-K-video-note-experience-upgrade.md`（status: done）。同会话另修首页 Composer 上移、识别视频封面、最近任务卡封面、workspace 命名统一为「合集」。
 - **结果页「占位」判断已勘误（2026-06-21 Claude 代码核实）**：下方「用户最新产品判断」称"只有视频完整、音频/图片/文本结果页占位"——**已过期失真**。实测 `AudioResultPage` / `ImageResultPage` / `TextResultPage` **均功能丰富、已注册路由、零占位/TODO 痕迹**（波形播放/说话人改名/逐句字幕编辑/字幕导出/正文编辑保存/联想·改写·翻译/版本栈/多文对比…）。原「Step 3 占位→可用」基本无事可做；真正可选的演进是把 NoteShell 统一笔记从 beta 升为默认入口（更大产品决策，未定）。
 - **Milkdown 图片渲染误报已勘误（2026-06-17，`7780f27`）**：`docs/plans/track-K-milkdown-image-render.md` 浏览器实锤复核，ProseMirror DOM img=7（抖音）/ img=4（B站②），非产品 bug，是 E2E 断言时机误报。已更新 E2E 报告，计划卡归档 done。
@@ -17,7 +18,7 @@ Last updated: 2026-06-21（**当前指针，给所有 AI 工具优先读取**）
 
 ## 下一步候选（按优先级）
 
-1. **补测 YouTube / 本地视频**：用户补充素材后跑 E2E 剩余两个平台（各带图+不带图）。**当前唯一明确待办**，卡在素材。
+1. **修 Bug #3 + 重测本地视频 B/D**：`_download_note_source` 本地分支查找目录错误（`pipeline_tasks.py:1334` 查 `{ws}/videos/`，文件在 `{ws}/`）。修好后用同素材重测 B（带图）/ D（不带图）。**当前唯一明确待办**。
 2. ~~Step 3：音频/图片/文本结果页从占位走向可用~~ → **已勘误（2026-06-21）：三页实际已丰富、非占位，此项基本无任务**。若要演进 = NoteShell 统一笔记 beta 升默认入口（更大决策，需用户先定）。
 
 ## 当前禁止事项
