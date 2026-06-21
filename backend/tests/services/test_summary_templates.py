@@ -32,3 +32,16 @@ def test_template_user_prompt_has_transcript_placeholder():
     for tid in list_template_ids():
         tpl = get_template(tid)
         assert "{transcript}" in tpl.user_prompt, f"{tid} 缺少 {{transcript}} 占位符"
+
+
+def test_vn6_contract_templates_have_full_structure():
+    """VN6：教程/会议纪要/任务导向模板升级为完整输出 contract（锁定关键小节）。"""
+    expectations = {
+        "steps": ["学完能做到什么", "前置条件", "操作步骤", "常见坑", "验收"],
+        "meeting": ["议题概览", "关键讨论与结论", "待办事项", "风险", "参会人"],
+        "actions": ["目标", "行动项", "依赖", "完成标准"],
+    }
+    for tid, sections in expectations.items():
+        sp = get_template(tid).system_prompt
+        for sec in sections:
+            assert sec in sp, f"{tid} contract 缺少小节「{sec}」"
