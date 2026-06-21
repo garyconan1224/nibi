@@ -32,12 +32,15 @@ def _fmt_ts_short(sec: float) -> str:
 
 
 def normalize_transcript(raw: Any) -> List[Dict[str, Any]]:
-    """把任意 transcript 形态统一规范成前端要的 [{t_sec, t_str, text}]。
+    """把任意 transcript 形态统一规范成前端要的 [{t_sec, t_str, text, speaker?}]。
 
     兼容三种格式：
       - [{start, end, text}]（transcriber 段格式）→ start 映射成 t_sec
       - [{t_sec, t_str, text}]（已规范，含落盘 transcript.json）→ 原样保留
       - 纯字符串 → 单行 t_sec=0
+
+    VN5：若 segment 含 speaker（diarization 跑过、assign_speakers_to_segments 写回），
+    透传 speaker 字段供前端「说话人模式」；无 speaker 则不带该键（条件式 UI）。
     """
     if isinstance(raw, str):
         text = raw.strip()
@@ -59,7 +62,11 @@ def normalize_transcript(raw: Any) -> List[Dict[str, Any]]:
             # transcriber 段格式：start/end
             t_sec = float(seg.get("start") or 0)
             t_str = _fmt_ts_short(t_sec)
-        lines.append({"t_sec": t_sec, "t_str": t_str, "text": text})
+        line: Dict[str, Any] = {"t_sec": t_sec, "t_str": t_str, "text": text}
+        speaker = seg.get("speaker")
+        if speaker:
+            line["speaker"] = str(speaker)
+        lines.append(line)
     return lines
 
 
