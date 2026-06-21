@@ -3,8 +3,9 @@ title: Track K · 视频笔记体验改造（对标 BiliNote）
 status: ready
 owner: Claude(规划/落地+开工卡) + mimo v2.5pro(执行) + Codex(审查)
 created: 2026-06-19
-commits: VN1=38041d5,9fd86c2; VN2=68ca0cd,aee22cd; VN3=7778f32,f051e8a; VN4.1=902da70,e7dbf73; VN4.2=75bfadb; VN4.3=e1030e3（均 Codex 通过）
-progress: VN1✅ VN2✅ VN3✅ VN4.1✅ VN4.2✅ VN4.3✅ | 剩 VN4.4(视频banner) → VN5(说话人+导出) → VN6(contract)。对账以 git 为准（2026-06-20 核对，frontmatter 行号已随代码增长漂移，定位用 grep）。
+commits: VN1=38041d5,9fd86c2; VN2=68ca0cd,aee22cd; VN3=7778f32,f051e8a; VN4.1=902da70,e7dbf73; VN4.2=75bfadb; VN4.3=e1030e3; VN4.4=7e9916c,95b39d2; VN5.1=c47481d（VN1-4 均 Codex 通过）
+progress: VN1✅ VN2✅ VN3✅ VN4(.1/.2/.3/.4)✅ VN5.1✅(后端speaker透传) | 剩 VN5.2(前端说话人tab，小米卡见下) → VN6(contract)。对账以 git 为准（2026-06-21 核对，行号随代码增长漂移、定位用 grep）。
+VN5 实测勘误（2026-06-21 Claude 核实）：① 服务路径是 note_assembler.normalize_transcript（非计划写的 workspaces.py ~2294）；② 「导出原文对照(txt)」**已存在**于 NoteShell 导出菜单（handleExportTranscript→downloadSubtitles srt with_speaker=true），VN5.2 不必重做导出，只做说话人 tab；③ 边界无 pyannote→speaker 恒缺，说话人 tab 条件式隐藏，VN5 净新增小。
 context: 用户给 Codex 生成的调研原型 docs/design/bilinote-video-note-flow-review.html + BiliNote 截图，要求把顺滑流程叠加到 Nibi 可编辑 NoteShell。Claude 调查真实代码后确认约 60–70% 后端能力已存在，多为前端接线/重组。三条边界：不迁移 workspace/item、不改 schema、不装新依赖（说话人条件式降级）。
 ---
 
