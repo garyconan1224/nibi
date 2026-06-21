@@ -73,3 +73,43 @@ def test_download_note_source_local_skips_download(tmp_path):
     assert result["video_file"] == str(fake_video)
     assert result["source_path"] == str(fake_video)
     # 本地分支在 _classify_note_url 之前 return，不会调到任何下载逻辑
+
+
+def test_download_note_source_local_finds_uploaded_file_in_workspace_root(tmp_path, monkeypatch):
+    """上传文件在 workspace 根目录时，也能被本地 note 分支找到。"""
+    workspace_root = tmp_path / "ws-1"
+    workspace_root.mkdir()
+    fake_video = workspace_root / "demo.mp4"
+    fake_video.write_bytes(b"\x00" * 16)
+    project_video_dir = tmp_path / "default_project" / "videos"
+    project_video_dir.mkdir(parents=True)
+
+    monkeypatch.setattr(
+        "backend.app.services.pipeline_tasks.get_workspace_root",
+        lambda _workspace_id: workspace_root if _workspace_id == "ws-1" else tmp_path / _workspace_id,
+    )
+    monkeypatch.setattr(
+        "backend.app.services.pipeline_tasks.get_workspace_videos_dir",
+        lambda _workspace_id: workspace_root / "videos" if _workspace_id == "ws-1" else tmp_path / _workspace_id / "videos",
+    )
+
+    runner = MagicMock()
+    runner.append_log = MagicMock()
+
+    record = MagicMock()
+    record.project_id = "default_project"
+
+    result = _download_note_source(
+        url="x/y/demo.mp4",
+        payload={"source_type": "local", "workspace_id": "ws-1", "video_basenames": ["demo.mp4"]},
+        record=record,
+        runner=runner,
+        task_id="task-1",
+        project_video_dir=project_video_dir,
+        dl_kwargs={},
+    )
+
+    assert result["ok"] is True
+    assert result["kind_hint"] == "video"
+    assert result["video_file"] == str(fake_video)
+    assert result["source_path"] == str(fake_video)

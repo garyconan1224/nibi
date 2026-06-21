@@ -1331,11 +1331,23 @@ def _download_note_source(
     log = lambda m: runner.append_log(task_id, m)
     # Bug #2：本地视频/音频 → 已在工作空间，跳过下载（source_type 由 bridge 标记）
     if payload.get("source_type") == "local":
-        videos = find_videos(project_video_dir)
         _names = payload.get("video_basenames")
-        if isinstance(_names, list) and _names:
-            _allowed = {str(x) for x in _names}
-            videos = [v for v in videos if v.name in _allowed]
+        _allowed = {str(x) for x in _names} if isinstance(_names, list) and _names else set()
+        _workspace_id = str(payload.get("workspace_id") or record.project_id)
+        _search_dirs = []
+        for _dir in (project_video_dir, get_workspace_videos_dir(_workspace_id), get_workspace_root(_workspace_id)):
+            if _dir not in _search_dirs:
+                _search_dirs.append(_dir)
+        videos = []
+        for _dir in _search_dirs:
+            if not _dir.exists():
+                continue
+            _candidates = find_videos(_dir)
+            if _allowed:
+                _candidates = [v for v in _candidates if v.name in _allowed]
+            if _candidates:
+                videos = _candidates
+                break
         if not videos:
             return {"ok": False, "kind_hint": "video", "error": f"本地视频未找到（{_names}）"}
         _local_path = str(videos[0])
