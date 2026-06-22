@@ -468,6 +468,13 @@ def build_prompt(
                 f"`[[图N]]` 必须独占一行，不要放在 `##` 标题行里。\n\n"
                 f"{frame_list}"
             )
+        else:
+            # B: 无可用截图，明确告知 LLM 不要生成配图说明
+            user_prompt = (
+                f"{user_prompt}\n\n"
+                f"⚠️ 本次无可用截图。不要在笔记中写「此图为…」「附：…界面示例」等配图说明，"
+                f"也不要使用 `[[图N]]`。只基于转写文字生成纯文本笔记。"
+            )
 
     if background.strip():
         user_prompt = f"【背景信息】\n{background.strip()}\n\n{user_prompt}"
@@ -727,11 +734,31 @@ def _find_frame_image(json_path: str, idx: int) -> str:
     return ""
 
 
+def _remove_orphan_image_descs(md: str) -> str:
+    """B2: 无截图时删除 LLM 幻觉生成的孤立配图说明。
+
+    删除两种模式：
+    1. `## 附：…界面示例…[时间戳]` 标题行（紧接着的「此图为…」段也一并删）
+    2. 独立的「此图为…」段落
+    """
+    # 1. 标题行含「附：」+「示例」（#6: LLM 为不存在的图生成的说明标题）
+    md = re.sub(
+        r"^[ \t]*#{1,6}\s+附：.*示例.*\n(?:[ \t]*\n)*(?:[ \t]*此图为[^\n]*\n(?:[ \t]*\n)*)?",
+        "",
+        md,
+        flags=re.MULTILINE,
+    )
+    # 2. 独立的「此图为…」段落（标题已被删或原就无标题）
+    md = re.sub(r"^[ \t]*此图为[^\n]*\n?", "", md, flags=re.MULTILINE)
+    return md.rstrip("\n")
+
+
 def _postprocess_frames(content_md: str, frames: List[Dict[str, object]]) -> str:
     """把 LLM 输出中的 [[图N]] 替换为 ![desc](/static/path)。越界的删掉。"""
     if not frames:
-        # 没有帧数据，删掉所有 [[图N]] 引用
-        return re.sub(r"\[\[图\d+]\]", "", content_md)
+        # 没有帧数据，删掉所有 [[图N]] 引用 + 孤立配图说明（B2 兜底）
+        md = re.sub(r"\[\[图\d+]\]", "", content_md)
+        return _remove_orphan_image_descs(md)
 
     def _replace(m: re.Match) -> str:
         # [[图N]] → 提取 N

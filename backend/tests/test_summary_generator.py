@@ -506,3 +506,98 @@ class TestSplitImagesFromHeadings:
         assert result == "## 本地与线上对比 [04:02]\n\n![截图@00:00](/static/shot.png)"
         # 标题行不含 ![
         assert "![" not in result.split("\n")[0]
+
+
+# ── Part B: 无截图时清理孤立配图说明 ────────────────────────────
+
+
+class TestBuildPromptNoFramesConstraint:
+    """B1: frames 空时 build_prompt 注入「不要配图说明」约束。"""
+
+    def test_no_frames_constraint_in_user_prompt(self) -> None:
+        item = _make_item()
+        _, usr_p = build_prompt(item, "standard", embed_frames=True)
+        assert "本次无可用截图" in usr_p
+        assert "此图为" in usr_p  # 约束中提到了要禁止的模式
+
+    def test_with_frames_no_constraint(self) -> None:
+        """有帧数据时不注入无图约束。"""
+        from backend.app.services.summary_generator import _collect_frames
+
+        item = _make_item(results={
+            "transcript": "内容",
+            "frames": [
+                {"idx": 0, "sec": 10, "description": "界面", "image_path": "/tmp/f0.jpg"},
+            ],
+        })
+        with patch.object(
+            __import__("backend.app.services.summary_generator", fromlist=["_collect_frames"]),
+            "_collect_frames",
+            return_value=[{"idx": 0, "sec": 10, "desc": "界面", "image_path": "/tmp/f0.jpg"}],
+        ):
+            _, usr_p = build_prompt(item, "standard", embed_frames=True)
+            assert "本次无可用截图" not in usr_p
+
+
+class TestRemoveOrphanImageDescs:
+    """B2: _remove_orphan_image_descs 清理 LLM 幻觉配图说明。"""
+
+    def test_removes_heading_with_shici_and_description(self) -> None:
+        """## 附：xx界面示例 + 此图为 段 → 全删。"""
+        from backend.app.services.summary_generator import _remove_orphan_image_descs
+
+        md = "## 总结\n\n正文\n\n## 附：Billy Note 配置界面示例 [04:56]\n\n此图为 Billy Note 的配置界面截图。\n\n## 延伸\n\n更多内容。"
+        result = _remove_orphan_image_descs(md)
+        assert "附：" not in result
+        assert "此图为" not in result
+        assert "## 总结" in result
+        assert "## 延伸" in result
+        assert "正文" in result
+
+    def test_removes_standalone_ci_tu_wei_paragraph(self) -> None:
+        """无标题的独立「此图为…」段 → 删除。"""
+        from backend.app.services.summary_generator import _remove_orphan_image_descs
+
+        md = "## 开头\n\n内容\n\n此图为视频中某个画面的截图。\n\n## 结尾\n\n更多。"
+        result = _remove_orphan_image_descs(md)
+        assert "此图为" not in result
+        assert "## 开头" in result
+        assert "## 结尾" in result
+
+    def test_preserves_heading_without_shici(self) -> None:
+        """## 附：xxx（无「示例」）→ 保留。"""
+        from backend.app.services.summary_generator import _remove_orphan_image_descs
+
+        md = "## 附：2026 年度总结 [05:30]\n\n正文。"
+        result = _remove_orphan_image_descs(md)
+        assert "附：2026 年度总结" in result
+
+    def test_preserves_normal_content(self) -> None:
+        """正常内容不受影响。"""
+        from backend.app.services.summary_generator import _remove_orphan_image_descs
+
+        md = "## 学习笔记\n\n这是一篇正常笔记，没有配图说明。"
+        result = _remove_orphan_image_descs(md)
+        assert result == md
+
+
+class TestPostprocessFramesOrphanCleanup:
+    """B2 兜底：_postprocess_frames frames 空时清理孤立配图说明。"""
+
+    def test_empty_frames_removes_orphan_descs(self) -> None:
+        from backend.app.services.summary_generator import _postprocess_frames
+
+        md = "## 学习笔记\n\n正文\n\n## 附：Billy Note 配置界面示例 [04:56]\n\n此图为截图。"
+        result = _postprocess_frames(md, [])
+        assert "附：" not in result
+        assert "此图为" not in result
+        assert "## 学习笔记" in result
+
+    def test_nonempty_frames_keeps_content(self) -> None:
+        """有帧时不触发孤立配图说明清理。"""
+        from backend.app.services.summary_generator import _postprocess_frames
+
+        frames = [{"idx": 0, "sec": 10, "desc": "a", "image_path": "/static/x.jpg"}]
+        md = "## 笔记\n\n[[图0]]"
+        result = _postprocess_frames(md, frames)
+        assert "![a]" in result
