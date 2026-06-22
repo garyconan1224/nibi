@@ -41,6 +41,7 @@ from shared.video_analyzer import (
     find_videos,
     get_output_dir,
     get_safe_name,
+    probe_duration_seconds,
     run_batch_analysis,
 )
 from shared.video_download_ytdlp import fetch_ytdlp_metadata, is_platform_url, run_ytdlp_download
@@ -1357,8 +1358,9 @@ def _download_note_source(
         _kind = "audio" if _ext in {".mp3", ".wav", ".aac", ".flac", ".ogg", ".m4a", ".opus", ".wma"} else "video"
         log(f"📁 本地{_kind} → 跳过下载：{Path(_local_path).name}")
 
-        # #18: 本地视频提取首帧作为封面缩略图
+        # #18: 本地视频提取首帧作为封面缩略图 + 探测时长
         _cover_path = ""
+        _duration = 0
         if _kind == "video":
             _thumb_path = Path(_local_path).parent / "thumbnail.jpg"
             try:
@@ -1367,12 +1369,17 @@ def _download_note_source(
                     log(f"🖼️ 首帧封面已提取：{_thumb_path.name}")
             except Exception:
                 pass
+            try:
+                _duration = probe_duration_seconds(_local_path)
+            except Exception:
+                _duration = 0
 
         return {
             "ok": True, "kind_hint": _kind, "source_path": _local_path,
             "content": "", "title": Path(_local_path).stem, "images": [],
             "video_file": _local_path, "metadata": {},
             "cover_thumbnail": _cover_path,
+            "video_duration": _duration,
         }
     # b23.tv 短链在入口处统一解析为真实 URL，后续所有适配器用真实 URL 工作
     url = _resolve_b23_url(url)
@@ -2454,6 +2461,8 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                     _local_meta["cover_thumbnail"] = _static_thumb
             if _source_title:
                 _local_meta["video_title"] = _source_title
+            if dl_result.get("video_duration"):
+                _local_meta["video_duration"] = dl_result["video_duration"]
             if _local_meta:
                 _persist_intermediate(runner, task_id, _local_meta)
 

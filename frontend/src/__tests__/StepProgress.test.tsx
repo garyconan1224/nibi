@@ -93,15 +93,18 @@ describe('deriveSteps', () => {
     expect(steps[2]).toMatchObject({ id: 'TRANSCRIBE', state: 'running', pct: 0.25 })
   })
 
-  it('FRAMES(链接视频) → 分析 running', () => {
+  it('FRAMES(链接视频) → 转录·分析 并行 running（转录不提前标完成）', () => {
     const steps = deriveSteps('FRAMES', 0.4, 'link', 'video')
     expect(steps.map(s => s.id)).toEqual(STEPS_LINK_VIDEO)
-    // PENDING + DOWNLOAD + TRANSCRIBE done
+    // PENDING + DOWNLOAD done
     expect(steps[0]).toMatchObject({ state: 'done' })
     expect(steps[1]).toMatchObject({ state: 'done' })
-    expect(steps[2]).toMatchObject({ state: 'done' })
-    // ANALYZE running
+    // #19: 转录与分析后端并行，FRAMES 期两轨都 running，转录不被提前标完成
+    expect(steps[2]).toMatchObject({ id: 'TRANSCRIBE', state: 'running' })
     expect(steps[3]).toMatchObject({ id: 'ANALYZE', state: 'running', pct: 0.4 })
+    // 生成笔记 / 完成 仍排队
+    expect(steps[4]).toMatchObject({ state: 'queued' })
+    expect(steps[5]).toMatchObject({ state: 'queued' })
   })
 
   it('VLM(链接图文) → 分析 running（无转录步骤）', () => {

@@ -573,19 +573,6 @@ export function AddMaterialModal({
                   </div>
                 </div>
           </div>
-
-          {/* ③ 输出 */}
-          <div className="m-section">
-            <div className="eyebrow" style={{ marginBottom: 10 }}>③ 输出</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div className="output-row" data-disabled="true">
-                <div className="output-row-text">
-                  <span className="gen-field-label">导出预设</span>
-                  <span className="kw" style={{ fontSize: 11 }}>生成后在结果页导出</span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
 
         <div className="m-foot">

@@ -220,6 +220,21 @@ def extract_first_frame(video_path: str | Path, output_path: str | Path) -> bool
         cap.release()
 
 
+def probe_duration_seconds(video_path: str | Path) -> int:
+    """探测视频时长（秒，向下取整）；打不开或拿不到帧率时返回 0。"""
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        return 0
+    try:
+        fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
+        frames = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0.0
+        if fps <= 0 or frames <= 0:
+            return 0
+        return int(frames / fps)
+    finally:
+        cap.release()
+
+
 def make_frame_filename(safe_name: str, ts: str) -> str:
     return f"{safe_name}_{ts.replace(':', '_')}.jpg"
 

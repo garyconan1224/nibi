@@ -12,8 +12,8 @@ interface StepDef {
 const STEP_DEFS: Record<string, StepDef> = {
   PENDING:       { id: 'PENDING',       name: '排队',     icon: Download },
   DOWNLOAD:      { id: 'DOWNLOAD',      name: '下载',     icon: Download },
-  TRANSCRIBE:    { id: 'TRANSCRIBE',    name: '转录',     icon: Subtitles },
-  ANALYZE:       { id: 'ANALYZE',       name: '分析',     icon: Eye },
+  TRANSCRIBE:    { id: 'TRANSCRIBE',    name: '音频转录', icon: Subtitles },
+  ANALYZE:       { id: 'ANALYZE',       name: '画面分析', icon: Eye },
   ANALYZE_NOTE:  { id: 'ANALYZE_NOTE',  name: '生成笔记', icon: BookMarked },
   SUCCESS:       { id: 'SUCCESS',       name: '完成',     icon: Check },
 }
@@ -57,6 +57,9 @@ function buildStepSequence(sourceType: SourceType, noteKind: NoteKind): string[]
 }
 
 /* ── 状态映射 ── */
+
+// #19: 后端 transcribe / analyze 两轨并行执行，对应这两个 UI 步骤同进同出
+const PARALLEL_STEP_IDS = new Set(['TRANSCRIBE', 'ANALYZE'])
 
 type StepState = 'queued' | 'running' | 'done'
 
@@ -119,8 +122,14 @@ export function deriveSteps(
 
   const activeId = statusToActiveId(currentStatus, stepIds)
   const activeIdx = steps.findIndex(s => s.id === activeId)
+  // #19: 转录(ASR)与分析(FRAMES/VLM)在后端并行，不能因 status 落在其一就把另一轨标完成。
+  // 激活步骤属于并行组时，组内步骤统一 running，直到进入「生成笔记」(activeId 离开并行组) 才整体判完成。
+  const activeInParallel = PARALLEL_STEP_IDS.has(activeId)
 
   return steps.map((step, idx) => {
+    if (activeInParallel && PARALLEL_STEP_IDS.has(step.id)) {
+      return { ...step, state: 'running', pct: progress }
+    }
     if (idx < activeIdx) return { ...step, state: 'done', pct: 1 }
     if (idx === activeIdx) return { ...step, state: progress >= 1 ? 'done' : 'running', pct: progress }
     return { ...step, state: 'queued', pct: 0 }
