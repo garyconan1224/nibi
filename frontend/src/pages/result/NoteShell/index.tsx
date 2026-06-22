@@ -249,11 +249,6 @@ function useMediaQuery(query: string): boolean {
 /** 视频笔记视图标签：中列只展示「标准总结」，两种格式（蓝图 §3.5）。
  *  富文本 = 渲染态（ReactMarkdown）；md格式 = 源码态（CodeMirror，可编辑）。
  *  源 md（转写+截帧原始内容）在右侧操作区，不是中列标签。 */
-const videoViewModeLabels: Record<ViewMode, string> = {
-  edit: 'md格式',
-  compare: '源md对照',
-  wysiwyg: '所见即所得',
-}
 const imageNoteViewModeLabels: Record<ViewMode, string> = {
   edit: 'md格式',
   compare: '源md对照',
@@ -905,12 +900,14 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     }}>
       {viewMode === 'compare' ? (
         <CompareView markdown={editingBody} onMarkdownChange={handleEditorChange} sourceMd={note.source_md} onSeek={handleSeek} />
-      ) : viewMode === 'wysiwyg' ? (
-        isImageNote
+      ) : isImageNote ? (
+        // 图文：wysiwyg=只读 ReadView；edit=源码 NoteEditor（图文唯一可编辑入口，不可删）
+        viewMode === 'wysiwyg'
           ? <ReadView markdown={editingBody} />
-          : <MilkdownEditor key={milkdownKey} markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
+          : <NoteEditor markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
       ) : (
-        <NoteEditor markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
+        // 视频：compare 以外一律 Milkdown（viewMode==='edit' 残留态也 fallback 到此）
+        <MilkdownEditor key={milkdownKey} markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
       )}
     </div>
   )
@@ -1118,9 +1115,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
           )}
         </div>
 
-        <Badge variant="outline" style={{ fontSize: 10 }}>
-          <FileText size={10} /> NoteShell
-        </Badge>
       </div>
 
       {/* ════════ 标签概览条（可折叠）════════ */}
@@ -1220,33 +1214,15 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
             )}
           </div>
 
-          {/* ── 中列：视图切换 tab + 正文（富文本/md格式）+ TOC ── */}
+          {/* ── 中列：正文（视频无 tab 切换）+ TOC ── */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-            {/* 视图切换 tab（点1：移到中列内容正上方） */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 0, padding: '0 24px', flexShrink: 0, borderBottom: '1px solid var(--line)', height: 36 }}>
-              {(['wysiwyg', 'edit'] as ViewMode[]).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => switchView(m)}
-                  style={{
-                    padding: '6px 16px', fontSize: 12, border: 'none', cursor: 'pointer', background: 'transparent',
-                    color: viewMode === m ? 'var(--accent-2)' : 'var(--ink-4)',
-                    fontWeight: viewMode === m ? 600 : 400,
-                    borderBottom: viewMode === m ? '2px solid var(--accent-2)' : '2px solid transparent',
-                    transition: 'color .15s, border-color .15s',
-                  }}
-                >
-                  {videoViewModeLabels[m]}
-                </button>
-              ))}
-              {/* 保存状态（编辑态 + 所见即所得态才显示） */}
-              {(viewMode === 'edit' || viewMode === 'wysiwyg') && (
-                <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-4)' }}>
-                  {saveStatus === 'saving' && '保存中…'}
-                  {saveStatus === 'saved' && `已保存 ${savedAt}`}
-                  {saveStatus === 'failed' && <span style={{ color: 'var(--accent)' }}>保存失败</span>}
-                </span>
-              )}
+            {/* 保存状态（顶栏右侧） */}
+            <div style={{ display: 'flex', alignItems: 'center', padding: '0 24px', flexShrink: 0, borderBottom: '1px solid var(--line)', height: 36 }}>
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-4)' }}>
+                {saveStatus === 'saving' && '保存中…'}
+                {saveStatus === 'saved' && `已保存 ${savedAt}`}
+                {saveStatus === 'failed' && <span style={{ color: 'var(--accent)' }}>保存失败</span>}
+              </span>
             </div>
             {/* 正文 */}
             <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
@@ -1378,6 +1354,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                       {imageNoteViewModeLabels[m]}
                     </button>
                   ))}
+                  {/* 保存状态（图文编辑态才显示） */}
                   {viewMode === 'edit' && (
                     <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-4)' }}>
                       {saveStatus === 'saving' && '保存中…'}
