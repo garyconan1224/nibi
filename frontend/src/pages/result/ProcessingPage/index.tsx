@@ -194,9 +194,16 @@ export default function ProcessingPage() {
   const payload = taskPayload
   const taskType: string = task?.task_type ?? ''
   const isAudioTask = taskType === 'audio'
-  // 图文笔记检测：result.note_kind（任务完成后）或 payload.kind_hint（下载阶段）
-  const isImageNote = (result.note_kind as string) === 'image_text'
-    || (payload.kind_hint as string) === 'image_text'
+  // #19: source_type × note_kind 用于动态步骤序列
+  const sourceType: string = (payload.source_type as string) ?? ''
+  const _kindHint = (payload.kind_hint as string) || ''
+  const _mediaKind = (payload.note_media_kind as string) || ''
+  const noteKind: string =
+    (result.note_kind as string) ||
+    (_kindHint && _kindHint !== 'auto' ? _kindHint : '') ||
+    (_mediaKind && _mediaKind !== 'auto' ? _mediaKind : '') ||
+    (isAudioTask ? 'audio' : '')
+  const isImageNote = noteKind === 'image' || noteKind === 'image_text'
   // R13.2/R18.1 标题/封面/时长来源优先级：result（直接来源）→ payload（从 download 继承）→ fallback
   const resultAudio = result.audio as Record<string, unknown> | undefined
   const url =
@@ -452,7 +459,8 @@ export default function ProcessingPage() {
                 <StepProgress
                   currentStatus={status}
                   progress={progress}
-                  isImageNote={isImageNote}
+                  sourceType={sourceType as 'local' | 'link'}
+                  noteKind={noteKind as 'video' | 'audio' | 'image' | 'image_text' | 'text'}
                 />
                 <div style={{ fontSize: 13, color: 'var(--ink-4)', marginTop: 24, lineHeight: 1.5 }}>
                   {isSuccess

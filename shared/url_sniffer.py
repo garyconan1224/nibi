@@ -70,19 +70,23 @@ _HTML_SNIFF_HEADERS = {
 
 # ── og: / title 提取正则 ──
 _OG_TYPE_RE = re.compile(
-    r'<meta\s[^>]*property\s*=\s*["\']og:type["\'][^>]*content\s*=\s*["\']([^"\']+)["\']',
+    r'<meta\s[^>]*(?:property|name)\s*=\s*["\']og:type["\'][^>]*content\s*=\s*["\']([^"\']+)["\']',
     re.IGNORECASE,
 )
 _OG_TITLE_RE = re.compile(
-    r'<meta\s[^>]*property\s*=\s*["\']og:title["\'][^>]*content\s*=\s*["\']([^"\']+)["\']',
+    r'<meta\s[^>]*(?:property|name)\s*=\s*["\']og:title["\'][^>]*content\s*=\s*["\']([^"\']+)["\']',
     re.IGNORECASE,
 )
 _OG_IMAGE_RE = re.compile(
-    r'<meta\s[^>]*property\s*=\s*["\']og:image["\'][^>]*content\s*=\s*["\']([^"\']+)["\']',
+    r'<meta\s[^>]*(?:property|name)\s*=\s*["\']og:image["\'][^>]*content\s*=\s*["\']([^"\']+)["\']',
     re.IGNORECASE,
 )
 _OG_VIDEO_RE = re.compile(
-    r'<meta\s[^>]*property\s*=\s*["\']og:video["\'][^>]*content\s*=\s*["\']([^"\']+)["\']',
+    r'<meta\s[^>]*(?:property|name)\s*=\s*["\']og:video["\'][^>]*content\s*=\s*["\']([^"\']+)["\']',
+    re.IGNORECASE,
+)
+_OG_IMAGE_RE_REV = re.compile(
+    r'<meta\s[^>]*content\s*=\s*["\']([^"\']+)["\'][^>]*(?:property|name)\s*=\s*["\']og:image["\']',
     re.IGNORECASE,
 )
 _TITLE_TAG_RE = re.compile(r"<title>([^<]+)</title>", re.IGNORECASE)
@@ -190,8 +194,8 @@ def _extract_html_meta(html_chunk: str) -> dict:
     m = _OG_TITLE_RE.search(html_chunk)
     if m:
         meta["title"] = m.group(1).strip()
-    # og:image
-    m = _OG_IMAGE_RE.search(html_chunk)
+    # og:image（反序兜底：content 在 property/name 之前的情况）
+    m = _OG_IMAGE_RE.search(html_chunk) or _OG_IMAGE_RE_REV.search(html_chunk)
     if m:
         meta["thumbnail"] = m.group(1).strip()
     # og:video（如果页面嵌了视频）

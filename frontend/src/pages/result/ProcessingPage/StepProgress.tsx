@@ -1,88 +1,148 @@
-import { Download, Subtitles, BookMarked, Check } from 'lucide-react'
+import { Download, Subtitles, BookMarked, Check, Eye } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
-const ALL_STEPS = [
-  { id: 'PENDING', name: '排队', icon: Download },
-  { id: 'DOWNLOAD', name: '下载', icon: Download },
-  { id: 'TRANSCRIBE', name: '转录', icon: Subtitles },
-  { id: 'ANALYZE_NOTE', name: '生成笔记', icon: BookMarked },
-  { id: 'SUCCESS', name: '完成', icon: Check },
-] as const
+/* ── 步骤定义 ── */
+
+interface StepDef {
+  id: string
+  name: string
+  icon: LucideIcon
+}
+
+const STEP_DEFS: Record<string, StepDef> = {
+  PENDING:       { id: 'PENDING',       name: '排队',     icon: Download },
+  DOWNLOAD:      { id: 'DOWNLOAD',      name: '下载',     icon: Download },
+  TRANSCRIBE:    { id: 'TRANSCRIBE',    name: '转录',     icon: Subtitles },
+  ANALYZE:       { id: 'ANALYZE',       name: '分析',     icon: Eye },
+  ANALYZE_NOTE:  { id: 'ANALYZE_NOTE',  name: '生成笔记', icon: BookMarked },
+  SUCCESS:       { id: 'SUCCESS',       name: '完成',     icon: Check },
+}
+
+/* ── 步骤序列矩阵 ── */
+
+type SourceType = 'local' | 'link' | ''
+type NoteKind = 'video' | 'audio' | 'image' | 'image_text' | 'text' | ''
+
+/**
+ * 按 source_type × note_kind 返回 UI 步骤 id 序列。
+ *
+ * 链接视频：排队→下载→转录→分析→生成笔记→完成
+ * 本地视频：转录→分析→生成笔记→完成（无下载）
+ * 音频：    （链接含下载）→转录→生成笔记→完成（无分析）
+ * 图文：    （链接含下载）→分析→生成笔记→完成（无转录）
+ * 文字：    生成笔记→完成
+ */
+function buildStepSequence(sourceType: SourceType, noteKind: NoteKind): string[] {
+  const isLocal = sourceType === 'local'
+  const isImageLike = noteKind === 'image' || noteKind === 'image_text'
+  const isMedia = noteKind === 'video' || noteKind === 'audio' || isImageLike
+  const ids: string[] = []
+
+  // 排队（始终有）
+  ids.push('PENDING')
+
+  // 下载（仅链接来源的媒体内容；文字链接走 FETCH 不走 DOWNLOAD，无类型时先不显示）
+  if (!isLocal && isMedia) ids.push('DOWNLOAD')
+
+  // 转录（视频 + 音频）
+  if (noteKind === 'video' || noteKind === 'audio') ids.push('TRANSCRIBE')
+
+  // 分析（视频 + 图文，音频无）
+  if (noteKind === 'video' || isImageLike) ids.push('ANALYZE')
+
+  // 生成笔记 + 完成（始终有）
+  ids.push('ANALYZE_NOTE', 'SUCCESS')
+
+  return ids
+}
+
+/* ── 状态映射 ── */
 
 type StepState = 'queued' | 'running' | 'done'
 
 export interface StepWithState {
   id: string
   name: string
-  icon: typeof Download
+  icon: LucideIcon
   state: StepState
   pct: number
 }
 
-export interface DeriveStepsOpts {
-  /** false 时省略 TRANSCRIBE 步（图片笔记等无 ASR 流程），默认 true */
-  hasTranscriptStep?: boolean
+/** 后端 status → 当前激活的 UI 步骤 id */
+function statusToActiveId(currentStatus: string, stepIds: string[]): string {
+  // 终态
+  if (currentStatus === 'SUCCESS') return 'SUCCESS'
+
+  // 下载 / 探测
+  if (currentStatus === 'DOWNLOAD' || currentStatus === 'PROBE') {
+    return stepIds.includes('DOWNLOAD') ? 'DOWNLOAD' : 'PENDING'
+  }
+
+  // 转录
+  if (currentStatus === 'ASR') {
+    return stepIds.includes('TRANSCRIBE') ? 'TRANSCRIBE' : 'ANALYZE_NOTE'
+  }
+
+  // 分析（截帧 + 视觉理解）
+  if (currentStatus === 'FRAMES' || currentStatus === 'VLM') {
+    return stepIds.includes('ANALYZE') ? 'ANALYZE' : 'ANALYZE_NOTE'
+  }
+
+  // 生成笔记 / 入库
+  if (currentStatus === 'SUM' || currentStatus === 'STORE') return 'ANALYZE_NOTE'
+
+  // PENDING / 其它
+  if (currentStatus === 'PENDING') return 'PENDING'
+
+  return 'PENDING'
 }
 
 /**
- * 5 步进度映射（VN3）。
- *
- * pipeline 实际阶段 → UI 显示步骤：
- *   PENDING/PROBE → 排队或下载 / DOWNLOAD → 下载 / ASR → 转录
- *   FRAMES/VLM/SUM/STORE → 生成笔记 / SUCCESS → 完成
- *
- * opts.hasTranscriptStep=false 时省略 TRANSCRIBE，产出 4 步列表。
+ * 核心函数：根据后端状态 + 内容类型 → 带状态的步骤列表。
  */
 export function deriveSteps(
   currentStatus: string,
   progress: number,
-  opts: DeriveStepsOpts = {},
+  sourceType: SourceType = '',
+  noteKind: NoteKind = '',
 ): StepWithState[] {
-  const { hasTranscriptStep = true } = opts
-  const steps = hasTranscriptStep
-    ? [...ALL_STEPS]
-    : ALL_STEPS.filter(s => s.id !== 'TRANSCRIBE')
+  const stepIds = buildStepSequence(sourceType, noteKind)
+  const steps: StepDef[] = stepIds.map(id => STEP_DEFS[id]).filter(Boolean)
 
-  // terminal / non-progress states → all queued (UI 层单独处理 AWAITING_CONFIRM / FAILED / CANCELLED)
+  // 终态 / 非进度状态
   if (currentStatus === 'SUCCESS') {
-    return steps.map(s => ({ ...s, icon: s.icon, state: 'done' as StepState, pct: 1 }))
+    return steps.map(s => ({ ...s, state: 'done' as StepState, pct: 1 }))
   }
   if (currentStatus === 'FAILED' || currentStatus === 'CANCELLED' || currentStatus === 'AWAITING_CONFIRM') {
-    return steps.map(s => ({ ...s, icon: s.icon, state: 'queued' as StepState, pct: 0 }))
+    return steps.map(s => ({ ...s, state: 'queued' as StepState, pct: 0 }))
   }
 
-  // pipeline stage → active step id
-  let activeId: string
-  if (currentStatus === 'PENDING') {
-    activeId = 'PENDING'
-  } else if (currentStatus === 'DOWNLOAD' || currentStatus === 'PROBE') {
-    // PROBE 是下载后的解析阶段，归入「下载」步骤
-    activeId = 'DOWNLOAD'
-  } else if (currentStatus === 'ASR') {
-    activeId = hasTranscriptStep ? 'TRANSCRIBE' : 'ANALYZE_NOTE'
-  } else if (currentStatus === 'FRAMES' || currentStatus === 'VLM' || currentStatus === 'SUM' || currentStatus === 'STORE') {
-    activeId = 'ANALYZE_NOTE'
-  } else {
-    activeId = 'PENDING'
-  }
-
+  const activeId = statusToActiveId(currentStatus, stepIds)
   const activeIdx = steps.findIndex(s => s.id === activeId)
 
   return steps.map((step, idx) => {
-    if (idx < activeIdx) return { ...step, icon: step.icon, state: 'done', pct: 1 }
-    if (idx === activeIdx) return { ...step, icon: step.icon, state: progress >= 1 ? 'done' : 'running', pct: progress }
-    return { ...step, icon: step.icon, state: 'queued', pct: 0 }
+    if (idx < activeIdx) return { ...step, state: 'done', pct: 1 }
+    if (idx === activeIdx) return { ...step, state: progress >= 1 ? 'done' : 'running', pct: progress }
+    return { ...step, state: 'queued', pct: 0 }
   })
 }
+
+/* ── 组件 ── */
 
 interface StepProgressProps {
   currentStatus: string
   progress: number
-  /** 图文笔记：省略「转录」步骤 */
-  isImageNote?: boolean
+  sourceType?: SourceType
+  noteKind?: NoteKind
 }
 
-export function StepProgress({ currentStatus, progress, isImageNote = false }: StepProgressProps) {
-  const steps = deriveSteps(currentStatus, progress, { hasTranscriptStep: !isImageNote })
+export function StepProgress({
+  currentStatus,
+  progress,
+  sourceType = '',
+  noteKind = '',
+}: StepProgressProps) {
+  const steps = deriveSteps(currentStatus, progress, sourceType, noteKind)
 
   return (
     <div className="step-rail">

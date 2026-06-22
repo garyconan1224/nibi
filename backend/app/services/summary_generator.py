@@ -464,7 +464,8 @@ def build_prompt(
                 f"以下是从视频中精选的画面。**配图原则**：\n"
                 f"- ✅ **应该配图**：演示操作、代码展示、UI界面、数据图表、关键步骤、对比示例、重要结论\n"
                 f"- ❌ **不要配图**：纯口播、过渡画面、与正文重复、无信息画面\n\n"
-                f"使用 `[[图N]]` 插入配图（N=帧号），整篇可只配几张甚至不配。\n\n"
+                f"使用 `[[图N]]` 插入配图（N=帧号），整篇可只配几张甚至不配。\n"
+                f"`[[图N]]` 必须独占一行，不要放在 `##` 标题行里。\n\n"
                 f"{frame_list}"
             )
 
@@ -750,7 +751,39 @@ def _postprocess_frames(content_md: str, frames: List[Dict[str, object]]) -> str
             return ""  # 图片不存在，删掉引用
         return ""  # 越界，删掉
 
-    return re.sub(r"\[\[图\d+]\]", _replace, content_md)
+    return _split_images_from_headings(
+        re.sub(r"\[\[图\d+]\]", _replace, content_md)
+    )
+
+
+_HEADING_IMG_ANYWHERE_RE = re.compile(
+    r"^(#{1,6}\s+)(.*?)\s*(!\[[^\]]*\]\([^)]+\))\s*(.*)$"
+)
+
+
+def _split_images_from_headings(md: str) -> str:
+    """#7: 把标题行里的 ![图](url) 拆到独立行，防止图片嵌进标题渲染不出。
+
+    覆盖两种 LLM 输出形态：
+    - `## 标题文字 [mm:ss] ![图](url)`  （图在末尾）
+    - `## ![图](url)标题文字 [mm:ss]`  （图在开头）
+    """
+    lines = md.split("\n")
+    out: list[str] = []
+    for line in lines:
+        m = _HEADING_IMG_ANYWHERE_RE.match(line)
+        if m:
+            prefix, before, img_tag, after = m.groups()
+            title_text = (before + after).strip()
+            if title_text:
+                out.append(f"{prefix}{title_text}")
+            else:
+                out.append(prefix.rstrip())
+            out.append("")
+            out.append(img_tag)
+        else:
+            out.append(line)
+    return "\n".join(out)
 
 
 def _to_static_url(path: str) -> str:

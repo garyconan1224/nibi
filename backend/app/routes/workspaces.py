@@ -1802,6 +1802,9 @@ def _bridge_to_pipeline_payload(
         payload: Dict[str, Any] = {
             "url": item.source_value,
             "workspace_id": workspace.workspace_id,
+            # #19: 供 ProcessingPage 动态步骤矩阵
+            "source_type": "link",
+            "kind_hint": item.type,  # "video"|"audio"|"image"|"text"
         }
         # TODO: quality 等高级参数目前 _resolve_download_kwargs 不消费，
         # 等 download handler 支持 format_selector 映射后再启用。
@@ -1844,6 +1847,7 @@ def _bridge_to_pipeline_payload(
     payload: Dict[str, Any] = {
         "url": item.source_value,          # 满足 handle_note_task 的 url 非空校验；本地分支不用它下载
         "source_type": "local",
+        "kind_hint": item.type,            # #19: 供 ProcessingPage 动态步骤矩阵
         "video_basenames": [_local_fname or item.name],
         "workspace_id": workspace.workspace_id,
     }
@@ -2006,6 +2010,9 @@ def generate_note(workspace_id: str, req: GenerateNoteRequest) -> Dict[str, Any]
     # 意图分流：记录用户选择的任务意图和笔记子类型
     _task_payload["intent"] = req.intent or "note"
     _task_payload["note_media_kind"] = req.note_media_kind or "auto"
+    # #19: 写入 source_type + kind_hint，ProcessingPage 动态步骤矩阵需要
+    _task_payload["source_type"] = "link"
+    _task_payload["kind_hint"] = sniff.primary_type  # "video"|"audio"|"image"|"text"
     # VN2: 透传笔记风格/发言人区分/用户补充说明（VN5 前后端联调时消费）
     _task_payload["summary_template"] = req.summary_template
     _task_payload["diarize"] = req.diarize

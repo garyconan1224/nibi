@@ -205,6 +205,21 @@ def save_frame_to_disk(frame: Any, filepath: Path) -> None:
     cv2.imwrite(str(filepath), frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
 
 
+def extract_first_frame(video_path: str | Path, output_path: str | Path) -> bool:
+    """提取视频首帧并保存为 JPEG，成功返回 True。"""
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        return False
+    try:
+        ok, frame = cap.read()
+        if not ok or frame is None:
+            return False
+        save_frame_to_disk(frame, Path(output_path))
+        return True
+    finally:
+        cap.release()
+
+
 def make_frame_filename(safe_name: str, ts: str) -> str:
     return f"{safe_name}_{ts.replace(':', '_')}.jpg"
 

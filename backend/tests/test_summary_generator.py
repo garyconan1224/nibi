@@ -457,3 +457,52 @@ class TestBuildImageTextNotePrompt:
         # source content 应被截断到 12000 字符
         assert "x" * 12000 in usr_p
         assert "x" * 15000 not in usr_p
+
+
+# ── _split_images_from_headings (#7) ───────────────────────────
+
+
+class TestSplitImagesFromHeadings:
+    """#7: 图片从标题行分离到独立行。"""
+
+    def test_heading_with_trailing_image_split(self) -> None:
+        from backend.app.services.summary_generator import _split_images_from_headings
+
+        md = "## 搭建数据库 [12:30] ![截图](/static/shot.png)"
+        result = _split_images_from_headings(md)
+        assert result == "## 搭建数据库 [12:30]\n\n![截图](/static/shot.png)"
+
+    def test_heading_without_image_unchanged(self) -> None:
+        from backend.app.services.summary_generator import _split_images_from_headings
+
+        md = "## 普通标题 [05:00]"
+        result = _split_images_from_headings(md)
+        assert result == md
+
+    def test_image_in_body_unchanged(self) -> None:
+        from backend.app.services.summary_generator import _split_images_from_headings
+
+        md = "正文段落\n\n![图片](/static/a.jpg)\n\n更多正文"
+        result = _split_images_from_headings(md)
+        assert result == md
+
+    def test_multiple_headings_with_images(self) -> None:
+        from backend.app.services.summary_generator import _split_images_from_headings
+
+        md = "## 章节一 [01:00] ![图1](/static/1.jpg)\n正文\n## 章节二 [02:00] ![图2](/static/2.jpg)"
+        result = _split_images_from_headings(md)
+        lines = result.split("\n")
+        # 两处标题行都不含 ![
+        for line in lines:
+            if line.startswith("##"):
+                assert "![" not in line
+
+    def test_image_at_start_of_heading(self) -> None:
+        """#7 真实 bug 形态：图在标题行开头。"""
+        from backend.app.services.summary_generator import _split_images_from_headings
+
+        md = "## ![截图@00:00](/static/shot.png)本地与线上对比 [04:02]"
+        result = _split_images_from_headings(md)
+        assert result == "## 本地与线上对比 [04:02]\n\n![截图@00:00](/static/shot.png)"
+        # 标题行不含 ![
+        assert "![" not in result.split("\n")[0]

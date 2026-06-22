@@ -37,6 +37,7 @@ from shared.audio_analyzer import (
 )
 from shared.video_analyzer import (
     CaptureParams,
+    extract_first_frame,
     find_videos,
     get_output_dir,
     get_safe_name,
@@ -1355,10 +1356,23 @@ def _download_note_source(
         _ext = Path(_local_path).suffix.lower()
         _kind = "audio" if _ext in {".mp3", ".wav", ".aac", ".flac", ".ogg", ".m4a", ".opus", ".wma"} else "video"
         log(f"📁 本地{_kind} → 跳过下载：{Path(_local_path).name}")
+
+        # #18: 本地视频提取首帧作为封面缩略图
+        _cover_path = ""
+        if _kind == "video":
+            _thumb_path = Path(_local_path).parent / "thumbnail.jpg"
+            try:
+                if extract_first_frame(_local_path, _thumb_path):
+                    _cover_path = str(_thumb_path)
+                    log(f"🖼️ 首帧封面已提取：{_thumb_path.name}")
+            except Exception:
+                pass
+
         return {
             "ok": True, "kind_hint": _kind, "source_path": _local_path,
             "content": "", "title": Path(_local_path).stem, "images": [],
             "video_file": _local_path, "metadata": {},
+            "cover_thumbnail": _cover_path,
         }
     # b23.tv 短链在入口处统一解析为真实 URL，后续所有适配器用真实 URL 工作
     url = _resolve_b23_url(url)
@@ -2430,6 +2444,18 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             "background_context": background_context,
             **_image_intermediate_patch(note_kind, images_from_download, DATA_DIR),
         })
+        # #18: 本地视频实时写入封面/标题（在线视频由 _apply_ytdlp_metadata_to_task 处理）
+        if payload.get("source_type") == "local":
+            _local_meta: Dict[str, Any] = {}
+            if dl_result.get("cover_thumbnail"):
+                # 绝对路径 → /static/ URL（前端 <img src> 需要 HTTP 路径）
+                _static_thumb = _img_to_static_url(str(dl_result["cover_thumbnail"]), DATA_DIR)
+                if _static_thumb:
+                    _local_meta["cover_thumbnail"] = _static_thumb
+            if _source_title:
+                _local_meta["video_title"] = _source_title
+            if _local_meta:
+                _persist_intermediate(runner, task_id, _local_meta)
 
     # ── 3.6. 图集分析（VLM-first：逐图视觉理解 → 文字提取 → 分类决策）──
     # 保存原始文本：source_text_from_download 后面会被 VLM 理解结果补充。

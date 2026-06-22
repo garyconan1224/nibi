@@ -59,7 +59,10 @@ def _extract_og(page_html: str) -> dict[str, Optional[str]]:
         return {"title": None, "description": None, "image_url": None}
 
     def _og(prop: str) -> Optional[str]:
-        nodes = tree.xpath(f'//meta[@property="og:{prop}"]/@content')
+        # 同时匹配 property 和 name（覆盖 Vue/React SSR 站用 name="og:..." 的情况）
+        nodes = tree.xpath(
+            f'//meta[@property="og:{prop}"]/@content | //meta[@name="og:{prop}"]/@content'
+        )
         return nodes[0].strip() if nodes and nodes[0].strip() else None
 
     # fallback: <title> 和 <meta name="description">
