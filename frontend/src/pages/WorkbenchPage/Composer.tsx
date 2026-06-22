@@ -13,8 +13,6 @@ import {
   sniffUrl,
   autoCreateWorkspace,
   uploadWorkspaceItem,
-  savePreflight,
-  startItemPipeline,
 } from '@/services/workspaces'
 import type { SniffResult } from '@/services/workspaces'
 import { AddMaterialModal, type StagedConfig } from '@/components/workspace/AddMaterialModal'
@@ -44,6 +42,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
   const [preflightStaged, setPreflightStaged] = useState<StagedConfig | undefined>(undefined)
   const [uploading, setUploading] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [localUpload, setLocalUpload] = useState<{ workspaceId: string; itemId: string; fileName: string } | null>(null)
 
   const popRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -141,7 +140,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
     fileInputRef.current?.click()
   }
 
-  // 单文件上传流程：选择文件 → autoCreateWorkspace → upload → savePreflight → start → navigate
+  // 单文件上传流程：选择文件 → autoCreateWorkspace → upload → 打开预检配置 → 用户确认后 start
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -154,17 +153,9 @@ export function Composer({ onTaskCreated }: ComposerProps) {
       })
       const item = updated.items[updated.items.length - 1]
       const itemId = item.item_id
-      await savePreflight(ws.workspace_id, itemId, {
-        background_overrides: {},
-        models: {},
-        tasks: {},
-      })
-      const { task_id } = await startItemPipeline(ws.workspace_id, itemId)
-      toast.success(`文件「${file.name}」已上传并开始分析`)
-      navigate(`/processing/${task_id}`, {
-        state: { url: file.name, workspaceId: ws.workspace_id, itemId },
-      })
-      handleAdded()
+      // 暂存上传结果，打开 PreflightDrawer 让用户配置分析任务
+      setLocalUpload({ workspaceId: ws.workspace_id, itemId, fileName: file.name })
+      setPreflightOpen(true)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '上传失败'
       toast.error(`文件上传失败: ${msg}`)
@@ -391,23 +382,28 @@ export function Composer({ onTaskCreated }: ComposerProps) {
         }}
       />
 
-      {/* R7.4: PreflightDrawer stage 模式 — 回写配置后重开 modal */}
+      {/* R7.4: PreflightDrawer — stage 模式（链接流程回写配置）或 execute 模式（本地文件预检确认后启动） */}
       <PreflightDrawer
         open={preflightOpen}
-        url={normalizedUrl || url}
+        url={localUpload ? localUpload.fileName : (normalizedUrl || url)}
         platformName={platform?.name ?? null}
-        sniffResult={sniffResult}
-        workspaceId={workspaceSel[0]}
-        stagedConfig={preflightStaged}
-        mode="stage"
-        onSaveStaged={(staged) => {
+        sniffResult={localUpload ? undefined : sniffResult}
+        workspaceId={localUpload ? localUpload.workspaceId : workspaceSel[0]}
+        itemId={localUpload?.itemId}
+        stagedConfig={localUpload ? undefined : preflightStaged}
+        mode={localUpload ? 'execute' : 'stage'}
+        onSaveStaged={localUpload ? undefined : (staged) => {
           setPreflightStaged(staged)
           setPreflightOpen(false)
           setUploadOpen(true)
         }}
-        onClose={() => setPreflightOpen(false)}
+        onClose={() => {
+          setPreflightOpen(false)
+          setLocalUpload(null)
+        }}
         onCreated={() => {
           setPreflightOpen(false)
+          setLocalUpload(null)
           handleAdded()
         }}
       />

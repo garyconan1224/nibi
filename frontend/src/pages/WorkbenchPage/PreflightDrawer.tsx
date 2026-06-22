@@ -66,6 +66,8 @@ interface PreflightDrawerProps {
   selectedTypes?: string[]
   sniffResult?: SniffResult | null
   workspaceId?: string
+  /** 本地文件上传场景：item 已由 Composer 预创建，传入后跳过 addWorkspaceItem 步骤 */
+  itemId?: string
   stagedConfig?: StagedConfig
   mode?: 'execute' | 'stage'
   onSaveStaged?: (staged: StagedConfig) => void
@@ -105,6 +107,7 @@ export function PreflightDrawer({
   selectedTypes,
   sniffResult,
   workspaceId,
+  itemId,
   stagedConfig,
   mode = 'execute',
   onSaveStaged,
@@ -320,16 +323,22 @@ export function PreflightDrawer({
       let successCount = 0
       const errors: string[] = []
 
+      // 本地文件场景：item 已由 Composer 预创建，跳过 addWorkspaceItem
+      const isLocalItem = Boolean(itemId)
+
       for (const itemType of typesToCreate) {
         try {
-          const ws = await addWorkspaceItem(wsId, {
-            type: itemType,
-            source: 'url',
-            source_value: url,
-            name: url,
-          })
-          const item = ws.items[ws.items.length - 1]
-          const itemId = item.item_id
+          const currentItemId = isLocalItem
+            ? itemId!
+            : await (async () => {
+                const ws = await addWorkspaceItem(wsId, {
+                  type: itemType,
+                  source: 'url',
+                  source_value: url,
+                  name: url,
+                })
+                return ws.items[ws.items.length - 1].item_id
+              })()
 
           const bgPayload: Partial<WorkspaceBackground> = {}
           if (bg.contentType) bgPayload.content_type = bg.contentType
@@ -342,15 +351,15 @@ export function PreflightDrawer({
           if (textModelId) preflightModels.text = textModelId
           if (models.video) preflightModels.video = models.video
 
-          await savePreflight(wsId, itemId, {
+          await savePreflight(wsId, currentItemId, {
             background_overrides: bgPayload,
             models: preflightModels,
             tasks: tasksPayload,
           })
 
-          const { task_id } = await startItemPipeline(wsId, itemId)
+          const { task_id } = await startItemPipeline(wsId, currentItemId)
 
-          if (!firstTaskId) { firstTaskId = task_id; firstItemId = itemId }
+          if (!firstTaskId) { firstTaskId = task_id; firstItemId = currentItemId }
           successCount++
         } catch (e) {
           errors.push(`${typeLabel(itemType)}: ${e instanceof Error ? e.message : '创建失败'}`)
