@@ -9,6 +9,7 @@ import re
 import subprocess
 import threading
 import time
+import traceback as tb
 import urllib.request
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
@@ -662,7 +663,7 @@ def _run_subtitle_summary(
         transcript_text, transcript_segments, whisper_duration = whisper_result
         log(f"✅ 转写完成 | {len(transcript_text)} 字符 / {len(transcript_segments)} 段 / {whisper_duration:.1f}s")
     except Exception as e:
-        log(f"⚠️  Whisper 转写失败: {e}")
+        log(f"⚠️  Whisper 转写失败: {e}\n{tb.format_exc()}")
         return {"summary_path": "subtitle", "transcript": [], "summary_error": f"转写失败: {e}"}
 
     if not transcript_text.strip():
@@ -2709,6 +2710,12 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                     beam_size=tcfg.beam_size,
                     vad_filter=tcfg.vad_filter,
                 )
+                if not _text or not _text.strip():
+                    runner.append_log(
+                        task_id,
+                        "🔇 该视频无音轨（或无有效语音），已跳过语音转写，"
+                        "将使用画面分析生成笔记。",
+                    )
                 return _text, _segments
 
             futures["transcribe"] = _pool.submit(_run_transcribe)
@@ -2821,6 +2828,11 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                         if f is future:
                             err_msg = f"{key} 失败: {e}"
                             break
+                    runner.append_log(
+                        task_id,
+                        f"❌ {err_msg}\n{tb.format_exc()}",
+                        level="error",
+                    )
                     # 协作取消：set event 让另一轨在检查点退出
                     _cancel_event.set()
                     # 兜底：取消尚未开始的 future

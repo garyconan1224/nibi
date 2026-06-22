@@ -31,6 +31,30 @@ def _hf_hub_cache_dir() -> Path:
     return Path.home() / ".cache" / "huggingface" / "hub"
 
 
+def _has_audio_stream(file_path: str | Path) -> bool:
+    """用 ffprobe 检测文件是否包含音频流。
+
+    无音轨视频（如纯画面录屏）喂给 faster-whisper 会抛
+    ``tuple index out of range``，提前检测可优雅跳过转写。
+    """
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-select_streams", "a",
+                "-show_entries", "stream=index",
+                "-of", "csv=p=0",
+                str(file_path),
+            ],
+            capture_output=True, text=True, timeout=15,
+        )
+        return bool(result.stdout.strip())
+    except Exception:  # noqa: BLE001 -- ffprobe 不可用时保守认为有音轨
+        return True
+
+
 def _hf_repo_dir(model_name: str) -> Path:
     """按 faster-whisper 约定拼 HF repo 缓存目录（Systran/faster-whisper-<size>）。"""
     # 允许用户直接传仓库全名（如 "Systran/faster-whisper-large-v3"），否则按 size 自动补前缀
@@ -379,6 +403,14 @@ def transcribe_file_with_fast_whisper(
     path = Path(file_path)
     if not path.is_file():
         raise FileNotFoundError(f"转录文件不存在: {path}")
+
+    # 无音轨视频（纯画面录屏等）会触发 faster-whisper "tuple index out of range"，
+    # 提前检测后优雅返回空，由上层决定是否用截帧产出兜底。
+    if not _has_audio_stream(path):
+        _emit_log("🔇 视频无音轨，跳过语音转写")
+        if return_segments:
+            return ("", [], 0.0)
+        return ""
 
     effective_threads = cpu_threads if cpu_threads > 0 else min(os.cpu_count() or 4, 8)
     _emit_log(
