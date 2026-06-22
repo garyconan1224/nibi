@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   Link2, Upload, Search, X, Check, Plus, ArrowRight, Layers,
 } from 'lucide-react'
@@ -13,6 +12,7 @@ import {
   sniffUrl,
   autoCreateWorkspace,
   uploadWorkspaceItem,
+  removeWorkspaceItem,
 } from '@/services/workspaces'
 import type { SniffResult } from '@/services/workspaces'
 import { AddMaterialModal, type StagedConfig } from '@/components/workspace/AddMaterialModal'
@@ -29,7 +29,6 @@ interface ComposerProps {
 }
 
 export function Composer({ onTaskCreated }: ComposerProps) {
-  const navigate = useNavigate()
   const [url, setUrl] = useState('')
   const [uploadOpen, setUploadOpen] = useState(false)
 
@@ -399,6 +398,12 @@ export function Composer({ onTaskCreated }: ComposerProps) {
         }}
         onClose={() => {
           setPreflightOpen(false)
+          // 本地文件预检取消：清理已上传但未启动的 item，避免残留半截素材
+          if (localUpload) {
+            removeWorkspaceItem(localUpload.workspaceId, localUpload.itemId).catch(() => {
+              // 清理失败不阻塞 UI，静默忽略
+            })
+          }
           setLocalUpload(null)
         }}
         onCreated={() => {
