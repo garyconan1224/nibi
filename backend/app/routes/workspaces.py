@@ -1820,14 +1820,23 @@ def _bridge_to_pipeline_payload(
         # R3.11: 透传嵌图配置（embed_frames / max_embed_frames）
         # 前端存 tasks.summary.embed_frames / tasks.summary.max_embed_frames
         _summary_cfg = tasks.get("summary")
+        _pf: Dict[str, Any] = payload.get("preflight") or {}
         if isinstance(_summary_cfg, dict):
-            _pf: Dict[str, Any] = payload.get("preflight") or {}
             if "embed_frames" in _summary_cfg:
                 _pf["embed_frames"] = _summary_cfg["embed_frames"]
             if "max_embed_frames" in _summary_cfg:
                 _pf["max_embed_frames"] = _summary_cfg["max_embed_frames"]
-            if _pf:
-                payload["preflight"] = _pf
+            if _summary_cfg.get("summary_template"):
+                payload["summary_template"] = _summary_cfg["summary_template"]
+            if "diarize" in _summary_cfg:
+                payload["diarize"] = _summary_cfg["diarize"]
+        if bg.get("frame_interval_sec") is not None:
+            _pf["frame_prompt"] = {
+                "mode": "interval",
+                "interval_sec": bg["frame_interval_sec"],
+            }
+        if _pf:
+            payload["preflight"] = _pf
         return "note", payload
 
     # local：走 note pipeline（视频已在本地，note handler 跳过下载）— Bug #2 修复
@@ -1851,14 +1860,23 @@ def _bridge_to_pipeline_payload(
         if _preflight.get("background_for_recognition"):
             payload["background_for_recognition"] = _preflight["background_for_recognition"]
     _summary_cfg = tasks.get("summary")
+    _pf: Dict[str, Any] = payload.get("preflight") or {}
     if isinstance(_summary_cfg, dict):
-        _pf: Dict[str, Any] = payload.get("preflight") or {}
         if "embed_frames" in _summary_cfg:
             _pf["embed_frames"] = _summary_cfg["embed_frames"]
         if "max_embed_frames" in _summary_cfg:
             _pf["max_embed_frames"] = _summary_cfg["max_embed_frames"]
-        if _pf:
-            payload["preflight"] = _pf
+        if _summary_cfg.get("summary_template"):
+            payload["summary_template"] = _summary_cfg["summary_template"]
+        if "diarize" in _summary_cfg:
+            payload["diarize"] = _summary_cfg["diarize"]
+    if bg.get("frame_interval_sec") is not None:
+        _pf["frame_prompt"] = {
+            "mode": "interval",
+            "interval_sec": bg["frame_interval_sec"],
+        }
+    if _pf:
+        payload["preflight"] = _pf
     models = item.preflight.models or {}
     if models.get("vision"):
         payload["vision_model"] = models["vision"]

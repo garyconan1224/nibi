@@ -969,6 +969,46 @@ def test_augment_video_analyze_payload_r21_p3_preflight_fields() -> None:
     assert payload["background_for_recognition"] == "课程专有名词 ABC"
 
 
+def test_bridge_local_video_preflight_reaches_note_payload() -> None:
+    """Local-video AddMaterial preflight must reach the note task consumer shape."""
+    from backend.app.routes.workspaces import _bridge_to_pipeline_payload
+
+    item = WorkspaceItem(
+        item_id="local-1",
+        type="video",
+        source="local",
+        source_value="/tmp/demo.mp4",
+        name="demo.mp4",
+        preflight=PreflightConfig(
+            background_overrides={"frame_interval_sec": 7},
+            models={"vision": "vision-model", "text": "text-model"},
+            tasks={
+                "summary": {
+                    "embed_frames": False,
+                    "max_embed_frames": 5,
+                    "summary_template": "concise",
+                    "diarize": True,
+                },
+            },
+        ),
+    )
+    ws = WorkspaceRecord(workspace_id="ws-1", name="合集", items=[item])
+
+    task_type, payload = _bridge_to_pipeline_payload(item, ws)
+
+    assert task_type == "note"
+    assert payload["vision_model"] == "vision-model"
+    assert payload["text_model"] == "text-model"
+    assert payload["summary_template"] == "concise"
+    assert payload["diarize"] is True
+    assert payload["preflight"]["embed_frames"] is False
+    assert payload["preflight"]["max_embed_frames"] == 5
+    assert payload["preflight"]["frame_prompt"] == {
+        "mode": "interval",
+        "interval_sec": 7,
+    }
+
+
 # ── _video_result_has_real_data 新路径 ──────────────────────────────────────
 
 

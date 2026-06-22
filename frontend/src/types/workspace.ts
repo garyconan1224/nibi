@@ -65,6 +65,8 @@ export interface WorkspaceBackground {
   topic: string
   glossary: string[]
   purpose: string
+  /** 截帧间隔（秒），后端 /start 从 background_overrides 读取 */
+  frame_interval_sec?: number
 }
 
 /** 工作空间记录 */

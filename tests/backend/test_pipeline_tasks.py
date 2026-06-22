@@ -324,6 +324,73 @@ class TestScenarioC:
         assert result["analysis"] == ""
         assert result["markdown"] == "降级转录内容"
 
+    def test_note_summary_template_payload_reaches_generate_summary(self, tmp_path: Path) -> None:
+        """本地/链接统一 start note pipeline 时，用户选择的笔记模板必须进入 note_body 生成器。"""
+        from backend.app.models.workspace import ItemSummary
+        from backend.app.services.pipeline_tasks import handle_note_task
+
+        fake_video = tmp_path / "videos" / "test.mp4"
+        fake_video.parent.mkdir(parents=True, exist_ok=True)
+        fake_video.touch()
+
+        long_transcript = (
+            "这是一段足够长的视频转录文本，用来触发 note_body 的总结生成逻辑，"
+            "并验证 payload.summary_template 不会在 handle_note_task 中丢失。"
+        )
+
+        store = TaskStore(path=tmp_path / "tasks.json")
+        runner = TaskRunner(store, max_workers=1)
+        rec = TaskRecord(
+            task_id="note-template-001",
+            project_id="proj-test",
+            task_type="note",
+            payload={
+                "url": "local:test.mp4",
+                "steps": ["download", "transcribe", "note"],
+                "api_key": "sk-test",
+                "summary_template": "concise",
+            },
+        )
+        store.create(rec)
+
+        with (
+            patch("backend.app.services.pipeline_tasks._download_note_source",
+                  return_value={
+                      "ok": True,
+                      "kind_hint": "video",
+                      "title": "模板透传测试",
+                      "content": "",
+                      "images": [],
+                      "video_file": str(fake_video),
+                      "source_path": str(fake_video),
+                      "metadata": {},
+                  }),
+            patch("backend.app.services.pipeline_tasks.get_workspace_videos_dir",
+                  return_value=fake_video.parent),
+            patch("backend.app.services.pipeline_tasks.get_workspace_json_dir",
+                  return_value=tmp_path / "json"),
+            patch("backend.app.services.pipeline_tasks.load_settings",
+                  return_value=_mock_settings("sk-test")),
+            patch("backend.app.services.pipeline_tasks.find_videos",
+                  return_value=[fake_video]),
+            patch("backend.app.services.asr_fast_whisper.is_fast_whisper_available",
+                  return_value=True),
+            patch("backend.app.services.asr_fast_whisper.transcribe_file_with_fast_whisper",
+                  side_effect=_whisper_side_effect(long_transcript)),
+            patch("backend.app.services.summary_generator.generate_summary",
+                  return_value=ItemSummary(
+                      summary_id="sum-1",
+                      template="concise",
+                      version=0,
+                      content_md="# concise note",
+                  )) as generate_summary_mock,
+        ):
+            result = handle_note_task(rec, runner)
+
+        assert result["note_body"] == "# concise note"
+        generate_summary_mock.assert_called_once()
+        assert generate_summary_mock.call_args.args[1] == "concise"
+
 
 class TestParallelCancel:
     """R22 协作取消：一轨失败时另一轨应通过 cancel_event 退出。"""

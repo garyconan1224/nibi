@@ -36,6 +36,14 @@ vi.mock('@/services/workspaces', () => ({
   generateNote: generateNoteMock,
 }))
 
+vi.mock('@/store/providerStore', () => ({
+  useProviderStore: vi.fn(() => ({
+    providers: [{ id: 'p1', name: 'TestProvider', enabled: true, capabilities: ['vision'] }],
+    providerModels: { p1: [{ id: 'm1', name: 'TestModel', capabilities: ['vision'] }] },
+    fetchProviders: vi.fn(),
+  })),
+}))
+
 describe('AddMaterialModal', () => {
   beforeEach(() => {
     navigateMock.mockClear()

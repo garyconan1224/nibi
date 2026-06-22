@@ -2911,7 +2911,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     else:
         json_paths = sorted(project_json_dir.glob("*_视觉数据.json"))
 
-    # ── 6.8. R3.5: 自动生成 standard 总结，作为 note.md 默认正文 ──────
+    # ── 6.8. R3.5: 自动生成总结，作为 note.md 默认正文 ──────
     # R3.11: 读取嵌图配置
     _preflight = payload.get("preflight") or {}
     _embed_frames = bool(_preflight.get("embed_frames", True))
@@ -2925,14 +2925,15 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     if not _source_title:
         _source_title = str((probe.get("source_title") if "download" in steps else "") or "").strip()
 
-    # note_body: image_text 分支已在 §3.7 设置学习笔记；此处对有 transcript 的类型生成 standard 总结。
+    # note_body: image_text 分支已在 §3.7 设置学习笔记；此处对有 transcript 的类型生成用户选择的总结。
     # note_body 已在中间产出容器初始化为 ""，image_text 设置后不会被覆盖（transcript_text 为空时不进此块）。
     if "note" in steps and api_key and transcript_text and len(transcript_text) > 50:
         try:
             from backend.app.models.workspace import WorkspaceItem
             from backend.app.services.summary_generator import generate_summary
 
-            runner.append_log(task_id, "📖 生成标准总结（standard）...")
+            summary_template_id = str(payload.get("summary_template") or "standard").strip() or "standard"
+            runner.append_log(task_id, f"📖 生成笔记总结（{summary_template_id}）...")
             runner.set_progress(task_id, 0.85, "生成标准总结...")
 
             # 构造临时 WorkspaceItem，填入 generate_summary 所需字段
@@ -2954,7 +2955,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                 },
             )
             _std_summary = generate_summary(
-                _tmp_item, "standard",
+                _tmp_item, summary_template_id,
                 embed_frames=_embed_frames,
                 max_embed_frames=_max_embed,
             )

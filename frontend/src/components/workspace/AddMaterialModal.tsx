@@ -24,7 +24,9 @@ import {
   autoCreateWorkspace,
   generateNote,
   probeDuration,
+  savePreflight,
   sniffUrl,
+  startItemPipeline,
 } from '@/services/workspaces'
 import { fetchLinkPreview } from '@/services/linkPreview'
 import type {
@@ -53,9 +55,13 @@ interface AddMaterialModalProps {
   workspaceBackgrounds?: Record<string, WorkspaceBackground>
   sniffResult?: SniffResult | null
   urlValue?: string
-  initialStaged?: StagedConfig
   onAdded?: () => void
-  onFineTune?: (staged: StagedConfig) => void
+  /** 本地文件：上传后的 item ID */
+  localFile?: string
+  /** 本地文件：原始文件名 */
+  localFileName?: string
+  /** 本地文件：所在 workspace ID */
+  localWsId?: string
 }
 
 type NoteMediaKind = 'auto' | 'video' | 'image_text' | 'audio'
@@ -114,9 +120,11 @@ export function AddMaterialModal({
   sniffResult,
   urlValue,
   onAdded,
-  onFineTune,
+  localFile,
+  localFileName,
+  localWsId,
 }: AddMaterialModalProps) {
-  void onFineTune
+  const isLocalFile = !!localFile
   const navigate = useNavigate()
   const { providers, providerModels, fetchProviders } = useProviderStore()
   const [internalUrl, setInternalUrl] = useState('')
@@ -155,8 +163,8 @@ export function AddMaterialModal({
   // providers 加载完成后，若用户还没手动改过开关，自动设置默认值
   const userToggledRef = useRef(false)
   useEffect(() => {
-    if (!userToggledRef.current && hasVisionModel) {
-      setEmbedFrames(true)
+    if (!userToggledRef.current) {
+      setEmbedFrames(hasVisionModel)
     }
   }, [hasVisionModel])
 
@@ -168,11 +176,13 @@ export function AddMaterialModal({
       : workspaceIds.length === 1
         ? '当前合集'
         : '未选择合集'
-  const sourceSummary = effectiveSniff?.title
-    ? `${effectiveSniff.platform ?? '未知平台'} · ${effectiveSniff.title}`
-    : effectiveUrl
-      ? '网络链接'
-      : '输入素材链接'
+  const sourceSummary = isLocalFile
+    ? (localFileName || '本地文件')
+    : effectiveSniff?.title
+      ? `${effectiveSniff.platform ?? '未知平台'} · ${effectiveSniff.title}`
+      : effectiveUrl
+        ? '网络链接'
+        : '输入素材链接'
 
   const doSniff = useCallback(async (url: string) => {
     try {
@@ -194,7 +204,7 @@ export function AddMaterialModal({
     setNoteStyle('standard')
     setError(null)
     setSubmitting(false)
-    setEmbedFrames(true)
+    // embedFrames 由 auto-detect effect 根据 hasVisionModel 设置，不在这里强制
   }, [open, urlValue])
 
   useEffect(() => {
@@ -240,6 +250,52 @@ export function AddMaterialModal({
   }, [open, effectiveUrl, effectiveSniff, effectiveSniff?.thumbnail])
 
   const handleGenerateNote = async () => {
+    if (isLocalFile) {
+      // 本地文件：savePreflight + startItemPipeline，绕开 generateNote 的 URL 校验
+      if (!localFile) return
+      setSubmitting(true)
+      setError(null)
+      try {
+        const wsId = localWsId || workspaceIds[0]
+        if (!wsId) { setError('未找到合集'); return }
+        const videoTask = selectedNoteType === 'auto' || selectedNoteType === 'video'
+        const effInterval = videoTask
+          ? (captureMode === 'auto' ? computeAutoInterval(videoDuration) : frameInterval)
+          : undefined
+        const videoModelId = selectedVisionModel === '__default__' || !selectedVisionModel ? undefined : selectedVisionModel
+        await savePreflight(wsId, localFile, {
+          background_overrides: {
+            // 后端 /start 从 background_overrides 读 frame_interval_sec
+            ...(effInterval != null ? { frame_interval_sec: effInterval } : {}),
+          },
+          models: {
+            ...(videoModelId ? { vision: videoModelId } : {}),
+          },
+          tasks: {
+            // 后端 /start 从 tasks.summary 读 embed_frames → payload.preflight.embed_frames
+            summary: {
+              embed_frames: videoTask ? embedFrames : false,
+              summary_template: noteStyle,
+              diarize: diarizeOn,
+            },
+          },
+        })
+        const { task_id } = await startItemPipeline(wsId, localFile)
+        toast.success('任务已创建', { description: localFileName || '本地文件' })
+        onAdded?.()
+        onOpenChange(false)
+        navigate(`/processing/${task_id}`, { state: { url: localFileName || '', workspaceId: wsId, itemId: localFile } })
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : '提交失败'
+        setError(msg)
+        toast.error(msg)
+      } finally {
+        setSubmitting(false)
+      }
+      return
+    }
+
+    // 链接提交：维持原有 generateNote 路径
     if (!effectiveUrl) {
       setError('请先输入素材链接')
       return
@@ -312,7 +368,13 @@ export function AddMaterialModal({
           {/* ① 视频源 */}
           <div className="m-section">
             <div className="eyebrow" style={{ marginBottom: 10 }}>① 视频源</div>
-            {urlValue ? (
+            {isLocalFile ? (
+              <div className="composer-url modal-composer-url">
+                <div className="platform"><PlayCircle size={16} /></div>
+                <span className="modal-source-value">{localFileName || '本地文件'}</span>
+                <span className="kw">已上传</span>
+              </div>
+            ) : urlValue ? (
               <div className="composer-url modal-composer-url">
                 <div className="platform"><Link2 size={16} /></div>
                 <span className="modal-source-value">{urlValue}</span>
@@ -332,7 +394,7 @@ export function AddMaterialModal({
                 />
               </div>
             )}
-            {!urlValue && !effectiveSniff && (
+            {!isLocalFile && !urlValue && !effectiveSniff && (
               <div className="modal-kw-row">
                 <span className="kw"><Link2 size={11} /> 支持网络链接</span>
                 <span className="kw">本地版无大小限制</span>
@@ -539,7 +601,7 @@ export function AddMaterialModal({
               type="button"
               className="btn btn-primary"
               onClick={handleGenerateNote}
-              disabled={!effectiveUrl || submitting}
+              disabled={(!isLocalFile && !effectiveUrl) || submitting}
               title="开始生成"
             >
               {submitting ? (

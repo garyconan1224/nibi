@@ -15,9 +15,8 @@ import {
   removeWorkspaceItem,
 } from '@/services/workspaces'
 import type { SniffResult } from '@/services/workspaces'
-import { AddMaterialModal, type StagedConfig } from '@/components/workspace/AddMaterialModal'
+import { AddMaterialModal } from '@/components/workspace/AddMaterialModal'
 import { LinkPreviewModal } from '@/components/workspace/LinkPreviewModal'
-import { PreflightDrawer } from '@/pages/WorkbenchPage/PreflightDrawer'
 
 const WS_COLORS = [
   '#22c55e', '#f59e0b', '#a855f7', '#0ea5e9',
@@ -37,15 +36,17 @@ export function Composer({ onTaskCreated }: ComposerProps) {
   const [wsOpen, setWsOpen] = useState(false)
   const [wsQuery, setWsQuery] = useState('')
   const [sniffResult, setSniffResult] = useState<SniffResult | null>(null)
-  const [preflightOpen, setPreflightOpen] = useState(false)
-  const [preflightStaged, setPreflightStaged] = useState<StagedConfig | undefined>(undefined)
   const [uploading, setUploading] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
-  const [localUpload, setLocalUpload] = useState<{ workspaceId: string; itemId: string; fileName: string } | null>(null)
+  const [localFile, setLocalFile] = useState<string | undefined>(undefined)
+  const [localFileName, setLocalFileName] = useState<string | undefined>(undefined)
+  const [localWsId, setLocalWsId] = useState<string | undefined>(undefined)
 
   const popRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const sniffTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  /** 已提交标记：同步更新，避免 onOpenChange 闭包拿到旧 state 误删 item */
+  const submittedRef = useRef(false)
 
   // Fetch workspaces on mount
   useEffect(() => {
@@ -152,9 +153,12 @@ export function Composer({ onTaskCreated }: ComposerProps) {
       })
       const item = updated.items[updated.items.length - 1]
       const itemId = item.item_id
-      // 暂存上传结果，打开 PreflightDrawer 让用户配置分析任务
-      setLocalUpload({ workspaceId: ws.workspace_id, itemId, fileName: file.name })
-      setPreflightOpen(true)
+      // 暂存上传结果，打开 AddMaterialModal 让用户配置
+      submittedRef.current = false
+      setLocalFile(itemId)
+      setLocalFileName(file.name)
+      setLocalWsId(ws.workspace_id)
+      setUploadOpen(true)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '上传失败'
       toast.error(`文件上传失败: ${msg}`)
@@ -166,8 +170,13 @@ export function Composer({ onTaskCreated }: ComposerProps) {
   }
 
   const handleAdded = () => {
+    submittedRef.current = true
     setUploadOpen(false)
     setUrl('')
+    // 清理本地文件标记，避免 onOpenChange 的 cleanup 误删已启动的 item
+    setLocalFile(undefined)
+    setLocalFileName(undefined)
+    setLocalWsId(undefined)
     listWorkspaces().then(setWorkspaces).catch(() => {
       toast.error('刷新合集列表失败')
     })
@@ -364,53 +373,29 @@ export function Composer({ onTaskCreated }: ComposerProps) {
         onCancel={() => setPreviewOpen(false)}
       />
 
-      {/* Upload modal */}
+      {/* Upload modal — 链接和本地文件统一走此弹窗 */}
       <AddMaterialModal
         open={uploadOpen}
-        onOpenChange={setUploadOpen}
+        onOpenChange={(open) => {
+          setUploadOpen(open)
+          // 关闭时清理：仅未提交时删除残留 item（ref 同步更新，不依赖 state 异步）
+          if (!open && !submittedRef.current && localFile && localWsId) {
+            removeWorkspaceItem(localWsId, localFile).catch(() => {})
+          }
+          if (!open) {
+            setLocalFile(undefined)
+            setLocalFileName(undefined)
+            setLocalWsId(undefined)
+          }
+        }}
         workspaceIds={workspaceSel}
         workspaceBackgrounds={wsBackgrounds}
         sniffResult={sniffResult}
         urlValue={normalizedUrl || undefined}
-        initialStaged={preflightStaged}
         onAdded={handleAdded}
-        onFineTune={(staged) => {
-          setUploadOpen(false)
-          setPreflightStaged(staged)
-          setPreflightOpen(true)
-        }}
-      />
-
-      {/* R7.4: PreflightDrawer — stage 模式（链接流程回写配置）或 execute 模式（本地文件预检确认后启动） */}
-      <PreflightDrawer
-        open={preflightOpen}
-        url={localUpload ? localUpload.fileName : (normalizedUrl || url)}
-        platformName={platform?.name ?? null}
-        sniffResult={localUpload ? undefined : sniffResult}
-        workspaceId={localUpload ? localUpload.workspaceId : workspaceSel[0]}
-        itemId={localUpload?.itemId}
-        stagedConfig={localUpload ? undefined : preflightStaged}
-        mode={localUpload ? 'execute' : 'stage'}
-        onSaveStaged={localUpload ? undefined : (staged) => {
-          setPreflightStaged(staged)
-          setPreflightOpen(false)
-          setUploadOpen(true)
-        }}
-        onClose={() => {
-          setPreflightOpen(false)
-          // 本地文件预检取消：清理已上传但未启动的 item，避免残留半截素材
-          if (localUpload) {
-            removeWorkspaceItem(localUpload.workspaceId, localUpload.itemId).catch(() => {
-              // 清理失败不阻塞 UI，静默忽略
-            })
-          }
-          setLocalUpload(null)
-        }}
-        onCreated={() => {
-          setPreflightOpen(false)
-          setLocalUpload(null)
-          handleAdded()
-        }}
+        localFile={localFile}
+        localFileName={localFileName}
+        localWsId={localWsId}
       />
     </div>
   )
