@@ -24,6 +24,7 @@ import {
   autoCreateWorkspace,
   generateNote,
   probeDuration,
+  probeItemMedia,
   savePreflight,
   sniffUrl,
   startItemPipeline,
@@ -137,6 +138,7 @@ export function AddMaterialModal({
   const [captureMode, setCaptureMode] = useState<'auto' | 'manual'>('auto')
   const [videoDuration, setVideoDuration] = useState(0) // 探测到的视频时长（秒），0=未知
   const [coverUrl, setCoverUrl] = useState('') // sniff 没给封面时，用 link-preview 补的封面
+  const [localCover, setLocalCover] = useState('') // 本地文件：后端 cv2 探测的首帧封面 static URL
   const [error, setError] = useState<string | null>(null)
   const [sniffFailed, setSniffFailed] = useState(false)
   const [diarizeOn, setDiarizeOn] = useState(false)
@@ -168,8 +170,10 @@ export function AddMaterialModal({
     }
   }, [hasVisionModel])
 
-  const effectiveUrl = (urlValue ?? internalUrl).trim()
-  const effectiveSniff = sniffResult ?? internalSniff
+  // 本地文件不参与链接识别：屏蔽 url/sniff，避免残留的 sniffResult 误显示「已识别视频」卡片、
+  // 也避免链接探测 useEffect 把 probeItemMedia 探到的本地时长清零覆盖。
+  const effectiveUrl = isLocalFile ? '' : (urlValue ?? internalUrl).trim()
+  const effectiveSniff = isLocalFile ? null : (sniffResult ?? internalSniff)
   const workspaceSummary =
     workspaceIds.length > 1
       ? `${workspaceIds.length} 个合集`
@@ -223,6 +227,7 @@ export function AddMaterialModal({
 
   // 识别为视频后，轻量探测时长（供「取画面」算预估帧数）；非视频/拿不到 → 0
   useEffect(() => {
+    if (isLocalFile) return // 本地文件时长由下方 probeItemMedia useEffect 负责，不在此清零
     if (!open || !effectiveUrl || effectiveSniff?.primary_type !== 'video') {
       setVideoDuration(0)
       return
@@ -232,7 +237,23 @@ export function AddMaterialModal({
       .then((r) => { if (!cancelled) setVideoDuration(r.duration_sec || 0) })
       .catch(() => { if (!cancelled) setVideoDuration(0) })
     return () => { cancelled = true }
-  }, [open, effectiveUrl, effectiveSniff?.primary_type])
+  }, [open, effectiveUrl, effectiveSniff?.primary_type, isLocalFile])
+
+  // 本地文件：上传后用后端 cv2 探测时长 + 首帧封面（支持 flv 等 HTML5 video 播不了的格式）
+  useEffect(() => {
+    if (!open || !isLocalFile || !localFile || !localWsId) return
+    let cancelled = false
+    setVideoDuration(0)
+    setLocalCover('')
+    probeItemMedia(localWsId, localFile)
+      .then((r) => {
+        if (cancelled) return
+        setVideoDuration(r.duration_sec || 0)
+        setLocalCover(r.cover_url || '')
+      })
+      .catch(() => { /* 探测失败降级，不阻塞添加 */ })
+    return () => { cancelled = true }
+  }, [open, isLocalFile, localFile, localWsId])
 
   // sniff 对已知平台（B站等）只做 O(1) 类型判断、不返回封面 → 用 link-preview 补封面
   useEffect(() => {
@@ -369,10 +390,31 @@ export function AddMaterialModal({
           <div className="m-section">
             <div className="eyebrow" style={{ marginBottom: 10 }}>① 视频源</div>
             {isLocalFile ? (
-              <div className="composer-url modal-composer-url">
-                <div className="platform"><PlayCircle size={16} /></div>
-                <span className="modal-source-value">{localFileName || '本地文件'}</span>
-                <span className="kw">已上传</span>
+              <div className="sniff-card">
+                <div className="sniff-thumb">
+                  {localCover ? (
+                    <img
+                      src={localCover}
+                      alt=""
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                    />
+                  ) : (
+                    <PlayCircle size={20} style={{ color: 'var(--ink-3)' }} />
+                  )}
+                </div>
+                <div className="sniff-meta">
+                  <div className="sniff-title">{localFileName || '本地文件'}</div>
+                  <div className="sniff-tags">
+                    {videoDuration > 0 && (
+                      <span className="kw" style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        <Clock size={11} /> {formatDuration(videoDuration)}
+                      </span>
+                    )}
+                    <span className="sniff-ok">
+                      <CheckCircle2 size={11} /> 已上传
+                    </span>
+                  </div>
+                </div>
               </div>
             ) : urlValue ? (
               <div className="composer-url modal-composer-url">

@@ -1148,6 +1148,43 @@ def probe_video_duration(req: ProbeDurationRequest) -> dict:
         return {"duration_sec": 0}
 
 
+@router.get("/{workspace_id}/items/{item_id}/probe-media")
+def probe_item_media(workspace_id: str, item_id: str) -> dict:
+    """探测本地素材时长 + 首帧封面，供「添加素材」弹窗即时显示。
+
+    本地文件已上传（source_value 为绝对路径），用 cv2 探测——支持 flv/mkv 等
+    HTML5 video 播不了的格式。失败一律降级返回 0 / 空，不阻塞添加流程。
+    """
+    from shared.video_analyzer import extract_first_frame, probe_duration_seconds
+
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = next((it for it in rec.items if it.item_id == item_id), None)
+    if item is None:
+        raise HTTPException(status_code=404, detail=f"item not found: {item_id}")
+
+    path = item.source_value or ""
+    if not path or not Path(path).is_file():
+        return {"duration_sec": 0, "cover_url": ""}
+
+    duration = 0
+    try:
+        duration = probe_duration_seconds(path)
+    except Exception:
+        logger.warning("probe_item_media duration failed for %s", path, exc_info=True)
+
+    cover_url = ""
+    try:
+        thumb = Path(path).parent / f"_probe_{item_id}_thumb.jpg"
+        if extract_first_frame(path, thumb):
+            cover_url = to_static_url(thumb)
+    except Exception:
+        logger.warning("probe_item_media cover failed for %s", path, exc_info=True)
+
+    return {"duration_sec": duration, "cover_url": cover_url}
+
+
 @router.get("")
 def list_workspaces(
     trashed_only: bool = False,

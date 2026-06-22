@@ -8,6 +8,7 @@ vi.mock('@/services/workspaces', () => ({
   autoCreateWorkspace: vi.fn(),
   generateNote: vi.fn(),
   probeDuration: vi.fn(),
+  probeItemMedia: vi.fn().mockResolvedValue({ duration_sec: 0, cover_url: '' }),
   savePreflight: vi.fn().mockResolvedValue({}),
   sniffUrl: vi.fn(),
   startItemPipeline: vi.fn().mockResolvedValue({ task_id: 'task-123', task_type: 'note' }),

@@ -107,6 +107,17 @@ export async function probeDuration(url: string): Promise<{ duration_sec: number
   return res.data
 }
 
+/** GET /workspaces/{id}/items/{itemId}/probe-media — 探测本地素材时长+首帧封面（cv2，支持 flv/mkv 等） */
+export async function probeItemMedia(
+  workspaceId: string,
+  itemId: string,
+): Promise<{ duration_sec: number; cover_url: string }> {
+  const res = await http.get<{ duration_sec: number; cover_url: string }>(
+    `${BASE}/${workspaceId}/items/${itemId}/probe-media`,
+  )
+  return res.data
+}
+
 /** POST /workspaces/{id}/items — 添加素材 */
 export async function addWorkspaceItem(
   workspaceId: string,
