@@ -572,6 +572,15 @@ class TestRemoveOrphanImageDescs:
         result = _remove_orphan_image_descs(md)
         assert "附：2026 年度总结" in result
 
+    def test_preserves_code_example_heading(self) -> None:
+        """## 附：代码示例 / 配置示例（无「界面/截图」）→ 保留。"""
+        from backend.app.services.summary_generator import _remove_orphan_image_descs
+
+        md = "## 附：代码示例 [03:20]\n\nprint('hello')\n\n## 附：配置示例\n\nsettings = {}"
+        result = _remove_orphan_image_descs(md)
+        assert "附：代码示例" in result
+        assert "附：配置示例" in result
+
     def test_preserves_normal_content(self) -> None:
         """正常内容不受影响。"""
         from backend.app.services.summary_generator import _remove_orphan_image_descs

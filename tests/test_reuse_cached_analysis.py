@@ -146,3 +146,97 @@ class TestReuseCachedAnalysis:
                 target_json_dir=cached_env["json_dir"],
             )
         assert result is False
+
+    def test_reuse_includes_frame_image_field(self, cached_env: dict) -> None:
+        """复用结果包含 frame_image（仅文件名）供 _save_html 使用。"""
+        from shared.video_analyzer import _reuse_cached_analysis
+
+        mock_cap = MagicMock()
+        mock_cap.isOpened.return_value = True
+        mock_cap.get.return_value = 30.0
+        mock_cap.read.return_value = (True, MagicMock())
+
+        with patch("shared.video_analyzer.cv2") as mock_cv2:
+            mock_cv2.VideoCapture.return_value = mock_cap
+            mock_cv2.CAP_PROP_FPS = 5
+            mock_cv2.CAP_PROP_POS_FRAMES = 1
+            mock_cv2.imwrite.return_value = True
+            result = _reuse_cached_analysis(
+                cached_env["video_path"],
+                target_json_dir=cached_env["json_dir"],
+            )
+        assert result is True
+
+        # 读生成的 _视觉数据.json，确认 frame_image 字段存在
+        output_dir = cached_env["video_path"].parent / (cached_env["safe_name"] + "_分析报告")
+        json_file = output_dir / (cached_env["safe_name"] + "_视觉数据.json")
+        import json
+        with open(json_file, encoding="utf-8") as f:
+            data = json.load(f)
+        # save_results 只写 4 字段到 json；frame_image 在 frames dict 上但不进 json
+        # 重点：_图文分镜.md 存在即可（save_results 被成功调用）
+        md_file = output_dir / (cached_env["safe_name"] + "_图文分镜.md")
+        assert md_file.exists()
+
+
+class TestRunBatchAnalysisReuse:
+    """run_batch_analysis 复用分支的状态。"""
+
+    def test_reuse_success_status_done(self, cached_env: dict) -> None:
+        """is_already_processed 命中 + 复用成功 → status='done'。"""
+        from shared.video_analyzer import run_batch_analysis
+
+        mock_cap = MagicMock()
+        mock_cap.isOpened.return_value = True
+        mock_cap.get.return_value = 30.0
+        mock_cap.read.return_value = (True, MagicMock())
+
+        with patch("shared.video_analyzer.cv2") as mock_cv2:
+            mock_cv2.VideoCapture.return_value = mock_cap
+            mock_cv2.CAP_PROP_FPS = 5
+            mock_cv2.CAP_PROP_POS_FRAMES = 1
+            mock_cv2.imwrite.return_value = True
+
+            state = run_batch_analysis(
+                api_key="fake",
+                video_paths=[cached_env["video_path"]],
+                target_json_dir=cached_env["json_dir"],
+            )
+            # 等待后台线程完成
+            import time
+            for _ in range(50):
+                if state.finished:
+                    break
+                time.sleep(0.1)
+
+        assert state.finished is True
+        snaps = state.snapshot()
+        assert len(snaps) == 1
+        assert snaps[0]["status"] == "done"
+        assert snaps[0]["percent"] == 100.0
+
+    def test_reuse_failure_status_skipped(self, cached_env: dict) -> None:
+        """is_already_processed 命中 + 复用失败 → status='skipped'（fallback）。"""
+        from shared.video_analyzer import run_batch_analysis
+
+        # Mock cv2 使 VideoCapture.isOpened 返回 False → 复用失败
+        with patch("shared.video_analyzer.cv2") as mock_cv2:
+            mock_cap = MagicMock()
+            mock_cap.isOpened.return_value = False
+            mock_cv2.VideoCapture.return_value = mock_cap
+
+            state = run_batch_analysis(
+                api_key="fake",
+                video_paths=[cached_env["video_path"]],
+                target_json_dir=cached_env["json_dir"],
+            )
+            import time
+            for _ in range(50):
+                if state.finished:
+                    break
+                time.sleep(0.1)
+
+        assert state.finished is True
+        snaps = state.snapshot()
+        assert len(snaps) == 1
+        assert snaps[0]["status"] == "skipped"

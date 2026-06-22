@@ -1071,6 +1071,18 @@ def _reuse_cached_analysis(
     不调 VLM（保留省钱语义），仅重新截帧 + 写 _图文分镜.md + _视觉数据.json。
     返回 True 表示复用成功。
     """
+    try:
+        return _reuse_cached_analysis_inner(video_path, target_json_dir)
+    except Exception:
+        logger.warning("复用缓存分析失败: %s", video_path.name, exc_info=True)
+        return False
+
+
+def _reuse_cached_analysis_inner(
+    video_path: Path,
+    target_json_dir: Path | None = None,
+) -> bool:
+    """_reuse_cached_analysis 的实际逻辑，异常由外层捕获。"""
     if cv2 is None:
         return False
 
@@ -1125,7 +1137,8 @@ def _reuse_cached_analysis(
             "content_zh": fr.get("content_zh", ""),
             "description_zh": fr.get("description_zh", ""),
             "image_prompt_en": fr.get("image_prompt_en", ""),
-            "image_path": img_path,
+            "frame_image": fname,      # 仅文件名，供 _save_html/_compute_avg_brightness
+            "image_path": img_path,    # 完整路径，供 _postprocess_frames/_collect_frames
         })
 
     cap.release()
