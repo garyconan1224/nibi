@@ -1062,6 +1062,88 @@ def process_video(
     return output_dir
 
 
+def _reuse_cached_analysis(
+    video_path: Path,
+    target_json_dir: Path | None = None,
+) -> bool:
+    """复用已缓存的 VLM 分析结果：读共享 json 的描述，按 timestamp 从当前视频重新截帧到当前 workspace。
+
+    不调 VLM（保留省钱语义），仅重新截帧 + 写 _图文分镜.md + _视觉数据.json。
+    返回 True 表示复用成功。
+    """
+    if cv2 is None:
+        return False
+
+    sn = get_safe_name(video_path)
+    json_dir = target_json_dir or JSON_DATA_DIR
+    jp = json_dir / (sn + "_视觉数据.json")
+    if not jp.exists() or not _check_json_complete(jp):
+        return False
+
+    try:
+        with open(jp, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return False
+
+    cached_frames = data.get("frames") or []
+    if not cached_frames:
+        return False
+
+    output_dir = get_output_dir(video_path)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    frames_dir = output_dir / "frames"
+    frames_dir.mkdir(exist_ok=True)
+
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        return False
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+
+    frames: list[dict[str, Any]] = []
+    for fr in cached_frames:
+        ts_str = str(fr.get("timestamp") or "")
+        if not ts_str:
+            continue
+        parts = ts_str.split(":")
+        try:
+            seconds = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+        except (IndexError, ValueError):
+            continue
+
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(seconds * fps))
+        ret, frame = cap.read()
+        if not ret or frame is None:
+            continue
+
+        fname = make_frame_filename(sn, ts_str)
+        img_path = str(frames_dir / fname)
+        cv2.imwrite(img_path, frame)
+
+        frames.append({
+            "timestamp": ts_str,
+            "content_zh": fr.get("content_zh", ""),
+            "description_zh": fr.get("description_zh", ""),
+            "image_prompt_en": fr.get("image_prompt_en", ""),
+            "image_path": img_path,
+        })
+
+    cap.release()
+
+    if not frames:
+        return False
+
+    save_results(
+        output_dir,
+        sn,
+        str(data.get("video_title") or video_path.stem),
+        str(data.get("product_name") or ""),
+        str(data.get("global_visual_summary") or ""),
+        frames,
+    )
+    return True
+
+
 def run_batch_analysis(
     api_key: str,
     video_paths: list[Path],
@@ -1097,7 +1179,11 @@ def run_batch_analysis(
             if progress_cb:
                 progress_cb(idx / max(total, 1), f"处理第 {idx + 1}/{total} 个视频：{vp.name}")
             if is_already_processed(vp, target_json_dir=target_json_dir):
-                state.update(idx, status="skipped", percent=100.0)
+                # A1: 复用模式 — 读缓存 json 描述，重新截帧到当前 workspace（不调 VLM）
+                if _reuse_cached_analysis(vp, target_json_dir=target_json_dir):
+                    state.update(idx, status="done", percent=100.0)
+                else:
+                    state.update(idx, status="skipped", percent=100.0)
                 continue
             try:
                 process_video(
