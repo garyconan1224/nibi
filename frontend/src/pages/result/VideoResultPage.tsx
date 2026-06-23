@@ -878,6 +878,14 @@ export default function VideoResultPage() {
             </button>
           </div>
           <div style={{ marginLeft: 'auto' }} />
+          <button
+            className="btn-ghost"
+            style={{ height: 24, padding: '0 8px', fontSize: 11, gap: 4, borderRadius: 4, border: '1px solid var(--border)' }}
+            onClick={() => navigate('/library?intent=replica')}
+            title="查看所有复刻项目"
+          >
+            <Copy size={12} /> 复刻项目
+          </button>
           <div style={{ position: 'relative' }}>
             <button className="btn-ghost" style={{ height: 28, padding: '0 10px', fontSize: 12, opacity: isVisualOnly ? 0.5 : 1 }} onClick={() => !isVisualOnly && setExportOpen(!exportOpen)} title={isVisualOnly ? "仅画面分析模式无字幕数据" : "导出字幕"} disabled={isVisualOnly}>
               <Download size={13} /> 字幕

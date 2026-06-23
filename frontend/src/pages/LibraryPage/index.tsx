@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Trash2, Plus, Inbox, Filter, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { fetchLibrary, deleteItem, batchDeleteItems, type LibraryItem, type LibraryResponse } from '@/services/library'
@@ -67,6 +67,8 @@ function sortItems(items: LibraryItem[], sortBy: SortBy): LibraryItem[] {
 
 export default function LibraryPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const intentFilter = searchParams.get('intent') || ''
   const [data, setData] = useState<LibraryResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -150,8 +152,12 @@ export default function LibraryPage() {
     } else {
       items = data.items.filter((it) => typeFilters.includes(it.type))
     }
+    // intent 筛选（?intent=replica 等）
+    if (intentFilter) {
+      items = items.filter((it) => it.preflight?.intent === intentFilter)
+    }
     return sortItems(items, sortBy)
-  }, [data, showAll, typeFilters, sortBy])
+  }, [data, showAll, typeFilters, sortBy, intentFilter])
 
   const selectAll = useCallback(() => {
     const next = new Set<string>()
