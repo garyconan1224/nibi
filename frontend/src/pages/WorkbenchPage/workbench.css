@@ -68,6 +68,8 @@
   max-width: 1040px;
   margin: 0 auto;
   padding: 0 32px;
+  position: relative;
+  z-index: 1;
 }
 
 /* ─── Composer card ─── */

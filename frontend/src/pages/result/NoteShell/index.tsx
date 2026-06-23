@@ -471,7 +471,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const [note, setNote] = useState<ItemNote | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [tagsOpen, setTagsOpen] = useState(true)
   const [chatOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   // VN4.3 AI 工具下拉
@@ -858,7 +857,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
           <ArrowLeft size={13} /> 返回
         </button>
         <span className="vd-sep" />
-        <span className="vd-title" style={{ fontWeight: 600 }}>{title}</span>
         <span className="kw mono" style={{ fontSize: 10, flexShrink: 0 }}>
           {TYPE_LABEL[itemType] ?? itemType.toUpperCase()}
         </span>
@@ -1154,36 +1152,14 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
 
       </div>
 
-      {/* ════════ 标签概览条（可折叠）════════ */}
-      {hasTags && (
-        <div style={{ borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
-          <button
-            onClick={() => setTagsOpen(!tagsOpen)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              width: '100%', padding: '8px 20px',
-              background: 'none', border: 'none', cursor: 'pointer',
-              fontSize: 12, color: 'var(--ink-3)',
-            }}
-          >
-            {tagsOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-            标签概览
-          </button>
-          {tagsOpen && (
-            <div style={{ padding: '0 20px 10px' }}>
-              <TagChips tags={tags} />
-            </div>
-          )}
-        </div>
-      )}
 
       {/* ════════ 主内容区（视频笔记 = 三列 / 图文笔记 = 三列 / 其余 = 通用布局）════════ */}
       {isVideoNote ? (
         /* ── 视频笔记 banner + 三列布局 ── */
         <>
-          {/* ── 视频 banner：标题 + 平台 + 原视频链接 ── */}
+          {/* ── 视频 banner：标题 + 平台 + 原视频链接 + 标签 ── */}
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
+            display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
             padding: '6px 20px',
             borderBottom: '1px solid var(--line)',
             background: 'var(--bg-sunken)',
@@ -1209,6 +1185,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 原视频 ↗
               </a>
             )}
+            {hasTags && <TagChips tags={tags} />}
           </div>
 
         {/* ── 视频笔记三列布局（蓝图 §3.5）：左播放器+字幕 / 中正文 / 右操作 ── */}
