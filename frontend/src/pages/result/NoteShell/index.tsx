@@ -1152,6 +1152,12 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
 
       </div>
 
+      {/* ════════ 标签概览（所有笔记类型通用）════════ */}
+      {hasTags && (
+        <div style={{ padding: '4px 20px 2px', flexShrink: 0 }}>
+          <TagChips tags={tags} />
+        </div>
+      )}
 
       {/* ════════ 主内容区（视频笔记 = 三列 / 图文笔记 = 三列 / 其余 = 通用布局）════════ */}
       {isVideoNote ? (
@@ -1185,7 +1191,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 原视频 ↗
               </a>
             )}
-            {hasTags && <TagChips tags={tags} />}
           </div>
 
         {/* ── 视频笔记三列布局（蓝图 §3.5）：左播放器+字幕 / 中正文 / 右操作 ── */}
