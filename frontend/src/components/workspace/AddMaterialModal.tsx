@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle2, Clock, Image as ImageIcon, Link2, PlayCircle, Settings2, Wand2, X } from 'lucide-react'
+import { CheckCircle2, Clock, Copy, FileText, Image as ImageIcon, LayoutTemplate, Link2, Lock, PenTool, PlayCircle, Settings2, Video, Wand2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -66,6 +66,7 @@ interface AddMaterialModalProps {
 }
 
 type NoteMediaKind = 'auto' | 'video' | 'image_text' | 'audio'
+type ActionType = 'note' | 'replica' | 'ai_video' | 'storyboard' | 'rewrite'
 
 const NOTE_TYPE_CARDS: { value: NoteMediaKind; label: string; desc: string }[] = [
   { value: 'auto', label: '自动识别', desc: '由系统判断笔记类型' },
@@ -131,6 +132,7 @@ export function AddMaterialModal({
   const [internalUrl, setInternalUrl] = useState('')
   const [internalSniff, setInternalSniff] = useState<SniffResult | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [selectedAction, setSelectedAction] = useState<ActionType>('note')
   const [selectedNoteType, setSelectedNoteType] = useState<NoteMediaKind>('auto')
   const [embedFrames, setEmbedFrames] = useState(false) // R4.7: 默认关，检测到视觉模型后自动开
   const [selectedVisionModel, setSelectedVisionModel] = useState('') // 空=用系统默认
@@ -206,6 +208,7 @@ export function AddMaterialModal({
     setDiarizeOn(false)
     setUserNotes('')
     setNoteStyle('standard')
+    setSelectedAction('note')
     setError(null)
     setSubmitting(false)
     // embedFrames 由 auto-detect effect 根据 hasVisionModel 设置，不在这里强制
@@ -285,6 +288,7 @@ export function AddMaterialModal({
           : undefined
         const videoModelId = selectedVisionModel === '__default__' || !selectedVisionModel ? undefined : selectedVisionModel
         await savePreflight(wsId, localFile, {
+          intent: selectedAction === 'replica' ? 'replica' : 'learning',
           background_overrides: {
             // 后端 /start 从 background_overrides 读 frame_interval_sec
             ...(effInterval != null ? { frame_interval_sec: effInterval } : {}),
@@ -338,19 +342,19 @@ export function AddMaterialModal({
       const effVisionModel = selectedVisionModel === '__default__' ? '' : selectedVisionModel
       const result = await generateNote(
         wsId, effectiveUrl, effectiveSniff?.title ?? undefined,
-        embedFrames, 'vision', effInterval, effVisionModel,
-        'note', selectedNoteType,
+        embedFrames, selectedAction === 'replica' ? 'replica_prompt' : 'vision', effInterval, effVisionModel,
+        selectedAction === 'replica' ? 'replica' : 'note', selectedNoteType,
         { diarize: diarizeOn, summary_template: noteStyle, user_notes: userNotes },
       )
-      toast.success('笔记生成中', { description: `${result.item_type} · ${effectiveUrl}` })
+      toast.success(selectedAction === 'replica' ? '复刻任务已创建' : '笔记生成中', { description: `${result.item_type} · ${effectiveUrl}` })
 
       onAdded?.()
       onOpenChange(false)
       navigate(`/processing/${result.task_id}`, {
-        state: { url: effectiveUrl, workspaceId: wsId, taskType: 'note', itemId: result.item_id },
+        state: { url: effectiveUrl, workspaceId: wsId, taskType: selectedAction === 'replica' ? 'replica' : 'note', itemId: result.item_id },
       })
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : '生成笔记失败'
+      const msg = err instanceof Error ? err.message : '任务创建失败'
       setError(msg)
       toast.error(msg)
     } finally {
@@ -367,7 +371,7 @@ export function AddMaterialModal({
       >
         <DialogTitle className="sr-only">添加素材</DialogTitle>
         <DialogDescription className="sr-only">
-          输入素材链接并生成笔记
+          输入素材链接并生成笔记或复刻
         </DialogDescription>
 
         <div className="m-head">
@@ -487,9 +491,53 @@ export function AddMaterialModal({
             )}
           </div>
 
-          {/* ② 生成设置 */}
+          {/* ② 你要做什么 */}
           <div className="m-section">
-            <div className="eyebrow" style={{ marginBottom: 10 }}>② 生成设置</div>
+            <div className="eyebrow" style={{ marginBottom: 10 }}>② 你要做什么</div>
+            <div className="note-type-grid" style={{ marginBottom: 14 }}>
+              <button
+                type="button"
+                className="note-type-card"
+                data-active={selectedAction === 'note'}
+                onClick={() => setSelectedAction('note')}
+              >
+                <div className="ntc-l"><FileText size={16} style={{ display: 'inline', verticalAlign: '-3px', marginRight: 4 }} /> 学习笔记</div>
+                <div className="ntc-d">沉浸式阅读与总结提取</div>
+              </button>
+              <button
+                type="button"
+                className="note-type-card"
+                data-active={selectedAction === 'replica'}
+                onClick={() => setSelectedAction('replica')}
+              >
+                <div className="ntc-l"><Copy size={16} style={{ display: 'inline', verticalAlign: '-3px', marginRight: 4 }} /> 逐帧复刻</div>
+                <div className="ntc-d">提取画面提示词与详细信息</div>
+              </button>
+            </div>
+            
+            <div style={{ display: 'flex', gap: 8, marginBottom: selectedAction === 'note' ? 24 : 0 }}>
+              {[{ id: 'ai_video', label: 'AI视频', icon: <Video size={12} /> },
+                { id: 'storyboard', label: '分镜脚本', icon: <LayoutTemplate size={12} /> },
+                { id: 'rewrite', label: '二创改写', icon: <PenTool size={12} /> }].map(item => (
+                <button
+                  key={item.id}
+                  type="button"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4,
+                    padding: '6px 10px', fontSize: 12, color: 'var(--ink-3)',
+                    border: '1px dashed var(--border)', borderRadius: 6,
+                    background: 'var(--bg-subtle)'
+                  }}
+                  onClick={() => toast('该功能即将上线')}
+                >
+                  {item.icon} {item.label} <Lock size={10} style={{ marginLeft: 2 }} />
+                </button>
+              ))}
+            </div>
+
+            {selectedAction === 'note' && (
+              <>
+                <div className="eyebrow" style={{ marginBottom: 10 }}>③ 笔记设置</div>
                 <div className="note-type-grid">
                   {NOTE_TYPE_CARDS.map(card => {
                     const active = selectedNoteType === card.value
@@ -614,14 +662,16 @@ export function AddMaterialModal({
                     />
                   </div>
                 </div>
+              </>
+            )}
           </div>
         </div>
 
         <div className="m-foot">
           <span className="mono modal-foot-status">
             <span className="chip-dot" style={{ marginRight: 6 }} />
-            笔记
-            {selectedNoteType !== 'auto'
+            {selectedAction === 'replica' ? '复刻' : '笔记'}
+            {selectedAction === 'note' && selectedNoteType !== 'auto'
               ? ` · ${NOTE_TYPE_CARDS.find(c => c.value === selectedNoteType)?.label ?? ''}`
               : ''}
           </span>

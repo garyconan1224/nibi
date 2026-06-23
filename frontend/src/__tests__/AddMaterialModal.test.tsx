@@ -81,7 +81,8 @@ describe('AddMaterialModal', () => {
       />,
     )
 
-    expect(screen.getByText('② 生成设置')).toBeTruthy()
+    expect(screen.getByText('② 你要做什么')).toBeTruthy()
+    expect(screen.getByText('③ 笔记设置')).toBeTruthy()
     expect(screen.getByText('test video')).toBeTruthy()
     expect(screen.getByText('链接有效')).toBeTruthy()
     expect(screen.getByRole('button', { name: /开始生成/ })).toBeTruthy()
@@ -114,6 +115,7 @@ describe('AddMaterialModal', () => {
       />,
     )
 
+    fireEvent.click(screen.getByRole('button', { name: /学习笔记/ }))
     fireEvent.click(screen.getByRole('button', { name: /图文笔记/ }))
     fireEvent.click(screen.getByRole('button', { name: /开始生成/ }))
 
@@ -142,6 +144,63 @@ describe('AddMaterialModal', () => {
         workspaceId: 'ws-1',
         taskType: 'note',
         itemId: 'item-1',
+      },
+    })
+  })
+
+  it('选择复刻时提交 intent=replica', async () => {
+    generateNoteMock.mockResolvedValueOnce({
+      task_id: 'task-replica-1',
+      task_type: 'replica',
+      item_type: 'video',
+      item_id: 'item-2',
+      workspace: {},
+    })
+
+    render(
+      <AddMaterialModal
+        open={true}
+        onOpenChange={vi.fn()}
+        workspaceIds={['ws-1']}
+        urlValue="https://example.com/video"
+        sniffResult={{
+          primary_type: 'video',
+          possible_types: ['video'],
+          platform: 'bilibili',
+          title: '复刻测试',
+          thumbnail: null,
+          content_type_header: null,
+        }}
+      />,
+    )
+
+    // 点击复刻大卡
+    fireEvent.click(screen.getByRole('button', { name: /逐帧复刻/ }))
+    // 此时应该不显示“③ 笔记设置”
+    expect(screen.queryByText('③ 笔记设置')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: /开始生成/ }))
+
+    await waitFor(() => {
+      expect(generateNoteMock).toHaveBeenCalledWith(
+        'ws-1',
+        'https://example.com/video',
+        '复刻测试',
+        true,
+        'replica_prompt',
+        10,
+        '',
+        'replica',
+        'auto',
+        { diarize: false, summary_template: 'standard', user_notes: '' },
+      )
+    })
+    expect(navigateMock).toHaveBeenCalledWith('/processing/task-replica-1', {
+      state: {
+        url: 'https://example.com/video',
+        workspaceId: 'ws-1',
+        taskType: 'replica',
+        itemId: 'item-2',
       },
     })
   })
