@@ -10,7 +10,7 @@
  *   - SourcePanel：source.md 只读区（可折叠）
  *   - NoteEditor：轻量 CodeMirror 编辑器（注册到 lnEditorStore，复用截图插入能力）
  */
-import { cloneElement, isValidElement, useCallback, useEffect, useMemo, useSyncExternalStore, useRef, useState } from 'react'
+import { cloneElement, isValidElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
@@ -99,9 +99,6 @@ export function platformLabelFromUrl(url: string): string {
   return '网页'
 }
 
-const VIEW_MODE_KEY = 'nibi-note-view-mode'
-
-type ViewMode = 'edit' | 'compare' | 'wysiwyg'
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed'
 
 /** 格式化 HH:mm */
@@ -220,169 +217,10 @@ function replaceNoteTimestampString(text: string, onSeek: (sec: number) => void)
   return parts.length > 0 ? parts : text
 }
 
-/** useSyncExternalStore 兼容的媒体查询 hook，窄屏降级用 */
-function useMediaQuery(query: string): boolean {
-  const mql = typeof window !== 'undefined' ? window.matchMedia(query) : null
-  return useSyncExternalStore(
-    (cb: () => void) => {
-      mql?.addEventListener('change', cb)
-      return () => { mql?.removeEventListener('change', cb) }
-    },
-    () => mql?.matches ?? false,
-    () => false,
-  )
-}
 
 /** 视频笔记视图标签：中列只展示「标准总结」，两种格式（蓝图 §3.5）。
  *  富文本 = 渲染态（ReactMarkdown）；md格式 = 源码态（CodeMirror，可编辑）。
  *  源 md（转写+截帧原始内容）在右侧操作区，不是中列标签。 */
-/* ────────────────── NoteEditor ────────────────── */
-
-/** CodeMirror 时间戳跳转扩展：给裸 [mm:ss] 加 note-ts-chip，点击调 onSeek。 */
-function makeTimestampExtension(getOnSeek: () => ((sec: number) => void) | undefined) {
-  const matcher = new MatchDecorator({
-    regexp: new RegExp(TS_RE.source, 'g'),
-    decoration: (m) =>
-      Decoration.mark({ class: 'note-ts-chip', attributes: { 'data-sec': String(parseTs(m[1])) } }),
-  })
-  return ViewPlugin.fromClass(
-    class {
-      decorations
-      constructor(view: EditorView) { this.decorations = matcher.createDeco(view) }
-      update(u: ViewUpdate) { this.decorations = matcher.updateDeco(u, this.decorations) }
-    },
-    {
-      decorations: (v) => v.decorations,
-      eventHandlers: {
-        mousedown(e) {
-          const t = e.target as HTMLElement
-          if (t?.classList?.contains('note-ts-chip')) {
-            const sec = Number(t.getAttribute('data-sec'))
-            if (!Number.isNaN(sec)) { getOnSeek()?.(sec); e.preventDefault(); return true }
-          }
-          return false
-        },
-      },
-    },
-  )
-}
-
-interface NoteEditorProps {
-  markdown: string
-  onMarkdownChange: (md: string) => void
-  onSeek?: (sec: number) => void
-}
-
-/** 轻量 CodeMirror 编辑器（复用 lnEditorStore 让截图按钮插入到当前光标）。 */
-function NoteEditor({ markdown: md, onMarkdownChange, onSeek }: NoteEditorProps) {
-  const hostRef = useRef<HTMLDivElement>(null)
-  const viewRef = useRef<EditorView | null>(null)
-  // 用 ref 追踪最新回调，避免 EditorView updateListener 闭包捕获旧回调
-  const cbRef = useRef(onMarkdownChange)
-  cbRef.current = onMarkdownChange
-  const seekRef = useRef(onSeek)
-  seekRef.current = onSeek
-
-  useEffect(() => {
-    if (!hostRef.current) return
-    const state = EditorState.create({
-      doc: md,
-      extensions: [
-        lineNumbers(),
-        history(),
-        cmMarkdown(),
-        EditorView.lineWrapping,
-        makeTimestampExtension(() => seekRef.current),
-        keymap.of([...defaultKeymap, ...historyKeymap]),
-        EditorView.updateListener.of((u) => {
-          if (u.docChanged) {
-            cbRef.current(u.state.doc.toString())
-          }
-        }),
-      ],
-    })
-    const view = new EditorView({ state, parent: hostRef.current })
-    viewRef.current = view
-    useLnEditorStore.getState().setCmView(view)
-    return () => {
-      const store = useLnEditorStore.getState()
-      if (store.cmView === view) store.setCmView(null)
-      view.destroy()
-      viewRef.current = null
-    }
-    // 只挂载一次
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // 外部 md 变化时同步到 CodeMirror（如「应用到主笔记」后刷新）
-  useEffect(() => {
-    const view = viewRef.current
-    if (!view) return
-    if (view.state.doc.toString() !== md) {
-      view.dispatch({
-        changes: { from: 0, to: view.state.doc.length, insert: md },
-      })
-    }
-  }, [md])
-
-  return <div ref={hostRef} className="ln-md-view" />
-}
-
-/* ────────────────── CompareView（R2.1 对照视图）────────────────── */
-
-interface CompareViewProps {
-  markdown: string
-  onMarkdownChange: (md: string) => void
-  sourceMd?: string
-  onSeek?: (sec: number) => void
-}
-
-/** 左 CodeMirror 编辑 + 右 ReactMarkdown 实时预览，各占 50%。右栏可切 source 原文。 */
-function CompareView({ markdown, onMarkdownChange, sourceMd, onSeek }: CompareViewProps) {
-  const [rightMode, setRightMode] = useState<'preview' | 'source'>('preview')
-  const hasSource = !!sourceMd
-
-  return (
-    <div style={{ display: 'flex', height: '100%', minHeight: 0, gap: 1, background: 'var(--line)' }}>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)' }}>
-        <NoteEditor markdown={markdown} onMarkdownChange={onMarkdownChange} onSeek={onSeek} />
-      </div>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
-        {/* 右栏顶栏：预览 / source 切换 */}
-        {hasSource && (
-          <div style={{ display: 'flex', gap: 0, padding: '4px 12px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
-            {(['preview', 'source'] as const).map((rm) => (
-              <button
-                key={rm}
-                onClick={() => setRightMode(rm)}
-                style={{
-                  padding: '2px 10px', fontSize: 11, border: 'none', cursor: 'pointer',
-                  background: rightMode === rm ? 'var(--accent)' : 'transparent',
-                  color: rightMode === rm ? '#fff' : 'var(--ink-2)',
-                  borderRadius: 3,
-                }}
-              >
-                {rm === 'preview' ? '预览' : 'source 原文'}
-              </button>
-            ))}
-          </div>
-        )}
-        <div style={{ flex: 1, overflowY: 'auto', padding: 16, fontSize: 14, lineHeight: 1.8, color: 'var(--ink-2)' }}>
-          {rightMode === 'preview' || !hasSource ? (
-            <ReactMarkdown remarkPlugins={remarkPlugins}>
-              {markdown}
-            </ReactMarkdown>
-          ) : (
-            <ReactMarkdown remarkPlugins={remarkPlugins}>
-              {sourceMd!}
-            </ReactMarkdown>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 /* ────────────────── TagChips ────────────────── */
 
 interface TagChipsProps {
@@ -480,23 +318,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const [showNewSummaryModal, setShowNewSummaryModal] = useState(false)
   const [creatingSummary, setCreatingSummary] = useState(false)
 
-  // R1.3 + R2.1: 视图模式 + 保存状态（兼容三值 + 窄屏降级 compare → wysiwyg）
-  const isWide = useMediaQuery('(min-width: 1024px)')
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    const saved = localStorage.getItem(VIEW_MODE_KEY)
-    // 旧版 'read' 回退到 wysiwyg（阶段三移除富文本只读模式）
-    if (saved === 'read') return 'wysiwyg'
-    const valid = saved === 'edit' || saved === 'compare' || saved === 'wysiwyg'
-    if (saved === 'compare' && !window.matchMedia('(min-width: 1024px)').matches) return 'wysiwyg'
-    return valid ? (saved as ViewMode) : 'wysiwyg'
-  })
-  // R2.1 窄屏运行时降级：已在对照态时缩窗到 <1024px → 自动切回所见即所得
-  useEffect(() => {
-    if (!isWide && viewMode === 'compare') {
-      setViewMode('wysiwyg')
-      localStorage.setItem(VIEW_MODE_KEY, 'wysiwyg')
-    }
-  }, [isWide, viewMode])
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [savedAt, setSavedAt] = useState<string>('')
 
@@ -627,19 +448,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
       /* 字幕已落盘，source.md 展示刷新失败不阻塞 */
     }
   }, [workspaceId, itemId])
-
-  // 视频笔记默认富文本（read），加载时强制归位
-  const videoDefaultedRef = useRef(false)
-  useEffect(() => {
-    if (!note || videoDefaultedRef.current) return
-    const fmType = String(((note.frontmatter ?? {}) as Record<string, unknown>).type ?? '')
-    const isVid = fmType === 'video' && !!note.media?.video?.url
-    if (isVid) {
-      videoDefaultedRef.current = true
-      setViewMode('wysiwyg')
-      localStorage.setItem(VIEW_MODE_KEY, 'wysiwyg')
-    }
-  }, [note])
 
   // ─── debounce 自动保存 ───
   const doSave = useCallback(async (body: string) => {
@@ -782,8 +590,10 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   // 改名（从顶栏版本下拉触发）
   const commitRename = useCallback(async () => {
     if (!renameTargetId) return
+    const targetId = renameTargetId
+    setRenameTargetId(null)
     try {
-      await renameSummary(workspaceId, itemId, renameTargetId, renameName.trim())
+      await renameSummary(workspaceId, itemId, targetId, renameName.trim())
       toast.success('已改名')
       refreshSummaries()
     } catch {
@@ -835,17 +645,10 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const noteContent = (
     <div style={{
       flex: 1, minWidth: 0,
-      padding: viewMode === 'compare' ? 0 : '20px 24px',
-      overflowY: viewMode === 'compare' ? 'hidden' : 'auto',
-      // compare 模式需要 100% 高度让 CompareView 能正确 flex 撑满
-      height: viewMode === 'compare' ? '100%' : undefined,
+      padding: '20px 24px',
+      overflowY: 'auto',
     }}>
-      {viewMode === 'compare' ? (
-        <CompareView markdown={editingBody} onMarkdownChange={handleEditorChange} sourceMd={note.source_md} onSeek={handleSeek} />
-      ) : (
-        // 图文/视频：compare 以外一律 Milkdown（viewMode==='edit' 残留态也 fallback 到此）
-        <MilkdownEditor key={milkdownKey} markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
-      )}
+      <MilkdownEditor key={milkdownKey} markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
     </div>
   )
 
