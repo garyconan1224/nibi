@@ -8,12 +8,38 @@
  */
 export function resolveItemRoute(
   workspaceId: string,
-  item: { item_id: string; type: string; preflight?: { intent?: string } | null },
+  item: { item_id: string; type: string; preflight?: { intent?: string } | null; primary_view?: string },
 ): string {
-  // 笔记向（非 replica）→ 直达 NoteShell
+  // 1. 若后端权威给定 primary_view，优先遵循
+  if (item.primary_view) {
+    if (item.primary_view === 'note') {
+      return `/workspaces/${workspaceId}/items/${item.item_id}/note`
+    } else {
+      const DETAIL_ROUTE: Record<string, string> = {
+        video: 'video_detail',
+        audio: 'audio_detail',
+        image: 'image_result',
+        text: 'text_result',
+      }
+      const suffix = DETAIL_ROUTE[item.type] ?? 'overview'
+      return `/workspaces/${workspaceId}/items/${item.item_id}/${suffix}`
+    }
+  }
+
+  // 2. 兜底回退：根据 intent
   if (item.preflight?.intent !== 'replica') {
     return `/workspaces/${workspaceId}/items/${item.item_id}/note`
   }
+  
+  const DETAIL_ROUTE: Record<string, string> = {
+    video: 'video_detail',
+    audio: 'audio_detail',
+    image: 'image_result',
+    text: 'text_result',
+  }
+  const suffix = DETAIL_ROUTE[item.type] ?? 'overview'
+  return `/workspaces/${workspaceId}/items/${item.item_id}/${suffix}`
+}
   // 复刻向（replica）→ 保留原逻辑
   const DETAIL_ROUTE: Record<string, string> = {
     video: 'video_detail',

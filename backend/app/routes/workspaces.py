@@ -988,6 +988,7 @@ def _enrich_workspace(rec: WorkspaceRecord) -> Dict[str, Any]:
         overlay = _sync_item_with_tasks(item_obj)
         if overlay:
             item_dict.update(overlay)
+        item_dict["primary_view"] = _compute_primary_view(item_obj, item_dict.get("results") or {})
     d["current_step"] = _current_step(rec)
     d["items_count_by_type"] = _items_count_by_type(rec)
     d["cover_thumbnail"] = _cover_thumbnail(rec)
@@ -1322,6 +1323,22 @@ def _item_primary_task_status(item: WorkspaceItem) -> Optional[str]:
     return latest.status if latest else None
 
 
+
+def _compute_primary_view(item: "WorkspaceItem", results: dict) -> str:
+    """计算前端该进哪个页。"""
+    intent = getattr(item.preflight, "intent", "") if item.preflight else ""
+    has_frames = bool(results.get("frames")) or bool(results.get("json_outputs"))
+    
+    if has_frames and intent == "replica":
+        return "replica"
+        
+    # 有笔记数据（转写/总结/执行过 note 任务）
+    has_note_data = bool(results.get("transcript")) or bool(results.get("summary")) or any("note" in t for t in (item.related_task_ids or []))
+    if has_note_data:
+        return "note"
+        
+    return "note"
+
 @router.get("/library")
 def get_library(include_trashed: bool = False) -> Dict[str, Any]:
     """聚合端点：摊平所有 workspace items + workspace 摘要，供「资料库」页使用。"""
@@ -1385,6 +1402,7 @@ def get_library(include_trashed: bool = False) -> Dict[str, Any]:
                 "uploader": str(results.get("video_uploader") or "") or None,
                 "has_subtitle": bool(results.get("subtitle_paths")),
                 "has_chapters": bool(results.get("chapters") or (results.get("av_synthesis") or {}).get("chapters")),
+                "primary_view": _compute_primary_view(item, results),
                 "frames_count": len(results.get("frames") or []) if item.type == "video" else 0,
                 "audio_nature": audio_nature,
             })
