@@ -2510,8 +2510,10 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             _source_title = str(probe.get("source_title") or "").strip()
 
         # R4.7: 配图关闭时跳过截帧+VLM（省掉重 API 调用），笔记只用转写文本
+        # replica prompt 必须保留 analyze（画面分析是复刻的核心），不受 embed_frames 控制
         _pf = payload.get("preflight") or {}
-        if not _pf.get("embed_frames", True) and "analyze" in steps:
+        _is_replica_prompt = str(payload.get("intent") or "") == "replica" and str(payload.get("replica_kind") or "prompt") == "prompt"
+        if not _is_replica_prompt and not _pf.get("embed_frames", True) and "analyze" in steps:
             steps = [s for s in steps if s != "analyze"]
             runner.append_log(task_id, "⏭️ embed_frames=False → 跳过截帧分析")
 
