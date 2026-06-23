@@ -1,20 +1,19 @@
 # AI Handoff
 
-Last updated: 2026-06-22（**当前指针，给所有 AI 工具优先读取**）
+Last updated: 2026-06-23（**当前指针，给所有 AI 工具优先读取**）
 
 ## 当前事实
 
-> **2026-06-22 更新（手测 19 条批量推进）；下方「📦 归档参考」为 2026-06-21 及更早。**
+> **2026-06-23 更新（④15 左侧导航重塑完成）；下方「📦 归档参考」为 2026-06-21 及更早。**
 
-- **基线 git `857379b`（main）**；工作树有未跟踪 `fix.py` / `fix_lint.py`（非 Claude 创建，疑小米临时脚本，**先确认来源再清理**）。
+- **基线 git `0a07e45`（main）**；fix.py / fix_lint.py 已清理（2026-06-22）。
 - **19 条手测反馈按分类推进**（来源 `docs/test-reports/manual-local-video-2026-06-21.md`）：
-  - ✅ 阻断(17,1) + ① 封面/图/信息缺失(3,7,18,19) 全 **done**（含反馈3「结果页无图」，小米已做 `989838d`/`dbb93df`/`ec58b74`）
-  - ② 结果页编辑器：6,13,7b,图文升级 **done**（`8301add`/`bf67c8d`）；**10,11,12 待小米执行**（计划+提示词已给）
-  - ④ 添加布局：**2,14 待小米执行**（计划+提示词已给）；15,16 待规划
+  - ✅ 阻断(17,1) + ① 封面/图/信息缺失(3,7,18,19) 全 **done**
+  - ✅ ② 结果页编辑器：6,13,7b,图文升级,10,11,12 **done**（已执行待 Codex 审）
+  - ✅ ④15 左侧导航重塑 **done**（`AppShell.tsx` 宽展开式导航，6 可用 + 2 占位，Playwright 25/25 全绿）
+  - ④ 添加布局：**2,14 待小米执行**（计划+提示词已给）；16 待规划
   - ③ 笔记风格(5,8,9)、📋 板块化(4)：待规划
-- **本轮计划**（`docs/plans/*-2026-06-22.md`）：video-note-flow-fixes / video-note-followup / result-page-no-image / result-page-cleanup-batch1 / image-note-editor-upgrade / result-page-summary-version-consolidation / workbench-noteshell-layout。
-- **设计资产** `docs/design/assets/bilinote-video-note/`：**sidebar-nav.png(→④15)** / result-toolbar.png / prototype-fullpage|preview.png / tasks-workbench.png；配套设计文档 `docs/design/bilinote-video-note-flow-review.html`。
-- **当前下一步**：① 等小米回报 10/11/12 + 2/14（过 Codex 审）；② Claude 调研+计划 **④15 左侧导航**(读 sidebar-nav.png + flow-review.html「昨天规划还有什么没做」) → **④16 字幕直取**(B站/YouTube CC→pipeline 后端独立大功能) → **③5/8/9**(等10落地，与总结/版本交叉) → 📋4；③ 先清理 fix.py/fix_lint.py。
+- **当前下一步**：① 等小米回报 2/14（过 Codex 审）；② Claude 调研+计划 **④16 字幕直取**(B站/YouTube CC→pipeline 后端独立大功能) → **③5/8/9**(等10落地，与总结/版本交叉) → 📋4。
 
 ---
 

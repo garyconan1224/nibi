@@ -2,17 +2,17 @@ import { type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Home,
-  Layers,
   Sparkles,
-  Clapperboard,
   Film,
   Library,
+  BookOpen,
+  Star,
   Wand2,
-  LayoutGrid,
   Search,
   Settings,
   type LucideIcon,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useSystemStats } from '@/hooks/useSystemStats'
 import { FloatingTaskQueue } from '@/components/FloatingTaskQueue'
@@ -23,19 +23,17 @@ interface NavItem {
   path: string
   icon: LucideIcon
   label: string
-  disabled?: boolean
-  tooltipExtra?: string
+  badge?: string
+  placeholder?: boolean
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'home',        path: '/',            icon: Home,         label: '工作台' },
-  { id: 'taskboard',   path: '/taskboard',   icon: Layers,       label: '任务中心',  disabled: true },
-  { id: 'processing',  path: '/processing',  icon: Sparkles,     label: '处理中',    disabled: true },
-  { id: 'results',     path: '/results',     icon: Clapperboard, label: '结果',      disabled: true },
+  { id: 'home',        path: '/',            icon: Home,         label: '新建笔记' },
+  { id: 'library',     path: '/library',     icon: Library,      label: '合集',     badge: 'Beta' },
+  { id: 'knowledge',   path: '#',            icon: BookOpen,     label: '知识库',   placeholder: true },
   { id: 'storyboard',  path: '/storyboard',  icon: Film,         label: '分镜' },
-  { id: 'library',     path: '/library',     icon: Library,      label: '合集' },
-  { id: 'director',    path: '/director',    icon: Wand2,        label: 'AI 导演',   disabled: true, tooltipExtra: ' · Phase [C]' },
-  { id: 'overview',    path: '/overview',    icon: LayoutGrid,   label: '12 屏概览', disabled: true },
+  { id: 'favorites',   path: '/favorites',   icon: Star,         label: '收藏夹' },
+  { id: 'director',    path: '#',            icon: Wand2,        label: 'AI 导演',  placeholder: true, badge: 'Phase C' },
 ]
 
 const BOTTOM_ITEMS: NavItem[] = [
@@ -47,29 +45,41 @@ interface SidebarBtnProps {
   icon: LucideIcon
   label: string
   active: boolean
-  disabled?: boolean
-  tooltipExtra?: string
+  badge?: string
+  placeholder?: boolean
   onClick: () => void
 }
 
-function SidebarBtn({ icon: Icon, label, active, disabled, tooltipExtra, onClick }: SidebarBtnProps) {
+function SidebarBtn({ icon: Icon, label, active, badge, placeholder, onClick }: SidebarBtnProps) {
   return (
     <button
-      title={label + (tooltipExtra ?? '')}
-      onClick={disabled ? undefined : onClick}
-      disabled={disabled}
+      title={label}
+      onClick={placeholder ? () => toast('该功能即将上线') : onClick}
       className={cn(
-        'relative flex size-11 items-center justify-center rounded-[14px] transition-all duration-150',
-        disabled
-          ? 'cursor-not-allowed text-muted-foreground/30'
+        'relative flex w-full items-center gap-3 rounded-[12px] px-3 py-2 text-sm transition-all duration-150',
+        placeholder
+          ? 'cursor-default text-muted-foreground/50'
           : active
             ? 'bg-accent text-foreground shadow-sm'
             : 'text-muted-foreground hover:bg-accent hover:text-foreground',
       )}
     >
-      <Icon size={20} />
-      {active && !disabled && (
-        <span className="absolute -left-3 top-2.5 bottom-2.5 w-[3px] rounded-full bg-foreground" />
+      <Icon size={18} className="shrink-0" />
+      <span className="truncate">{label}</span>
+      {badge && (
+        <span
+          className={cn(
+            'ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium leading-tight',
+            badge === 'Beta'
+              ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400'
+              : 'bg-muted text-muted-foreground',
+          )}
+        >
+          {badge}
+        </span>
+      )}
+      {active && !placeholder && (
+        <span className="absolute -left-2 top-2 bottom-2 w-[3px] rounded-full bg-foreground" />
       )}
     </button>
   )
@@ -104,16 +114,19 @@ export function AppShell({ children }: AppShellProps) {
       {/* ── Sidebar ── */}
       <nav
         aria-label="主导航"
-        className="flex w-[72px] shrink-0 flex-col items-center gap-1.5 border-r border-border bg-background py-4 print:hidden"
+        className="flex w-[216px] shrink-0 flex-col items-stretch gap-1 border-r border-border bg-background px-2 py-4 print:hidden"
       >
         {/* Logo slot */}
         <button
-          className="mb-2 flex size-11 items-center justify-center rounded-[14px] bg-violet-100 text-violet-600 shadow-sm transition-colors hover:bg-violet-200 dark:bg-violet-900/30 dark:text-violet-400 dark:hover:bg-violet-900/50"
+          className="mb-3 flex items-center gap-2.5 rounded-[14px] px-3 py-2 text-sm font-semibold transition-colors hover:bg-violet-50 dark:hover:bg-violet-900/20"
           onClick={() => navigate('/')}
-          title="VidMirror"
+          title="Nibi"
           aria-label="返回工作台"
         >
-          <Sparkles size={18} />
+          <span className="flex size-8 items-center justify-center rounded-[10px] bg-violet-100 text-violet-600 shadow-sm dark:bg-violet-900/30 dark:text-violet-400">
+            <Sparkles size={16} />
+          </span>
+          <span className="text-foreground">Nibi</span>
         </button>
 
         {/* Main nav */}
@@ -123,14 +136,14 @@ export function AppShell({ children }: AppShellProps) {
             icon={item.icon}
             label={item.label}
             active={isActive(item)}
-            disabled={item.disabled}
-            tooltipExtra={item.tooltipExtra}
+            badge={item.badge}
+            placeholder={item.placeholder}
             onClick={() => navigate(item.path)}
           />
         ))}
 
         {/* Separator */}
-        <div className="mx-auto my-2 h-px w-6 bg-border" />
+        <div className="mx-2 my-2 h-px bg-border" />
 
         {/* Bottom nav (search, settings) */}
         {BOTTOM_ITEMS.map((item) => (
