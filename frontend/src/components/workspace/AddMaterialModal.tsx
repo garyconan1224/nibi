@@ -63,6 +63,8 @@ interface AddMaterialModalProps {
   localFileName?: string
   /** 本地文件：所在 workspace ID */
   localWsId?: string
+  /** 合集类型，从合集详情页传入时启用硬锁 */
+  workspaceKind?: 'note' | 'replica'
 }
 
 type NoteMediaKind = 'auto' | 'video' | 'image_text' | 'audio'
@@ -125,6 +127,7 @@ export function AddMaterialModal({
   localFile,
   localFileName,
   localWsId,
+  workspaceKind,
 }: AddMaterialModalProps) {
   const isLocalFile = !!localFile
   const navigate = useNavigate()
@@ -157,6 +160,13 @@ export function AddMaterialModal({
       .map(m => ({ providerId: p.id, providerName: p.name, modelId: m.id, modelName: m.name }))
     )
   const hasVisionModel = visionModels.length > 0
+
+  // 硬锁：从合集详情页进入时，动作锁成合集 kind
+  useEffect(() => {
+    if (workspaceKind && open) {
+      setSelectedAction(workspaceKind)
+    }
+  }, [workspaceKind, open])
 
   // 首次打开弹窗时：拉最新 providers；有视觉模型则默认开配图
   useEffect(() => {
@@ -334,7 +344,7 @@ export function AddMaterialModal({
     try {
       let wsId = workspaceIds[0]
       if (!wsId) {
-        const ws = await autoCreateWorkspace({ hint_url: effectiveUrl })
+        const ws = await autoCreateWorkspace({ hint_url: effectiveUrl, kind: selectedAction === 'replica' ? 'replica' : 'note' })
         wsId = ws.workspace_id
         toast.info(`已自动创建合集「${ws.name}」`)
       }
@@ -497,12 +507,19 @@ export function AddMaterialModal({
           {/* ② 你要做什么 */}
           <div className="m-section">
             <div className="eyebrow" style={{ marginBottom: 10 }}>② 你要做什么</div>
+            {workspaceKind && (
+              <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 8 }}>
+                🔒 动作已锁定为「{workspaceKind === 'replica' ? '复刻' : '笔记'}」合集类型
+              </div>
+            )}
             <div className="note-type-grid" style={{ marginBottom: 14 }}>
               <button
                 type="button"
                 className="note-type-card"
                 data-active={selectedAction === 'note'}
-                onClick={() => setSelectedAction('note')}
+                disabled={!!workspaceKind && workspaceKind !== 'note'}
+                style={workspaceKind && workspaceKind !== 'note' ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
+                onClick={() => !workspaceKind && setSelectedAction('note')}
               >
                 <div className="ntc-l"><FileText size={16} style={{ display: 'inline', verticalAlign: '-3px', marginRight: 4 }} /> 学习笔记</div>
                 <div className="ntc-d">沉浸式阅读与总结提取</div>
@@ -511,7 +528,9 @@ export function AddMaterialModal({
                 type="button"
                 className="note-type-card"
                 data-active={selectedAction === 'replica'}
-                onClick={() => setSelectedAction('replica')}
+                disabled={!!workspaceKind && workspaceKind !== 'replica'}
+                style={workspaceKind && workspaceKind !== 'replica' ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
+                onClick={() => !workspaceKind && setSelectedAction('replica')}
               >
                 <div className="ntc-l"><Copy size={16} style={{ display: 'inline', verticalAlign: '-3px', marginRight: 4 }} /> 逐帧复刻</div>
                 <div className="ntc-d">提取画面提示词与详细信息</div>

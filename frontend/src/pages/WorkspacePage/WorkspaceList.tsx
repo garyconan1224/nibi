@@ -63,6 +63,7 @@ export default function WorkspaceList() {
   // 新建模态状态
   const [createOpen, setCreateOpen] = useState(false)
   const [newName, setNewName] = useState('')
+  const [newKind, setNewKind] = useState<'note' | 'replica'>('note')
   const [creating, setCreating] = useState(false)
 
   // 删除确认状态
@@ -103,9 +104,10 @@ export default function WorkspaceList() {
     if (!name) return
     setCreating(true)
     try {
-      const created = await createWorkspace({ name })
+      const created = await createWorkspace({ name, kind: newKind })
       setCreateOpen(false)
       setNewName('')
+      setNewKind('note')
       // 跳转到详情页（详情页自己会再 GET 一次，确保拿到最新数据）
       navigate(`/workspaces/${created.workspace_id}`)
     } catch (err: unknown) {
@@ -223,6 +225,25 @@ export default function WorkspaceList() {
                 }
               }}
             />
+            <Label>合集类型</Label>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={newKind === 'note' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setNewKind('note')}
+              >
+                📝 笔记
+              </Button>
+              <Button
+                type="button"
+                variant={newKind === 'replica' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setNewKind('replica')}
+              >
+                🎬 复刻
+              </Button>
+            </div>
           </div>
           <DialogFooter>
             <Button

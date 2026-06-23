@@ -51,6 +51,7 @@ export async function createWorkspace(
 export async function autoCreateWorkspace(req: {
   hint_url?: string
   hint_text?: string
+  kind?: 'note' | 'replica'
 }): Promise<WorkspaceRecord> {
   const res = await http.post<WorkspaceRecord>(`${BASE}/auto-create`, req)
   return res.data

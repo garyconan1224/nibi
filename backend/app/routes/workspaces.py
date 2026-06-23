@@ -561,6 +561,7 @@ _EXTENSION_TYPE_MAP: Dict[str, str] = {
 class WorkspaceCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120, description="工作空间名称")
     background: Dict[str, Any] = Field(default_factory=dict)
+    kind: str = Field(default="note", description="合集类型：note|replica")
 
 
 class WorkspaceUpdateRequest(BaseModel):
@@ -629,6 +630,7 @@ class AutoCreateRequest(BaseModel):
 
     hint_url: Optional[str] = Field(default=None, description="提示 URL，用于推导名称")
     hint_text: Optional[str] = Field(default=None, description="提示文本，用于推导名称")
+    kind: str = Field(default="note", description="合集类型：note|replica")
 
 
 class SniffUrlRequest(BaseModel):
@@ -1003,10 +1005,12 @@ def _enrich_workspace(rec: WorkspaceRecord) -> Dict[str, Any]:
 def create_workspace(req: WorkspaceCreateRequest) -> Dict[str, Any]:
     """新建一个工作空间。"""
     bg = WorkspaceBackground.from_dict(req.background or {})
+    kind = req.kind if req.kind in ("note", "replica") else "note"
     rec = WorkspaceRecord(
         workspace_id=str(uuid.uuid4()),
         name=req.name.strip(),
         background=bg,
+        kind=kind,
     )
     _store.create(rec)
     return rec.to_dict()
@@ -1101,9 +1105,11 @@ def _platform_prefix_from_url(url: str) -> str:
 def auto_create_workspace(req: AutoCreateRequest) -> Dict[str, Any]:
     """根据 hint URL/text 用 LLM 生成名字，自动建空间。"""
     name = _generate_workspace_name(req.hint_url, req.hint_text)
+    kind = req.kind if req.kind in ("note", "replica") else "note"
     rec = WorkspaceRecord(
         workspace_id=str(uuid.uuid4()),
         name=name,
+        kind=kind,
     )
     _store.create(rec)
     return rec.to_dict()
