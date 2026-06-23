@@ -101,6 +101,9 @@ export default function PreflightConfigPanel({
   // ── 3. 任务勾选 state（N5：值是嵌套对象 {enabled, ...params}） ─────
   const [tasks, setTasks] = useState<Record<string, unknown>>({})
 
+  // ── 3.5 ④16 CC-first：字幕优先开关（默认开）───
+  const [preferSubtitle, setPreferSubtitle] = useState(true)
+
   const {
     providers,
     loading: providersLoading,
@@ -168,6 +171,7 @@ export default function PreflightConfigPanel({
         ...(videoModelId && { video: videoModelId }),
       },
       tasks: normalizeTasksShape(tasks, item.type),
+      prefer_subtitle: preferSubtitle,
     }
     onSave(payload)
   }
@@ -314,6 +318,23 @@ export default function PreflightConfigPanel({
           <p className="text-xs text-muted-foreground">
             未勾选项完全跳过，不消耗模型调用。
           </p>
+
+          {/* ④16 CC-first：字幕优先开关（仅视频类型显示） */}
+          {item.type === 'video' && (
+            <label className="flex cursor-pointer items-center gap-2 rounded-md border border-blue-200 bg-blue-50/50 p-3 text-sm">
+              <Checkbox
+                checked={preferSubtitle}
+                onCheckedChange={(v) => setPreferSubtitle(!!v)}
+              />
+              <div>
+                <div className="font-medium">优先用平台字幕（更快）</div>
+                <div className="text-xs text-muted-foreground">
+                  B站/YouTube 有 CC 字幕时直接取，跳过 Whisper 转写。无字幕自动回退。
+                </div>
+              </div>
+            </label>
+          )}
+
           <div className="space-y-2">
             {topLevelTasks.map((opt) => {
               const enabled = isTaskEnabled(tasks, opt.id)

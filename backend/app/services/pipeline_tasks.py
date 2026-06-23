@@ -618,65 +618,127 @@ def _run_subtitle_summary(
     """N7b 路径 1：从视频提取音频 → Whisper 转写 → LLM 字幕直接总结。"""
     log = lambda msg: runner.append_log(task_id, msg)  # noqa: E731
 
-    # 1. 选第一个视频文件
-    video_path = videos[0]
-    log(f"🔊 路径 1 字幕总结 | 视频: {video_path.name}")
+    # 0. 字幕优先分支（④16 CC-first）
+    prefer_subtitle = bool(payload.get('prefer_subtitle', True))
+    video_url = str(payload.get('url') or '').strip()
 
-    # 2. 提取音频
-    audio_hash = hashlib.md5(str(video_path).encode()).hexdigest()[:8]
-    audio_path = project_json_dir / f"{video_path.stem}_{audio_hash}.wav"
-    try:
-        runner.set_progress(task_id, 0.955, "提取音频轨道...")
-        _extract_audio_from_video(video_path, audio_path, log_fn=log)
-    except Exception as e:
-        log(f"⚠️  音频提取失败: {e}")
-        return {"summary_path": "subtitle", "summary_error": f"音频提取失败: {e}"}
+    if prefer_subtitle and video_url:
+        log("🎯 字幕优先模式：尝试直取平台 CC 字幕...")
+        runner.set_progress(task_id, 0.95, "正在获取平台字幕...")
+        try:
+            from backend.app.services.subtitle_fetcher import fetch_best_subtitle
+            from shared.transcript_cleaner import clean_transcript
 
-    # 3. Whisper 转写
-    transcript_text = ""
-    transcript_segments: List[Dict[str, Any]] = []
-    try:
-        from backend.app.services.asr_fast_whisper import (
-            is_fast_whisper_available,
-            transcribe_file_with_fast_whisper,
-        )
-        if not is_fast_whisper_available():
-            log("⚠️  本地 ASR 引擎未就绪，跳过转写")
-            return {"summary_path": "subtitle", "transcript": [], "summary_error": "ASR 引擎未就绪"}
+            # 从 payload 读访问上下文（复用 yt-dlp 的网络配置）
+            proxy = str(payload.get('proxy') or '').strip() or None
+            po_token = str(payload.get('po_token') or '').strip() or None
+            visitor_data = str(payload.get('visitor_data') or '').strip() or None
 
-        runner.set_progress(task_id, 0.96, "Whisper 转写中...")
-        tcfg = load_settings().transcriber
-        log(f"📄 Whisper 转写 | model={tcfg.whisper_model_size} device={tcfg.device}")
+            result = fetch_best_subtitle(
+                video_url,
+                proxy=proxy,
+                po_token=po_token,
+                visitor_data=visitor_data,
+            )
 
-        def _on_progress(ratio: float, msg: str) -> None:
-            mapped = 0.96 + 0.02 * max(0.0, min(1.0, ratio))
-            runner.set_progress(task_id, mapped, msg)
+            if result:
+                transcript_text, transcript_segments, meta = result
+                source = meta.get('source', 'unknown')
+                lang = meta.get('lang', '?')
+                seg_count = len(transcript_segments)
 
-        whisper_result = transcribe_file_with_fast_whisper(
-            str(audio_path),
-            model_name=tcfg.whisper_model_size or "base",
-            device=tcfg.device or "cpu",
-            language=tcfg.language or "",
-            initial_prompt=tcfg.initial_prompt or "",
-            log_callback=log,
-            progress_callback=_on_progress,
-            return_segments=True,
-        )
-        transcript_text, transcript_segments, whisper_duration = whisper_result
-        log(f"✅ 转写完成 | {len(transcript_text)} 字符 / {len(transcript_segments)} 段 / {whisper_duration:.1f}s")
-    except Exception as e:
-        log(f"⚠️  Whisper 转写失败: {e}\n{tb.format_exc()}")
-        return {"summary_path": "subtitle", "transcript": [], "summary_error": f"转写失败: {e}"}
+                if source == 'manual':
+                    # 人工字幕直接用
+                    log(f"✅ 人工字幕命中 (lang={lang}) | {len(transcript_text)} 字符 / {seg_count} 段，跳过 Whisper")
+                else:
+                    # 自动字幕过规则层清洗
+                    raw_len = len(transcript_text)
+                    glossary = payload.get("glossary") or []
+                    transcript_text = clean_transcript(transcript_text, glossary=glossary)
+                    log(f"✅ 自动字幕命中 (lang={lang}) + 清洗 | {raw_len} → {len(transcript_text)} 字符 / {seg_count} 段，跳过 Whisper")
 
-    if not transcript_text.strip():
-        log("⚠️  转写结果为空（可能无人声）")
-        return {
-            "summary_path": "subtitle",
-            "transcript": [],
-            "summary": "（转写结果为空，可能视频无人声内容）",
-        }
+                # 跳过音频提取 + Whisper，直接进入字幕清洗（3.5）→ LLM 总结（4）
+                # 注意：下游的 clean_transcript（3.5）对字幕也会再跑一遍（保证一致性），但自动字幕已预清洗过
+                runner.set_progress(task_id, 0.97, "字幕已就绪，准备总结...")
 
-    # 3.5 字幕清洗（F1.6）
+                # ---- 直接跳到 3.5 + 4（复用下面已有的逻辑）----
+                # 为了保持代码结构，把字幕结果设到局部变量，然后 goto 到 3.5
+                # Python 没有 goto，用 flag 跳过后面的音频提取+Whisper
+                _cc_skip_to_summary = True
+            else:
+                log("ℹ️  未获取到平台字幕，回退 Whisper 转写")
+                _cc_skip_to_summary = False
+        except Exception as e:
+            log(f"ℹ️  字幕获取异常（{e}），回退 Whisper 转写")
+            _cc_skip_to_summary = False
+    else:
+        _cc_skip_to_summary = False
+        if not prefer_subtitle:
+            log("ℹ️  字幕优先已关闭，直接走 Whisper")
+        # 本地上传（无 url）静默跳过直取
+
+    # ---- 以下：如果 _cc_skip_to_summary=False，走原有 Whisper 流程 ----
+
+    if not _cc_skip_to_summary:
+        # 1. 选第一个视频文件
+        video_path = videos[0]
+        log(f"🔊 路径 1 字幕总结 | 视频: {video_path.name}")
+
+        # 2. 提取音频
+        audio_hash = hashlib.md5(str(video_path).encode()).hexdigest()[:8]
+        audio_path = project_json_dir / f"{video_path.stem}_{audio_hash}.wav"
+        try:
+            runner.set_progress(task_id, 0.955, "提取音频轨道...")
+            _extract_audio_from_video(video_path, audio_path, log_fn=log)
+        except Exception as e:
+            log(f"⚠️  音频提取失败: {e}")
+            return {"summary_path": "subtitle", "summary_error": f"音频提取失败: {e}"}
+
+        # 3. Whisper 转写
+        transcript_text = ""
+        transcript_segments: List[Dict[str, Any]] = []
+        try:
+            from backend.app.services.asr_fast_whisper import (
+                is_fast_whisper_available,
+                transcribe_file_with_fast_whisper,
+            )
+            if not is_fast_whisper_available():
+                log("⚠️  本地 ASR 引擎未就绪，跳过转写")
+                return {"summary_path": "subtitle", "transcript": [], "summary_error": "ASR 引擎未就绪"}
+
+            runner.set_progress(task_id, 0.96, "Whisper 转写中...")
+            tcfg = load_settings().transcriber
+            log(f"📄 Whisper 转写 | model={tcfg.whisper_model_size} device={tcfg.device}")
+
+            def _on_progress(ratio: float, msg: str) -> None:
+                mapped = 0.96 + 0.02 * max(0.0, min(1.0, ratio))
+                runner.set_progress(task_id, mapped, msg)
+
+            whisper_result = transcribe_file_with_fast_whisper(
+                str(audio_path),
+                model_name=tcfg.whisper_model_size or "base",
+                device=tcfg.device or "cpu",
+                language=tcfg.language or "",
+                initial_prompt=tcfg.initial_prompt or "",
+                log_callback=log,
+                progress_callback=_on_progress,
+                return_segments=True,
+            )
+            transcript_text, transcript_segments, whisper_duration = whisper_result
+            log(f"✅ 转写完成 | {len(transcript_text)} 字符 / {len(transcript_segments)} 段 / {whisper_duration:.1f}s")
+        except Exception as e:
+            log(f"⚠️  Whisper 转写失败: {e}\n{tb.format_exc()}")
+            return {"summary_path": "subtitle", "transcript": [], "summary_error": f"转写失败: {e}"}
+
+        if not transcript_text.strip():
+            log("⚠️  转写结果为空（可能无人声）")
+            return {
+                "summary_path": "subtitle",
+                "transcript": [],
+                "summary": "（转写结果为空，可能视频无人声内容）",
+            }
+
+    # 3.5 字幕清洗（F1.6）—— 对字幕（人工/自动）和 Whisper 结果都执行
     from shared.transcript_cleaner import clean_transcript
 
     glossary = payload.get("glossary") or []

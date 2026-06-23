@@ -109,6 +109,7 @@ export interface PreflightSaveRequest {
   background_overrides?: Partial<WorkspaceBackground>
   models?: PreflightConfig['models']
   tasks?: PreflightConfig['tasks']
+  prefer_subtitle?: boolean  // ④16 CC-first：优先用平台字幕（默认 true）
 }
 
 /** start 接口的返回 */
