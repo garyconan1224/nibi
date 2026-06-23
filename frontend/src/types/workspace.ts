@@ -80,12 +80,14 @@ export interface WorkspaceRecord {
   favorites: string[]
   created_at: string
   updated_at: string
+  kind: 'note' | 'replica'
 }
 
 /** 创建工作空间请求体 */
 export interface WorkspaceCreateRequest {
   name: string
   background?: Partial<WorkspaceBackground>
+  kind?: 'note' | 'replica'
 }
 
 /** 更新工作空间请求体（所有字段可选） */

@@ -270,6 +270,7 @@ class WorkspaceRecord:
     prompt_versions: Dict[str, List[PromptVersion]] = field(default_factory=dict)
     created_at: str = field(default_factory=_now_iso)
     updated_at: str = field(default_factory=_now_iso)
+    kind: str = "note"  # "note" | "replica"，合集类型
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -286,6 +287,7 @@ class WorkspaceRecord:
             },
             "created_at": self.created_at,
             "updated_at": self.updated_at,
+            "kind": self.kind,
         }
 
     @classmethod
@@ -308,6 +310,10 @@ class WorkspaceRecord:
         if raw_status == "completed":
             raw_status = WorkspaceStatus.ANALYZED.value
         # 老数据可能仍含 project_id 字段；from_dict 静默忽略
+        # 老数据兼容：缺 kind 字段默认 "note"
+        raw_kind = str(data.get("kind") or "note")
+        if raw_kind not in ("note", "replica"):
+            raw_kind = "note"
         return cls(
             workspace_id=str(data.get("workspace_id") or ""),
             name=str(data.get("name") or ""),
@@ -319,4 +325,5 @@ class WorkspaceRecord:
             prompt_versions=prompt_versions,
             created_at=str(data.get("created_at") or _now_iso()),
             updated_at=str(data.get("updated_at") or _now_iso()),
+            kind=raw_kind,
         )
