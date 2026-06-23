@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Home,
@@ -10,6 +10,8 @@ import {
   Wand2,
   Search,
   Settings,
+  PanelLeftClose,
+  PanelLeftOpen,
   type LucideIcon,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -47,10 +49,35 @@ interface SidebarBtnProps {
   active: boolean
   badge?: string
   placeholder?: boolean
+  collapsed: boolean
   onClick: () => void
 }
 
-function SidebarBtn({ icon: Icon, label, active, badge, placeholder, onClick }: SidebarBtnProps) {
+function SidebarBtn({ icon: Icon, label, active, badge, placeholder, collapsed, onClick }: SidebarBtnProps) {
+  const tooltip = [label, badge, placeholder ? '即将上线' : undefined].filter(Boolean).join(' · ')
+
+  if (collapsed) {
+    return (
+      <button
+        title={tooltip}
+        onClick={placeholder ? () => toast('该功能即将上线') : onClick}
+        className={cn(
+          'relative flex size-11 items-center justify-center rounded-[14px] transition-all duration-150',
+          placeholder
+            ? 'cursor-default text-muted-foreground/50'
+            : active
+              ? 'bg-accent text-foreground shadow-sm'
+              : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+        )}
+      >
+        <Icon size={20} />
+        {active && !placeholder && (
+          <span className="absolute -left-2 top-2 bottom-2 w-[3px] rounded-full bg-foreground" />
+        )}
+      </button>
+    )
+  }
+
   return (
     <button
       title={label}
@@ -103,6 +130,16 @@ export function AppShell({ children }: AppShellProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const { stats, online } = useSystemStats()
+  const [collapsed, setCollapsed] = useState<boolean>(
+    () => localStorage.getItem('nibi-sidebar-collapsed') === '1',
+  )
+
+  const toggleCollapsed = () => {
+    setCollapsed((v) => {
+      localStorage.setItem('nibi-sidebar-collapsed', v ? '0' : '1')
+      return !v
+    })
+  }
 
   const isActive = (item: NavItem) => {
     if (item.id === 'home') return location.pathname === '/'
@@ -114,20 +151,54 @@ export function AppShell({ children }: AppShellProps) {
       {/* ── Sidebar ── */}
       <nav
         aria-label="主导航"
-        className="flex w-[216px] shrink-0 flex-col items-stretch gap-1 border-r border-border bg-background px-2 py-4 print:hidden"
+        className={cn(
+          'flex shrink-0 flex-col border-r border-border bg-background py-4 transition-[width] duration-200 print:hidden',
+          collapsed ? 'w-[64px] items-center gap-1 px-0' : 'w-[216px] items-stretch gap-1 px-2',
+        )}
       >
-        {/* Logo slot */}
-        <button
-          className="mb-3 flex items-center gap-2.5 rounded-[14px] px-3 py-2 text-sm font-semibold transition-colors hover:bg-violet-50 dark:hover:bg-violet-900/20"
-          onClick={() => navigate('/')}
-          title="Nibi"
-          aria-label="返回工作台"
-        >
-          <span className="flex size-8 items-center justify-center rounded-[10px] bg-violet-100 text-violet-600 shadow-sm dark:bg-violet-900/30 dark:text-violet-400">
-            <Sparkles size={16} />
-          </span>
-          <span className="text-foreground">Nibi</span>
-        </button>
+        {/* Logo slot + collapse toggle */}
+        {collapsed ? (
+          <>
+            <button
+              className="mb-1 flex size-11 items-center justify-center rounded-[10px] bg-violet-100 text-violet-600 shadow-sm transition-colors hover:bg-violet-200 dark:bg-violet-900/30 dark:text-violet-400 dark:hover:bg-violet-900/50"
+              onClick={() => navigate('/')}
+              title="Nibi"
+              aria-label="返回工作台"
+            >
+              <Sparkles size={16} />
+            </button>
+            <button
+              className="mb-2 flex size-8 items-center justify-center rounded-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              onClick={toggleCollapsed}
+              title="展开导航"
+              aria-label="展开导航"
+            >
+              <PanelLeftOpen size={16} />
+            </button>
+          </>
+        ) : (
+          <div className="mb-3 flex items-center gap-2.5 rounded-[14px] px-3 py-2">
+            <button
+              className="flex items-center gap-2.5 transition-colors hover:opacity-80"
+              onClick={() => navigate('/')}
+              title="Nibi"
+              aria-label="返回工作台"
+            >
+              <span className="flex size-8 items-center justify-center rounded-[10px] bg-violet-100 text-violet-600 shadow-sm dark:bg-violet-900/30 dark:text-violet-400">
+                <Sparkles size={16} />
+              </span>
+              <span className="text-sm font-semibold text-foreground">Nibi</span>
+            </button>
+            <button
+              className="ml-auto flex size-8 items-center justify-center rounded-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              onClick={toggleCollapsed}
+              title="折叠导航"
+              aria-label="折叠导航"
+            >
+              <PanelLeftClose size={16} />
+            </button>
+          </div>
+        )}
 
         {/* Main nav */}
         {NAV_ITEMS.map((item) => (
@@ -138,12 +209,13 @@ export function AppShell({ children }: AppShellProps) {
             active={isActive(item)}
             badge={item.badge}
             placeholder={item.placeholder}
+            collapsed={collapsed}
             onClick={() => navigate(item.path)}
           />
         ))}
 
         {/* Separator */}
-        <div className="mx-2 my-2 h-px bg-border" />
+        <div className={cn('my-2 h-px bg-border', collapsed ? 'mx-3 w-6' : 'mx-2')} />
 
         {/* Bottom nav (search, settings) */}
         {BOTTOM_ITEMS.map((item) => (
@@ -152,6 +224,7 @@ export function AppShell({ children }: AppShellProps) {
             icon={item.icon}
             label={item.label}
             active={isActive(item)}
+            collapsed={collapsed}
             onClick={() => navigate(item.path)}
           />
         ))}

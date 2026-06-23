@@ -25,6 +25,8 @@
 
 **形态**：72px 窄图标条 → 宽展开式（图标 + 文字常显 + 右侧徽章），观感对齐 `sidebar-nav.png`。
 
+**可折叠（用户追加需求 2026-06-23）**：顶部 logo 旁加折叠按钮，在 宽展开式 ↔ 窄图标条 间切换；**收起态即原 72px 窄条形态**（只图标、悬停 tooltip）。默认展开，localStorage 记住上次选择。
+
 **最终入口**：
 
 | # | 名称 | path | icon | 状态 | 徽章 |
@@ -56,7 +58,7 @@
    - director：`disabled → placeholder:true`，`tooltipExtra` 改为 `badge:'Phase C'`
    - **删除** taskboard / processing / results / overview
 3. **BOTTOM_ITEMS**（行 41-44）：保留 搜索 / 设置（收藏夹已移走）。
-4. **import**（行 3-15）：新增 `Star`、`BookOpen`（如用则加 `FilePlus`）；**删除不再使用的** `Layers` / `Clapperboard` / `LayoutGrid`（避免未用 import lint 报错——参见过往 lint 清理教训）。
+4. **import**（行 3-15）：新增 `Star`、`BookOpen`（如用则加 `FilePlus`）、折叠用 `PanelLeftClose` / `PanelLeftOpen`；**删除不再使用的** `Layers` / `Clapperboard` / `LayoutGrid`（避免未用 import lint 报错——参见过往 lint 清理教训）。
 5. **SidebarBtn**（行 55-76）改造为展开式行按钮：
    - 容器：`flex w-full items-center gap-3 px-3 py-2 rounded-[12px]` 左对齐（替换 `size-11 justify-center`）
    - 内容：`<Icon size={18}/>` + `<span>{label}</span>` + 徽章/状态（`ml-auto` 推到右侧）
@@ -69,6 +71,13 @@
 6. **nav 容器**（行 105-107）：`w-[72px] ... items-center` → `w-[216px] ... items-stretch px-2`（宽度微调对齐设计稿）。
 7. **Logo slot**（行 110-117）：改成展开式（图标 + 产品名文字）。产品名建议 `Nibi`（与设计稿一致）；**注**：代码现 `title="VidMirror"`，产品名以用户最终确认为准，有疑问就只保留图标。
 8. `isActive` 对 placeholder 项恒为 false（占位 path `'#'` 自然不会 startsWith 命中正常路由）。
+9. **折叠 / 展开（用户追加需求，按钮放顶部 logo 旁）**：
+   - 状态：`const [collapsed, setCollapsed] = useState<boolean>(() => localStorage.getItem('nibi-sidebar-collapsed') === '1')`（默认展开 = false）；toggle 时写回 localStorage。
+   - nav 容器宽度随状态：`collapsed ? 'w-[64px] items-center' : 'w-[216px] items-stretch'`，加 `transition-[width] duration-200`。
+   - 折叠按钮放 **logo 区**：展开态 logo 行 = 图标 + 「Nibi」+ 右侧折叠键（`PanelLeftClose` «）；收起态 logo 图标居中，展开键（`PanelLeftOpen` »）放 logo 正下方单独一行居中。点击 `setCollapsed(v => !v)`。
+   - `SidebarBtn` 加 `collapsed` prop：collapsed 时回到 `size-11 justify-center`、**只显图标、隐藏 label 与 badge**、`title` 含「label · badge」作 tooltip；展开时图标 + 文字 + 徽章（见 §四.5）。
+   - 占位项收起态：只灰图标，悬停 tooltip「知识库 · 即将上线」，点击仍 toast。
+   - active 高亮在两种宽度下都要正确。
 
 ## 五、涉及文件
 
@@ -85,7 +94,8 @@
 - 无 任务中心/处理中/结果/12 屏概览 残留；无 disabled 死链。
 - 收藏夹在导航中且可用。
 - **无未使用 import**（lint 干净）；`npm run build` + `npm test` 全绿。
-- `./dev.sh` 实跑：逐个点击 6 可用 + 2 占位确认行为；窄屏 & 打印（`print:hidden`）不破。
+- 折叠按钮（顶部 logo 旁）可在 宽展开式 ↔ 窄图标条 间切换；收起态只图标、悬停有 tooltip；刷新后保持上次状态（localStorage）。
+- `./dev.sh` 实跑：逐个点击 6 可用 + 2 占位确认行为；折叠 / 展开切换 + 刷新保持；窄屏 & 打印（`print:hidden`）不破。
 
 ## 七、给小米的执行须知与红线
 
