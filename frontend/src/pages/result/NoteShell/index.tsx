@@ -529,8 +529,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   // 新建总结（复用 NewSummaryModal）
   const [showNewSummaryModal, setShowNewSummaryModal] = useState(false)
   const [creatingSummary, setCreatingSummary] = useState(false)
-  // 原文对照面板 ref（用于聚焦高亮）
-  const transcriptPanelRef = useRef<HTMLDivElement>(null)
 
   // R1.3 + R2.1: 视图模式 + 保存状态（兼容三值 + 窄屏降级 compare → wysiwyg）
   const isWide = useMediaQuery('(min-width: 1024px)')
@@ -784,16 +782,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     }
   }, [workspaceId, itemId, refreshSummaries, navigate])
 
-  // VN4.3 原文对照聚焦：滚动到左列 transcript 面板并短暂高亮
-  const handleFocusTranscript = useCallback(() => {
-    const panel = transcriptPanelRef.current
-    if (!panel) return
-    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-    panel.style.transition = 'box-shadow .2s'
-    panel.style.boxShadow = '0 0 0 2px var(--accent-2)'
-    setTimeout(() => { panel.style.boxShadow = '' }, 1500)
-  }, [])
-
   // ─── loading / error ───
   if (loading) {
     return (
@@ -1013,22 +1001,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 boxShadow: 'var(--shadow-md)',
               }}
             >
-              {isVideoNote && (
-                <button
-                  className="btn-ghost"
-                  onClick={() => { handleFocusTranscript(); setAiToolsOpen(false) }}
-                  style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
-                >
-                  <Subtitles size={13} /> 原文对照
-                </button>
-              )}
-              <button
-                className="btn-ghost"
-                onClick={() => { setShowNewSummaryModal(true); setAiToolsOpen(false) }}
-                style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
-              >
-                <RefreshCw size={13} /> 重新生成
-              </button>
               {/* ── 占位项（灰显 disabled） ── */}
               {[
                 { icon: <Network size={13} />, label: '思维导图' },
@@ -1134,7 +1106,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
             </div>
             {/* 字幕区 — 独立挂载，不受中列 re-render 影响 */}
             {Array.isArray(note.transcript) && (note.transcript as VideoResultTranscriptLine[]).length > 0 ? (
-              <div ref={transcriptPanelRef} style={{ flex: 1, overflowY: 'auto', borderTop: '1px solid var(--line)' }}>
+              <div style={{ flex: 1, overflowY: 'auto', borderTop: '1px solid var(--line)' }}>
                 <LNTranscriptPanel
                   transcript={note.transcript as VideoResultTranscriptLine[]}
                   currentTime={currentTime}
@@ -1142,6 +1114,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                   workspaceId={workspaceId}
                   itemId={itemId}
                   onSaved={refreshAfterTranscriptEdit}
+                  sourceMd={note.source_md ?? undefined}
                 />
               </div>
             ) : (
@@ -1182,15 +1155,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
 
             {/* 可滚动内容区 */}
             <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
-
-              {/* 源 md → 点击弹悬浮框（点4） */}
-              <button
-                className="btn-ghost"
-                onClick={() => note.source_md && setSourceModalOpen(true)}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-start', height: 36, padding: '0 14px', fontSize: 12, borderRadius: 0, borderBottom: '1px solid var(--line)', flexShrink: 0 }}
-              >
-                <FileCode size={13} /> 源 md
-              </button>
 
               {/* 换总结 */}
               <button
@@ -1270,6 +1234,16 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                       {selectedImageIdx + 1} / {images.length}
                     </div>
                   )}
+                  {/* 源 md 入口（移自右列操作区） */}
+                  {note.source_md && (
+                    <button
+                      className="btn-ghost"
+                      onClick={() => setSourceModalOpen(true)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center', height: 28, fontSize: 11, marginTop: 6, flexShrink: 0 }}
+                    >
+                      <FileCode size={12} /> 源 md
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1301,15 +1275,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 </div>
 
                 <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', padding: '12px 14px', gap: 8 }}>
-
-                  {/* 源 md */}
-                  <button
-                    className="btn-ghost"
-                    onClick={() => note.source_md && setSourceModalOpen(true)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', justifyContent: 'flex-start', height: 36, padding: '0 14px', fontSize: 12, borderRadius: 0, borderBottom: '1px solid var(--line)', flexShrink: 0 }}
-                  >
-                    <FileCode size={13} /> 源 md
-                  </button>
 
                   {/* 换总结 */}
                   <button

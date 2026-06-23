@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Quote } from 'lucide-react'
+import { FileCode, Quote } from 'lucide-react'
 import { toast } from 'sonner'
 import type { VideoResultTranscriptLine } from '@/services/workspaces'
 import { updateTranscriptSegment } from '@/services/workspaces'
@@ -15,6 +15,8 @@ interface LNTranscriptPanelProps {
   itemId: string
   /** 字幕保存成功后回调（父组件可借此刷新 source.md 展示） */
   onSaved?: () => void
+  /** 源 md 内容（有值时显示「字幕/源md」切换 tab） */
+  sourceMd?: string
 }
 
 function activeTranscriptIdx(
@@ -35,9 +37,11 @@ export default function LNTranscriptPanel({
   workspaceId,
   itemId,
   onSaved,
+  sourceMd,
 }: LNTranscriptPanelProps) {
   const hasSpeaker = useMemo(() => transcript.some((l) => l.speaker), [transcript])
   const [mode, setMode] = useState<TranscriptMode>('original')
+  const [showSourceMd, setShowSourceMd] = useState(false)
   const activeIdx = useMemo(
     () => activeTranscriptIdx(transcript, currentTime),
     [transcript, currentTime],
@@ -110,70 +114,97 @@ export default function LNTranscriptPanel({
 
   return (
     <div className="ln-transcript-panel">
-      {/* 模式 tab 栏 */}
-      {hasSpeaker && (
+      {/* 顶层切换：字幕 | 源 md（仅当 sourceMd 有值时显示） */}
+      {sourceMd && (
         <div className="ln-tr-mode-tabs">
-          {([
-            { key: 'original' as const, label: '原文' },
-            { key: 'speaker' as const, label: '说话人' },
-            { key: 'translated' as const, label: '译文' },
-          ]).map((t) => (
-            <button
-              key={t.key}
-              className="ln-tr-tab"
-              data-active={mode === t.key ? 'true' : undefined}
-              disabled={t.key === 'translated'}
-              onClick={() => setMode(t.key)}
-            >
-              {t.label}
-            </button>
-          ))}
+          <button
+            className="ln-tr-tab"
+            data-active={!showSourceMd ? 'true' : undefined}
+            onClick={() => setShowSourceMd(false)}
+          >
+            字幕
+          </button>
+          <button
+            className="ln-tr-tab"
+            data-active={showSourceMd ? 'true' : undefined}
+            onClick={() => setShowSourceMd(true)}
+          >
+            <FileCode size={11} style={{ marginRight: 3 }} /> 源 md
+          </button>
         </div>
       )}
-      {transcript.map((line, i) => {
-        const isEditing = editingIdx === i
-        const displayText = localEdits[i] ?? line.text
-        const speakerPrefix = mode === 'speaker' && line.speaker ? `[${line.speaker}] ` : ''
-        return (
-          <div
-            key={`${line.t_sec}-${i}`}
-            ref={i === activeIdx ? activeRef : undefined}
-            className="ln-tr-row"
-            data-active={i === activeIdx}
-            onClick={() => !isEditing && onSeek(line.t_sec)}
-            onDoubleClick={(e) => {
-              e.stopPropagation()
-              setEditingIdx(i)
-              setEditText(displayText)
-            }}
-          >
-            <span className="ln-tr-time">{line.t_str}</span>
-            {isEditing ? (
-              <input
-                className="ln-tr-edit-input"
-                autoFocus
-                value={editText}
-                onChange={(e) => setEditText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleEditSave(i)
-                  if (e.key === 'Escape') handleEditCancel()
+      {showSourceMd ? (
+        <div style={{ padding: '10px 14px', fontSize: 13, lineHeight: 1.7, color: 'var(--ink-2)', overflowY: 'auto' }}>
+          <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', margin: 0 }}>{sourceMd}</pre>
+        </div>
+      ) : (
+        <>
+          {/* 模式 tab 栏 */}
+          {hasSpeaker && (
+            <div className="ln-tr-mode-tabs">
+              {([
+                { key: 'original' as const, label: '原文' },
+                { key: 'speaker' as const, label: '说话人' },
+                { key: 'translated' as const, label: '译文' },
+              ]).map((t) => (
+                <button
+                  key={t.key}
+                  className="ln-tr-tab"
+                  data-active={mode === t.key ? 'true' : undefined}
+                  disabled={t.key === 'translated'}
+                  onClick={() => setMode(t.key)}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          )}
+          {transcript.map((line, i) => {
+            const isEditing = editingIdx === i
+            const displayText = localEdits[i] ?? line.text
+            const speakerPrefix = mode === 'speaker' && line.speaker ? `[${line.speaker}] ` : ''
+            return (
+              <div
+                key={`${line.t_sec}-${i}`}
+                ref={i === activeIdx ? activeRef : undefined}
+                className="ln-tr-row"
+                data-active={i === activeIdx}
+                onClick={() => !isEditing && onSeek(line.t_sec)}
+                onDoubleClick={(e) => {
+                  e.stopPropagation()
+                  setEditingIdx(i)
+                  setEditText(displayText)
                 }}
-                onBlur={() => handleEditSave(i)}
-                onClick={(e) => e.stopPropagation()}
-              />
-            ) : (
-              <span className="ln-tr-text">{speakerPrefix}{displayText}</span>
-            )}
-            <button
-              className="ln-tr-quote"
-              title="引用到笔记"
-              onClick={(e) => handleQuote(line, displayText, e)}
-            >
-              <Quote size={12} />
-            </button>
-          </div>
-        )
-      })}
+              >
+                <span className="ln-tr-time">{line.t_str}</span>
+                {isEditing ? (
+                  <input
+                    className="ln-tr-edit-input"
+                    autoFocus
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleEditSave(i)
+                      if (e.key === 'Escape') handleEditCancel()
+                    }}
+                    onBlur={() => handleEditSave(i)}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <span className="ln-tr-text">{speakerPrefix}{displayText}</span>
+                )}
+                <button
+                  className="ln-tr-quote"
+                  title="引用到笔记"
+                  onClick={(e) => handleQuote(line, displayText, e)}
+                >
+                  <Quote size={12} />
+                </button>
+              </div>
+            )
+          })}
+        </>
+      )}
     </div>
   )
 }
