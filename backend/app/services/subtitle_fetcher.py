@@ -155,16 +155,9 @@ def _download_subtitle_text(
 
     # 用 yt-dlp 内置下载器下载（复用 ydl 的网络配置：proxy/cookie 等）
     try:
-        req = ydl._make_opener().open(url)  # type: ignore[attr-defined]
-        content = req.read().decode('utf-8', errors='replace')
+        content = ydl.urlopen(url).read().decode('utf-8', errors='replace')
     except Exception:
-        # 降级：用 urllib（不走 yt-dlp 的 proxy，但至少试试）
-        try:
-            import urllib.request
-            with urllib.request.urlopen(url, timeout=15) as resp:
-                content = resp.read().decode('utf-8', errors='replace')
-        except Exception:
-            return None
+        return None
 
     return content, ext
 
@@ -210,42 +203,44 @@ def fetch_best_subtitle(
     if cookie_base_dirs:
         opts['cookie_base_dirs'] = cookie_base_dirs
 
+    # 整个字幕提取+下载都在 with 块内（ydl.urlopen 需要 ydl 实例）
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=False)
+
+            if not isinstance(info, dict):
+                return None
+
+            subtitles = info.get('subtitles') or {}
+            auto_subs = info.get('automatic_captions') or {}
+
+            # 优先人工字幕，再自动字幕
+            for is_auto, captions in [(False, subtitles), (True, auto_subs)]:
+                if not isinstance(captions, dict) or not captions:
+                    continue
+                lang = _pick_lang(captions, prefer_langs)
+                if not lang:
+                    continue
+
+                result = _download_subtitle_text(ydl, info, lang, is_auto)
+                if not result:
+                    continue
+                content, ext = result
+
+                segments = _parse_subtitle_content(content, ext)
+                if not segments:
+                    continue
+
+                transcript_text = '\n'.join(s['text'] for s in segments)
+                if not transcript_text.strip():
+                    continue
+
+                return transcript_text, segments, {
+                    'lang': lang,
+                    'source': 'auto' if is_auto else 'manual',
+                }
+
     except Exception:
         return None
-
-    if not isinstance(info, dict):
-        return None
-
-    subtitles = info.get('subtitles') or {}
-    auto_subs = info.get('automatic_captions') or {}
-
-    # 优先人工字幕，再自动字幕
-    for is_auto, captions in [(False, subtitles), (True, auto_subs)]:
-        if not isinstance(captions, dict) or not captions:
-            continue
-        lang = _pick_lang(captions, prefer_langs)
-        if not lang:
-            continue
-
-        result = _download_subtitle_text(ydl, info, lang, is_auto)
-        if not result:
-            continue
-        content, ext = result
-
-        segments = _parse_subtitle_content(content, ext)
-        if not segments:
-            continue
-
-        transcript_text = '\n'.join(s['text'] for s in segments)
-        if not transcript_text.strip():
-            continue
-
-        return transcript_text, segments, {
-            'lang': lang,
-            'source': 'auto' if is_auto else 'manual',
-        }
 
     return None
