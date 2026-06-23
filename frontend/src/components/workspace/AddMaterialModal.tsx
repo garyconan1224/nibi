@@ -351,7 +351,7 @@ export function AddMaterialModal({
       onAdded?.()
       onOpenChange(false)
       navigate(`/processing/${result.task_id}`, {
-        state: { url: effectiveUrl, workspaceId: wsId, taskType: selectedAction === 'replica' ? 'replica' : 'note', itemId: result.item_id },
+        state: { url: effectiveUrl, workspaceId: wsId, taskType: selectedAction === 'replica' ? 'replica' : 'note', itemId: result.item_id, itemType: result.item_type },
       })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '任务创建失败'

@@ -31,6 +31,7 @@ interface LocationState {
   itemId?: string
   url?: string
   taskType?: string
+  itemType?: string
 }
 
 const STUCK_MS = 10 * 60 * 1000
@@ -111,7 +112,7 @@ export default function ProcessingPage() {
     if (analyze && analyze.task_id !== taskId) {
       navigate(`/processing/${analyze.task_id}`, {
         replace: true,
-        state: { workspaceId, itemId, taskType: state?.taskType },
+        state: { workspaceId, itemId, taskType: state?.taskType, itemType: state?.itemType },
       })
     }
   }, [task, allTasks, taskId, navigate, workspaceId, itemId])
@@ -360,13 +361,23 @@ export default function ProcessingPage() {
                   onClick={() => {
                     if (!isSuccess) return
                     if (itemId && workspaceId) {
-                      // NI.2: note task 完成后直接进 NoteShell
-                      const isNote = (state?.taskType ?? taskType) === 'note'
-                      navigate(
-                        isNote
-                          ? `/workspaces/${workspaceId}/items/${itemId}/note`
-                          : `/workspaces/${workspaceId}/items/${itemId}/overview`,
-                      )
+                      // NI.2: note task 完成后直接进 NoteShell；replica 落复刻页
+                      // state?.taskType 来自 AddMaterialModal；兜底 payload.intent（FloatingTaskQueue 场景）
+                      const effectiveType = state?.taskType ?? ((payload.intent as string) === 'replica' ? 'replica' : 'note')
+                      const isNote = effectiveType === 'note'
+                      const isReplica = effectiveType === 'replica'
+                      let targetPath: string
+                      if (isNote) {
+                        targetPath = `/workspaces/${workspaceId}/items/${itemId}/note`
+                      } else if (isReplica) {
+                        const DETAIL: Record<string, string> = { video: 'video_detail', image: 'image_result', audio: 'audio_detail', text: 'text_result' }
+                        const itemType = state?.itemType ?? (sourceType === 'image' ? 'image' : 'video')
+                        const suffix = DETAIL[itemType] ?? 'overview'
+                        targetPath = `/workspaces/${workspaceId}/items/${itemId}/${suffix}`
+                      } else {
+                        targetPath = `/workspaces/${workspaceId}/items/${itemId}/overview`
+                      }
+                      navigate(targetPath)
                     } else {
                       // 兜底：跳转到资料库，用户可从那里找到结果
                       navigate('/library')

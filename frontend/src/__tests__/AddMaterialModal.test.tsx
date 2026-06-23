@@ -144,6 +144,7 @@ describe('AddMaterialModal', () => {
         workspaceId: 'ws-1',
         taskType: 'note',
         itemId: 'item-1',
+        itemType: 'video',
       },
     })
   })
@@ -201,6 +202,7 @@ describe('AddMaterialModal', () => {
         workspaceId: 'ws-1',
         taskType: 'replica',
         itemId: 'item-2',
+        itemType: 'video',
       },
     })
   })

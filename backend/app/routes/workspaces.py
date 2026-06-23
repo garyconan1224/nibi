@@ -2024,6 +2024,11 @@ def generate_note(workspace_id: str, req: GenerateNoteRequest) -> Dict[str, Any]
     except KeyError as err:
         raise HTTPException(status_code=404, detail=str(err)) from err
 
+    # 2.1 将 intent 写入 item preflight（复刻页 / get_item_result 依赖此字段）
+    _intent = req.intent or "note"
+    item.preflight = PreflightConfig(intent=_intent)
+    _store.update_item(workspace_id, item.item_id, preflight=item.preflight)
+
     # 3. 创建 note task（复用 handle_note_task 统一流程）
     #    注入 LLM 配置（从 provider store 获取活跃 chat provider 的 key + model）
     _task_payload: dict = {
@@ -2039,7 +2044,8 @@ def generate_note(workspace_id: str, req: GenerateNoteRequest) -> Dict[str, Any]
         "frame_prompt": {
             "mode": "interval",
             "interval_sec": req.frame_interval
-        }
+        },
+        "intent": req.intent or "note",
     }
     # R4.7: 透传用户选择的视觉模型（空=用系统默认）
     if req.vision_model.strip():
