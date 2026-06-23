@@ -605,6 +605,64 @@ def _apply_ytdlp_metadata_to_task(
     return meta
 
 
+def _try_cc_subtitle(
+    payload: Dict[str, Any],
+    log: Any,
+) -> Optional[Tuple[str, List[Dict[str, Any]], Dict[str, Any]]]:
+    """④16 CC-first：尝试直取平台字幕。
+
+    返回 (transcript_text, segments, meta) 或 None。
+    调用方根据返回值决定：命中→跳过 Whisper，未命中→回退 Whisper。
+    """
+    prefer_subtitle = bool(payload.get('prefer_subtitle', True))
+    video_url = str(payload.get('url') or '').strip()
+
+    if not (prefer_subtitle and video_url):
+        if not prefer_subtitle:
+            log("ℹ️  字幕优先已关闭，直接走 Whisper")
+        return None
+
+    log("🎯 字幕优先模式：尝试直取平台 CC 字幕...")
+    try:
+        from backend.app.services.subtitle_fetcher import fetch_best_subtitle
+
+        # 复用 pipeline 的下载上下文（cookie/extras），B站 412 必需
+        dl_kwargs = _resolve_download_kwargs(payload)
+        result = fetch_best_subtitle(
+            video_url,
+            proxy=dl_kwargs.get('proxy'),
+            po_token=dl_kwargs.get('po_token'),
+            visitor_data=dl_kwargs.get('visitor_data'),
+            cookie_base_dirs=dl_kwargs.get('cookie_base_dirs_list'),
+        )
+
+        if not result:
+            log("ℹ️  未获取到平台字幕，回退 Whisper 转写")
+            return None
+
+        transcript_text, segments, meta = result
+        source = meta.get('source', 'unknown')
+        lang = meta.get('lang', '?')
+        seg_count = len(segments)
+
+        if source == 'manual':
+            # 人工字幕直接用
+            log(f"✅ 人工字幕命中 (lang={lang}) | {len(transcript_text)} 字符 / {seg_count} 段，跳过 Whisper")
+        else:
+            # 自动字幕过规则层清洗
+            from shared.transcript_cleaner import clean_transcript
+            raw_len = len(transcript_text)
+            glossary = payload.get("glossary") or []
+            transcript_text = clean_transcript(transcript_text, glossary=glossary)
+            log(f"✅ 自动字幕命中 (lang={lang}) + 清洗 | {raw_len} → {len(transcript_text)} 字符 / {seg_count} 段，跳过 Whisper")
+
+        return transcript_text, segments, meta
+
+    except Exception as e:
+        log(f"ℹ️  字幕获取异常（{e}），回退 Whisper 转写")
+        return None
+
+
 def _run_subtitle_summary(
     videos: List[Path],
     payload: Dict[str, Any],
@@ -619,63 +677,14 @@ def _run_subtitle_summary(
     log = lambda msg: runner.append_log(task_id, msg)  # noqa: E731
 
     # 0. 字幕优先分支（④16 CC-first）
-    prefer_subtitle = bool(payload.get('prefer_subtitle', True))
-    video_url = str(payload.get('url') or '').strip()
-
-    if prefer_subtitle and video_url:
-        log("🎯 字幕优先模式：尝试直取平台 CC 字幕...")
-        runner.set_progress(task_id, 0.95, "正在获取平台字幕...")
-        try:
-            from backend.app.services.subtitle_fetcher import fetch_best_subtitle
-            from shared.transcript_cleaner import clean_transcript
-
-            # 从 payload 读访问上下文（复用 yt-dlp 的网络配置）
-            proxy = str(payload.get('proxy') or '').strip() or None
-            po_token = str(payload.get('po_token') or '').strip() or None
-            visitor_data = str(payload.get('visitor_data') or '').strip() or None
-
-            result = fetch_best_subtitle(
-                video_url,
-                proxy=proxy,
-                po_token=po_token,
-                visitor_data=visitor_data,
-            )
-
-            if result:
-                transcript_text, transcript_segments, meta = result
-                source = meta.get('source', 'unknown')
-                lang = meta.get('lang', '?')
-                seg_count = len(transcript_segments)
-
-                if source == 'manual':
-                    # 人工字幕直接用
-                    log(f"✅ 人工字幕命中 (lang={lang}) | {len(transcript_text)} 字符 / {seg_count} 段，跳过 Whisper")
-                else:
-                    # 自动字幕过规则层清洗
-                    raw_len = len(transcript_text)
-                    glossary = payload.get("glossary") or []
-                    transcript_text = clean_transcript(transcript_text, glossary=glossary)
-                    log(f"✅ 自动字幕命中 (lang={lang}) + 清洗 | {raw_len} → {len(transcript_text)} 字符 / {seg_count} 段，跳过 Whisper")
-
-                # 跳过音频提取 + Whisper，直接进入字幕清洗（3.5）→ LLM 总结（4）
-                # 注意：下游的 clean_transcript（3.5）对字幕也会再跑一遍（保证一致性），但自动字幕已预清洗过
-                runner.set_progress(task_id, 0.97, "字幕已就绪，准备总结...")
-
-                # ---- 直接跳到 3.5 + 4（复用下面已有的逻辑）----
-                # 为了保持代码结构，把字幕结果设到局部变量，然后 goto 到 3.5
-                # Python 没有 goto，用 flag 跳过后面的音频提取+Whisper
-                _cc_skip_to_summary = True
-            else:
-                log("ℹ️  未获取到平台字幕，回退 Whisper 转写")
-                _cc_skip_to_summary = False
-        except Exception as e:
-            log(f"ℹ️  字幕获取异常（{e}），回退 Whisper 转写")
-            _cc_skip_to_summary = False
+    cc_result = _try_cc_subtitle(payload, log)
+    if cc_result:
+        transcript_text, transcript_segments, _meta = cc_result
+        runner.set_progress(task_id, 0.97, "字幕已就绪，准备总结...")
+        # 跳过音频提取 + Whisper，直接进入字幕清洗（3.5）→ LLM 总结（4）
+        _cc_skip_to_summary = True
     else:
         _cc_skip_to_summary = False
-        if not prefer_subtitle:
-            log("ℹ️  字幕优先已关闭，直接走 Whisper")
-        # 本地上传（无 url）静默跳过直取
 
     # ---- 以下：如果 _cc_skip_to_summary=False，走原有 Whisper 流程 ----
 
@@ -2771,10 +2780,19 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         # ── transcribe 轨 ──────────────────────────────────────
         # whisper 是单次长调用，无法中途断；进度回调中做 best-effort 检查。
         if "transcribe" in steps:
-            def _run_transcribe() -> str:
+            def _run_transcribe() -> Tuple[str, List[Dict[str, Any]]]:
                 runner.store.update(task_id, status=TaskStatus.ASR.value)
                 _monotonic_progress(0.12, "开始转录音频...")
 
+                # ④16 CC-first：先尝试直取平台字幕，命中则跳过 Whisper
+                log_fn = lambda msg: runner.append_log(task_id, msg)  # noqa: E731
+                cc_result = _try_cc_subtitle(payload, log_fn)
+                if cc_result:
+                    _cc_text, _cc_segments, _cc_meta = cc_result
+                    _monotonic_progress(0.30, "字幕已就绪，跳过转录")
+                    return _cc_text, _cc_segments
+
+                # 字幕未命中，走 Whisper
                 tcfg = load_settings().transcriber
                 # 兜底：fast-whisper 不支持 mps
                 _device = tcfg.device if tcfg.device != "mps" else "cpu"

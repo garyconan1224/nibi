@@ -175,7 +175,7 @@ def fetch_best_subtitle(
     proxy: Optional[str] = None,
     po_token: Optional[str] = None,
     visitor_data: Optional[str] = None,
-    cookies: Optional[str] = None,
+    cookie_base_dirs: Optional[List[str]] = None,
     prefer_langs: Tuple[str, ...] = _PREFER_LANGS,
 ) -> Optional[Tuple[str, List[Dict[str, Any]], Dict[str, Any]]]:
     """尝试获取视频的平台字幕（CC）。
@@ -205,8 +205,10 @@ def fetch_best_subtitle(
         opts['po_token'] = po_token
     if visitor_data:
         opts['visitor_data'] = visitor_data
-    if cookies:
-        opts['cookiefile'] = cookies  # yt-dlp 接受 cookie 文件路径或字符串
+
+    # 复用 cookie_base_dirs 自动查找 cookie 文件（对齐 pipeline 的下载上下文，B站 412 必需）
+    if cookie_base_dirs:
+        opts['cookie_base_dirs'] = cookie_base_dirs
 
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
