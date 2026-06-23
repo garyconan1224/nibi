@@ -3,21 +3,19 @@
  *
  * 统一笔记壳：读 R0 的 GET …/note 渲染 note.md + 标签概览。
  * R1.3 新增：Markdown 编辑态（CodeMirror + debounce 自动保存）、
- * 总结风格面板（SummariesTab + 应用到主笔记）。
- * 先只接 text 跑通，与旧 TextResultPage 并存（灰度）。
+ * 顶栏两层下拉（总结风格▾ + 版本▾）管理总结。
  *
  * 子组件拆分：
  *   - TagChips：frontmatter.tags → 标签 chips 展示
  *   - SourcePanel：source.md 只读区（可折叠）
  *   - NoteEditor：轻量 CodeMirror 编辑器（注册到 lnEditorStore，复用截图插入能力）
- *   - SummariesPanel：总结风格面板（可折叠，含应用到主笔记）
  */
 import { cloneElement, isValidElement, useCallback, useEffect, useMemo, useSyncExternalStore, useRef, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowLeft, BookOpenCheck, Brain, Check, ChevronDown, ChevronRight, Download, FileCode, FileDown, FileText, FileType, Image, List, Network, Presentation, RefreshCw, Sparkles, Subtitles } from 'lucide-react'
+import { ArrowLeft, BookOpenCheck, Brain, Check, ChevronDown, ChevronRight, Download, FileCode, FileDown, FileText, FileType, Image, List, Network, Pencil, Presentation, RefreshCw, Sparkles, Subtitles, Trash2 } from 'lucide-react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers, Decoration, ViewPlugin, MatchDecorator, type ViewUpdate } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
@@ -27,7 +25,7 @@ import { toast } from 'sonner'
 import { downloadSubtitles, exportItemNoteObsidian, getItemNote, putItemNote } from '@/services/workspaces'
 import type { VideoResultTranscriptLine } from '@/services/workspaces'
 import type { ItemNote } from '@/types/workspace'
-import { createSummary, listSummaries, type ItemSummary } from '@/services/summaries'
+import { createSummary, deleteSummary, listSummaries, renameSummary, type ItemSummary } from '@/services/summaries'
 import { TS_RE, parseTs } from '@/pages/results/LearningNotesPage/HtmlView'
 import { Badge } from '@/components/ui/badge'
 import { SYSTEM_TAG_DIMENSIONS } from '@/constants/tagDimensions'
@@ -36,7 +34,6 @@ import MilkdownEditor from './MilkdownEditor'
 import LNVideoPanel, { type LNVideoPanelHandle } from '@/pages/results/LearningNotesPage/LNVideoPanel'
 import LNTranscriptPanel from '@/pages/results/LearningNotesPage/LNTranscriptPanel'
 import '@/pages/results/LearningNotesPage/learning-notes.css'
-import { SummariesTab } from '@/components/SummariesTab'
 import { NewSummaryModal } from '@/components/NewSummaryModal'
 import NoteChatDrawer from '@/components/NoteChatDrawer'
 import { SourceMdModal } from './SourceMdModal'
@@ -463,52 +460,6 @@ function SourcePanel({ sourceMd, open: controlledOpen, onToggle }: SourcePanelPr
   )
 }
 
-/* ────────────────── SummariesPanel ────────────────── */
-
-interface SummariesPanelProps {
-  workspaceId: string
-  itemId: string
-  onApplyToNote: (summary: ItemSummary) => void
-  /** 外部受控开关（可选）；不传则内部自管 */
-  open?: boolean
-  onToggle?: () => void
-  onRefresh?: () => void
-}
-
-/** 总结风格面板（可折叠），内嵌 SummariesTab。 */
-function SummariesPanel({ workspaceId, itemId, onApplyToNote, open: controlledOpen, onToggle, onRefresh }: SummariesPanelProps) {
-  const [internalOpen, setInternalOpen] = useState(false)
-  const open = controlledOpen ?? internalOpen
-  const toggle = onToggle ?? (() => setInternalOpen((v) => !v))
-
-  return (
-    <div style={{ borderTop: '1px solid var(--line)', flexShrink: 0 }}>
-      <button
-        onClick={toggle}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          width: '100%', padding: '10px 20px',
-          background: 'none', border: 'none', cursor: 'pointer',
-          fontSize: 13, fontWeight: 600, color: 'var(--ink-2)',
-        }}
-      >
-        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        总结风格
-      </button>
-      {open && (
-        <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-          <SummariesTab
-            workspaceId={workspaceId}
-            itemId={itemId}
-            onApplyToNote={onApplyToNote}
-            onRefresh={onRefresh}
-          />
-        </div>
-      )}
-    </div>
-  )
-}
-
 /* ────────────────── NoteShell ────────────────── */
 
 export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { workspaceId?: string; itemId?: string } = {}) {
@@ -564,15 +515,38 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   // 7.3: 视频笔记三列布局 — 播放器 + 转录轴联动
   const videoRef = useRef<LNVideoPanelHandle>(null)
   const [currentTime, setCurrentTime] = useState(0)
-  const [summariesOpen, setSummariesOpen] = useState(false)
   const [sourceModalOpen, setSourceModalOpen] = useState(false)
   const [activeSummaryId, setActiveSummaryId] = useState<string | undefined>(undefined)
-  // VN4.1 版本下拉
+  // VN4.1 版本下拉 + 风格/版本两层
   const [summaries, setSummaries] = useState<ItemSummary[]>([])
   const [summariesVersion, setSummariesVersion] = useState(0)
   const [versionDropOpen, setVersionDropOpen] = useState(false)
   const versionDropRef = useRef<HTMLDivElement>(null)
+  const [templateDropOpen, setTemplateDropOpen] = useState(false)
+  const templateDropRef = useRef<HTMLDivElement>(null)
+  // 改名（迁入顶栏下拉）
+  const [renameTargetId, setRenameTargetId] = useState<string | null>(null)
+  const [renameName, setRenameName] = useState('')
   const refreshSummaries = useCallback(() => setSummariesVersion((v) => v + 1), [])
+
+  // 按 template 分组（两层下拉用）
+  const templateGroups = useMemo(() => {
+    const map = new Map<string, ItemSummary[]>()
+    for (const s of summaries) {
+      const arr = map.get(s.template) ?? []
+      arr.push(s)
+      map.set(s.template, arr)
+    }
+    // 每组内按 version 排序
+    for (const arr of map.values()) arr.sort((a, b) => a.version - b.version)
+    return map
+  }, [summaries])
+
+  const activeTemplate = useMemo(() => {
+    if (!activeSummaryId) return templateGroups.keys().next().value ?? ''
+    const s = summaries.find((x) => x.summary_id === activeSummaryId)
+    return s?.template ?? ''
+  }, [activeSummaryId, summaries, templateGroups])
 
   useEffect(() => {
     let cancelled = false
@@ -593,6 +567,18 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     document.addEventListener('mousedown', handle)
     return () => document.removeEventListener('mousedown', handle)
   }, [versionDropOpen])
+
+  // 点击外部关闭模板下拉
+  useEffect(() => {
+    if (!templateDropOpen) return
+    const handle = (e: MouseEvent) => {
+      if (templateDropRef.current && !templateDropRef.current.contains(e.target as Node)) {
+        setTemplateDropOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [templateDropOpen])
 
   // 点击外部关闭 AI 工具下拉
   useEffect(() => {
@@ -782,6 +768,33 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     }
   }, [workspaceId, itemId, refreshSummaries, navigate])
 
+  // 删除总结（从顶栏版本下拉触发）
+  const handleDeleteSummary = useCallback(async (summaryId: string) => {
+    try {
+      await deleteSummary(workspaceId, itemId, summaryId)
+      toast.success('已删除')
+      if (activeSummaryId === summaryId) setActiveSummaryId(undefined)
+      refreshSummaries()
+    } catch {
+      toast.error('删除失败')
+    }
+  }, [workspaceId, itemId, activeSummaryId, refreshSummaries])
+
+  // 改名（从顶栏版本下拉触发）
+  const commitRename = useCallback(async () => {
+    if (!renameTargetId) return
+    try {
+      await renameSummary(workspaceId, itemId, renameTargetId, renameName.trim())
+      toast.success('已改名')
+      refreshSummaries()
+    } catch {
+      toast.error('改名失败')
+    } finally {
+      setRenameTargetId(null)
+      setRenameName('')
+    }
+  }, [renameTargetId, renameName, workspaceId, itemId, refreshSummaries])
+
   // ─── loading / error ───
   if (loading) {
     return (
@@ -852,57 +865,172 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
 
         <div style={{ flex: 1 }} />
 
-        {/* VN4.1 版本下拉（视频+图文共用） */}
-        {summaries.length > 0 && (
-          <div ref={versionDropRef} style={{ position: 'relative' }}>
-            <button
-              className="btn-ghost"
-              onClick={() => setVersionDropOpen((v) => !v)}
-              style={{
-                height: 28, padding: '0 10px', fontSize: 12,
-                color: activeSummaryId ? 'var(--accent-2)' : undefined,
-              }}
-              title="切换总结版本"
-            >
-              <List size={13} /> 版本{activeSummaryId ? (() => { const s = summaries.find(x => x.summary_id === activeSummaryId); return s ? ` · v${s.version}` : '' })() : ''}
-              <ChevronDown size={11} style={{ marginLeft: 2 }} />
-            </button>
-            {versionDropOpen && (
-              <div
-                style={{
-                  position: 'absolute', right: 0, top: 34, zIndex: 20,
-                  minWidth: 200, maxHeight: 240, overflowY: 'auto',
-                  padding: '4px',
-                  border: '1px solid var(--line)',
-                  borderRadius: 'var(--radius-sm)',
-                  background: 'var(--bg)',
-                  boxShadow: 'var(--shadow-md)',
-                }}
-              >
-                {summaries.map((s) => {
-                  const isActive = s.summary_id === activeSummaryId
-                  const label = s.name || `v${s.version}`
-                  return (
+        {/* ── 总结风格▾ + 版本▾ 两层联动下拉 ── */}
+        {summaries.length > 0 && (() => {
+          const TEMPLATE_LABELS: Record<string, string> = {
+            concise: '简洁摘要', detailed: '详细要点', quotes: '金句提取',
+            meeting: '会议纪要', xhs: '小红书风格', longform: '公众号长文',
+            lecture: '教学笔记', interview: '访谈整理', shownotes: '播客 shownotes',
+            oral: '口播稿', steps: '步骤教程', outline: '大纲',
+            qa: '问答卡(Anki)', actions: '行动清单', tool_recommendation: '工具推荐',
+            science_popularization: '知识科普', standard: '标准总结',
+          }
+          const tl = (id: string) => TEMPLATE_LABELS[id] ?? id
+          const currentVersions = templateGroups.get(activeTemplate) ?? []
+          const activeS = summaries.find(x => x.summary_id === activeSummaryId)
+
+          return (
+            <>
+              {/* 总结风格▾ */}
+              <div ref={templateDropRef} style={{ position: 'relative' }}>
+                <button
+                  className="btn-ghost"
+                  onClick={() => { setTemplateDropOpen((v) => !v); setVersionDropOpen(false) }}
+                  style={{ height: 28, padding: '0 10px', fontSize: 12, color: 'var(--accent-2)' }}
+                  title="切换总结风格"
+                >
+                  <List size={13} /> {tl(activeTemplate)}
+                  <ChevronDown size={11} style={{ marginLeft: 2 }} />
+                </button>
+                {templateDropOpen && (
+                  <div style={{
+                    position: 'absolute', left: 0, top: 34, zIndex: 20,
+                    minWidth: 180, maxHeight: 300, overflowY: 'auto',
+                    padding: '4px',
+                    border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)',
+                    background: 'var(--bg)', boxShadow: 'var(--shadow-md)',
+                  }}>
+                    {[...templateGroups.keys()].map((tmpl) => (
+                      <button
+                        key={tmpl}
+                        className="btn-ghost"
+                        onClick={() => {
+                          const first = templateGroups.get(tmpl)?.[0]
+                          if (first) handleApplyToNote(first)
+                          setTemplateDropOpen(false)
+                        }}
+                        style={{
+                          width: '100%', justifyContent: 'space-between', height: 30,
+                          padding: '0 10px', fontSize: 12,
+                          color: tmpl === activeTemplate ? 'var(--accent-2)' : undefined,
+                          fontWeight: tmpl === activeTemplate ? 600 : undefined,
+                        }}
+                      >
+                        <span>{tl(tmpl)}</span>
+                        <span style={{ color: 'var(--ink-4)', fontSize: 10 }}>({(templateGroups.get(tmpl) ?? []).length})</span>
+                      </button>
+                    ))}
+                    <div style={{ height: 1, background: 'var(--line)', margin: '4px 0' }} />
                     <button
-                      key={s.summary_id}
                       className="btn-ghost"
-                      onClick={() => { handleApplyToNote(s); setVersionDropOpen(false) }}
-                      style={{
-                        width: '100%', justifyContent: 'flex-start', height: 30,
-                        padding: '0 10px', fontSize: 12,
-                        color: isActive ? 'var(--accent-2)' : undefined,
-                        fontWeight: isActive ? 600 : undefined,
-                      }}
+                      onClick={() => { setShowNewSummaryModal(true); setTemplateDropOpen(false) }}
+                      style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
                     >
-                      {isActive && <Check size={12} style={{ marginRight: 6, flexShrink: 0 }} />}
-                      <span style={{ marginRight: 6 }}>{label}</span>
-                      <span style={{ color: 'var(--ink-3)', fontSize: 10 }}>{s.template}</span>
+                      + 新建风格
                     </button>
-                  )
-                })}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+
+              {/* 版本▾ */}
+              <div ref={versionDropRef} style={{ position: 'relative' }}>
+                <button
+                  className="btn-ghost"
+                  onClick={() => { setVersionDropOpen((v) => !v); setTemplateDropOpen(false) }}
+                  style={{
+                    height: 28, padding: '0 10px', fontSize: 12,
+                    color: activeSummaryId ? 'var(--accent-2)' : undefined,
+                  }}
+                  title="切换版本"
+                >
+                  <RefreshCw size={13} /> {activeS ? (activeS.name || `v${activeS.version}`) : '版本'}
+                  <ChevronDown size={11} style={{ marginLeft: 2 }} />
+                </button>
+                {versionDropOpen && (
+                  <div style={{
+                    position: 'absolute', right: 0, top: 34, zIndex: 20,
+                    minWidth: 220, maxHeight: 320, overflowY: 'auto',
+                    padding: '4px',
+                    border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)',
+                    background: 'var(--bg)', boxShadow: 'var(--shadow-md)',
+                  }}>
+                    {currentVersions.map((s) => {
+                      const isActive = s.summary_id === activeSummaryId
+                      const isRenaming = renameTargetId === s.summary_id
+                      return (
+                        <div key={s.summary_id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          {isRenaming ? (
+                            <input
+                              autoFocus
+                              value={renameName}
+                              onChange={(e) => setRenameName(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') { setRenameTargetId(null); setRenameName('') } }}
+                              onBlur={commitRename}
+                              style={{ flex: 1, height: 30, padding: '0 8px', fontSize: 12, border: '1px solid var(--accent-2)', borderRadius: 4, background: 'var(--bg)', outline: 'none' }}
+                            />
+                          ) : (
+                            <button
+                              className="btn-ghost"
+                              onClick={() => { handleApplyToNote(s); setVersionDropOpen(false) }}
+                              style={{
+                                flex: 1, justifyContent: 'flex-start', height: 30,
+                                padding: '0 8px', fontSize: 12,
+                                color: isActive ? 'var(--accent-2)' : undefined,
+                                fontWeight: isActive ? 600 : undefined,
+                              }}
+                            >
+                              {isActive && <Check size={12} style={{ marginRight: 4, flexShrink: 0 }} />}
+                              {s.name || `v${s.version}`}
+                            </button>
+                          )}
+                          {!isRenaming && (
+                            <>
+                              <button
+                                className="btn-ghost"
+                                title="改名"
+                                onClick={(e) => { e.stopPropagation(); setRenameTargetId(s.summary_id); setRenameName(s.name || '') }}
+                                style={{ padding: 4, height: 24, width: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                              >
+                                <Pencil size={11} />
+                              </button>
+                              <button
+                                className="btn-ghost"
+                                title="删除"
+                                onClick={(e) => { e.stopPropagation(); handleDeleteSummary(s.summary_id) }}
+                                style={{ padding: 4, height: 24, width: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'var(--ink-4)' }}
+                              >
+                                <Trash2 size={11} />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )
+                    })}
+                    <div style={{ height: 1, background: 'var(--line)', margin: '4px 0' }} />
+                    <button
+                      className="btn-ghost"
+                      onClick={() => { setShowNewSummaryModal(true); setVersionDropOpen(false) }}
+                      style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
+                    >
+                      + 新建版本
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )
+        })()}
+
+        {/* 空态：尚无总结时的入口按钮 */}
+        {summaries.length === 0 && (
+          <button
+            className="btn-ghost"
+            onClick={() => setShowNewSummaryModal(true)}
+            style={{ height: 28, padding: '0 10px', fontSize: 12 }}
+            title="新建总结"
+          >
+            <RefreshCw size={13} /> 新建总结
+          </button>
         )}
 
         {/* 导出（所有类型都在顶栏右上角） */}
@@ -1139,44 +1267,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
               {noteContent}
             </div>
           </div>
-
-          {/* ── 右列：操作区（瘦身后只剩 源md悬浮触发 + 换总结）── */}
-          <div style={{
-            width: 220, flexShrink: 0,
-            borderLeft: '1px solid var(--line)',
-            display: 'flex', flexDirection: 'column',
-            overflow: 'hidden',
-            background: 'var(--bg-elev)',
-          }}>
-            {/* 操作区顶部标题栏 */}
-            <div style={{ padding: '10px 14px 8px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
-              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-2)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--mono)' }}>操作区</span>
-            </div>
-
-            {/* 可滚动内容区 */}
-            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column' }}>
-
-              {/* 换总结 */}
-              <button
-                className="btn-ghost"
-                onClick={() => setSummariesOpen((v) => !v)}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-start', height: 36, padding: '0 14px', fontSize: 12, borderRadius: 0, borderBottom: '1px solid var(--line)', flexShrink: 0, color: summariesOpen ? 'var(--accent-2)' : undefined }}
-              >
-                <RefreshCw size={13} /> 换总结
-              </button>
-              {summariesOpen && (
-                <div style={{ borderBottom: '1px solid var(--line)', maxHeight: 300, overflowY: 'auto' }}>
-                  <SummariesTab
-                    workspaceId={workspaceId}
-                    itemId={itemId}
-                    onApplyToNote={handleApplyToNote}
-                    activeSummaryId={activeSummaryId}
-                    onRefresh={refreshSummaries}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
         </div>
         </>
       ) : isImageNote ? (
@@ -1276,26 +1366,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
 
                 <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', padding: '12px 14px', gap: 8 }}>
 
-                  {/* 换总结 */}
-                  <button
-                    className="btn-ghost"
-                    onClick={() => setSummariesOpen((v) => !v)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%', justifyContent: 'flex-start', height: 36, padding: '0 14px', fontSize: 12, borderRadius: 0, borderBottom: '1px solid var(--line)', flexShrink: 0, color: summariesOpen ? 'var(--accent-2)' : undefined }}
-                  >
-                    <RefreshCw size={13} /> 换总结
-                  </button>
-                  {summariesOpen && (
-                    <div style={{ maxHeight: 300, overflowY: 'auto' }}>
-                      <SummariesTab
-                        workspaceId={workspaceId}
-                        itemId={itemId}
-                        onApplyToNote={handleApplyToNote}
-                        activeSummaryId={activeSummaryId}
-                        onRefresh={refreshSummaries}
-                      />
-                    </div>
-                  )}
-
                   {/* OCR 识别文本（默认折叠，仅当非空时显示） */}
                   {currentInfo?.ocr_text && (
                     <details style={{ marginTop: 4 }}>
@@ -1338,12 +1408,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 sourceUrl={(note.frontmatter as Record<string, unknown>)?.source_url as string || ''}
               />
             )}
-            <SummariesPanel
-              workspaceId={workspaceId}
-              itemId={itemId}
-              onApplyToNote={handleApplyToNote}
-              onRefresh={refreshSummaries}
-            />
             <SourcePanel sourceMd={note.source_md} />
           </div>
         </>
