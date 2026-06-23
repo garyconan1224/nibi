@@ -160,6 +160,13 @@ export default function MilkdownEditor({
         .note-milkdown .note-ts-chip:hover {
           background: rgba(99, 179, 237, 0.3);
         }
+        /* Image nodes — block display, responsive width */
+        .note-milkdown .milkdown img {
+          max-width: 100%;
+          display: block;
+          margin: 16px auto;
+          border-radius: 6px;
+        }
       `}</style>
       <MilkdownProvider>
         <MilkdownEditorInner

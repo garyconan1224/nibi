@@ -84,16 +84,6 @@ function extractBody(noteMd: string): string {
   return idx >= 0 ? rest.slice(idx + 4) : noteMd
 }
 
-/** 规范化 Markdown 里 ![alt](url) 的 URL：
- *  已编码的不动（防 %20 → %2520）；未编码的补 encodeURI。
- *  解决中文/空格路径在 Milkdown 解析器中截断的问题。 */
-function normalizeMarkdownImageUrls(md: string): string {
-  return md.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_m, alt: string, url: string) => {
-    const needsEncode = /[一-鿿\s]/.test(url) && !/%[0-9A-Fa-f]{2}/.test(url)
-    return `![${alt}](${needsEncode ? encodeURI(url) : url})`
-  })
-}
-
 /** type → 中文标签映射。 */
 const TYPE_LABEL: Record<string, string> = {
   text: '文本',
@@ -249,46 +239,6 @@ function useMediaQuery(query: string): boolean {
 /** 视频笔记视图标签：中列只展示「标准总结」，两种格式（蓝图 §3.5）。
  *  富文本 = 渲染态（ReactMarkdown）；md格式 = 源码态（CodeMirror，可编辑）。
  *  源 md（转写+截帧原始内容）在右侧操作区，不是中列标签。 */
-const imageNoteViewModeLabels: Record<ViewMode, string> = {
-  edit: 'md格式',
-  compare: '源md对照',
-  wysiwyg: '阅读',
-}
-
-/* ────────────────── ReadView（图文笔记只读渲染）────────────────── */
-
-interface ReadViewProps {
-  markdown: string
-}
-
-/** 图文笔记只读视图：ReactMarkdown + 图片样式优化。 */
-function ReadView({ markdown }: ReadViewProps) {
-  const normalized = useMemo(() => normalizeMarkdownImageUrls(markdown), [markdown])
-  return (
-    <div style={{ padding: '0 24px', overflowY: 'auto', flex: 1 }}>
-      <ReactMarkdown
-        remarkPlugins={remarkPlugins}
-        components={{
-          img: ({ src, alt }) => (
-            <img
-              src={src}
-              alt={alt ?? ''}
-              style={{
-                maxWidth: '100%',
-                display: 'block',
-                margin: '16px auto',
-                borderRadius: 6,
-              }}
-            />
-          ),
-        }}
-      >
-        {normalized}
-      </ReactMarkdown>
-    </div>
-  )
-}
-
 /* ────────────────── NoteEditor ────────────────── */
 
 /** CodeMirror 时间戳跳转扩展：给裸 [mm:ss] 加 note-ts-chip，点击调 onSeek。 */
@@ -762,14 +712,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   }, [workspaceId, itemId])
 
   // 切换视图模式（记忆 localStorage）
-  const switchView = useCallback((mode: ViewMode) => {
-    setViewMode(mode)
-    localStorage.setItem(VIEW_MODE_KEY, mode)
-    // 切换模式时同步 editingBody（以防内容被外部更新）
-    if (note) {
-      setEditingBody(extractBody(note.note_md))
-    }
-  }, [note])
 
   const currentBody = editingBody
   const chatSystemPrompt = useMemo(
@@ -900,13 +842,8 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     }}>
       {viewMode === 'compare' ? (
         <CompareView markdown={editingBody} onMarkdownChange={handleEditorChange} sourceMd={note.source_md} onSeek={handleSeek} />
-      ) : isImageNote ? (
-        // 图文：wysiwyg=只读 ReadView；edit=源码 NoteEditor（图文唯一可编辑入口，不可删）
-        viewMode === 'wysiwyg'
-          ? <ReadView markdown={editingBody} />
-          : <NoteEditor markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
       ) : (
-        // 视频：compare 以外一律 Milkdown（viewMode==='edit' 残留态也 fallback 到此）
+        // 图文/视频：compare 以外一律 Milkdown（viewMode==='edit' 残留态也 fallback 到此）
         <MilkdownEditor key={milkdownKey} markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
       )}
     </div>
@@ -1336,32 +1273,14 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 </div>
               </div>
 
-              {/* ── 中列：视图切换 tab + 整篇笔记 ── */}
+              {/* ── 中列：正文（图文/视频统一，无 tab 切换）+ TOC ── */}
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 0, padding: '0 24px', flexShrink: 0, borderBottom: '1px solid var(--line)', height: 36 }}>
-                  {(['wysiwyg', 'edit'] as ViewMode[]).map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => switchView(m)}
-                      style={{
-                        padding: '6px 16px', fontSize: 12, border: 'none', cursor: 'pointer', background: 'transparent',
-                        color: viewMode === m ? 'var(--accent-2)' : 'var(--ink-4)',
-                        fontWeight: viewMode === m ? 600 : 400,
-                        borderBottom: viewMode === m ? '2px solid var(--accent-2)' : '2px solid transparent',
-                        transition: 'color .15s, border-color .15s',
-                      }}
-                    >
-                      {imageNoteViewModeLabels[m]}
-                    </button>
-                  ))}
-                  {/* 保存状态（图文编辑态才显示） */}
-                  {viewMode === 'edit' && (
-                    <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-4)' }}>
-                      {saveStatus === 'saving' && '保存中…'}
-                      {saveStatus === 'saved' && `已保存 ${savedAt}`}
-                      {saveStatus === 'failed' && <span style={{ color: 'var(--accent)' }}>保存失败</span>}
-                    </span>
-                  )}
+                <div style={{ display: 'flex', alignItems: 'center', padding: '0 24px', flexShrink: 0, borderBottom: '1px solid var(--line)', height: 36 }}>
+                  <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-4)' }}>
+                    {saveStatus === 'saving' && '保存中…'}
+                    {saveStatus === 'saved' && `已保存 ${savedAt}`}
+                    {saveStatus === 'failed' && <span style={{ color: 'var(--accent)' }}>保存失败</span>}
+                  </span>
                 </div>
                 <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
                   {noteContent}
