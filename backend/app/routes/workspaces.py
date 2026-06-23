@@ -1854,6 +1854,8 @@ def _bridge_to_pipeline_payload(
             if k in bg:
                 payload[k] = bg[k]
         # R21.P3.S1: 透传 preflight 新字段（intent / background_for_recognition）
+        # 优先读 item.preflight.intent（前端 savePreflight 存在顶层），
+        # 兜底读 tasks.preflight.intent（旧路径兼容）。
         tasks = item.preflight.tasks or {}
         _preflight = tasks.get("preflight")
         if isinstance(_preflight, dict):
@@ -1861,6 +1863,8 @@ def _bridge_to_pipeline_payload(
                 payload["intent"] = _preflight["intent"]
             if _preflight.get("background_for_recognition"):
                 payload["background_for_recognition"] = _preflight["background_for_recognition"]
+        if "intent" not in payload and item.preflight.intent:
+            payload["intent"] = item.preflight.intent
         # replica 二级类型透传（前端存 tasks.replica_kind）
         _rk = tasks.get("replica_kind")
         if _rk:
@@ -1908,6 +1912,8 @@ def _bridge_to_pipeline_payload(
             payload["intent"] = _preflight["intent"]
         if _preflight.get("background_for_recognition"):
             payload["background_for_recognition"] = _preflight["background_for_recognition"]
+    if "intent" not in payload and item.preflight.intent:
+        payload["intent"] = item.preflight.intent
     # replica 二级类型透传
     _rk = tasks.get("replica_kind")
     if _rk:
@@ -2489,7 +2495,10 @@ def get_item_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
         payload.setdefault("intent", item.preflight.intent)
         return payload
 
-    return build_demo_video_result(item.item_id, item.name)
+    demo_res = build_demo_video_result(item.item_id, item.name)
+    demo_res["is_demo"] = True
+    demo_res["intent"] = item.preflight.intent if item.preflight else None
+    return demo_res
 
 
 # ── Phase 1H: 图片结果页接口 ───────────────────────────────

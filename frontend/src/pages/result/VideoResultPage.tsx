@@ -11,6 +11,7 @@ import {
   downloadSubtitles,
   exportReproducePackage,
   getItemResult,
+  getItemNote,
   listPromptVersions,
   updateFrameTitle,
 } from '@/services/workspaces'
@@ -152,7 +153,23 @@ export default function VideoResultPage() {
     let cancelled = false
     getItemResult(workspaceId, itemId)
       .then((data) => {
-        if (!cancelled) setFetchState({ kind: 'ready', data })
+        if (cancelled) return
+        if (data.is_demo || !data.frames || data.frames.length === 0) {
+          getItemNote(workspaceId, itemId)
+            .then((note) => {
+              if (cancelled) return
+              if (note && note.note_md && note.note_md.trim().length > 0) {
+                navigate(`/workspaces/${workspaceId}/items/${itemId}/note`, { replace: true })
+              } else {
+                setFetchState({ kind: 'ready', data })
+              }
+            })
+            .catch(() => {
+              if (!cancelled) setFetchState({ kind: 'ready', data })
+            })
+        } else {
+          setFetchState({ kind: 'ready', data })
+        }
       })
       .catch((err: unknown) => {
         if (cancelled) return
@@ -168,8 +185,8 @@ export default function VideoResultPage() {
   }, [workspaceId, itemId])
 
   const result = fetchState.kind === 'ready' ? fetchState.data : null
-  const frames = useMemo(() => result?.frames ?? [], [result])
-  const transcript = useMemo(() => result?.transcript ?? [], [result])
+  const frames = useMemo(() => (result?.is_demo ? [] : result?.frames ?? []), [result])
+  const transcript = useMemo(() => (result?.is_demo ? [] : result?.transcript ?? []), [result])
   const totalSec = result?.tracks_meta.total_sec ?? 0
   const isLearning = result?.intent === 'learning'
 
