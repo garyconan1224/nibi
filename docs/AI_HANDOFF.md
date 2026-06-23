@@ -1,8 +1,24 @@
 # AI Handoff
 
-Last updated: 2026-06-21（**当前指针，给所有 AI 工具优先读取**）
+Last updated: 2026-06-22（**当前指针，给所有 AI 工具优先读取**）
 
 ## 当前事实
+
+> **2026-06-22 更新（手测 19 条批量推进）；下方「📦 归档参考」为 2026-06-21 及更早。**
+
+- **基线 git `857379b`（main）**；工作树有未跟踪 `fix.py` / `fix_lint.py`（非 Claude 创建，疑小米临时脚本，**先确认来源再清理**）。
+- **19 条手测反馈按分类推进**（来源 `docs/test-reports/manual-local-video-2026-06-21.md`）：
+  - ✅ 阻断(17,1) + ① 封面/图/信息缺失(3,7,18,19) 全 **done**（含反馈3「结果页无图」，小米已做 `989838d`/`dbb93df`/`ec58b74`）
+  - ② 结果页编辑器：6,13,7b,图文升级 **done**（`8301add`/`bf67c8d`）；**10,11,12 待小米执行**（计划+提示词已给）
+  - ④ 添加布局：**2,14 待小米执行**（计划+提示词已给）；15,16 待规划
+  - ③ 笔记风格(5,8,9)、📋 板块化(4)：待规划
+- **本轮计划**（`docs/plans/*-2026-06-22.md`）：video-note-flow-fixes / video-note-followup / result-page-no-image / result-page-cleanup-batch1 / image-note-editor-upgrade / result-page-summary-version-consolidation / workbench-noteshell-layout。
+- **设计资产** `docs/design/assets/bilinote-video-note/`：**sidebar-nav.png(→④15)** / result-toolbar.png / prototype-fullpage|preview.png / tasks-workbench.png；配套设计文档 `docs/design/bilinote-video-note-flow-review.html`。
+- **当前下一步**：① 等小米回报 10/11/12 + 2/14（过 Codex 审）；② Claude 调研+计划 **④15 左侧导航**(读 sidebar-nav.png + flow-review.html「昨天规划还有什么没做」) → **④16 字幕直取**(B站/YouTube CC→pipeline 后端独立大功能) → **③5/8/9**(等10落地，与总结/版本交叉) → 📋4；③ 先清理 fix.py/fix_lint.py。
+
+---
+
+### 📦 归档参考（2026-06-21 及更早，非当前下一步）
 
 - **本地视频 E2E 重测完成（2026-06-21 22:30）**：Bug #2 修复（commit `1225566`）经 Playwright 真实 UI 验证——路由修复生效（`/start` → `note` task），但 download 步骤暴露新 Bug #3：`_download_note_source` 本地分支查找 `{workspace_root}/videos/`，而上传文件在 `{workspace_root}/`（`pipeline_tasks.py:1334` vs `workspaces.py:1556`）。B/D 仍 ❌，需修 Bug #3 后再重测。报告 `docs/test-reports/e2e-2026-06-21.md`。
 - **BiliNote 视频笔记改造主线（VN1–VN6）全部完成（2026-06-21）**：合集语义 / 新建弹窗三段式 / 处理页 5 步 / 结果页工具栏+视频 banner / 说话人透传+条件式 tab / 教程·会议·任务模板 contract 升级。计划 `docs/plans/track-K-video-note-experience-upgrade.md`（status: done）。同会话另修首页 Composer 上移、识别视频封面、最近任务卡封面、workspace 命名统一为「合集」。
