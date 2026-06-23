@@ -193,7 +193,7 @@ describe('AddMaterialModal', () => {
         '',
         'replica',
         'auto',
-        { diarize: false, summary_template: 'standard', user_notes: '' },
+        { diarize: false, summary_template: 'standard', user_notes: '', replica_kind: 'prompt' },
       )
     })
     expect(navigateMock).toHaveBeenCalledWith('/processing/task-replica-1', {

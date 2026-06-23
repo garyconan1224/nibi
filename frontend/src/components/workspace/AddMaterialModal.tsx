@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle2, Clock, Copy, FileText, Image as ImageIcon, LayoutTemplate, Link2, Lock, PenTool, PlayCircle, Settings2, Video, Wand2, X } from 'lucide-react'
+import { CheckCircle2, Clock, Copy, FileText, Film, Image as ImageIcon, LayoutTemplate, Link2, Lock, PenTool, PlayCircle, Settings2, Target, Video, Wand2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -134,6 +134,7 @@ export function AddMaterialModal({
   const [submitting, setSubmitting] = useState(false)
   const [selectedAction, setSelectedAction] = useState<ActionType>('note')
   const [selectedNoteType, setSelectedNoteType] = useState<NoteMediaKind>('auto')
+  const [replicaKind, setReplicaKind] = useState<'prompt' | 'story' | 'compete'>('prompt')
   const [embedFrames, setEmbedFrames] = useState(false) // R4.7: 默认关，检测到视觉模型后自动开
   const [selectedVisionModel, setSelectedVisionModel] = useState('') // 空=用系统默认
   const [frameInterval, setFrameInterval] = useState(5)
@@ -303,13 +304,15 @@ export function AddMaterialModal({
               summary_template: noteStyle,
               diarize: diarizeOn,
             },
+            // 复刻二级类型（后端 /start 透传到 payload）
+            ...(selectedAction === 'replica' ? { replica_kind: replicaKind } : {}),
           },
         })
         const { task_id } = await startItemPipeline(wsId, localFile)
         toast.success('任务已创建', { description: localFileName || '本地文件' })
         onAdded?.()
         onOpenChange(false)
-        navigate(`/processing/${task_id}`, { state: { url: localFileName || '', workspaceId: wsId, itemId: localFile } })
+        navigate(`/processing/${task_id}`, { state: { url: localFileName || '', workspaceId: wsId, itemId: localFile, taskType: selectedAction === 'replica' ? 'replica' : 'note' } })
       } catch (e) {
         const msg = e instanceof Error ? e.message : '提交失败'
         setError(msg)
@@ -344,7 +347,7 @@ export function AddMaterialModal({
         wsId, effectiveUrl, effectiveSniff?.title ?? undefined,
         embedFrames, selectedAction === 'replica' ? 'replica_prompt' : 'vision', effInterval, effVisionModel,
         selectedAction === 'replica' ? 'replica' : 'note', selectedNoteType,
-        { diarize: diarizeOn, summary_template: noteStyle, user_notes: userNotes },
+        { diarize: diarizeOn, summary_template: noteStyle, user_notes: userNotes, ...(selectedAction === 'replica' ? { replica_kind: replicaKind } : {}) },
       )
       toast.success(selectedAction === 'replica' ? '复刻任务已创建' : '笔记生成中', { description: `${result.item_type} · ${effectiveUrl}` })
 
@@ -514,7 +517,42 @@ export function AddMaterialModal({
                 <div className="ntc-d">提取画面提示词与详细信息</div>
               </button>
             </div>
-            
+
+            {/* 复刻二级：选择复刻类型 */}
+            {selectedAction === 'replica' && (
+              <div className="note-type-grid" style={{ marginBottom: 14 }}>
+                <button
+                  type="button"
+                  className="note-type-card"
+                  data-active={replicaKind === 'prompt'}
+                  onClick={() => setReplicaKind('prompt')}
+                >
+                  <div className="ntc-l"><Copy size={16} style={{ display: 'inline', verticalAlign: '-3px', marginRight: 4 }} /> 复刻提示词</div>
+                  <div className="ntc-d">逐帧画面描述 → AI 生图/生视频提示词</div>
+                </button>
+                <button
+                  type="button"
+                  className="note-type-card"
+                  data-active={false}
+                  disabled
+                  style={{ opacity: 0.5, cursor: 'not-allowed' }}
+                >
+                  <div className="ntc-l"><Film size={16} style={{ display: 'inline', verticalAlign: '-3px', marginRight: 4 }} /> 拉片分析 <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>即将上线</span></div>
+                  <div className="ntc-d">逐镜头拆解景别/构图/运镜/转场</div>
+                </button>
+                <button
+                  type="button"
+                  className="note-type-card"
+                  data-active={false}
+                  disabled
+                  style={{ opacity: 0.5, cursor: 'not-allowed' }}
+                >
+                  <div className="ntc-l"><Target size={16} style={{ display: 'inline', verticalAlign: '-3px', marginRight: 4 }} /> 竞品对标 <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>即将上线</span></div>
+                  <div className="ntc-d">内容结构/爆点/钩子/节奏拆解</div>
+                </button>
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: 8, marginBottom: selectedAction === 'note' ? 24 : 0 }}>
               {[{ id: 'ai_video', label: 'AI视频', icon: <Video size={12} /> },
                 { id: 'storyboard', label: '分镜脚本', icon: <LayoutTemplate size={12} /> },

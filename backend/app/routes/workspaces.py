@@ -587,6 +587,10 @@ class GenerateNoteRequest(BaseModel):
     frame_interval: int = Field(default=5, description="截帧间隔，多少秒截一帧")
     vision_model: str = Field(default="", description="视觉模型 ID（空=用系统默认）")
     intent: str = Field(default="note", description="任务意图：note / replica / collect 等")
+    replica_kind: str = Field(
+        default="prompt",
+        description="复刻二级类型：prompt（复刻提示词）/ story（拉片分析）/ compete（竞品对标）",
+    )
     note_media_kind: str = Field(
         default="auto",
         description="笔记子类型：auto / video / image_text / audio / text",
@@ -1857,6 +1861,10 @@ def _bridge_to_pipeline_payload(
                 payload["intent"] = _preflight["intent"]
             if _preflight.get("background_for_recognition"):
                 payload["background_for_recognition"] = _preflight["background_for_recognition"]
+        # replica 二级类型透传（前端存 tasks.replica_kind）
+        _rk = tasks.get("replica_kind")
+        if _rk:
+            payload["replica_kind"] = _rk
         # R3.11: 透传嵌图配置（embed_frames / max_embed_frames）
         # 前端存 tasks.summary.embed_frames / tasks.summary.max_embed_frames
         _summary_cfg = tasks.get("summary")
@@ -1900,6 +1908,10 @@ def _bridge_to_pipeline_payload(
             payload["intent"] = _preflight["intent"]
         if _preflight.get("background_for_recognition"):
             payload["background_for_recognition"] = _preflight["background_for_recognition"]
+    # replica 二级类型透传
+    _rk = tasks.get("replica_kind")
+    if _rk:
+        payload["replica_kind"] = _rk
     _summary_cfg = tasks.get("summary")
     _pf: Dict[str, Any] = payload.get("preflight") or {}
     if isinstance(_summary_cfg, dict):
@@ -2052,6 +2064,7 @@ def generate_note(workspace_id: str, req: GenerateNoteRequest) -> Dict[str, Any]
         _task_payload["vision_model"] = req.vision_model.strip()
     # 意图分流：记录用户选择的任务意图和笔记子类型
     _task_payload["intent"] = req.intent or "note"
+    _task_payload["replica_kind"] = req.replica_kind or "prompt"
     _task_payload["note_media_kind"] = req.note_media_kind or "auto"
     # #19: 写入 source_type + kind_hint，ProcessingPage 动态步骤矩阵需要
     _task_payload["source_type"] = "link"
