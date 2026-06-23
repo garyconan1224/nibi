@@ -8,7 +8,7 @@ from typing import Any, Dict, List
 
 from backend.app.services.asr_fast_whisper import transcribe_with_fast_whisper
 from backend.app.services.asr_groq import transcribe_with_groq
-from backend.app.services.subtitle_fetcher import fetch_best_subtitle_text
+from backend.app.services.subtitle_fetcher import fetch_best_subtitle
 
 
 def _download_audio_bytes(url: str) -> bytes:
@@ -60,9 +60,9 @@ def get_transcript(
     """获取语音转录结果"""
     started = time.perf_counter()
     if prefer_subtitle:
-        hit = fetch_best_subtitle_text(url)
+        hit = fetch_best_subtitle(url)
         if hit is not None:
-            text, meta = hit
+            text, segments, meta = hit
             return {
                 "source": "subtitle",
                 "text": text,
