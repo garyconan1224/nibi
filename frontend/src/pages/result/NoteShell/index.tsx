@@ -14,7 +14,6 @@ import { cloneElement, isValidElement, useCallback, useEffect, useMemo, useRef, 
 import type { ReactElement, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, BookOpenCheck, Brain, Check, ChevronDown, ChevronRight, Download, FileCode, FileDown, FileText, FileType, Image, List, Network, Pencil, Presentation, RefreshCw, Sparkles, Subtitles, Trash2 } from 'lucide-react'
-import { EditorView, keymap, lineNumbers, Decoration, ViewPlugin, MatchDecorator, type ViewUpdate } from '@codemirror/view'
 import { toast } from 'sonner'
 
 import { downloadSubtitles, exportItemNoteObsidian, getItemNote, putItemNote } from '@/services/workspaces'
@@ -33,7 +32,6 @@ import { NewSummaryModal } from '@/components/NewSummaryModal'
 import NoteChatDrawer from '@/components/NoteChatDrawer'
 import { SourceMdModal } from './SourceMdModal'
 import { FloatingAskAi } from './FloatingAskAi'
-import { useLnEditorStore } from '@/store/lnEditorStore'
 
 /* ────────────────── helpers ────────────────── */
 

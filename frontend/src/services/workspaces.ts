@@ -287,7 +287,6 @@ export interface VideoResultTranscriptLine {
 export interface VideoResult {
   source: 'demo_fixture' | 'item_results'
   is_demo?: boolean
-  intent?: string
   video: {
     item_id: string
     title: string

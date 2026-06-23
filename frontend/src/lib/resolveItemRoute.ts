@@ -40,13 +40,3 @@ export function resolveItemRoute(
   const suffix = DETAIL_ROUTE[item.type] ?? 'overview'
   return `/workspaces/${workspaceId}/items/${item.item_id}/${suffix}`
 }
-  // 复刻向（replica）→ 保留原逻辑
-  const DETAIL_ROUTE: Record<string, string> = {
-    video: 'video_detail',
-    audio: 'audio_detail',
-    image: 'image_result',
-    text: 'text_result',
-  }
-  const suffix = DETAIL_ROUTE[item.type] ?? 'overview'
-  return `/workspaces/${workspaceId}/items/${item.item_id}/${suffix}`
-}
