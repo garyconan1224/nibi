@@ -73,14 +73,23 @@ export default function WorkspaceList() {
   // Phase 3C.5：tag 筛选（与 URL search params 双向同步）
   const { filter, setFilter, filterItems, hasActiveFilter } = useTagFilter()
 
+  // 合集类型筛选
+  const [kindFilter, setKindFilter] = useState<'all' | 'note' | 'replica'>('all')
+
   // 工作空间显示规则：若有 tag 筛选，仅展示「至少一个 item 命中筛选」的 workspace；
-  // 同时把每个 ws 的 items 过滤一次给 WorkspaceCard 做计数
+  // 同时把每个 ws 的 items 过滤一次给 WorkspaceCard 做计数；再按 kind 筛选
   const filteredItems = useMemo(() => {
-    if (!hasActiveFilter) return items
-    return items
-      .map(ws => ({ ...ws, items: filterItems(ws.items) }))
-      .filter(ws => ws.items.length > 0)
-  }, [items, hasActiveFilter, filterItems])
+    let result = items
+    if (hasActiveFilter) {
+      result = result
+        .map(ws => ({ ...ws, items: filterItems(ws.items) }))
+        .filter(ws => ws.items.length > 0)
+    }
+    if (kindFilter !== 'all') {
+      result = result.filter(ws => ws.kind === kindFilter)
+    }
+    return result
+  }, [items, hasActiveFilter, filterItems, kindFilter])
 
   const refresh = async () => {
     setLoading(true)
@@ -157,6 +166,22 @@ export default function WorkspaceList() {
       {/* Phase 3C.5：tag 筛选栏 */}
       {!loading && items.length > 0 && (
         <TagFilterBar value={filter} onChange={setFilter} />
+      )}
+
+      {/* 合集类型筛选 */}
+      {!loading && items.length > 0 && (
+        <div className="flex gap-2">
+          {(['all', 'note', 'replica'] as const).map(k => (
+            <Button
+              key={k}
+              variant={kindFilter === k ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setKindFilter(k)}
+            >
+              {k === 'all' ? '全部' : k === 'note' ? '📝 笔记' : '🎬 复刻'}
+            </Button>
+          ))}
+        </div>
       )}
 
       {/* 主体：列表 / 加载 / 空态 */}
@@ -303,7 +328,12 @@ function WorkspaceCard({ workspace, onOpen, onDelete }: WorkspaceCardProps) {
       onClick={onOpen}
     >
       <CardHeader className="flex-row items-start justify-between space-y-0">
-        <CardTitle className="line-clamp-2 text-base">{workspace.name}</CardTitle>
+        <div className="flex items-center gap-2">
+          <CardTitle className="line-clamp-2 text-base">{workspace.name}</CardTitle>
+          <Badge variant="secondary" className={workspace.kind === 'replica' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}>
+            {workspace.kind === 'replica' ? '🎬 复刻' : '📝 笔记'}
+          </Badge>
+        </div>
         <button
           type="button"
           className="ml-2 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
