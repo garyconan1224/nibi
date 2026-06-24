@@ -685,6 +685,27 @@ export async function downloadExport(workspaceId: string, itemId: string): Promi
   URL.revokeObjectURL(url)
 }
 
+/** GET /workspaces/{id}/export-html — 下载合集全部笔记的自包含 HTML 文件 */
+export async function downloadCollectionHtml(workspaceId: string): Promise<void> {
+  const res = await http.get(`${BASE}/${workspaceId}/export-html`, {
+    responseType: 'blob',
+  })
+  const disposition = res.headers['content-disposition'] as string | undefined
+  let filename = '合集笔记.html'
+  if (disposition) {
+    const match = disposition.match(/filename\*=(?:UTF-8''|")?([^";]+)/i)
+    if (match) filename = decodeURIComponent(match[1])
+  }
+  const url = URL.createObjectURL(res.data as Blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 /** POST /workspaces/{id}/items/{itemId}/reproduce/export — 下载复刻包 zip */
 export async function exportReproducePackage(
   workspaceId: string,

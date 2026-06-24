@@ -1081,3 +1081,77 @@ def _build_notes_obsidian(notes: Any, ws_root: Path) -> StreamingResponse:
     """Obsidian Vault 导出：zip 含 markdown + frames/。"""
     from backend.app.services.av_synthesis.obsidian_builder import build_obsidian_zip
     return build_obsidian_zip(notes, ws_root)
+
+
+# ── 合集级 HTML 导出（自包含单文件） ──────────────────────
+
+
+def _strip_frontmatter(md: str) -> str:
+    """移除 markdown 头部的 YAML frontmatter（--- 块）。"""
+    if md.startswith("---\n"):
+        parts = md.split("---\n", 2)
+        if len(parts) >= 3:
+            return parts[2].lstrip("\n")
+    return md
+
+
+@router.get("/{workspace_id}/export-html")
+def export_collection_html(workspace_id: str) -> StreamingResponse:
+    """导出合集内全部素材笔记为自包含单文件 HTML。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+
+    from backend.app.services.note_assembler import note_dir  # noqa: PLC0415
+    import markdown2  # noqa: PLC0415
+    from jinja2 import Environment, FileSystemLoader  # noqa: PLC0415
+
+    template_dir = Path(__file__).resolve().parents[2] / "services" / "av_synthesis" / "templates"
+
+    notes_data: List[Dict[str, str]] = []
+    type_label = {
+        "video": "视频",
+        "image": "图片",
+        "audio": "音频",
+        "text": "文本",
+    }
+
+    for item in rec.items:
+        nd = note_dir(workspace_id, item.item_id)
+        note_path = nd / "note.md"
+        if not note_path.exists():
+            continue
+        raw_md = note_path.read_text(encoding="utf-8")
+        md_body = _strip_frontmatter(raw_md).strip()
+        if not md_body:
+            continue
+        html_body = markdown2.markdown(md_body, extras=["tables", "fenced-code-blocks", "break-on-newline"])
+        notes_data.append({
+            "title": item.name or "未命名素材",
+            "item_type": type_label.get(item.type, item.type),
+            "html": html_body,
+        })
+
+    ctx = {
+        "title": rec.name or "Nibi 合集",
+        "material_count": len(rec.items),
+        "date": date.today().isoformat(),
+        "notes": notes_data,
+    }
+
+    env = Environment(loader=FileSystemLoader(str(template_dir)))
+    template = env.get_template("collection.html.j2")
+    html_content = template.render(ctx=ctx)
+
+    safe_title = (rec.name or "合集").replace("/", "_").replace("\\", "_").replace(" ", "_")[:50]
+    today = date.today().isoformat()
+    filename = f"合集_{safe_title}_{today}.html"
+    filename_star = f"UTF-8''{quote(filename)}"
+
+    return StreamingResponse(
+        iter([html_content.encode("utf-8")]),
+        media_type="text/html; charset=utf-8",
+        headers={
+            "Content-Disposition": f"attachment; filename*= {filename_star}",
+        },
+    )

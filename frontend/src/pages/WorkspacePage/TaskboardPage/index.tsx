@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { getWorkspace, getItemNote } from '@/services/workspaces'
+import { getWorkspace, getItemNote, downloadCollectionHtml } from '@/services/workspaces'
 import { AddMaterialModal } from '@/components/workspace/AddMaterialModal'
 import { usePipelineTasks } from '@/hooks/usePipelineTasks'
 
@@ -136,8 +136,13 @@ export default function TaskboardPage() {
             toast.error('复制失败，请重试')
           }
         }}
-        onShareHtml={() => {
-          // TODO: Commit 3 实现导出 HTML
+        onShareHtml={async () => {
+          try {
+            await downloadCollectionHtml(workspace.workspace_id)
+            toast.success('HTML 导出成功')
+          } catch {
+            toast.error('导出失败，请重试')
+          }
         }}
         onMenuAction={handleMenuAction}
       />
