@@ -935,8 +935,10 @@ def generate_summary(
         provider_id=provider_id, model=model,
     )
 
-    # R3.2: standard 模板后处理 — [[图N]] → ![desc](/static/path)
-    if template_id == "standard":
+    # R3.2: 后处理 — [[图N]] → ![desc](/static/path)
+    # ⚠️ 这里的模板集合必须与上面「注入配图提示」的集合（约 line 450）保持一致，
+    # 否则会出现「LLM 标了 [[图N]] 却没被替换成真图」（#3 教学笔记没图的根因）。
+    if template_id in {"standard", "detailed", "lecture", "steps"}:
         frames = _collect_frames(item)
         content_md = _postprocess_frames(content_md, frames)
 
