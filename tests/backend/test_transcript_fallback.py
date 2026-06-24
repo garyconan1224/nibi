@@ -4,8 +4,8 @@ from backend.app.services import transcript_service
 def test_transcript_prefers_subtitle(monkeypatch) -> None:
     monkeypatch.setattr(
         transcript_service,
-        "fetch_best_subtitle_text",
-        lambda url: ("subtitle text", {"lang": "zh"}),
+        "fetch_best_subtitle",
+        lambda url: ("subtitle text", [], {"lang": "zh"}),
     )
     out = transcript_service.get_transcript("https://example.com/v")
     assert out["source"] == "subtitle"
@@ -13,7 +13,7 @@ def test_transcript_prefers_subtitle(monkeypatch) -> None:
 
 
 def test_transcript_falls_back_to_asr(monkeypatch) -> None:
-    monkeypatch.setattr(transcript_service, "fetch_best_subtitle_text", lambda url: None)
+    monkeypatch.setattr(transcript_service, "fetch_best_subtitle", lambda url: None)
     monkeypatch.setattr(transcript_service, "_download_audio_bytes", lambda url: b"fake")
     monkeypatch.setattr(
         transcript_service,

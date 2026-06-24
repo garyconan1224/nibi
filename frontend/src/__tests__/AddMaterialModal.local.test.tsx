@@ -5,7 +5,7 @@ import { AddMaterialModal } from '@/components/workspace/AddMaterialModal'
 import * as workspaces from '@/services/workspaces'
 
 vi.mock('@/services/workspaces', () => ({
-  autoCreateWorkspace: vi.fn(),
+  ensureInbox: vi.fn(),
   generateNote: vi.fn(),
   probeDuration: vi.fn(),
   probeItemMedia: vi.fn().mockResolvedValue({ duration_sec: 0, cover_url: '' }),

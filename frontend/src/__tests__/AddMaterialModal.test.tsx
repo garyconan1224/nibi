@@ -7,6 +7,7 @@ const {
   sniffUrlMock,
   probeDurationMock,
   autoCreateWorkspaceMock,
+  ensureInboxMock,
   generateNoteMock,
   addWorkspaceItemMock,
   savePreflightMock,
@@ -16,6 +17,7 @@ const {
   sniffUrlMock: vi.fn(),
   probeDurationMock: vi.fn(),
   autoCreateWorkspaceMock: vi.fn(),
+  ensureInboxMock: vi.fn(),
   generateNoteMock: vi.fn(),
   addWorkspaceItemMock: vi.fn(),
   savePreflightMock: vi.fn(),
@@ -30,6 +32,7 @@ vi.mock('@/services/workspaces', () => ({
   sniffUrl: sniffUrlMock,
   probeDuration: probeDurationMock,
   autoCreateWorkspace: autoCreateWorkspaceMock,
+  ensureInbox: ensureInboxMock,
   addWorkspaceItem: addWorkspaceItemMock,
   savePreflight: savePreflightMock,
   startItemPipeline: startItemPipelineMock,
@@ -50,6 +53,7 @@ describe('AddMaterialModal', () => {
     sniffUrlMock.mockReset()
     probeDurationMock.mockReset()
     autoCreateWorkspaceMock.mockReset()
+    ensureInboxMock.mockReset()
     generateNoteMock.mockReset()
     addWorkspaceItemMock.mockReset()
     savePreflightMock.mockReset()
@@ -84,7 +88,7 @@ describe('AddMaterialModal', () => {
     expect(screen.getByText('② 你要做什么')).toBeTruthy()
     expect(screen.getByText('③ 笔记设置')).toBeTruthy()
     expect(screen.getByText('test video')).toBeTruthy()
-    expect(screen.getByText('链接有效')).toBeTruthy()
+    expect(screen.getByText('已识别视频')).toBeTruthy()
     expect(screen.getByRole('button', { name: /开始生成/ })).toBeTruthy()
     expect(screen.queryByText(/分析范围/)).toBeNull()
     expect(screen.queryByText(/勾选分析任务/)).toBeNull()
@@ -207,8 +211,8 @@ describe('AddMaterialModal', () => {
     })
   })
 
-  it('没有工作空间时先自动创建，再生成笔记', async () => {
-    autoCreateWorkspaceMock.mockResolvedValue({ workspace_id: 'ws-new', name: '新工作空间' })
+  it('没有工作空间时落入收纳箱，再生成笔记', async () => {
+    ensureInboxMock.mockResolvedValue({ workspace_id: '__inbox__', name: '收纳箱' })
 
     render(
       <AddMaterialModal
@@ -222,9 +226,9 @@ describe('AddMaterialModal', () => {
     fireEvent.click(screen.getByRole('button', { name: /开始生成/ }))
 
     await waitFor(() => {
-      expect(autoCreateWorkspaceMock).toHaveBeenCalledWith({ hint_url: 'https://example.com/article', kind: 'note' })
+      expect(ensureInboxMock).toHaveBeenCalled()
       expect(generateNoteMock).toHaveBeenCalledWith(
-        'ws-new',
+        '__inbox__',
         'https://example.com/article',
         undefined,
         true,
@@ -275,7 +279,7 @@ describe('AddMaterialModal', () => {
 
     await waitFor(() => {
       expect(screen.getByText('文章标题')).toBeTruthy()
-      expect(screen.getByText('链接有效')).toBeTruthy()
+      expect(screen.getByText('已识别网页')).toBeTruthy()
     })
   })
 })
