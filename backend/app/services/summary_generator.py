@@ -418,16 +418,18 @@ def build_prompt(
 
     user_prompt = tpl.user_prompt.format(transcript=transcript)
 
-    # R3.6: standard 模板注入「内容画像」元数据（转写字数 + 视频时长）
-    if template_id == "standard" and not _is_image_text_item(item):
-        char_count = len(plain_text)
-        # 从 transcript_segments 最后一段的 t_sec 推算视频大致时长
-        duration_sec = 0
+    # R3.6: 计算视频时长（供后续 metadata 和配图 cap 使用）
+    duration_sec = 0
+    if not _is_image_text_item(item):
         raw_seg = (item.results or {}).get("transcript_segments", [])
         if isinstance(raw_seg, list) and raw_seg:
             last_seg = raw_seg[-1]
             if isinstance(last_seg, dict):
                 duration_sec = float(last_seg.get("t_sec") or last_seg.get("start") or 0)
+
+    # R3.6: standard 模板注入「内容画像」元数据（转写字数 + 视频时长）
+    if template_id == "standard" and not _is_image_text_item(item):
+        char_count = len(plain_text)
         if duration_sec > 0:
             mm, ss = divmod(int(duration_sec), 60)
             duration_str = f"{mm}分{ss}秒" if mm else f"{ss}秒"
@@ -440,11 +442,12 @@ def build_prompt(
         )
         user_prompt = f"{meta}\n{user_prompt}"
 
-    # R3.2: standard 模板注入关键帧清单（若有截帧数据）
+    # R3.2: 含步骤/要点/教学的风格注入关键帧清单（若有截帧数据）
     # R3.11: embed_frames=False 时跳过
     # R3.16: max_embed_frames=0 不再表示「无限」（那会把所有帧塞进 prompt → 图太多），
     #        改为按时长自适应封顶；_collect_frames 已过价值闸门+去重，再按 cap 均匀采样。
-    if template_id == "standard" and embed_frames and not _is_image_text_item(item):
+    # Stage A #9: 扩展到 detailed/lecture/steps（这几个含步骤/要点/教学，配图有意义）
+    if template_id in {"standard", "detailed", "lecture", "steps"} and embed_frames and not _is_image_text_item(item):
         frames = _collect_frames(item)  # 已过价值闸门 + 去重，idx 连续
         cap = max_embed_frames if max_embed_frames > 0 else _adaptive_frame_cap(
             duration_sec, len(frames)
