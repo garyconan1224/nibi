@@ -706,6 +706,38 @@ export async function downloadCollectionHtml(workspaceId: string): Promise<void>
   URL.revokeObjectURL(url)
 }
 
+/** 融合笔记数据结构 */
+export interface MergedNote {
+  merged_id: string
+  title: string
+  item_ids: string[]
+  content_md: string
+  created_at: string
+}
+
+/** POST /workspaces/{id}/merge — 融合选中素材笔记 */
+export async function mergeNotes(
+  workspaceId: string,
+  itemIds: string[],
+): Promise<MergedNote> {
+  const res = await http.post(`${BASE}/${workspaceId}/merge`, { item_ids: itemIds })
+  return res.data as MergedNote
+}
+
+/** GET /workspaces/{id}/merged-notes — 列出融合笔记 */
+export async function listMergedNotes(workspaceId: string): Promise<MergedNote[]> {
+  const res = await http.get(`${BASE}/${workspaceId}/merged-notes`)
+  return res.data as MergedNote[]
+}
+
+/** DELETE /workspaces/{id}/merged-notes/{mergedId} — 删除融合笔记 */
+export async function deleteMergedNote(
+  workspaceId: string,
+  mergedId: string,
+): Promise<void> {
+  await http.delete(`${BASE}/${workspaceId}/merged-notes/${mergedId}`)
+}
+
 /** POST /workspaces/{id}/items/{itemId}/reproduce/export — 下载复刻包 zip */
 export async function exportReproducePackage(
   workspaceId: string,

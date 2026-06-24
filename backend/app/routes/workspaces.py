@@ -49,6 +49,7 @@ from backend.app.models.workspace import (
     ItemStatus,
     ItemSummary,
     ItemType,
+    MergedNote,
     PreflightConfig,
     WorkspaceBackground,
     WorkspaceItem,
@@ -4132,3 +4133,126 @@ async def music_teaching(
         raise HTTPException(status_code=502, detail=f"LLM 调用失败: {err}") from err
 
     return {"explanation": explanation}
+
+
+# ── 融合（Merge） ──────────────────────────────────────────
+
+
+def _strip_frontmatter(md: str) -> str:
+    """移除 markdown 头部的 YAML frontmatter（--- 块）。"""
+    if md.startswith("---\n"):
+        parts = md.split("---\n", 2)
+        if len(parts) >= 3:
+            return parts[2].lstrip("\n")
+    return md
+
+
+class MergeRequest(BaseModel):
+    item_ids: List[str]
+
+
+@router.post("/{workspace_id}/merge")
+def merge_notes(workspace_id: str, req: MergeRequest) -> Dict[str, Any]:
+    """融合：取选中素材的笔记 → LLM 合成综合笔记 → 存合集级 merged_notes。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+
+    if len(req.item_ids) < 2:
+        raise HTTPException(status_code=400, detail="融合至少需要 2 个素材")
+
+    # 收集选中素材的笔记内容
+    notes_to_merge: List[str] = []
+    for item_id in req.item_ids:
+        item = next((it for it in rec.items if it.item_id == item_id), None)
+        if item is None:
+            continue
+        nd = note_dir(workspace_id, item_id)
+        note_path = nd / "note.md"
+        if not note_path.exists():
+            continue
+        raw_md = note_path.read_text(encoding="utf-8")
+        md_body = _strip_frontmatter(raw_md).strip()
+        if md_body:
+            label = item.name or "未命名素材"
+            notes_to_merge.append(f"## {label}\n\n{md_body}")
+
+    if not notes_to_merge:
+        raise HTTPException(status_code=400, detail="选中的素材均无笔记内容")
+
+    # 调用 LLM 合成综合笔记
+    combined = "\n\n---\n\n".join(notes_to_merge)
+    prompt = f"""你是一个内容整合助手。请阅读以下多篇素材笔记，将它们融合成一篇**连贯、有条理的综合笔记**。
+
+要求：
+1. 提炼各素材的共同主题和关键信息
+2. 按逻辑结构组织（如：概述、要点、对比分析、总结）
+3. 保留重要细节，删除冗余
+4. 用 Markdown 格式输出（h2/h3 + 正文 + 列表）
+
+素材笔记如下：
+
+{combined}
+
+请输出综合笔记的 Markdown 正文（不要包含 frontmatter）："""
+
+    try:
+        from backend.app.services.av_synthesis.llm import _call_llm  # noqa: PLC0415
+        from shared.settings_store import load_settings as _load_s  # noqa: PLC0415
+
+        _s = _load_s()
+        api_key = (_s.openai_api_key or "").strip()
+        if not api_key:
+            raise HTTPException(status_code=503, detail="未配置 API Key，无法调用 LLM")
+
+        merged_md = _call_llm(prompt, api_key, max_tokens=6000, temperature=0.4).strip()
+    except HTTPException:
+        raise
+    except Exception as err:
+        raise HTTPException(status_code=502, detail=f"LLM 调用失败: {err}") from err
+
+    # 存入合集级载体（不新增 item，避免污染素材网格）
+    merged = MergedNote(
+        title="综合笔记",
+        item_ids=req.item_ids,
+        content_md=merged_md,
+    )
+    rec.merged_notes.append(merged)
+    _store.update(workspace_id, merged_notes=rec.merged_notes)
+
+    return merged.to_dict()
+
+
+@router.get("/{workspace_id}/merged-notes")
+def list_merged_notes(workspace_id: str) -> List[Dict[str, Any]]:
+    """列出合集内的全部融合笔记。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    return [mn.to_dict() for mn in rec.merged_notes]
+
+
+@router.get("/{workspace_id}/merged-notes/{merged_id}")
+def get_merged_note(workspace_id: str, merged_id: str) -> Dict[str, Any]:
+    """获取单条融合笔记详情。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    mn = next((m for m in rec.merged_notes if m.merged_id == merged_id), None)
+    if mn is None:
+        raise HTTPException(status_code=404, detail=f"merged note not found: {merged_id}")
+    return mn.to_dict()
+
+
+@router.delete("/{workspace_id}/merged-notes/{merged_id}")
+def delete_merged_note(workspace_id: str, merged_id: str) -> Dict[str, str]:
+    """删除单条融合笔记。"""
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    before = len(rec.merged_notes)
+    rec.merged_notes = [m for m in rec.merged_notes if m.merged_id != merged_id]
+    if len(rec.merged_notes) == before:
+        raise HTTPException(status_code=404, detail=f"merged note not found: {merged_id}")
+    _store.update(workspace_id, merged_notes=rec.merged_notes)
+    return {"msg": "deleted"}

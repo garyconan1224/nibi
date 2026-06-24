@@ -3,7 +3,8 @@ import { useParams } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { getWorkspace, getItemNote, downloadCollectionHtml } from '@/services/workspaces'
+import { getWorkspace, getItemNote, downloadCollectionHtml, mergeNotes } from '@/services/workspaces'
+import type { MergedNote } from '@/services/workspaces'
 import { AddMaterialModal } from '@/components/workspace/AddMaterialModal'
 import { usePipelineTasks } from '@/hooks/usePipelineTasks'
 
@@ -40,6 +41,10 @@ export default function TaskboardPage() {
   const [exportOpen, setExportOpen] = useState(false)
   const [compareOpen, setCompareOpen] = useState(false)
   const [morePanelId, setMorePanelId] = useState<TabId | null>(null)
+
+  // 融合状态
+  const [mergeLoading, setMergeLoading] = useState(false)
+  const [mergeResult, setMergeResult] = useState<MergedNote | null>(null)
 
 
   const abortRef = useRef<AbortController | null>(null)
@@ -109,8 +114,22 @@ export default function TaskboardPage() {
         onAddMaterial={() => setAddOpen(true)}
         onExport={() => setExportOpen(true)}
         onCompare={() => setCompareOpen(true)}
-        onMerge={() => {
-          // TODO: Commit 4 实现融合
+        onMerge={async () => {
+          const ids = [...compareSelectedIds]
+          if (ids.length < 2) {
+            toast.info('请先在素材网格中多选 ≥2 个素材，再点击融合')
+            return
+          }
+          setMergeLoading(true)
+          try {
+            const result = await mergeNotes(workspace.workspace_id, ids)
+            setMergeResult(result)
+            toast.success('融合完成')
+          } catch {
+            toast.error('融合失败，请重试')
+          } finally {
+            setMergeLoading(false)
+          }
         }}
         onShareMarkdown={async () => {
           if (workspace.items.length === 0) {
@@ -210,6 +229,51 @@ export default function TaskboardPage() {
             {morePanelId === 'style' && (
               <div className="tb-placeholder">Phase [C] 开放</div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── 融合加载中 ── */}
+      {mergeLoading && (
+        <div className="tb-modal-overlay">
+          <div className="tb-modal" style={{ textAlign: 'center', padding: '48px 32px' }}>
+            <div style={{ fontSize: 32, marginBottom: 16 }}>✨</div>
+            <div style={{ fontSize: 16, color: 'var(--ink-2)' }}>正在融合笔记，请稍候…</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 8 }}>
+              LLM 合成中，通常需要 10-30 秒
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal：融合结果 ── */}
+      {mergeResult && (
+        <div className="tb-modal-overlay" onClick={() => setMergeResult(null)}>
+          <div className="tb-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 700 }}>
+            <button className="tb-modal-close" onClick={() => setMergeResult(null)}>
+              <X size={18} />
+            </button>
+            <h2 style={{ fontSize: 20, marginBottom: 8 }}>{mergeResult.title}</h2>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 16 }}>
+              融合了 {mergeResult.item_ids.length} 个素材 · {new Date(mergeResult.created_at).toLocaleString('zh-CN')}
+            </div>
+            <div
+              className="tb-merged-content"
+              style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, fontSize: 14, color: 'var(--ink-1)' }}
+            >
+              {mergeResult.content_md}
+            </div>
+            <div style={{ marginTop: 20, textAlign: 'right' }}>
+              <button
+                className="btn btn-primary"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(mergeResult.content_md)
+                  toast.success('已复制到剪贴板')
+                }}
+              >
+                复制内容
+              </button>
+            </div>
           </div>
         </div>
       )}

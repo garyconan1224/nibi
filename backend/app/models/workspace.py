@@ -256,6 +256,42 @@ class WorkspaceBackground:
         )
 
 
+def _gen_merged_id() -> str:
+    """生成融合笔记 ID（短 UUID）。"""
+    import uuid
+    return uuid.uuid4().hex[:12]
+
+
+@dataclass
+class MergedNote:
+    """合集级融合笔记：多个素材笔记经 LLM 合成后的综合笔记。"""
+
+    merged_id: str = field(default_factory=_gen_merged_id)
+    title: str = "综合笔记"
+    item_ids: List[str] = field(default_factory=list)
+    content_md: str = ""
+    created_at: str = field(default_factory=_now_iso)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "merged_id": self.merged_id,
+            "title": self.title,
+            "item_ids": list(self.item_ids),
+            "content_md": self.content_md,
+            "created_at": self.created_at,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "MergedNote":
+        return cls(
+            merged_id=str(data.get("merged_id") or _gen_merged_id()),
+            title=str(data.get("title") or "综合笔记"),
+            item_ids=list(data.get("item_ids") or []),
+            content_md=str(data.get("content_md") or ""),
+            created_at=str(data.get("created_at") or _now_iso()),
+        )
+
+
 @dataclass
 class WorkspaceRecord:
     """工作空间记录。"""
@@ -273,6 +309,7 @@ class WorkspaceRecord:
     kind: str = "note"  # "note" | "replica"，合集类型
     source: str = "manual"  # "manual" | "inbox" | "bilibili_favorites" | "bilibili_multipart" | "bilibili_uploader"
     source_meta: Dict[str, Any] = field(default_factory=dict)  # 来源合集的元数据（B站收藏夹/分P/UP主）
+    merged_notes: List[MergedNote] = field(default_factory=list)  # 合集级融合笔记
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -292,6 +329,7 @@ class WorkspaceRecord:
             "kind": self.kind,
             "source": self.source,
             "source_meta": self.source_meta,
+            "merged_notes": [mn.to_dict() for mn in self.merged_notes],
         }
 
     @classmethod
@@ -339,4 +377,5 @@ class WorkspaceRecord:
             kind=raw_kind,
             source=raw_source,
             source_meta=raw_source_meta,
+            merged_notes=[MergedNote.from_dict(mn) for mn in (data.get("merged_notes") or []) if isinstance(mn, dict)],
         )
