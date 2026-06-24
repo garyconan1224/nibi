@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { X } from 'lucide-react'
+import { toast } from 'sonner'
 
-import { getWorkspace } from '@/services/workspaces'
+import { getWorkspace, getItemNote } from '@/services/workspaces'
 import { AddMaterialModal } from '@/components/workspace/AddMaterialModal'
 import { usePipelineTasks } from '@/hooks/usePipelineTasks'
 
@@ -111,8 +112,32 @@ export default function TaskboardPage() {
         onMerge={() => {
           // TODO: Commit 4 实现融合
         }}
-        onShare={() => {
-          // TODO: Commit 2 实现复制 Markdown
+        onShareMarkdown={async () => {
+          if (workspace.items.length === 0) {
+            toast.info('合集为空，暂无可复制的笔记')
+            return
+          }
+          try {
+            const notes = await Promise.all(
+              workspace.items.map((item) =>
+                getItemNote(workspace.workspace_id, item.item_id).catch(() => null)
+              )
+            )
+            const mdParts = notes
+              .filter((n): n is NonNullable<typeof n> => n != null && n.note_md.trim().length > 0)
+              .map((n) => n.note_md.trim())
+            if (mdParts.length === 0) {
+              toast.info('暂无笔记内容可复制')
+              return
+            }
+            await navigator.clipboard.writeText(mdParts.join('\n\n---\n\n'))
+            toast.success(`已复制 ${mdParts.length} 篇笔记到剪贴板`)
+          } catch {
+            toast.error('复制失败，请重试')
+          }
+        }}
+        onShareHtml={() => {
+          // TODO: Commit 3 实现导出 HTML
         }}
         onMenuAction={handleMenuAction}
       />

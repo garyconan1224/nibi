@@ -14,6 +14,8 @@ import {
   MessageCircle,
   BookOpen,
   Layers,
+  FileText,
+  Globe,
 } from 'lucide-react'
 import type { WorkspaceBackground } from '@/types/workspace'
 
@@ -35,7 +37,8 @@ interface TaskboardHeadProps {
   onExport?: () => void
   onCompare?: () => void
   onMerge?: () => void
-  onShare?: () => void
+  onShareMarkdown?: () => void
+  onShareHtml?: () => void
   onMenuAction?: (id: string) => void
 }
 
@@ -63,23 +66,28 @@ export function TaskboardHead({
   onExport,
   onCompare,
   onMerge,
-  onShare,
+  onShareMarkdown,
+  onShareHtml,
   onMenuAction,
 }: TaskboardHeadProps) {
   const [moreOpen, setMoreOpen] = useState(false)
   const moreRef = useRef<HTMLDivElement>(null)
+  const [shareOpen, setShareOpen] = useState(false)
+  const shareRef = useRef<HTMLDivElement>(null)
 
   // 点击外部关闭下拉
   useEffect(() => {
-    if (!moreOpen) return
     const handler = (e: MouseEvent) => {
       if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
         setMoreOpen(false)
       }
+      if (shareRef.current && !shareRef.current.contains(e.target as Node)) {
+        setShareOpen(false)
+      }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [moreOpen])
+  }, [])
 
   return (
     <div className="tb-head">
@@ -112,10 +120,35 @@ export function TaskboardHead({
           <Sparkles size={14} />
           融合
         </button>
-        <button className="btn" onClick={onShare}>
-          <Share2 size={14} />
-          分享
-        </button>
+        {/* 分享下拉 */}
+        <div className="tb-head-more-wrap" ref={shareRef}>
+          <button
+            className="btn"
+            data-active={shareOpen}
+            onClick={() => setShareOpen(!shareOpen)}
+          >
+            <Share2 size={14} />
+            分享
+          </button>
+          {shareOpen && (
+            <div className="tb-head-more-menu">
+              <button
+                className="tb-head-more-item"
+                onClick={() => { setShareOpen(false); onShareMarkdown?.() }}
+              >
+                <FileText size={14} />
+                <span>复制 Markdown</span>
+              </button>
+              <button
+                className="tb-head-more-item"
+                onClick={() => { setShareOpen(false); onShareHtml?.() }}
+              >
+                <Globe size={14} />
+                <span>导出 HTML</span>
+              </button>
+            </div>
+          )}
+        </div>
         <button className="btn" onClick={onEditBackground}>
           <Pencil size={14} />
           编辑背景
