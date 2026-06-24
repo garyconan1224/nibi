@@ -271,7 +271,7 @@ class WorkspaceRecord:
     created_at: str = field(default_factory=_now_iso)
     updated_at: str = field(default_factory=_now_iso)
     kind: str = "note"  # "note" | "replica"，合集类型
-    source: str = "manual"  # "manual" | "bilibili_favorites" | "bilibili_multipart" | "bilibili_uploader"
+    source: str = "manual"  # "manual" | "inbox" | "bilibili_favorites" | "bilibili_multipart" | "bilibili_uploader"
     source_meta: Dict[str, Any] = field(default_factory=dict)  # 来源合集的元数据（B站收藏夹/分P/UP主）
 
     def to_dict(self) -> Dict[str, Any]:
@@ -320,7 +320,7 @@ class WorkspaceRecord:
             raw_kind = "note"
         # 老数据兼容：缺 source 字段默认 "manual"
         raw_source = str(data.get("source") or "manual")
-        if raw_source not in ("manual", "bilibili_favorites", "bilibili_multipart", "bilibili_uploader"):
+        if raw_source not in ("manual", "inbox", "bilibili_favorites", "bilibili_multipart", "bilibili_uploader"):
             raw_source = "manual"
         raw_source_meta = data.get("source_meta") or {}
         if not isinstance(raw_source_meta, dict):

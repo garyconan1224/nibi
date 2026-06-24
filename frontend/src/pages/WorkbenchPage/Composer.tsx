@@ -10,7 +10,7 @@ import {
   listWorkspaces,
   createWorkspace,
   sniffUrl,
-  autoCreateWorkspace,
+  ensureInbox,
   uploadWorkspaceItem,
   removeWorkspaceItem,
 } from '@/services/workspaces'
@@ -140,14 +140,13 @@ export function Composer({ onTaskCreated }: ComposerProps) {
     fileInputRef.current?.click()
   }
 
-  // 单文件上传流程：选择文件 → autoCreateWorkspace → upload → 打开预检配置 → 用户确认后 start
+  // 单文件上传流程：选择文件 → 落入收纳箱 → upload → 打开预检配置 → 用户确认后 start
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
     try {
-      const ws = await autoCreateWorkspace({ hint_text: file.name })
-      toast.info(`已自动创建合集「${ws.name}」`)
+      const ws = await ensureInbox()
       const updated = await uploadWorkspaceItem(ws.workspace_id, file, {
         name: file.name,
       })

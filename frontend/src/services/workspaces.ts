@@ -57,6 +57,15 @@ export async function autoCreateWorkspace(req: {
   return res.data
 }
 
+/** 收纳箱 workspace 固定 ID */
+export const INBOX_WORKSPACE_ID = '__inbox__'
+
+/** POST /workspaces/ensure-inbox — 懒创建隐藏收纳箱（已存在则直接返回） */
+export async function ensureInbox(): Promise<WorkspaceRecord> {
+  const res = await http.post<WorkspaceRecord>(`${BASE}/ensure-inbox`)
+  return res.data
+}
+
 /** PATCH /workspaces/{id} — 更新名称 / 状态 / 背景信息 */
 export async function updateWorkspace(
   workspaceId: string,

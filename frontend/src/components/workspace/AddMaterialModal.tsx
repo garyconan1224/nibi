@@ -24,7 +24,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useProviderStore } from '@/store/providerStore'
 import type { SniffResult } from '@/services/workspaces'
 import {
-  autoCreateWorkspace,
+  ensureInbox,
   generateNote,
   probeDuration,
   probeItemMedia,
@@ -373,9 +373,8 @@ export function AddMaterialModal({
     try {
       let wsId = workspaceIds[0]
       if (!wsId) {
-        const ws = await autoCreateWorkspace({ hint_url: effectiveUrl, kind: selectedAction === 'replica' ? 'replica' : 'note' })
+        const ws = await ensureInbox()
         wsId = ws.workspace_id
-        toast.info(`已自动创建合集「${ws.name}」`)
       }
 
       // SniffResult 暂无 duration 字段，智能档兜底默认 10 秒

@@ -1115,6 +1115,24 @@ def auto_create_workspace(req: AutoCreateRequest) -> Dict[str, Any]:
     return rec.to_dict()
 
 
+_INBOX_WORKSPACE_ID = "__inbox__"
+
+
+@router.post("/ensure-inbox")
+def ensure_inbox() -> Dict[str, Any]:
+    """懒创建隐藏收纳箱 workspace（固定 ID __inbox__）。已存在则直接返回。"""
+    rec = _store.get(_INBOX_WORKSPACE_ID)
+    if rec is not None:
+        return rec.to_dict()
+    rec = WorkspaceRecord(
+        workspace_id=_INBOX_WORKSPACE_ID,
+        name="收纳箱",
+        source="inbox",
+    )
+    _store.create(rec)
+    return rec.to_dict()
+
+
 @router.post("/sniff-url")
 def sniff_media_url(req: SniffUrlRequest) -> dict:
     """嗅探 URL 的内容类型（不下载实际文件）。
@@ -1210,6 +1228,8 @@ def list_workspaces(
         trashed_only=trashed_only,
         include_trashed=include_trashed,
     )
+    # 隐藏收纳箱，不在合集列表展示
+    recs = [r for r in recs if r.source != "inbox"]
     return [_enrich_workspace(r) for r in recs]
 
 
@@ -1357,16 +1377,17 @@ def get_library(include_trashed: bool = False) -> Dict[str, Any]:
     workspaces_out: List[Dict[str, Any]] = []
 
     for rec in recs:
-        # workspace 摘要卡片
-        workspaces_out.append({
-            "workspace_id": rec.workspace_id,
-            "name": rec.name,
-            "items_count": len(rec.items),
-            "items_count_by_type": _items_count_by_type(rec),
-            "cover_thumbnail": _cover_thumbnail(rec),
-            "updated_at": rec.updated_at,
-            "status": rec.status,
-        })
+        # workspace 摘要卡片（收纳箱不展示为合集卡片）
+        if rec.source != "inbox":
+            workspaces_out.append({
+                "workspace_id": rec.workspace_id,
+                "name": rec.name,
+                "items_count": len(rec.items),
+                "items_count_by_type": _items_count_by_type(rec),
+                "cover_thumbnail": _cover_thumbnail(rec),
+                "updated_at": rec.updated_at,
+                "status": rec.status,
+            })
 
         for item in rec.items:
             # X.1 bridge：用 task 状态覆盖 item status
