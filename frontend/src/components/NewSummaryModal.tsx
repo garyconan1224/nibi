@@ -16,34 +16,26 @@ import './new-summary-modal.css'
 /* ── 模板选项 ────────────────────────────────────────────── */
 
 const QUICK_CARDS: { value: string; label: string; desc: string }[] = [
-  { value: 'standard', label: '标准总结', desc: '按内容结构生成学习笔记' },
-  { value: 'tool_recommendation', label: '工具推荐', desc: '提炼工具用途、亮点与取舍' },
-  { value: 'concise', label: '精简摘要', desc: '几句话概括核心内容' },
-  { value: 'steps', label: '步骤教程', desc: '有序步骤清单，可照着做' },
-  { value: 'meeting', label: '会议纪要', desc: '议题 / 决议 / 待办 / 参会人' },
-  { value: 'xhs', label: '小红书风格', desc: '标题党 + emoji + 话题标签' },
-  { value: 'quotes', label: '金句提取', desc: '5-10 条金句，适合转发' },
+  { value: 'standard', label: '标准总结', desc: '自适应教学笔记，短内容精简、长内容完整结构' },
+  { value: 'concise', label: '精简摘要', desc: '100-200 字，适合快速浏览' },
+  { value: 'detailed', label: '详细要点', desc: '多级要点 + 关键词，适合深度学习' },
+  { value: 'outline', label: '大纲', desc: '多级层次提纲，一眼看清结构' },
+  { value: 'lecture', label: '教学笔记', desc: '知识点/例子/重点/延伸阅读，适合课程录音' },
+  { value: 'steps', label: '步骤教程', desc: '前置条件→步骤→常见坑→验收标准，适合操作类内容' },
+  { value: 'quotes', label: '金句提取', desc: '5-10 条独立金句卡片，适合短视频/社媒' },
 ]
 
-const MORE_GROUPS: { label: string; items: { value: string; label: string }[] }[] = [
-  { label: '学习笔记', items: [
-    { value: 'lecture', label: '教学笔记' },
-    { value: 'detailed', label: '详细要点' },
-    { value: 'outline', label: '大纲' },
-    { value: 'qa', label: '问答卡(Anki)' },
-    { value: 'science_popularization', label: '知识科普' },
-  ]},
-  { label: '创作改写', items: [
-    { value: 'longform', label: '公众号长文' },
-    { value: 'oral', label: '口播稿' },
-  ]},
-  { label: '对话记录', items: [
-    { value: 'interview', label: '访谈整理' },
-    { value: 'shownotes', label: '播客 shownotes' },
-  ]},
-  { label: '行动规划', items: [
-    { value: 'actions', label: '行动清单' },
-  ]},
+const MORE_STYLES = [
+  { value: 'meeting', label: '会议纪要' },
+  { value: 'interview', label: '访谈整理' },
+  { value: 'shownotes', label: '播客 shownotes' },
+  { value: 'oral', label: '口播稿' },
+  { value: 'xhs', label: '小红书风格' },
+  { value: 'longform', label: '公众号长文' },
+  { value: 'qa', label: '问答卡(Anki)' },
+  { value: 'actions', label: '行动清单' },
+  { value: 'tool_recommendation', label: '工具推荐' },
+  { value: 'science_popularization', label: '知识科普' },
 ]
 
 const QUICK_VALUES = new Set(QUICK_CARDS.map((c) => c.value))
@@ -167,12 +159,8 @@ export function NewSummaryModal({
                 className="nsm-select"
               >
                 <option value="" disabled>选择其他模板</option>
-                {MORE_GROUPS.map((g) => (
-                  <optgroup key={g.label} label={g.label}>
-                    {g.items.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </optgroup>
+                {MORE_STYLES.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
             </div>
