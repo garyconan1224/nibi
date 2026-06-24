@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 
+import { HelpCircle } from 'lucide-react'
 import { useProviderStore, type Model } from '@/store/providerStore'
 import { useConfigStore } from '@/store/configStore'
 
@@ -25,17 +26,17 @@ const QUICK_CARDS: { value: string; label: string; desc: string }[] = [
   { value: 'quotes', label: '金句提取', desc: '5-10 条独立金句卡片，适合短视频/社媒' },
 ]
 
-const MORE_STYLES = [
-  { value: 'meeting', label: '会议纪要' },
-  { value: 'interview', label: '访谈整理' },
-  { value: 'shownotes', label: '播客 shownotes' },
-  { value: 'oral', label: '口播稿' },
-  { value: 'xhs', label: '小红书风格' },
-  { value: 'longform', label: '公众号长文' },
-  { value: 'qa', label: '问答卡(Anki)' },
-  { value: 'actions', label: '行动清单' },
-  { value: 'tool_recommendation', label: '工具推荐' },
-  { value: 'science_popularization', label: '知识科普' },
+const MORE_STYLES: { value: string; label: string; desc: string }[] = [
+  { value: 'meeting', label: '会议纪要', desc: '议题/结论/待办(负责人·截止)/风险，适合工作录音' },
+  { value: 'interview', label: '访谈整理', desc: 'Q&A 对话 + 嘉宾观点摘录，适合播客/采访' },
+  { value: 'shownotes', label: '播客 shownotes', desc: '时间戳章节 + 嘉宾介绍 + 推荐链接，适合自媒体' },
+  { value: 'oral', label: '口播稿', desc: '可直接念的口语化文案，适合短视频/直播' },
+  { value: 'xhs', label: '小红书风格', desc: '标题党+emoji+分段+话题 tag，适合转笔记' },
+  { value: 'longform', label: '公众号长文', desc: '引言/正文(H2分节)/结尾，适合内容创作' },
+  { value: 'qa', label: '问答卡(Anki)', desc: 'Q/A 卡片，便于记忆复习' },
+  { value: 'actions', label: '行动清单', desc: '目标→行动项→依赖→完成标准，适合会议/规划' },
+  { value: 'tool_recommendation', label: '工具推荐', desc: '工具名称/功能/适用场景/对比，适合工具测评' },
+  { value: 'science_popularization', label: '知识科普', desc: '通俗语言讲原理+类比+常见误区，适合科普' },
 ]
 
 const QUICK_VALUES = new Set(QUICK_CARDS.map((c) => c.value))
@@ -160,10 +161,21 @@ export function NewSummaryModal({
               >
                 <option value="" disabled>选择其他模板</option>
                 {MORE_STYLES.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <option key={o.value} value={o.value} title={o.desc}>{o.label}</option>
                 ))}
               </select>
+              <span
+                title={MORE_STYLES.find((o) => o.value === template)?.desc}
+                style={{ display: QUICK_VALUES.has(template) ? 'none' : 'inline-flex', cursor: 'help' }}
+              >
+                <HelpCircle size={14} style={{ opacity: 0.5 }} />
+              </span>
             </div>
+            {!QUICK_VALUES.has(template) && MORE_STYLES.find((o) => o.value === template) && (
+              <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+                {MORE_STYLES.find((o) => o.value === template)!.desc}
+              </div>
+            )}
           </div>
 
           {/* 模型选择（与 PreflightConfigPanel 对齐的双下拉） */}
