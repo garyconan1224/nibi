@@ -5,6 +5,7 @@ export interface LibraryItem {
   item_id: string
   workspace_id: string
   workspace_name: string
+  workspace_kind: 'note' | 'replica'
   type: 'video' | 'audio' | 'image' | 'text'
   source: 'url' | 'local'
   source_value: string
@@ -28,6 +29,7 @@ export interface LibraryItem {
 export interface LibraryWorkspace {
   workspace_id: string
   name: string
+  kind: 'note' | 'replica'
   items_count: number
   items_count_by_type: Record<string, number>
   cover_thumbnail: string | null

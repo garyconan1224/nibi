@@ -1382,6 +1382,7 @@ def get_library(include_trashed: bool = False) -> Dict[str, Any]:
             workspaces_out.append({
                 "workspace_id": rec.workspace_id,
                 "name": rec.name,
+                "kind": rec.kind,
                 "items_count": len(rec.items),
                 "items_count_by_type": _items_count_by_type(rec),
                 "cover_thumbnail": _cover_thumbnail(rec),
@@ -1411,6 +1412,7 @@ def get_library(include_trashed: bool = False) -> Dict[str, Any]:
                 "item_id": item.item_id,
                 "workspace_id": rec.workspace_id,
                 "workspace_name": rec.name,
+                "workspace_kind": rec.kind,
                 "type": item.type,
                 "source": item.source,
                 "source_value": item.source_value,

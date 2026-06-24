@@ -10,7 +10,7 @@ export const FILTER_OPTIONS: { key: FilterKey; label: string }[] = [
   { key: 'audio', label: '音频' },
   { key: 'image', label: '图片' },
   { key: 'text', label: '文字' },
-  { key: 'workspace', label: '工作空间' },
+  { key: 'workspace', label: '合集' },
 ]
 
 export type SortBy =

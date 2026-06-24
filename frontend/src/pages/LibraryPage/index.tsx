@@ -65,8 +65,7 @@ function sortItems(items: LibraryItem[], sortBy: SortBy): LibraryItem[] {
   }
 }
 
-export default function LibraryPage({ kind: _kind }: { kind?: 'note' | 'replica' } = {}) {
-  void _kind // Commit 4 将用 kind 过滤笔记/复刻
+export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const intentFilter = searchParams.get('intent') || ''
@@ -140,25 +139,29 @@ export default function LibraryPage({ kind: _kind }: { kind?: 'note' | 'replica'
 
   const filteredWorkspaces = useMemo(() => {
     if (!data || !showWorkspace) return null
-    return data.workspaces
-  }, [data, showWorkspace])
+    let ws = data.workspaces
+    if (kind) ws = ws.filter((w) => w.kind === kind)
+    return ws
+  }, [data, showWorkspace, kind])
 
   const filteredItems = useMemo(() => {
     if (!data) return []
     let items: LibraryItem[]
+    // 先按 kind 过滤（笔记/复刻页）
+    const kindItems = kind ? data.items.filter((it) => it.workspace_kind === kind) : data.items
     if (showAll) {
-      items = data.items
+      items = kindItems
     } else if (typeFilters.length === 0) {
       return []
     } else {
-      items = data.items.filter((it) => typeFilters.includes(it.type))
+      items = kindItems.filter((it) => typeFilters.includes(it.type))
     }
     // intent 筛选（?intent=replica 等）
     if (intentFilter) {
       items = items.filter((it) => it.preflight?.intent === intentFilter)
     }
     return sortItems(items, sortBy)
-  }, [data, showAll, typeFilters, sortBy, intentFilter])
+  }, [data, showAll, typeFilters, sortBy, intentFilter, kind])
 
   const selectAll = useCallback(() => {
     const next = new Set<string>()
@@ -271,6 +274,8 @@ export default function LibraryPage({ kind: _kind }: { kind?: 'note' | 'replica'
     }
   }, [data])
 
+  const pageTitle = kind === 'note' ? '笔记' : kind === 'replica' ? '复刻' : '资料库'
+
   const statLabel =
     showWorkspace && typeFilters.length === 0
       ? `${filteredWorkspaces?.length ?? 0} 合集`
@@ -297,7 +302,7 @@ export default function LibraryPage({ kind: _kind }: { kind?: 'note' | 'replica'
         }}
       >
         <div>
-          <div className="eyebrow">LIBRARY · {statLabel} · LOCAL</div>
+          <div className="eyebrow">{pageTitle.toUpperCase()} · {statLabel} · LOCAL</div>
           <h1
             className="display"
             style={{
@@ -307,7 +312,7 @@ export default function LibraryPage({ kind: _kind }: { kind?: 'note' | 'replica'
               letterSpacing: '-0.02em',
             }}
           >
-            资料库
+            {pageTitle}
           </h1>
           <p
             style={{
@@ -318,7 +323,9 @@ export default function LibraryPage({ kind: _kind }: { kind?: 'note' | 'replica'
               lineHeight: 1.55,
             }}
           >
-            横切所有合集的笔记池。按类型筛、按时长/状态排，找到该用的那一个。
+            {kind
+              ? `按类型筛、按时长/状态排，找到该用的那一个。`
+              : '横切所有合集的笔记池。按类型筛、按时长/状态排，找到该用的那一个。'}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
