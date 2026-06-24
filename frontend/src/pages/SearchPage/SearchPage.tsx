@@ -37,12 +37,12 @@ export default function SearchPage() {
       .then(setWorkspaces)
       .catch(err => {
         console.error(err)
-        toast.error('加载工作空间列表失败')
+        toast.error('加载合集列表失败')
       })
   }, [])
 
   const scopeLabel = useMemo(() => {
-    if (scope === '__all__') return '全部工作空间'
+    if (scope === '__all__') return '全部合集'
     const ws = workspaces.find(w => w.workspace_id === scope)
     return ws?.name ?? scope
   }, [scope, workspaces])
@@ -78,7 +78,7 @@ export default function SearchPage() {
         <div className="mx-auto flex max-w-3xl flex-col gap-3">
           <h1 className="text-lg font-semibold">知识库检索</h1>
           <p className="text-xs text-muted-foreground">
-            跨工作空间语义检索（RAG）。返回带引用的回答和可跳转的来源片段。
+            跨合集语义检索（RAG）。返回带引用的回答和可跳转的来源片段。
           </p>
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
@@ -102,7 +102,7 @@ export default function SearchPage() {
                 <SelectValue placeholder="范围" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__all__">全部工作空间</SelectItem>
+                <SelectItem value="__all__">全部合集</SelectItem>
                 {workspaces.map(ws => (
                   <SelectItem key={ws.workspace_id} value={ws.workspace_id}>
                     {ws.name}

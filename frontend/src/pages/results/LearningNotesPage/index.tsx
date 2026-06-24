@@ -163,7 +163,7 @@ export default function LearningNotesPage() {
 
         const videoItem = ws.items.find((i) => i.type === 'video')
         if (!videoItem) {
-          setPageState({ kind: 'error', message: '该工作空间没有视频素材' })
+          setPageState({ kind: 'error', message: '该合集没有视频素材' })
           return
         }
 

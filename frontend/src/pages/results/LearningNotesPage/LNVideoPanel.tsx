@@ -75,7 +75,7 @@ const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
         return
       }
       if (!workspaceId) {
-        toast.error('缺少工作空间 ID')
+        toast.error('缺少合集 ID')
         return
       }
 

@@ -76,7 +76,7 @@ export default function TaskboardPage() {
   if (error || !workspace) {
     return (
       <div className="tb-wrap" style={{ textAlign: 'center', paddingTop: 120, color: 'var(--ink-3)' }}>
-        {error ?? '工作空间不存在'}
+        {error ?? '合集不存在'}
       </div>
     )
   }

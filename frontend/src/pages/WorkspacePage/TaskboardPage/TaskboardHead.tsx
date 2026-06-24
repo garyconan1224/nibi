@@ -39,7 +39,7 @@ export function TaskboardHead({
             color: 'var(--ink-3)',
           }}
         >
-          TASK · 工作空间 · 本地
+          TASK · 合集 · 本地
         </div>
         <h1
           className="display"

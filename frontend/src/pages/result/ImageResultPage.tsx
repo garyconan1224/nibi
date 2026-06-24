@@ -563,7 +563,7 @@ function ImageCompareDialog({ data, onClose }: { data: ImageCompareResult; onClo
 
         {others.length === 0 ? (
           <div className="im-compare-empty">
-            同工作空间内暂无其他已完成分析的图片素材，无法对比。
+            同合集内暂无其他已完成分析的图片素材，无法对比。
           </div>
         ) : (
           <>

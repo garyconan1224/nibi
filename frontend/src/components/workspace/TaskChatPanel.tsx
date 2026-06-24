@@ -187,7 +187,7 @@ export function TaskChatPanel({ workspace, autoSelectAll }: TaskChatPanelProps) 
   }
 
   const placeholder = useMemo(() => {
-    if (items.length === 0) return '当前工作空间还没有笔记，先去「素材」标签添加'
+    if (items.length === 0) return '当前合集还没有笔记，先去「素材」标签添加'
     if (selectedIds.size === 0) return '请先勾选上方的素材 chip 作为对话上下文'
     return '输入消息… Enter 发送 / Shift+Enter 换行'
   }, [items.length, selectedIds.size])
@@ -233,7 +233,7 @@ export function TaskChatPanel({ workspace, autoSelectAll }: TaskChatPanelProps) 
         <div className="flex flex-wrap gap-2">
           {items.length === 0 ? (
             <span className="text-xs text-muted-foreground">
-              {autoSelectAll ? '当前工作空间还没有笔记' : '当前任务还没有素材'}
+              {autoSelectAll ? '当前合集还没有笔记' : '当前任务还没有素材'}
             </span>
           ) : (
             items.map((it) => {
