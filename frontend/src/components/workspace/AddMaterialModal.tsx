@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle2, Clock, Copy, FileText, Film, Image as ImageIcon, LayoutTemplate, Link2, Lock, PenTool, PlayCircle, Settings2, Target, Video, Wand2, X } from 'lucide-react'
+import { CheckCircle2, Clock, Copy, FileText, Film, HelpCircle, Image as ImageIcon, LayoutTemplate, Link2, Lock, PenTool, PlayCircle, Settings2, Target, Video, Wand2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -12,7 +12,10 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -77,25 +80,51 @@ const NOTE_TYPE_CARDS: { value: NoteMediaKind; label: string; desc: string }[] =
   { value: 'audio', label: '音频笔记', desc: '音频转写 + 章节整理' },
 ]
 
-const NOTE_STYLE_OPTIONS: { id: string; label: string }[] = [
+/** 7 个常用风格（主显） */
+const PRIMARY_STYLES = [
   { id: 'standard', label: '标准总结' },
   { id: 'concise', label: '精简摘要' },
   { id: 'detailed', label: '详细要点' },
-  { id: 'quotes', label: '金句提取' },
   { id: 'outline', label: '大纲' },
-  { id: 'meeting', label: '会议纪要' },
   { id: 'lecture', label: '教学笔记' },
+  { id: 'steps', label: '步骤教程' },
+  { id: 'quotes', label: '金句提取' },
+] as const
+
+/** 其余风格（折叠在「更多」里，不删） */
+const MORE_STYLES = [
+  { id: 'meeting', label: '会议纪要' },
   { id: 'interview', label: '访谈整理' },
   { id: 'shownotes', label: '播客 shownotes' },
   { id: 'oral', label: '口播稿' },
-  { id: 'steps', label: '步骤教程' },
   { id: 'xhs', label: '小红书风格' },
   { id: 'longform', label: '公众号长文' },
   { id: 'qa', label: '问答卡(Anki)' },
   { id: 'actions', label: '行动清单' },
   { id: 'tool_recommendation', label: '工具推荐' },
   { id: 'science_popularization', label: '知识科普' },
-]
+] as const
+
+/** 风格适用范围说明（hover ? 显示），内容来自后端 summary_templates.py */
+const STYLE_DESCRIPTIONS: Record<string, string> = {
+  standard: '自适应教学笔记，短内容精简、长内容完整结构',
+  concise: '100-200 字，适合快速浏览',
+  detailed: '多级要点 + 关键词，适合深度学习',
+  outline: '多级层次提纲，一眼看清结构',
+  lecture: '知识点/例子/重点/延伸阅读，适合课程录音',
+  steps: '前置条件→步骤→常见坑→验收标准，适合操作类内容',
+  quotes: '5-10 条独立金句卡片，适合短视频/社媒',
+  meeting: '议题/结论/待办(负责人·截止)/风险，适合工作录音',
+  interview: 'Q&A 对话 + 嘉宾观点摘录，适合播客/采访',
+  shownotes: '时间戳章节 + 嘉宾介绍 + 推荐链接，适合自媒体',
+  oral: '可直接念的口语化文案，适合短视频/直播',
+  xhs: '标题党+emoji+分段+话题 tag，适合转笔记',
+  longform: '引言/正文(H2分节)/结尾，适合内容创作',
+  qa: 'Q/A 卡片，便于记忆复习',
+  actions: '目标→行动项→依赖→完成标准，适合会议/规划',
+  tool_recommendation: '工具名称/功能/适用场景/对比，适合工具测评',
+  science_popularization: '通俗语言讲原理+类比+常见误区，适合科普',
+}
 
 /** 智能截帧间隔：按时长取约 25 张画面，clamp 到 5~60 秒；拿不到时长默认 10 */
 function computeAutoInterval(durationSec?: number): number {
@@ -620,9 +649,33 @@ export function AddMaterialModal({
                         <SelectValue placeholder="选择风格" />
                       </SelectTrigger>
                       <SelectContent>
-                        {NOTE_STYLE_OPTIONS.map(opt => (
-                          <SelectItem key={opt.id} value={opt.id}>{opt.label}</SelectItem>
-                        ))}
+                        <SelectGroup>
+                          <SelectLabel style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>常用风格</SelectLabel>
+                          {PRIMARY_STYLES.map(opt => (
+                            <SelectItem key={opt.id} value={opt.id}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                {opt.label}
+                                <span title={STYLE_DESCRIPTIONS[opt.id]} style={{ display: 'inline-flex', cursor: 'help' }}>
+                                  <HelpCircle size={12} style={{ opacity: 0.4 }} />
+                                </span>
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                        <SelectSeparator />
+                        <SelectGroup>
+                          <SelectLabel style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>更多风格</SelectLabel>
+                          {MORE_STYLES.map(opt => (
+                            <SelectItem key={opt.id} value={opt.id}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                {opt.label}
+                                <span title={STYLE_DESCRIPTIONS[opt.id]} style={{ display: 'inline-flex', cursor: 'help' }}>
+                                  <HelpCircle size={12} style={{ opacity: 0.4 }} />
+                                </span>
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
                       </SelectContent>
                     </Select>
                   </div>
