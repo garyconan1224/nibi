@@ -122,6 +122,7 @@ class SniffResult:
     title: Optional[str] = None
     thumbnail: Optional[str] = None
     content_type_header: Optional[str] = None
+    confident: bool = True  # 纯兜底时为 False，已知平台/og: 命中为 True
 
     def to_dict(self) -> dict:
         return {
@@ -131,6 +132,7 @@ class SniffResult:
             "title": self.title,
             "thumbnail": self.thumbnail,
             "content_type_header": self.content_type_header,
+            "confident": self.confident,
         }
 
 
@@ -266,13 +268,13 @@ def sniff_url(url: str) -> SniffResult:
     """
     raw = url.strip()
     if not raw:
-        return SniffResult(primary_type="video", possible_types=["video"])
+        return SniffResult(primary_type="video", possible_types=["video"], confident=False)
 
     # 解析 URL
     try:
         parsed = urlparse(raw if "://" in raw else f"https://{raw}")
     except Exception:
-        return SniffResult(primary_type="video", possible_types=["video"])
+        return SniffResult(primary_type="video", possible_types=["video"], confident=False)
 
     hostname = (parsed.hostname or "").lower().removeprefix("www.")
     url_path = parsed.path or "/"
@@ -378,4 +380,4 @@ def sniff_url(url: str) -> SniffResult:
         )
 
     # ── 策略 3: 完全 fallback ──
-    return SniffResult(primary_type="video", possible_types=["video"])
+    return SniffResult(primary_type="video", possible_types=["video"], confident=False)

@@ -91,16 +91,18 @@ class TestSniffUrlFallback:
         assert resp.status_code == 422
 
     def test_unknown_domain_fallback_to_video(self):
-        """未知域名且无 HTTP 访问时降级为 video。"""
+        """未知域名且无 HTTP 访问时降级为 video，confident=False。"""
         resp = client.post(SNIFF_URL, json={"url": "https://totally-unknown-xyz.example/foo"})
         assert resp.status_code == 200
         data = resp.json()
         assert data["primary_type"] == "video"
+        assert data["confident"] is False
         assert "error" in data
 
     def test_pure_bv_fallback_to_video(self):
-        """纯 BV 号没有域名信息，降级为 video。"""
+        """纯 BV 号没有域名信息，降级为 video，confident=False。"""
         resp = client.post(SNIFF_URL, json={"url": "BV1qA5j6jEJC"})
         assert resp.status_code == 200
         data = resp.json()
         assert data["primary_type"] == "video"
+        assert data["confident"] is False

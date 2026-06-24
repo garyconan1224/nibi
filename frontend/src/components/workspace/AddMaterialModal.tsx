@@ -491,7 +491,12 @@ export function AddMaterialModal({
                 </span>
               </div>
             )}
-            {effectiveSniff && (
+            {effectiveSniff && effectiveSniff.confident === false && (
+              <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 6 }}>
+                无法确认链接类型，将自动识别
+              </div>
+            )}
+            {effectiveSniff && effectiveSniff.confident !== false && (
               <div className="sniff-card">
                 <div className="sniff-thumb">
                   {(effectiveSniff.thumbnail || coverUrl) ? (
@@ -504,11 +509,11 @@ export function AddMaterialModal({
                   ) : (
                     <ImageIcon size={20} style={{ color: 'var(--ink-3)' }} />
                   )}
-                  <PlayCircle size={22} className="sniff-play" />
+                  {effectiveSniff.primary_type === 'video' && <PlayCircle size={22} className="sniff-play" />}
                 </div>
                 <div className="sniff-meta">
                   <div className="sniff-title">
-                    {effectiveSniff.title || '已识别视频'}
+                    {effectiveSniff.title || `已识别${{ video: '视频', audio: '音频', image: '图片', text: '网页' }[effectiveSniff.primary_type] ?? '内容'}`}
                   </div>
                   <div className="sniff-tags">
                     {effectiveSniff.platform && (
@@ -520,7 +525,7 @@ export function AddMaterialModal({
                       </span>
                     )}
                     <span className="sniff-ok">
-                      <CheckCircle2 size={11} /> 链接有效
+                      <CheckCircle2 size={11} /> 已识别{{ video: '视频', audio: '音频', image: '图片', text: '网页' }[effectiveSniff.primary_type] ?? '内容'}
                     </span>
                   </div>
                 </div>

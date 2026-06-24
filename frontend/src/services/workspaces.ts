@@ -95,6 +95,7 @@ export interface SniffResult {
   title: string | null
   thumbnail: string | null
   content_type_header: string | null
+  confident?: boolean  // 后端兜底时为 false
   error?: string
 }
 
