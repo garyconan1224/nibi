@@ -513,7 +513,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const handleCreateSummary = useCallback(async (opts: {
     template: string; background: string; providerId: string; model: string; searchWeb: boolean
   }) => {
-    setShowNewSummaryModal(false)
     setCreatingSummary(true)
     try {
       const s = await createSummary(workspaceId, itemId, opts.template, opts.background, {
@@ -522,6 +521,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
         search_web: opts.searchWeb,
       })
       toast.success(`v${s.version} 总结生成完成`)
+      setShowNewSummaryModal(false)
       refreshSummaries()
     } catch (err: unknown) {
       const axiosData = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
