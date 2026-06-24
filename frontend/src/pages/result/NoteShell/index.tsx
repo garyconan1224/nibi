@@ -303,8 +303,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   // VN4.1 版本下拉 + 风格/版本两层
   const [summaries, setSummaries] = useState<ItemSummary[]>([])
   const [summariesVersion, setSummariesVersion] = useState(0)
-  const [versionDropOpen, setVersionDropOpen] = useState(false)
-  const versionDropRef = useRef<HTMLDivElement>(null)
   const [templateDropOpen, setTemplateDropOpen] = useState(false)
   const templateDropRef = useRef<HTMLDivElement>(null)
   // 改名（迁入顶栏下拉）
@@ -338,18 +336,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
       .catch(() => {})
     return () => { cancelled = true }
   }, [workspaceId, itemId, activeSummaryId, summariesVersion])
-
-  // 点击外部关闭版本下拉
-  useEffect(() => {
-    if (!versionDropOpen) return
-    const handle = (e: MouseEvent) => {
-      if (versionDropRef.current && !versionDropRef.current.contains(e.target as Node)) {
-        setVersionDropOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handle)
-    return () => document.removeEventListener('mousedown', handle)
-  }, [versionDropOpen])
 
   // 点击外部关闭模板下拉
   useEffect(() => {
@@ -629,7 +615,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
 
         <div style={{ flex: 1 }} />
 
-        {/* ── 总结风格▾ + 版本▾ 两层联动下拉 ── */}
+        {/* ── 总结风格 + 版本 合并下拉 ── */}
         {summaries.length > 0 && (() => {
           const TEMPLATE_LABELS: Record<string, string> = {
             concise: '简洁摘要', detailed: '详细要点', quotes: '金句提取',
@@ -640,148 +626,118 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
             science_popularization: '知识科普', standard: '标准总结',
           }
           const tl = (id: string) => TEMPLATE_LABELS[id] ?? id
-          const currentVersions = templateGroups.get(activeTemplate) ?? []
           const activeS = summaries.find(x => x.summary_id === activeSummaryId)
+          const activeVersionLabel = activeS ? (activeS.name || `v${activeS.version}`) : ''
 
           return (
-            <>
-              {/* 总结风格▾ */}
-              <div ref={templateDropRef} style={{ position: 'relative' }}>
-                <button
-                  className="btn-ghost"
-                  onClick={() => { setTemplateDropOpen((v) => !v); setVersionDropOpen(false) }}
-                  style={{ height: 28, padding: '0 10px', fontSize: 12, color: 'var(--accent-2)' }}
-                  title="切换总结风格"
-                >
-                  <List size={13} /> {tl(activeTemplate)}
-                  <ChevronDown size={11} style={{ marginLeft: 2 }} />
-                </button>
-                {templateDropOpen && (
-                  <div style={{
-                    position: 'absolute', left: 0, top: 34, zIndex: 20,
-                    minWidth: 180, maxHeight: 300, overflowY: 'auto',
-                    padding: '4px',
-                    border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)',
-                    background: 'var(--bg)', boxShadow: 'var(--shadow-md)',
-                  }}>
-                    {[...templateGroups.keys()].map((tmpl) => (
-                      <button
-                        key={tmpl}
-                        className="btn-ghost"
-                        onClick={() => {
-                          const first = templateGroups.get(tmpl)?.[0]
-                          if (first) handleApplyToNote(first)
-                          setTemplateDropOpen(false)
-                        }}
-                        style={{
-                          width: '100%', justifyContent: 'space-between', height: 30,
-                          padding: '0 10px', fontSize: 12,
-                          color: tmpl === activeTemplate ? 'var(--accent-2)' : undefined,
-                          fontWeight: tmpl === activeTemplate ? 600 : undefined,
-                        }}
-                      >
-                        <span>{tl(tmpl)}</span>
-                        <span style={{ color: 'var(--ink-4)', fontSize: 10 }}>({(templateGroups.get(tmpl) ?? []).length})</span>
-                      </button>
-                    ))}
-                    <div style={{ height: 1, background: 'var(--line)', margin: '4px 0' }} />
-                    <button
-                      className="btn-ghost"
-                      onClick={() => { setShowNewSummaryModal(true); setTemplateDropOpen(false) }}
-                      style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
-                    >
-                      + 新建风格
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* 版本▾ */}
-              <div ref={versionDropRef} style={{ position: 'relative' }}>
-                <button
-                  className="btn-ghost"
-                  onClick={() => { setVersionDropOpen((v) => !v); setTemplateDropOpen(false) }}
-                  style={{
-                    height: 28, padding: '0 10px', fontSize: 12,
-                    color: activeSummaryId ? 'var(--accent-2)' : undefined,
-                  }}
-                  title="切换版本"
-                >
-                  <RefreshCw size={13} /> {activeS ? (activeS.name || `v${activeS.version}`) : '版本'}
-                  <ChevronDown size={11} style={{ marginLeft: 2 }} />
-                </button>
-                {versionDropOpen && (
-                  <div style={{
-                    position: 'absolute', right: 0, top: 34, zIndex: 20,
-                    minWidth: 220, maxHeight: 320, overflowY: 'auto',
-                    padding: '4px',
-                    border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)',
-                    background: 'var(--bg)', boxShadow: 'var(--shadow-md)',
-                  }}>
-                    {currentVersions.map((s) => {
-                      const isActive = s.summary_id === activeSummaryId
-                      const isRenaming = renameTargetId === s.summary_id
-                      return (
-                        <div key={s.summary_id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          {isRenaming ? (
-                            <input
-                              autoFocus
-                              value={renameName}
-                              onChange={(e) => setRenameName(e.target.value)}
-                              onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') { setRenameTargetId(null); setRenameName('') } }}
-                              onBlur={commitRename}
-                              style={{ flex: 1, height: 30, padding: '0 8px', fontSize: 12, border: '1px solid var(--accent-2)', borderRadius: 4, background: 'var(--bg)', outline: 'none' }}
-                            />
-                          ) : (
-                            <button
-                              className="btn-ghost"
-                              onClick={() => { handleApplyToNote(s); setVersionDropOpen(false) }}
-                              style={{
-                                flex: 1, justifyContent: 'flex-start', height: 30,
-                                padding: '0 8px', fontSize: 12,
-                                color: isActive ? 'var(--accent-2)' : undefined,
-                                fontWeight: isActive ? 600 : undefined,
-                              }}
-                            >
-                              {isActive && <Check size={12} style={{ marginRight: 4, flexShrink: 0 }} />}
-                              {s.name || `v${s.version}`}
-                            </button>
-                          )}
-                          {!isRenaming && (
-                            <>
-                              <button
-                                className="btn-ghost"
-                                title="改名"
-                                onClick={(e) => { e.stopPropagation(); setRenameTargetId(s.summary_id); setRenameName(s.name || '') }}
-                                style={{ padding: 4, height: 24, width: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                              >
-                                <Pencil size={11} />
-                              </button>
-                              <button
-                                className="btn-ghost"
-                                title="删除"
-                                onClick={(e) => { e.stopPropagation(); handleDeleteSummary(s.summary_id) }}
-                                style={{ padding: 4, height: 24, width: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'var(--ink-4)' }}
-                              >
-                                <Trash2 size={11} />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      )
-                    })}
-                    <div style={{ height: 1, background: 'var(--line)', margin: '4px 0' }} />
-                    <button
-                      className="btn-ghost"
-                      onClick={() => { setShowNewSummaryModal(true); setVersionDropOpen(false) }}
-                      style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
-                    >
-                      + 新建版本
-                    </button>
-                  </div>
-                )}
-              </div>
-            </>
+            <div ref={templateDropRef} style={{ position: 'relative' }}>
+              <button
+                className="btn-ghost"
+                onClick={() => setTemplateDropOpen((v) => !v)}
+                style={{ height: 28, padding: '0 10px', fontSize: 12, color: 'var(--accent-2)' }}
+                title="切换总结风格 / 版本"
+              >
+                <List size={13} /> {tl(activeTemplate)}{activeVersionLabel ? ` · ${activeVersionLabel}` : ''}
+                <ChevronDown size={11} style={{ marginLeft: 2 }} />
+              </button>
+              {templateDropOpen && (
+                <div style={{
+                  position: 'absolute', left: 0, top: 34, zIndex: 20,
+                  minWidth: 240, maxHeight: 360, overflowY: 'auto',
+                  padding: '4px',
+                  border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)',
+                  background: 'var(--bg)', boxShadow: 'var(--shadow-md)',
+                }}>
+                  {[...templateGroups.entries()].map(([tmpl, versions], gi) => {
+                    const isCurrentTmpl = tmpl === activeTemplate
+                    return (
+                      <div key={tmpl}>
+                        {gi > 0 && <div style={{ height: 1, background: 'var(--line)', margin: '2px 0' }} />}
+                        {/* 风格标题行 */}
+                        <button
+                          className="btn-ghost"
+                          onClick={() => {
+                            const first = versions[0]
+                            if (first) handleApplyToNote(first)
+                            setTemplateDropOpen(false)
+                          }}
+                          style={{
+                            width: '100%', justifyContent: 'space-between', height: 30,
+                            padding: '0 10px', fontSize: 12,
+                            color: isCurrentTmpl ? 'var(--accent-2)' : undefined,
+                            fontWeight: isCurrentTmpl ? 600 : undefined,
+                          }}
+                        >
+                          <span>{tl(tmpl)}</span>
+                          <span style={{ color: 'var(--ink-4)', fontSize: 10 }}>({versions.length})</span>
+                        </button>
+                        {/* 版本列表 */}
+                        {versions.map((s) => {
+                          const isActive = s.summary_id === activeSummaryId
+                          const isRenaming = renameTargetId === s.summary_id
+                          return (
+                            <div key={s.summary_id} style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 16 }}>
+                              {isRenaming ? (
+                                <input
+                                  autoFocus
+                                  value={renameName}
+                                  onChange={(e) => setRenameName(e.target.value)}
+                                  onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') { setRenameTargetId(null); setRenameName('') } }}
+                                  onBlur={commitRename}
+                                  style={{ flex: 1, height: 28, padding: '0 8px', fontSize: 12, border: '1px solid var(--accent-2)', borderRadius: 4, background: 'var(--bg)', outline: 'none' }}
+                                />
+                              ) : (
+                                <button
+                                  className="btn-ghost"
+                                  onClick={() => { handleApplyToNote(s); setTemplateDropOpen(false) }}
+                                  style={{
+                                    flex: 1, justifyContent: 'flex-start', height: 28,
+                                    padding: '0 8px', fontSize: 12,
+                                    color: isActive ? 'var(--accent-2)' : undefined,
+                                    fontWeight: isActive ? 600 : undefined,
+                                  }}
+                                >
+                                  {isActive && <Check size={12} style={{ marginRight: 4, flexShrink: 0 }} />}
+                                  {s.name || `v${s.version}`}
+                                </button>
+                              )}
+                              {!isRenaming && (
+                                <>
+                                  <button
+                                    className="btn-ghost"
+                                    title="改名"
+                                    onClick={(e) => { e.stopPropagation(); setRenameTargetId(s.summary_id); setRenameName(s.name || '') }}
+                                    style={{ padding: 4, height: 22, width: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+                                  >
+                                    <Pencil size={11} />
+                                  </button>
+                                  <button
+                                    className="btn-ghost"
+                                    title="删除"
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteSummary(s.summary_id) }}
+                                    style={{ padding: 4, height: 22, width: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'var(--ink-4)' }}
+                                  >
+                                    <Trash2 size={11} />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
+                  <div style={{ height: 1, background: 'var(--line)', margin: '4px 0' }} />
+                  <button
+                    className="btn-ghost"
+                    onClick={() => { setShowNewSummaryModal(true); setTemplateDropOpen(false) }}
+                    style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
+                  >
+                    + 新建风格 / 版本
+                  </button>
+                </div>
+              )}
+            </div>
           )
         })()}
 
