@@ -1,10 +1,12 @@
 import { type ReactNode, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  Home,
+  Plus,
   Sparkles,
   Film,
   Library,
+  FileText,
+  Copy,
   BookOpen,
   Star,
   Wand2,
@@ -30,17 +32,18 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: 'home',        path: '/',            icon: Home,         label: '新建笔记' },
-  { id: 'library',     path: '/library',     icon: Library,      label: '合集',     badge: 'Beta' },
-  { id: 'knowledge',   path: '#',            icon: BookOpen,     label: '知识库',   placeholder: true },
-  { id: 'storyboard',  path: '/storyboard',  icon: Film,         label: '分镜' },
-  { id: 'favorites',   path: '/favorites',   icon: Star,         label: '收藏夹' },
-  { id: 'director',    path: '#',            icon: Wand2,        label: 'AI 导演',  placeholder: true, badge: 'Phase C' },
+  { id: 'notes',      path: '/notes',      icon: FileText,     label: '笔记' },
+  { id: 'replicas',   path: '/replicas',   icon: Copy,         label: '复刻' },
+  { id: 'library',    path: '/library',    icon: Library,      label: '资料库' },
 ]
 
 const BOTTOM_ITEMS: NavItem[] = [
-  { id: 'search',   path: '/search',   icon: Search,   label: '搜索' },
-  { id: 'settings', path: '/settings', icon: Settings, label: '设置' },
+  { id: 'storyboard',  path: '/storyboard',  icon: Film,       label: '分镜' },
+  { id: 'favorites',   path: '/favorites',   icon: Star,       label: '收藏夹' },
+  { id: 'knowledge',   path: '#',            icon: BookOpen,   label: '知识库',   placeholder: true },
+  { id: 'director',    path: '#',            icon: Wand2,      label: 'AI 导演',  placeholder: true, badge: 'Phase C' },
+  { id: 'search',      path: '/search',      icon: Search,     label: '搜索' },
+  { id: 'settings',    path: '/settings',    icon: Settings,   label: '设置' },
 ]
 
 interface SidebarBtnProps {
@@ -142,7 +145,8 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   const isActive = (item: NavItem) => {
-    if (item.id === 'home') return location.pathname === '/'
+    if (item.id === 'notes') return location.pathname === '/' || location.pathname.startsWith('/notes')
+    if (item.id === 'replicas') return location.pathname.startsWith('/replicas')
     return location.pathname.startsWith(item.path)
   }
 
@@ -199,6 +203,24 @@ export function AppShell({ children }: AppShellProps) {
             </button>
           </div>
         )}
+
+        {/* ＋新建 按钮 */}
+        <button
+          className={cn(
+            'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+            'bg-violet-100 text-violet-700 hover:bg-violet-200 dark:bg-violet-900/30 dark:text-violet-400 dark:hover:bg-violet-900/50',
+            collapsed && 'justify-center px-0',
+          )}
+          onClick={() => navigate('/')}
+          title="新建笔记"
+          aria-label="新建笔记"
+        >
+          <Plus size={16} />
+          {!collapsed && <span>新建</span>}
+        </button>
+
+        {/* Separator */}
+        <div className={cn('my-2 h-px bg-border', collapsed ? 'mx-3 w-6' : 'mx-2')} />
 
         {/* Main nav */}
         {NAV_ITEMS.map((item) => (

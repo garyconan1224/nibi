@@ -61,6 +61,8 @@ export const router = createBrowserRouter([
       { path: 'favorites', element: withSuspense(<FavoritesPage />) },
       { path: 'search', element: withSuspense(<SearchPage />) },
       { path: 'library', element: withSuspense(<LibraryPage />) },
+      { path: 'notes', element: withSuspense(<LibraryPage kind="note" />) },
+      { path: 'replicas', element: withSuspense(<LibraryPage kind="replica" />) },
       { path: 'workspaces/:id', element: withSuspense(<TaskboardPage />) },
       {
         path: 'workspaces/:workspaceId/items/:itemId/overview',

@@ -65,7 +65,8 @@ function sortItems(items: LibraryItem[], sortBy: SortBy): LibraryItem[] {
   }
 }
 
-export default function LibraryPage() {
+export default function LibraryPage({ kind: _kind }: { kind?: 'note' | 'replica' } = {}) {
+  void _kind // Commit 4 将用 kind 过滤笔记/复刻
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const intentFilter = searchParams.get('intent') || ''
