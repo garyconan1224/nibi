@@ -222,7 +222,7 @@ describe('AddMaterialModal', () => {
     fireEvent.click(screen.getByRole('button', { name: /开始生成/ }))
 
     await waitFor(() => {
-      expect(autoCreateWorkspaceMock).toHaveBeenCalledWith({ hint_url: 'https://example.com/article' })
+      expect(autoCreateWorkspaceMock).toHaveBeenCalledWith({ hint_url: 'https://example.com/article', kind: 'note' })
       expect(generateNoteMock).toHaveBeenCalledWith(
         'ws-new',
         'https://example.com/article',

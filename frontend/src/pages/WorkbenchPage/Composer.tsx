@@ -390,6 +390,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
         }}
         workspaceIds={workspaceSel}
         workspaceBackgrounds={wsBackgrounds}
+        workspaceKind={workspaceSel[0] ? wsById[workspaceSel[0]]?.kind : undefined}
         sniffResult={sniffResult}
         urlValue={normalizedUrl || undefined}
         onAdded={handleAdded}
