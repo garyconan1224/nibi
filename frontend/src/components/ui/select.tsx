@@ -123,8 +123,9 @@ function SelectLabel({
 function SelectItem({
   className,
   children,
+  suffix,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Item>) {
+}: React.ComponentProps<typeof SelectPrimitive.Item> & { suffix?: React.ReactNode }) {
   return (
     <SelectPrimitive.Item
       className={cn(
@@ -140,6 +141,7 @@ function SelectItem({
         </SelectPrimitive.ItemIndicator>
       </span>
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+      {suffix && <span className="ml-auto flex items-center">{suffix}</span>}
     </SelectPrimitive.Item>
   )
 }

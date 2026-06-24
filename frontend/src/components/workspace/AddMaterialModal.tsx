@@ -652,13 +652,16 @@ export function AddMaterialModal({
                         <SelectGroup>
                           <SelectLabel style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>常用风格</SelectLabel>
                           {PRIMARY_STYLES.map(opt => (
-                            <SelectItem key={opt.id} value={opt.id}>
-                              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                {opt.label}
+                            <SelectItem 
+                              key={opt.id} 
+                              value={opt.id}
+                              suffix={
                                 <span title={STYLE_DESCRIPTIONS[opt.id]} style={{ display: 'inline-flex', cursor: 'help' }}>
                                   <HelpCircle size={12} style={{ opacity: 0.4 }} />
                                 </span>
-                              </span>
+                              }
+                            >
+                              {opt.label}
                             </SelectItem>
                           ))}
                         </SelectGroup>
@@ -666,13 +669,16 @@ export function AddMaterialModal({
                         <SelectGroup>
                           <SelectLabel style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>更多风格</SelectLabel>
                           {MORE_STYLES.map(opt => (
-                            <SelectItem key={opt.id} value={opt.id}>
-                              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                {opt.label}
+                            <SelectItem 
+                              key={opt.id} 
+                              value={opt.id}
+                              suffix={
                                 <span title={STYLE_DESCRIPTIONS[opt.id]} style={{ display: 'inline-flex', cursor: 'help' }}>
                                   <HelpCircle size={12} style={{ opacity: 0.4 }} />
                                 </span>
-                              </span>
+                              }
+                            >
+                              {opt.label}
                             </SelectItem>
                           ))}
                         </SelectGroup>
