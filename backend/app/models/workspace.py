@@ -271,6 +271,8 @@ class WorkspaceRecord:
     created_at: str = field(default_factory=_now_iso)
     updated_at: str = field(default_factory=_now_iso)
     kind: str = "note"  # "note" | "replica"，合集类型
+    source: str = "manual"  # "manual" | "bilibili_favorites" | "bilibili_multipart" | "bilibili_uploader"
+    source_meta: Dict[str, Any] = field(default_factory=dict)  # 来源合集的元数据（B站收藏夹/分P/UP主）
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -288,6 +290,8 @@ class WorkspaceRecord:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "kind": self.kind,
+            "source": self.source,
+            "source_meta": self.source_meta,
         }
 
     @classmethod
@@ -314,6 +318,13 @@ class WorkspaceRecord:
         raw_kind = str(data.get("kind") or "note")
         if raw_kind not in ("note", "replica"):
             raw_kind = "note"
+        # 老数据兼容：缺 source 字段默认 "manual"
+        raw_source = str(data.get("source") or "manual")
+        if raw_source not in ("manual", "bilibili_favorites", "bilibili_multipart", "bilibili_uploader"):
+            raw_source = "manual"
+        raw_source_meta = data.get("source_meta") or {}
+        if not isinstance(raw_source_meta, dict):
+            raw_source_meta = {}
         return cls(
             workspace_id=str(data.get("workspace_id") or ""),
             name=str(data.get("name") or ""),
@@ -326,4 +337,6 @@ class WorkspaceRecord:
             created_at=str(data.get("created_at") or _now_iso()),
             updated_at=str(data.get("updated_at") or _now_iso()),
             kind=raw_kind,
+            source=raw_source,
+            source_meta=raw_source_meta,
         )
