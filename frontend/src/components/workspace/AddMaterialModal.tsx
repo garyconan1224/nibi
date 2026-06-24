@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle2, Clock, Copy, FileText, Film, HelpCircle, Image as ImageIcon, LayoutTemplate, Link2, Lock, PenTool, PlayCircle, Settings2, Target, Video, Wand2, X } from 'lucide-react'
+import { CheckCircle2, Clock, Copy, FileText, Film, Image as ImageIcon, LayoutTemplate, Link2, Lock, PenTool, PlayCircle, Settings2, Target, Video, Wand2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -652,16 +652,9 @@ export function AddMaterialModal({
                         <SelectGroup>
                           <SelectLabel style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>常用风格</SelectLabel>
                           {PRIMARY_STYLES.map(opt => (
-                            <SelectItem 
-                              key={opt.id} 
-                              value={opt.id}
-                              suffix={
-                                <span title={STYLE_DESCRIPTIONS[opt.id]} style={{ display: 'inline-flex', cursor: 'help' }}>
-                                  <HelpCircle size={12} style={{ opacity: 0.4 }} />
-                                </span>
-                              }
-                            >
+                            <SelectItem key={opt.id} value={opt.id}>
                               {opt.label}
+                              <span style={{ fontSize: 11, color: 'var(--ink-3)', marginLeft: 6 }}>{STYLE_DESCRIPTIONS[opt.id]}</span>
                             </SelectItem>
                           ))}
                         </SelectGroup>
@@ -669,16 +662,9 @@ export function AddMaterialModal({
                         <SelectGroup>
                           <SelectLabel style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>更多风格</SelectLabel>
                           {MORE_STYLES.map(opt => (
-                            <SelectItem 
-                              key={opt.id} 
-                              value={opt.id}
-                              suffix={
-                                <span title={STYLE_DESCRIPTIONS[opt.id]} style={{ display: 'inline-flex', cursor: 'help' }}>
-                                  <HelpCircle size={12} style={{ opacity: 0.4 }} />
-                                </span>
-                              }
-                            >
+                            <SelectItem key={opt.id} value={opt.id}>
                               {opt.label}
+                              <span style={{ fontSize: 11, color: 'var(--ink-3)', marginLeft: 6 }}>{STYLE_DESCRIPTIONS[opt.id]}</span>
                             </SelectItem>
                           ))}
                         </SelectGroup>
