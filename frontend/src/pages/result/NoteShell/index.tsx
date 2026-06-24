@@ -13,7 +13,7 @@
 import { cloneElement, isValidElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, BookOpenCheck, Brain, Check, ChevronDown, ChevronRight, Download, FileCode, FileDown, FileText, FileType, Image, List, Network, Pencil, Presentation, RefreshCw, Sparkles, Subtitles, Trash2 } from 'lucide-react'
+import { ArrowLeft, BookOpenCheck, Brain, Check, ChevronDown, ChevronRight, Download, FileCode, FileDown, FileText, FileType, Image, List, Loader2, Network, Pencil, Presentation, RefreshCw, Sparkles, Subtitles, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { downloadSubtitles, exportItemNoteObsidian, getItemNote, putItemNote } from '@/services/workspaces'
@@ -500,6 +500,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     template: string; background: string; providerId: string; model: string; searchWeb: boolean
   }) => {
     setCreatingSummary(true)
+    setShowNewSummaryModal(false)
     try {
       const s = await createSummary(workspaceId, itemId, opts.template, opts.background, {
         provider_id: opts.providerId,
@@ -507,7 +508,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
         search_web: opts.searchWeb,
       })
       toast.success(`v${s.version} 总结生成完成`)
-      setShowNewSummaryModal(false)
       refreshSummaries()
     } catch (err: unknown) {
       const axiosData = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
@@ -730,10 +730,14 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                   <div style={{ height: 1, background: 'var(--line)', margin: '4px 0' }} />
                   <button
                     className="btn-ghost"
-                    onClick={() => { setShowNewSummaryModal(true); setTemplateDropOpen(false) }}
-                    style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
+                    onClick={() => { if (!creatingSummary) { setShowNewSummaryModal(true); setTemplateDropOpen(false) } }}
+                    disabled={creatingSummary}
+                    style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12, ...(creatingSummary ? { color: 'var(--accent)', opacity: 0.7 } : undefined) }}
                   >
-                    + 新建风格 / 版本
+                    {creatingSummary
+                      ? <><Loader2 size={13} className="animate-spin" /> 生成中…</>
+                      : '+ 新建风格 / 版本'
+                    }
                   </button>
                 </div>
               )}
@@ -745,11 +749,15 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
         {summaries.length === 0 && (
           <button
             className="btn-ghost"
-            onClick={() => setShowNewSummaryModal(true)}
-            style={{ height: 28, padding: '0 10px', fontSize: 12 }}
+            onClick={() => !creatingSummary && setShowNewSummaryModal(true)}
+            disabled={creatingSummary}
+            style={{ height: 28, padding: '0 10px', fontSize: 12, ...(creatingSummary ? { color: 'var(--accent)', opacity: 0.7 } : undefined) }}
             title="新建总结"
           >
-            <RefreshCw size={13} /> 新建总结
+            {creatingSummary
+              ? <><Loader2 size={13} className="animate-spin" /> 生成中…</>
+              : <><RefreshCw size={13} /> 新建总结</>
+            }
           </button>
         )}
 
