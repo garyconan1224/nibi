@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { X } from 'lucide-react'
 
 import { getWorkspace } from '@/services/workspaces'
 import { AddMaterialModal } from '@/components/workspace/AddMaterialModal'
 import { usePipelineTasks } from '@/hooks/usePipelineTasks'
-import { useTaskStore } from '@/store/taskStore'
-import { isTaskTerminal } from '@/types/task'
+
 import type { WorkspaceRecord } from '@/types/workspace'
 
 import { ChatTab } from './ChatTab'
@@ -18,26 +18,29 @@ import { QueueTab } from './QueueTab'
 import { TagsTab } from './TagsTab'
 import { BackgroundEditor } from './BackgroundEditor'
 import { TaskboardHead } from './TaskboardHead'
-import { TabsNav } from './TabsNav'
 import type { TabId } from './types'
 import { VersionsTab } from './VersionsTab'
 import './taskboard.css'
 
 /**
- * Taskboard 主入口 — 替代旧 WorkspaceDetail。
- *
- * H2.4: 骨架 + 头部 + 9 Tab（7 可用 + 2 禁用）。
+ * Taskboard 主入口 — BiliNote 式布局：
+ * 头部（名称 + 计数 + 操作按钮） + 素材网格主体 + Modal 弹层（导出/对比/更多功能）。
  */
 export default function TaskboardPage() {
   const { id } = useParams<{ id: string }>()
   const [workspace, setWorkspace] = useState<WorkspaceRecord | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [tab, setTab] = useState<TabId>('materials')
   const [addOpen, setAddOpen] = useState(false)
   const [bgOpen, setBgOpen] = useState(false)
   const [compareSelectedIds, setCompareSelectedIds] = useState<Set<string>>(new Set())
-  const tasks = useTaskStore((s) => s.tasks)
+
+  // Modal 状态：导出 / 对比 / 更多功能面板
+  const [exportOpen, setExportOpen] = useState(false)
+  const [compareOpen, setCompareOpen] = useState(false)
+  const [morePanelId, setMorePanelId] = useState<TabId | null>(null)
+
+
   const abortRef = useRef<AbortController | null>(null)
 
   usePipelineTasks({ projectId: id, pollInterval: 5000, enabled: Boolean(id) })
@@ -65,6 +68,20 @@ export default function TaskboardPage() {
     return () => ac.abort()
   }, [id])
 
+  /** 「更多」菜单点击处理 */
+  const handleMenuAction = (menuId: string) => {
+    const validIds: TabId[] = ['queue', 'favs', 'history', 'tags', 'chat', 'knowledgeQA', 'style']
+    if (validIds.includes(menuId as TabId)) {
+      setMorePanelId(menuId as TabId)
+    }
+  }
+
+  /** 刷新 workspace 数据 */
+  const refresh = () => {
+    if (!workspace) return
+    getWorkspace(workspace.workspace_id).then(setWorkspace).catch(() => {})
+  }
+
   if (loading) {
     return (
       <div className="tb-wrap" style={{ opacity: 0.5, textAlign: 'center', paddingTop: 120 }}>
@@ -81,71 +98,103 @@ export default function TaskboardPage() {
     )
   }
 
-  const counts: Partial<Record<TabId, number>> = {
-    materials: workspace.items.length,
-    queue: tasks.filter((t) => t.project_id === workspace.workspace_id && !isTaskTerminal(t.status)).length,
-    favs: workspace.favorites.length,
-  }
-
   return (
     <div className="tb-wrap">
       <TaskboardHead
         name={workspace.name}
+        materialCount={workspace.items.length}
         background={workspace.background}
         onEditBackground={() => setBgOpen(true)}
         onAddMaterial={() => setAddOpen(true)}
+        onExport={() => setExportOpen(true)}
+        onCompare={() => setCompareOpen(true)}
+        onMerge={() => {
+          // TODO: Commit 4 实现融合
+        }}
+        onShare={() => {
+          // TODO: Commit 2 实现复制 Markdown
+        }}
+        onMenuAction={handleMenuAction}
       />
 
-      <TabsNav active={tab} onChange={setTab} counts={counts} />
-
+      {/* 素材网格 — 默认主体 */}
       <div className="tb-body">
-        {tab === 'materials' && (
-          <MaterialsTab
-            items={workspace.items}
-            workspaceId={workspace.workspace_id}
-            onAddMaterial={() => setAddOpen(true)}
-            onNavigateToCompare={() => setTab('compare')}
-            onSelectedIdsChange={setCompareSelectedIds}
-          />
-        )}
-        {tab === 'queue' && <QueueTab workspaceId={workspace.workspace_id} />}
-        {tab === 'favs' && (
-          <FavoritesTab
-            favoriteIds={workspace.favorites}
-            items={workspace.items}
-            workspaceId={workspace.workspace_id}
-          />
-        )}
-        {tab === 'history' && <VersionsTab />}
-        {tab === 'tags' && (
-          <TagsTab
-            items={workspace.items}
-            workspaceId={workspace.workspace_id}
-            onTagsChanged={() => getWorkspace(workspace.workspace_id).then(setWorkspace).catch(() => {})}
-          />
-        )}
-        {tab === 'chat' && <ChatTab workspace={workspace} />}
-        {tab === 'knowledgeQA' && <KnowledgeQATab workspace={workspace} />}
-        {tab === 'export' && (
-          <ExportTab items={workspace.items} workspaceId={workspace.workspace_id} />
-        )}
-        {tab === 'compare' && (
-          <CompareTab workspace={workspace} selectedIds={compareSelectedIds} />
-        )}
-        {tab === 'style' && (
-          <div className="tb-placeholder">Phase [C] 开放</div>
-        )}
+        <MaterialsTab
+          items={workspace.items}
+          workspaceId={workspace.workspace_id}
+          onAddMaterial={() => setAddOpen(true)}
+          onNavigateToCompare={() => setCompareOpen(true)}
+          onSelectedIdsChange={setCompareSelectedIds}
+        />
       </div>
 
+      {/* ── Modal：导出 ── */}
+      {exportOpen && (
+        <div className="tb-modal-overlay" onClick={() => setExportOpen(false)}>
+          <div className="tb-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="tb-modal-close" onClick={() => setExportOpen(false)}>
+              <X size={18} />
+            </button>
+            <ExportTab items={workspace.items} workspaceId={workspace.workspace_id} />
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal：对比 ── */}
+      {compareOpen && (
+        <div className="tb-modal-overlay" onClick={() => setCompareOpen(false)}>
+          <div className="tb-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="tb-modal-close" onClick={() => setCompareOpen(false)}>
+              <X size={18} />
+            </button>
+            <CompareTab workspace={workspace} selectedIds={compareSelectedIds} />
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal：更多功能面板（队列/收藏/版本/标签/AI对话/知识库/风格报告） ── */}
+      {morePanelId && (
+        <div className="tb-modal-overlay" onClick={() => setMorePanelId(null)}>
+          <div className="tb-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="tb-modal-close" onClick={() => setMorePanelId(null)}>
+              <X size={18} />
+            </button>
+            {morePanelId === 'queue' && <QueueTab workspaceId={workspace.workspace_id} />}
+            {morePanelId === 'favs' && (
+              <FavoritesTab
+                favoriteIds={workspace.favorites}
+                items={workspace.items}
+                workspaceId={workspace.workspace_id}
+              />
+            )}
+            {morePanelId === 'history' && <VersionsTab />}
+            {morePanelId === 'tags' && (
+              <TagsTab
+                items={workspace.items}
+                workspaceId={workspace.workspace_id}
+                onTagsChanged={refresh}
+              />
+            )}
+            {morePanelId === 'chat' && <ChatTab workspace={workspace} />}
+            {morePanelId === 'knowledgeQA' && <KnowledgeQATab workspace={workspace} />}
+            {morePanelId === 'style' && (
+              <div className="tb-placeholder">Phase [C] 开放</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── AddMaterialModal ── */}
       <AddMaterialModal
         open={addOpen}
         onOpenChange={setAddOpen}
         workspaceIds={[workspace.workspace_id]}
         workspaceBackgrounds={{ [workspace.workspace_id]: workspace.background }}
         workspaceKind={workspace.kind}
-        onAdded={() => getWorkspace(workspace.workspace_id).then(setWorkspace).catch(() => {})}
+        onAdded={refresh}
       />
 
+      {/* ── BackgroundEditor ── */}
       <BackgroundEditor
         open={bgOpen}
         workspaceId={workspace.workspace_id}

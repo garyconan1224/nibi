@@ -6,24 +6,74 @@
   padding: 28px 32px 48px;
 }
 
-/* ─── Header ─── */
+/* ─── Header (BiliNote-style) ─── */
 .tb-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 28px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-subtle, #eee);
 }
 .tb-head-l {
   flex: 1;
   min-width: 0;
 }
-.tb-head-r {
+.tb-head-count {
   display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-  padding-top: 28px;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--ink-3);
 }
+.tb-head-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+/* 更多按钮容器 */
+.tb-head-more-wrap {
+  position: relative;
+}
+/* 更多下拉菜单 */
+.tb-head-more-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 140px;
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border-subtle, #eee);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  padding: 4px;
+  z-index: 100;
+}
+.tb-head-more-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: none;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--ink-2, #333);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.tb-head-more-item:hover {
+  background: var(--bg-hover, #f5f5f5);
+}
+.tb-head-more-item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 
 /* ─── 5-dimension context grid ─── */
 .tb-ctx {
@@ -619,4 +669,45 @@
   gap: 8px;
   font-size: 13px;
   color: var(--ink-2);
+}
+
+/* ─── Modal overlay (Export / Compare / etc.) ─── */
+.tb-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: tb-fade-in 0.15s ease-out;
+}
+@keyframes tb-fade-in {
+  from { opacity: 0 }
+  to   { opacity: 1 }
+}
+.tb-modal {
+  background: var(--bg-card, #fff);
+  border-radius: 14px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.2);
+  width: min(800px, 90vw);
+  max-height: 85vh;
+  overflow: auto;
+  padding: 24px;
+  position: relative;
+}
+.tb-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-3);
+  padding: 4px;
+  border-radius: 6px;
+  line-height: 1;
+}
+.tb-modal-close:hover {
+  background: var(--bg-hover, #f0f0f0);
 }
