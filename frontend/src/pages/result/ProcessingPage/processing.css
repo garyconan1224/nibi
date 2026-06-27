@@ -1,29 +1,29 @@
-/* ProcessingPage 局部 token 别名（复用 tokens.css 模式） */
+/* ProcessingPage 局部 token 映射到 Nibi */
 .vm-processing-scope {
-  --accent:       #FF4D7E;
-  --accent-2:     #B84CFF;
-  --accent-3:     #3C77FB;
-  --accent-warm:  #FFB84C;
-  --accent-green: #22D39A;
+  --accent:       var(--color-accent);
+  --accent-2:     var(--color-accent);
+  --accent-3:     var(--color-accent);
+  --accent-warm:  var(--color-warning);
+  --accent-green: var(--color-success);
 
-  --bg:        #f6f5f0;
-  --bg-elev:   #ffffff;
-  --bg-sunken: #efede6;
-  --ink:    #111111;
-  --ink-2:  #3a3a3a;
-  --ink-3:  #6b6b6b;
-  --ink-4:  #a0a0a0;
-  --line:        rgba(0, 0, 0, 0.08);
-  --line-strong: rgba(0, 0, 0, 0.18);
+  --bg:        var(--color-bg);
+  --bg-elev:   var(--color-surface);
+  --bg-sunken: var(--color-bg-alt);
+  --ink:    var(--color-fg);
+  --ink-2:  var(--color-fg-2);
+  --ink-3:  var(--color-muted);
+  --ink-4:  oklch(70% 0.008 70);
+  --line:        var(--color-border);
+  --line-strong: var(--color-border-s);
 
-  --mono:    ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
-  --display: 'Instrument Serif', 'Source Han Serif SC', 'Noto Serif SC', Georgia, serif;
-  --radius:   12px;
-  --radius-lg: 16px;
+  --mono:    var(--font-mono);
+  --display: var(--font-display);
+  --radius:   10px;
+  --radius-lg: 14px;
 
-  color: var(--ink);
-  background: var(--bg);
-  font-family: 'Inter', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  color: var(--color-fg);
+  background: var(--color-bg);
+  font-family: var(--font-body);
   height: 100%;
   overflow-y: auto;
 }

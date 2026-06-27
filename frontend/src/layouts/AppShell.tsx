@@ -164,7 +164,8 @@ export function AppShell({ children }: AppShellProps) {
         {collapsed ? (
           <>
             <button
-              className="mb-1 flex size-11 items-center justify-center rounded-[10px] bg-violet-100 text-violet-600 shadow-sm transition-colors hover:bg-violet-200 dark:bg-violet-900/30 dark:text-violet-400 dark:hover:bg-violet-900/50"
+              className="mb-1 flex size-11 items-center justify-center rounded-[10px] transition-colors hover:opacity-80"
+              style={{ background: 'var(--accl)', color: 'var(--acc)' }}
               onClick={() => navigate('/')}
               title="Nibi"
               aria-label="返回工作台"
@@ -188,10 +189,15 @@ export function AppShell({ children }: AppShellProps) {
               title="Nibi"
               aria-label="返回工作台"
             >
-              <span className="flex size-8 items-center justify-center rounded-[10px] bg-violet-100 text-violet-600 shadow-sm dark:bg-violet-900/30 dark:text-violet-400">
+              <span
+                className="flex size-8 items-center justify-center rounded-[10px] shadow-sm"
+                style={{ background: 'var(--accl)', color: 'var(--acc)' }}
+              >
                 <Sparkles size={16} />
               </span>
-              <span className="text-sm font-semibold text-foreground">Nibi</span>
+              <span className="text-sm font-semibold" style={{ fontFamily: 'var(--fd)', color: 'var(--fg)' }}>
+                Nibi
+              </span>
             </button>
             <button
               className="ml-auto flex size-8 items-center justify-center rounded-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -208,9 +214,12 @@ export function AppShell({ children }: AppShellProps) {
         <button
           className={cn(
             'flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-            'bg-violet-100 text-violet-700 hover:bg-violet-200 dark:bg-violet-900/30 dark:text-violet-400 dark:hover:bg-violet-900/50',
             collapsed && 'justify-center px-0',
           )}
+          style={{
+            background: 'var(--accl)',
+            color: 'var(--acc)',
+          }}
           onClick={() => navigate('/')}
           title="新建笔记"
           aria-label="新建笔记"

@@ -1,24 +1,80 @@
 @import 'tailwindcss';
+@import './styles/nibi-tokens.css';
+@import './styles/nibi-components.css';
 
 @custom-variant dark (&:is(.dark *));
 
-/* VidMirror design tokens */
+/* ── 过渡层：旧 shadcn/v4 token 指向 Nibi token ── */
 :root {
-  --vm-accent:       #FF4D7E;
-  --vm-accent-2:     #B84CFF;
-  --vm-accent-3:     #3C77FB;
-  --vm-accent-warm:  #FFB84C;
-  --vm-accent-green: #22D39A;
-  --vm-sans: 'Inter', 'PingFang SC', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
-  --vm-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
-  --vm-display: 'Instrument Serif', 'Source Han Serif SC', 'Noto Serif SC', Georgia, serif;
+  --radius: 10px;
+
+  --background:            var(--color-bg);
+  --foreground:            var(--color-fg);
+  --card:                  var(--color-surface);
+  --card-foreground:       var(--color-fg);
+  --popover:               var(--color-surface);
+  --popover-foreground:    var(--color-fg);
+  --primary:               var(--color-accent);
+  --primary-light:         var(--color-accent-light);
+  --primary-foreground:    var(--color-accent-fg);
+  --secondary:             oklch(95% 0.005 80);
+  --secondary-foreground:  var(--color-fg-2);
+  --muted:                 var(--color-bg-alt);
+  --muted-foreground:      var(--color-muted);
+  --accent:                var(--color-bg-alt);
+  --accent-foreground:     var(--color-fg);
+  --destructive:           var(--color-error);
+  --border:                var(--color-border);
+  --input:                 var(--color-border);
+  --ring:                  var(--color-accent);
+
+  --sidebar:               var(--color-sidebar);
+  --sidebar-foreground:    var(--color-fg);
+  --sidebar-primary:       var(--color-accent);
+  --sidebar-primary-foreground: var(--color-accent-fg);
+  --sidebar-accent:        var(--color-bg-alt);
+  --sidebar-accent-foreground: var(--color-fg);
+  --sidebar-border:        var(--color-border);
+  --sidebar-ring:          var(--color-border-s);
 }
+
+.dark {
+  --background:            var(--color-bg);
+  --foreground:            var(--color-fg);
+  --card:                  var(--color-surface);
+  --card-foreground:       var(--color-fg);
+  --popover:               var(--color-surface);
+  --popover-foreground:    var(--color-fg);
+  --primary:               var(--color-accent);
+  --primary-light:         var(--color-accent-light);
+  --primary-foreground:    var(--color-accent-fg);
+  --secondary:             oklch(25% 0.006 70);
+  --secondary-foreground:  var(--color-fg-2);
+  --muted:                 var(--color-bg-alt);
+  --muted-foreground:      var(--color-muted);
+  --accent:                var(--color-bg-alt);
+  --accent-foreground:     var(--color-fg);
+  --destructive:           var(--color-error);
+  --border:                var(--color-border);
+  --input:                 var(--color-border-s);
+  --ring:                  var(--color-accent);
+
+  --sidebar:               var(--color-sidebar);
+  --sidebar-foreground:    var(--color-fg);
+  --sidebar-primary:       var(--color-accent);
+  --sidebar-primary-foreground: var(--color-accent-fg);
+  --sidebar-accent:        var(--color-bg-alt);
+  --sidebar-accent-foreground: var(--color-fg);
+  --sidebar-border:        var(--color-border);
+  --sidebar-ring:          var(--color-border-s);
+}
+
 html, body, #root {
   height: 100%;
   overflow: hidden;
 }
 
-/* 打印时放开最外层高度/overflow，让长内容（如学习笔记导出 PDF）自然分多页，不被裁到一页 */
+/* 打印时放开最外层高度/overflow，让长内容自然分多页 */
 @media print {
   html, body, #root {
     height: auto;
@@ -26,96 +82,19 @@ html, body, #root {
   }
 }
 
-/* 修改滚动条轨道颜色 */
+/* ── 滚动条 ── */
 ::-webkit-scrollbar {
-  width: 8px; /* 控制滚动条的宽度 */
+  width: 8px;
 }
-
-/* 修改滚动条的轨道颜色 */
 ::-webkit-scrollbar-track {
-  background-color: #f1f1f1; /* 轨道的背景颜色 */
+  background-color: var(--color-bg-alt);
 }
-
-/* 修改滚动条的滑块颜色 */
 ::-webkit-scrollbar-thumb {
-  background-color: #888; /* 滑块的颜色 */
-  border-radius: 4px; /* 圆角 */
+  background-color: var(--color-muted);
+  border-radius: var(--radius-sm);
 }
-
-/* 当鼠标悬停时，修改滑块颜色 */
 ::-webkit-scrollbar-thumb:hover {
-  background-color: #555; /* 悬停时的颜色 */
-}
-
-:root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #3c77fb;
-  --primary-light: #e0eeff;
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: var(    --color-neutral-200);
-  --input: oklch(0.922 0 0);
-  --ring: #096dd9;
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: #3c77fb;
-  --primary-light: #e0eeff;
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: #e6f7ff;
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  background-color: var(--color-fg-2);
 }
 
 @theme inline {
@@ -123,6 +102,7 @@ html, body, #root {
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -142,11 +122,6 @@ html, body, #root {
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -163,5 +138,8 @@ html, body, #root {
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    font-size: var(--text-base);
+    line-height: 1.6;
   }
 }
