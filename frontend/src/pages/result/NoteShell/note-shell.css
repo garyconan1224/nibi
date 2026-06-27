@@ -352,6 +352,195 @@
   box-shadow: 0 18px 42px rgba(36, 28, 18, 0.08);
 }
 
+/* ══════════════════════════════════════════
+   设计稿对齐：.note-bar / .note-page
+   ══════════════════════════════════════════ */
+
+/* ── 顶栏：.note-bar（设计稿 .note-bar） ── */
+.nibi-note-bar {
+  height: 46px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  background: var(--srf, #fff);
+  flex-shrink: 0;
+}
+
+.nibi-note-bar-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--fg2, #3d3929);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: var(--rs, 6px);
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.nibi-note-bar-back:hover {
+  background: var(--bgalt, #f7f3ec);
+}
+
+.nibi-note-bar-title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--sm, 13px);
+  font-weight: 700;
+  color: var(--fg, #191410);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
+.nibi-note-bar-meta {
+  color: var(--mut, #7c7464);
+  font-family: var(--fm, 'JetBrains Mono', monospace);
+  font-size: var(--xs, 11px);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.nibi-note-bar-tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.nibi-note-bar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  border-radius: var(--rs, 6px);
+  background: var(--bgalt, #f7f3ec);
+  color: var(--fg2, #3d3929);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  text-decoration: none;
+}
+
+.nibi-note-bar-btn:hover {
+  background: var(--accl, rgba(255, 138, 54, 0.1));
+  color: var(--acc, #ff8a36);
+}
+
+.nibi-note-bar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── 两栏布局：.note-page（设计稿 .note-page） ── */
+.nibi-note-page {
+  --note-left-width: 60%;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+  background: var(--bg, #fbf8f3);
+  position: relative;
+}
+
+/* ── 左栏（60%）：播放器 + 转录 ── */
+.nibi-note-left {
+  flex: 0 0 var(--note-left-width);
+  width: var(--note-left-width);
+  max-width: var(--note-left-width);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--srf, #fff);
+  border-right: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  overflow: hidden;
+  container-type: inline-size;
+  container-name: note-left;
+}
+
+/* Override .vm-ln-scope table width that forces left column wider */
+.nibi-note-left .ln-tr-table {
+  table-layout: auto;
+  width: 100% !important;
+  max-width: 100%;
+}
+
+.nibi-note-left .ln-video-panel {
+  width: 100% !important;
+}
+
+.nibi-note-player-wrap {
+  flex: 0 0 auto;
+  max-height: 55%;
+  overflow: hidden;
+  background: #050505;
+}
+
+.nibi-note-transcript-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border-top: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+}
+
+/* ── 右栏（40%）：标签 + 结构化笔记 ── */
+.nibi-note-right {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg, #fbf8f3);
+}
+
+.nibi-note-right-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklch, var(--bdr, rgba(25, 20, 16, 0.08)) 72%, var(--bg, #fbf8f3)) transparent;
+  padding: 20px;
+}
+
+.nibi-note-right-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.nibi-note-right-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.nibi-note-right-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in oklch, var(--bdr, rgba(25, 20, 16, 0.08)) 72%, var(--bg, #fbf8f3));
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+.nibi-note-right-scroll::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklch, var(--acc, #ff8a36) 45%, var(--bdr, rgba(25, 20, 16, 0.08)));
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
 @media (max-width: 920px) {
   .nibi-note-hero {
     align-items: flex-start;
@@ -371,5 +560,35 @@
   .nibi-note-media-rail {
     width: 100% !important;
     max-width: none !important;
+  }
+
+  .nibi-note-page {
+    flex-direction: column;
+    --note-left-width: 100%;
+  }
+
+  .nibi-note-left {
+    flex: 0 0 auto;
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  }
+
+  .nibi-note-right {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .nibi-note-bar {
+    height: 42px;
+    padding: 0 12px;
+  }
+
+  .nibi-note-bar-title {
+    font-size: 12px;
+  }
+
+  .nibi-note-bar-meta {
+    font-size: 10px;
   }
 }

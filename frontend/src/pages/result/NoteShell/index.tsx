@@ -13,7 +13,7 @@
 import { cloneElement, isValidElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, BookOpenCheck, Brain, Check, ChevronDown, ChevronRight, Download, FileCode, FileDown, FileText, FileType, Image, List, Loader2, Network, Pencil, Presentation, RefreshCw, Sparkles, Subtitles, Trash2 } from 'lucide-react'
+import { ArrowLeft, Brain, Check, ChevronDown, ChevronRight, Download, FileCode, List, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { downloadSubtitles, exportItemNoteObsidian, getItemNote, putItemNote } from '@/services/workspaces'
@@ -68,6 +68,16 @@ type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed'
 /** 格式化 HH:mm */
 function formatTime(d: Date): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+/** 秒数 → mm:ss 或 hh:mm:ss */
+function formatTimecode(sec: number): string {
+  const s = Math.round(sec)
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const ss = s % 60
+  const mm = h > 0 ? String(m).padStart(2, '0') : String(m)
+  return h > 0 ? `${h}:${mm}:${String(ss).padStart(2, '0')}` : `${mm}:${String(ss).padStart(2, '0')}`
 }
 
 function safeFilename(name: string): string {
@@ -278,6 +288,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   // VN4.3 AI 工具下拉
   const [aiToolsOpen, setAiToolsOpen] = useState(false)
   const aiToolsDropRef = useRef<HTMLDivElement>(null)
+  const exportDropRef = useRef<HTMLDivElement>(null)
   // 新建总结（复用 NewSummaryModal）
   const [showNewSummaryModal, setShowNewSummaryModal] = useState(false)
   const [creatingSummary, setCreatingSummary] = useState(false)
@@ -592,13 +603,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const currentInfo = imageInfos[selectedImageIdx]
   const transcriptCount = Array.isArray(note.transcript) ? note.transcript.length : 0
   const sourceLabel = sourceUrl ? platformLabelFromUrl(sourceUrl) : '本地素材'
-  const noteLead = itemType === 'audio'
-    ? '音频转写、说话人线索与总结版本集中在同一个工作台里。'
-    : itemType === 'image'
-      ? '图文识别、OCR 与提示词结构在左中右三栏中联动。'
-      : itemType === 'video'
-        ? '视频、字幕时间轴、结构化笔记和 AI 工具在同一屏协作。'
-        : '文本正文、来源依据与总结版本在这里整理。'
   const saveStatusNode = (
     <span className={`nibi-note-save nibi-note-save--${saveStatus}`}>
       {saveStatus === 'saving' && '保存中…'}
@@ -617,345 +621,127 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
 
   return (
     <div className={`nibi-note-shell nibi-note-shell--${itemType}`}>
-      {/* ════════ 顶栏 ════════ */}
-      <div className="vd-nav nibi-note-topbar" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 20px', flexShrink: 0 }}>
-        <button className="btn-ghost" onClick={() => navigate(-1)} style={{ height: 28, padding: '0 10px', fontSize: 12 }}>
-          <ArrowLeft size={13} /> 返回
+      {/* ════════ 顶栏：.note-bar（设计稿 .note-bar 对齐） ════════ */}
+      <div className="nibi-note-bar">
+        <button className="nibi-note-bar-back" onClick={() => navigate(-1)} title="返回任务中心">
+          <ArrowLeft size={15} />
+          <span>返回</span>
         </button>
-        <span className="vd-sep" />
-        <span className="kw mono" style={{ fontSize: 10, flexShrink: 0 }}>
-          {TYPE_LABEL[itemType] ?? itemType.toUpperCase()}
-        </span>
-
-        <div style={{ flex: 1 }} />
-
-        {/* ── 总结风格 + 版本 合并下拉 ── */}
-        {summaries.length > 0 && (() => {
-          const TEMPLATE_LABELS: Record<string, string> = {
-            concise: '简洁摘要', detailed: '详细要点', quotes: '金句提取',
-            meeting: '会议纪要', xhs: '小红书风格', longform: '公众号长文',
-            lecture: '教学笔记', interview: '访谈整理', shownotes: '播客 shownotes',
-            oral: '口播稿', steps: '步骤教程', outline: '大纲',
-            qa: '问答卡(Anki)', actions: '行动清单', tool_recommendation: '工具推荐',
-            science_popularization: '知识科普', standard: '标准总结',
-          }
-          const tl = (id: string) => TEMPLATE_LABELS[id] ?? id
-          const activeS = summaries.find(x => x.summary_id === activeSummaryId)
-          const activeVersionLabel = activeS ? (activeS.name || `v${activeS.version}`) : ''
-
-          return (
-            <div ref={templateDropRef} style={{ position: 'relative' }}>
-              <button
-                className="btn-ghost"
-                onClick={() => setTemplateDropOpen((v) => !v)}
-                style={{ height: 28, padding: '0 10px', fontSize: 12, color: 'var(--acc)' }}
-                title="切换总结风格 / 版本"
-              >
-                <List size={13} /> {tl(activeTemplate)}{activeVersionLabel ? ` · ${activeVersionLabel}` : ''}
-                <ChevronDown size={11} style={{ marginLeft: 2 }} />
-              </button>
-              {templateDropOpen && (
-                <div style={{
-                  position: 'absolute', left: 0, top: 34, zIndex: 20,
-                  minWidth: 240, maxHeight: 360, overflowY: 'auto',
-                  padding: '4px',
-                  border: '1px solid var(--bdr)', borderRadius: 'var(--radius-sm)',
-                  background: 'var(--bg)', boxShadow: 'var(--shadow-md)',
-                }}>
-                  {[...templateGroups.entries()].map(([tmpl, versions], gi) => {
-                    const isCurrentTmpl = tmpl === activeTemplate
-                    return (
-                      <div key={tmpl}>
-                        {gi > 0 && <div style={{ height: 1, background: 'var(--bdr)', margin: '2px 0' }} />}
-                        {/* 风格标题行 */}
-                        <button
-                          className="btn-ghost"
-                          onClick={() => {
-                            const first = versions[0]
-                            if (first) handleApplyToNote(first)
-                            setTemplateDropOpen(false)
-                          }}
-                          style={{
-                            width: '100%', justifyContent: 'space-between', height: 30,
-                            padding: '0 10px', fontSize: 12,
-                            color: isCurrentTmpl ? 'var(--acc)' : undefined,
-                            fontWeight: isCurrentTmpl ? 600 : undefined,
-                          }}
-                        >
-                          <span>{tl(tmpl)}</span>
-                          <span style={{ color: 'var(--mut)', fontSize: 10 }}>({versions.length})</span>
-                        </button>
-                        {/* 版本列表 */}
-                        {versions.map((s) => {
-                          const isActive = s.summary_id === activeSummaryId
-                          const isRenaming = renameTargetId === s.summary_id
-                          return (
-                            <div key={s.summary_id} style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 16 }}>
-                              {isRenaming ? (
-                                <input
-                                  autoFocus
-                                  value={renameName}
-                                  onChange={(e) => setRenameName(e.target.value)}
-                                  onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') { setRenameTargetId(null); setRenameName('') } }}
-                                  onBlur={commitRename}
-                                  style={{ flex: 1, height: 28, padding: '0 8px', fontSize: 12, border: '1px solid var(--acc)', borderRadius: 4, background: 'var(--bg)', outline: 'none' }}
-                                />
-                              ) : (
-                                <button
-                                  className="btn-ghost"
-                                  onClick={() => { handleApplyToNote(s); setTemplateDropOpen(false) }}
-                                  style={{
-                                    flex: 1, justifyContent: 'flex-start', height: 28,
-                                    padding: '0 8px', fontSize: 12,
-                                    color: isActive ? 'var(--acc)' : undefined,
-                                    fontWeight: isActive ? 600 : undefined,
-                                  }}
-                                >
-                                  {isActive && <Check size={12} style={{ marginRight: 4, flexShrink: 0 }} />}
-                                  {s.name || `v${s.version}`}
-                                </button>
-                              )}
-                              {!isRenaming && (
-                                <>
-                                  <button
-                                    className="btn-ghost"
-                                    title="改名"
-                                    onClick={(e) => { e.stopPropagation(); setRenameTargetId(s.summary_id); setRenameName(s.name || '') }}
-                                    style={{ padding: 4, height: 22, width: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-                                  >
-                                    <Pencil size={11} />
-                                  </button>
-                                  <button
-                                    className="btn-ghost"
-                                    title="删除"
-                                    onClick={(e) => { e.stopPropagation(); handleDeleteSummary(s.summary_id) }}
-                                    style={{ padding: 4, height: 22, width: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'var(--mut)' }}
-                                  >
-                                    <Trash2 size={11} />
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )
-                  })}
-                  <div style={{ height: 1, background: 'var(--bdr)', margin: '4px 0' }} />
-                  <button
-                    className="btn-ghost"
-                    onClick={() => { if (!creatingSummary) { setShowNewSummaryModal(true); setTemplateDropOpen(false) } }}
-                    disabled={creatingSummary}
-                    style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12, ...(creatingSummary ? { color: 'var(--accent)', opacity: 0.7 } : undefined) }}
-                  >
-                    {creatingSummary
-                      ? <><Loader2 size={13} className="animate-spin" /> 生成中…</>
-                      : '+ 新建风格 / 版本'
-                    }
-                  </button>
-                </div>
-              )}
-            </div>
-          )
-        })()}
-
-        {/* 空态：尚无总结时的入口按钮 */}
-        {summaries.length === 0 && (
-          <button
-            className="btn-ghost"
-            onClick={() => !creatingSummary && setShowNewSummaryModal(true)}
-            disabled={creatingSummary}
-            style={{ height: 28, padding: '0 10px', fontSize: 12, ...(creatingSummary ? { color: 'var(--accent)', opacity: 0.7 } : undefined) }}
-            title="新建总结"
-          >
-            {creatingSummary
-              ? <><Loader2 size={13} className="animate-spin" /> 生成中…</>
-              : <><RefreshCw size={13} /> 新建总结</>
-            }
-          </button>
+        <h1 className="nibi-note-bar-title">{title || '未命名笔记'}</h1>
+        {isVideoNote && (
+          <span className="nibi-note-bar-meta">VIDEO{note.media?.video?.duration ? ` · ${formatTimecode(note.media.video.duration)}` : ''}</span>
         )}
-
-        {/* 导出（所有类型都在顶栏右上角） */}
-        <div style={{ position: 'relative' }}>
-          <button
-            className="btn-ghost"
-            onClick={() => setExportOpen((open) => !open)}
-            style={{ height: 28, padding: '0 10px', fontSize: 12 }}
-            title="导出当前笔记"
-          >
-            <Download size={13} /> 导出
-          </button>
-          {exportOpen && (
-            <div
-              style={{
-                position: 'absolute',
-                right: 0,
-                top: 34,
-                zIndex: 20,
-                minWidth: 160,
-                padding: '4px',
-                border: '1px solid var(--bdr)',
-                borderRadius: 'var(--radius-sm)',
-                background: 'var(--bg)',
-                boxShadow: 'var(--shadow-md)',
-              }}
-            >
-              <button
-                className="btn-ghost"
-                onClick={handleExportMarkdown}
-                style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
-              >
-                <FileText size={13} /> Markdown
-              </button>
-              <button
-                className="btn-ghost"
-                onClick={() => void handleExportObsidian()}
-                style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
-              >
-                <BookOpenCheck size={13} /> Obsidian 包
-              </button>
-              {isVideoNote && (
+        {itemType === 'audio' && (
+          <span className="nibi-note-bar-meta">AUDIO</span>
+        )}
+        {!isVideoNote && itemType !== 'audio' && (
+          <span className="nibi-note-bar-meta">{(TYPE_LABEL[itemType] ?? itemType).toUpperCase()}</span>
+        )}
+        <div className="nibi-note-bar-tools">
+          {/* 总结风格 + 版本 合并下拉 */}
+          {summaries.length > 0 && (() => {
+            const TEMPLATE_LABELS: Record<string, string> = {
+              concise: '简洁摘要', detailed: '详细要点', quotes: '金句提取',
+              meeting: '会议纪要', xhs: '小红书风格', longform: '公众号长文',
+              lecture: '教学笔记', interview: '访谈整理', shownotes: '播客 shownotes',
+              oral: '口播稿', steps: '步骤教程', outline: '大纲',
+              qa: '问答卡(Anki)', actions: '行动清单', tool_recommendation: '工具推荐',
+              science_popularization: '知识科普', standard: '标准总结',
+            }
+            const tl = (id: string) => TEMPLATE_LABELS[id] ?? id
+            const activeS = summaries.find(x => x.summary_id === activeSummaryId)
+            const activeVersionLabel = activeS ? (activeS.name || `v${activeS.version}`) : ''
+            return (
+              <div ref={templateDropRef} style={{ position: 'relative' }}>
                 <button
-                  className="btn-ghost"
-                  onClick={() => void handleExportTranscript()}
-                  style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
+                  className="nibi-note-bar-btn"
+                  onClick={() => setTemplateDropOpen((v) => !v)}
+                  title="切换总结风格 / 版本"
                 >
-                  <Subtitles size={13} /> 原文对照（txt）
+                  <List size={13} /> {tl(activeTemplate)}{activeVersionLabel ? ` · ${activeVersionLabel}` : ''}
+                  <ChevronDown size={11} style={{ marginLeft: 2 }} />
                 </button>
-              )}
-              {/* ── 占位导出项（灰显 disabled） ── */}
-              {[
-                { icon: <FileDown size={13} />, label: 'PDF' },
-                { icon: <FileType size={13} />, label: 'Word' },
-                { icon: <Image size={13} />, label: '长图' },
-                { icon: <Presentation size={13} />, label: 'PPT' },
-                { icon: <Sparkles size={13} />, label: '沉浸式笔记' },
-              ].map((item) => (
-                <button
-                  key={item.label}
-                  disabled
-                  title="敬请期待"
-                  style={{
-                    width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12,
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    background: 'none', border: 'none', cursor: 'not-allowed',
-                    color: 'var(--mut)', opacity: 0.45,
-                  }}
-                >
-                  {item.icon} {item.label}
-                </button>
-              ))}
-            </div>
+                {templateDropOpen && (
+                  <div style={{ position: 'absolute', right: 0, top: 34, zIndex: 20, minWidth: 240, maxHeight: 360, overflowY: 'auto', padding: '4px', border: '1px solid var(--bdr)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', boxShadow: 'var(--shadow-md)' }}>
+                    {[...templateGroups.entries()].map(([tmpl, versions], gi) => {
+                      const isCurrentTmpl = tmpl === activeTemplate
+                      return (
+                        <div key={tmpl}>
+                          {gi > 0 && <div style={{ height: 1, background: 'var(--bdr)', margin: '2px 0' }} />}
+                          <button className="btn-ghost" onClick={() => { const first = versions[0]; if (first) handleApplyToNote(first); setTemplateDropOpen(false) }} style={{ width: '100%', justifyContent: 'space-between', height: 30, padding: '0 10px', fontSize: 12, color: isCurrentTmpl ? 'var(--acc)' : undefined, fontWeight: isCurrentTmpl ? 600 : undefined }}>
+                            <span>{tl(tmpl)}</span>
+                            <span style={{ color: 'var(--mut)', fontSize: 10 }}>({versions.length})</span>
+                          </button>
+                          {versions.map((s) => {
+                            const isActive = s.summary_id === activeSummaryId
+                            const isRenaming = renameTargetId === s.summary_id
+                            return (
+                              <div key={s.summary_id} style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 16 }}>
+                                {isRenaming ? (
+                                  <input autoFocus value={renameName} onChange={(e) => setRenameName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') { setRenameTargetId(null); setRenameName('') } }} onBlur={commitRename} style={{ flex: 1, height: 28, padding: '0 8px', fontSize: 12, border: '1px solid var(--acc)', borderRadius: 4, background: 'var(--bg)', outline: 'none' }} />
+                                ) : (
+                                  <button className="btn-ghost" onClick={() => { handleApplyToNote(s); setTemplateDropOpen(false) }} style={{ flex: 1, justifyContent: 'flex-start', height: 28, padding: '0 8px', fontSize: 12, color: isActive ? 'var(--acc)' : undefined, fontWeight: isActive ? 600 : undefined }}>
+                                    {isActive && <Check size={12} style={{ marginRight: 4, flexShrink: 0 }} />}
+                                    {s.name || `v${s.version}`}
+                                  </button>
+                                )}
+                                {!isRenaming && (
+                                  <>
+                                    <button className="btn-ghost" title="改名" onClick={(e) => { e.stopPropagation(); setRenameTargetId(s.summary_id); setRenameName(s.name || '') }} style={{ padding: 4, height: 22, width: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Pencil size={11} /></button>
+                                    <button className="btn-ghost" title="删除" onClick={(e) => { e.stopPropagation(); handleDeleteSummary(s.summary_id) }} style={{ padding: 4, height: 22, width: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'var(--mut)' }}><Trash2 size={11} /></button>
+                                  </>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )
+                    })}
+                    <div style={{ height: 1, background: 'var(--bdr)', margin: '4px 0' }} />
+                    <button className="btn-ghost" onClick={() => { if (!creatingSummary) { setShowNewSummaryModal(true); setTemplateDropOpen(false) } }} disabled={creatingSummary} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12, ...(creatingSummary ? { color: 'var(--accent)', opacity: 0.7 } : undefined) }}>+ 新建总结…</button>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+          {sourceUrl && (
+            <a className="nibi-note-bar-btn" href={sourceUrl} target="_blank" rel="noreferrer" title="原视频">↗</a>
           )}
-        </div>
-
-        {/* VN4.3 AI 工具（视频+图文共用） */}
-        <div ref={aiToolsDropRef} style={{ position: 'relative' }}>
-          <button
-            className="btn-ghost"
-            onClick={() => setAiToolsOpen((v) => !v)}
-            style={{ height: 28, padding: '0 10px', fontSize: 12 }}
-            title="AI 工具"
-          >
-            <Brain size={13} /> AI 工具
-            <ChevronDown size={11} style={{ marginLeft: 2 }} />
-          </button>
-          {aiToolsOpen && (
-            <div
-              style={{
-                position: 'absolute', right: 0, top: 34, zIndex: 20,
-                minWidth: 160, padding: '4px',
-                border: '1px solid var(--bdr)',
-                borderRadius: 'var(--radius-sm)',
-                background: 'var(--bg)',
-                boxShadow: 'var(--shadow-md)',
-              }}
-            >
-              {/* ── 占位项（灰显 disabled） ── */}
-              {[
-                { icon: <Network size={13} />, label: '思维导图' },
-                { icon: <Image size={13} />, label: '总结海报' },
-              ].map((item) => (
-                <button
-                  key={item.label}
-                  disabled
-                  title="敬请期待"
-                  style={{
-                    width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12,
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    background: 'none', border: 'none', cursor: 'not-allowed',
-                    color: 'var(--mut)', opacity: 0.45,
-                  }}
-                >
-                  {item.icon} {item.label}
-                </button>
-              ))}
-            </div>
+          {note.source_md && (
+            <button className="nibi-note-bar-btn" onClick={() => setSourceModalOpen(true)} title="源 md"><FileCode size={14} /></button>
           )}
+          <div style={{ position: 'relative' }} ref={exportDropRef}>
+            <button className="nibi-note-bar-btn" onClick={() => setExportOpen((v) => !v)} title="导出"><Download size={14} /><ChevronDown size={11} /></button>
+            {exportOpen && (
+              <div style={{ position: 'absolute', right: 0, top: 34, zIndex: 20, minWidth: 180, padding: '4px', border: '1px solid var(--bdr)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', boxShadow: 'var(--shadow-md)' }}>
+                <button className="btn-ghost" onClick={() => { handleExportMarkdown(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}>Markdown (.md)</button>
+                <button className="btn-ghost" onClick={() => { handleExportObsidian(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}>Obsidian ZIP</button>
+                <button className="btn-ghost" onClick={() => { handleExportTranscript(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}>SRT 字幕</button>
+              </div>
+            )}
+          </div>
+          <div style={{ position: 'relative' }} ref={aiToolsDropRef}>
+            <button className="nibi-note-bar-btn" onClick={() => setAiToolsOpen((v) => !v)} title="AI 工具"><Brain size={14} /><ChevronDown size={11} /></button>
+            {aiToolsOpen && (
+              <div style={{ position: 'absolute', right: 0, top: 34, zIndex: 20, minWidth: 180, padding: '4px', border: '1px solid var(--bdr)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', boxShadow: 'var(--shadow-md)' }}>
+                <button className="btn-ghost" onClick={() => { setShowNewSummaryModal(true); setAiToolsOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}>新建总结</button>
+                <button className="btn-ghost" disabled title="即将上线" style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12, color: 'var(--mut)', cursor: 'not-allowed' }}>敬请期待</button>
+              </div>
+            )}
+          </div>
         </div>
-
       </div>
 
-      <section className="nibi-note-hero">
-        <div className="nibi-note-hero-copy">
-          <div className="eyebrow">{itemType.toUpperCase()} NOTE · {sourceLabel}</div>
-          <h1>{title || '未命名笔记'}</h1>
-          <p>{noteLead}</p>
-        </div>
-        <div className="nibi-note-stats" aria-label="note-stats">
-          <span>{TYPE_LABEL[itemType] ?? itemType}</span>
-          <span>{transcriptCount > 0 ? `${transcriptCount} 句` : '无转写'}</span>
-          <span>{summaries.length > 0 ? `${summaries.length} 总结` : '可生成总结'}</span>
-        </div>
-      </section>
-
-      {/* ════════ 标签概览（所有笔记类型通用）════════ */}
-      {hasTags && (
-        <div className="nibi-note-tags">
-          <TagChips tags={tags} />
-        </div>
-      )}
 
       {/* ════════ 主内容区（视频笔记 = 三列 / 图文笔记 = 三列 / 其余 = 通用布局）════════ */}
       {isVideoNote ? (
-        /* ── 视频笔记 banner + 三列布局 ── */
         <>
-          {/* ── 视频 banner：标题 + 平台 + 原视频链接 + 标签 ── */}
-          <div className="nibi-note-context-bar">
-            <span className="nibi-note-context-title">
-              {title}
-            </span>
-            {sourceUrl && (
-              <span className="kw mono nibi-note-context-chip">
-                {platformLabelFromUrl(sourceUrl)}
-              </span>
-            )}
-            <div style={{ flex: 1 }} />
-            {sourceUrl && (
-              <a
-                className="btn-ghost"
-                href={sourceUrl}
-                target="_blank"
-                rel="noreferrer"
-                style={{ height: 26, padding: '0 10px', fontSize: 12, flexShrink: 0 }}
-              >
-                原视频 ↗
-              </a>
-            )}
-          </div>
+        {/* ── 视频笔记两栏布局：.note-page（设计稿 pg-note 对齐） ── */}
+        <div className="nibi-note-page">
 
-        {/* ── 视频笔记三列布局（蓝图 §3.5）：左播放器+字幕 / 中正文 / 右操作 ── */}
-        <div className="nibi-note-workbench nibi-note-workbench--video">
-
-          {/* ── 左列：视频播放器 + 实时字幕 ── */}
-          <div className="vm-ln-scope nibi-note-media-rail" style={{
-            width: '30%', minWidth: 260, maxWidth: 420, flexShrink: 0,
-            display: 'flex', flexDirection: 'column',
-            borderRight: '1px solid var(--bdr)',
-            overflow: 'hidden',
-            background: 'var(--bgalt)',
-          }}>
-            <div style={{ flex: '0 0 auto', maxHeight: '55%', overflow: 'hidden' }}>
+          {/* ── 左栏（60%）：播放器 + 控制 + 转录 ── */}
+          <div className="nibi-note-left vm-ln-scope">
+            <div className="nibi-note-player-wrap">
               <LNVideoPanel
                 ref={videoRef}
                 src={note.media!.video?.url?.startsWith('/static/') ? note.media!.video!.url : ''}
@@ -965,9 +751,9 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 onTimeUpdate={handleTimeUpdate}
               />
             </div>
-            {/* 字幕区 — 独立挂载，不受中列 re-render 影响 */}
+            {/* 转录 */}
             {Array.isArray(note.transcript) && (note.transcript as VideoResultTranscriptLine[]).length > 0 ? (
-              <div style={{ flex: 1, overflowY: 'auto', borderTop: '1px solid var(--bdr)' }}>
+              <div className="nibi-note-transcript-wrap">
                 <LNTranscriptPanel
                   transcript={note.transcript as VideoResultTranscriptLine[]}
                   currentTime={currentTime}
@@ -979,22 +765,44 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 />
               </div>
             ) : (
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--mut)', fontSize: 12, borderTop: '1px solid var(--bdr)' }}>
-                暂无字幕
-              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--mut)', fontSize: 12, padding: 24 }}>暂无字幕</div>
             )}
           </div>
 
-          {/* ── 中列：正文（视频无 tab 切换）+ TOC ── */}
-          <div className="nibi-note-main-panel">
-            {/* 保存状态（顶栏右侧） */}
-            <div className="nibi-note-panel-head">
-              <span>标准总结</span>
-              {saveStatusNode}
-            </div>
-            {/* 正文 */}
-            <div className="nibi-note-editor-scroll">
-              {noteContent}
+          {/* ── 右栏（40%）：标签 + 结构化笔记 ── */}
+          <div className="nibi-note-right">
+            <div className="nibi-note-right-scroll">
+              {hasTags && (
+                <div style={{ marginBottom: 12 }}><TagChips tags={tags} /></div>
+              )}
+              <section className="nibi-note-side-card" style={{ flex: 'none' }}>
+                <div className="nibi-note-card-kicker">内容总结</div>
+                <h2>{title || '未命名笔记'}</h2>
+                {/* 总结版本切换 */}
+                {summaries.length > 0 && (() => {
+                  const TEMPLATE_LABELS: Record<string, string> = { concise: '简洁摘要', detailed: '详细要点', quotes: '金句提取', meeting: '会议纪要', xhs: '小红书风格', longform: '公众号长文', lecture: '教学笔记', interview: '访谈整理', shownotes: '播客 shownotes', standard: '标准总结' }
+                  const tl = (id: string) => TEMPLATE_LABELS[id] ?? id
+                  return (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+                      {[...templateGroups.entries()].map(([tmpl]) => (
+                        <button
+                          key={tmpl}
+                          className="btn-ghost"
+                          onClick={() => { const first = templateGroups.get(tmpl)?.[0]; if (first) handleApplyToNote(first) }}
+                          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: tmpl === activeTemplate ? 'var(--accl)' : 'var(--bgalt)', color: tmpl === activeTemplate ? 'var(--acc)' : 'var(--mut)', fontWeight: tmpl === activeTemplate ? 600 : 400 }}
+                        >
+                          {tl(tmpl)}
+                        </button>
+                      ))}
+                    </div>
+                  )
+                })()}
+              </section>
+              <div style={{ padding: '8px 0', textAlign: 'right' }}>{saveStatusNode}</div>
+              {/* 正文编辑器 */}
+              <div className="nibi-note-editor-panel" style={{ marginTop: 8 }}>
+                <MilkdownEditor key={milkdownKey} markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
+              </div>
             </div>
           </div>
         </div>

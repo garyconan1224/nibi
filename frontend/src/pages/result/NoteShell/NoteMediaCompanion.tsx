@@ -68,9 +68,9 @@ const NoteMediaCompanion = forwardRef<NoteMediaCompanionHandle, NoteMediaCompani
     const externalUrl = !isPlayableVideo ? (sourceUrl || videoUrl) : undefined
 
     return (
-      <div className="vm-ln-scope" style={{ display: 'flex', flexDirection: 'column', gap: 0, borderTop: '1px solid var(--bdr)' }}>
+      <div className="vm-ln-scope" style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
         {/* 播放器 */}
-        <div style={{ maxHeight: 240, overflow: 'hidden' }}>
+        <div>
           <LNVideoPanel
             ref={videoRef}
             src={videoSrc}
@@ -82,7 +82,7 @@ const NoteMediaCompanion = forwardRef<NoteMediaCompanionHandle, NoteMediaCompani
         </div>
         {/* 转录轴 */}
         {transcript.length > 0 && (
-          <div style={{ maxHeight: 200, overflowY: 'auto', borderTop: '1px solid var(--bdr)' }}>
+          <div className="nibi-note-transcript-wrap">
             <LNTranscriptPanel
               transcript={transcript}
               currentTime={currentTime}
