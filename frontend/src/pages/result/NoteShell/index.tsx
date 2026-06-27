@@ -718,6 +718,8 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const isAudioNote = itemType === 'audio' && !!note.media?.audio
   // 图文笔记三列布局标志
   const isImageNote = itemType === 'image' && (note.media?.images?.length ?? 0) > 0
+  // Stage 4: 文本笔记两栏布局标志（无媒体 / 播放器）
+  const isTextNote = itemType === 'text'
   const images = note.media?.images ?? []
   const imageInfos = note.media?.image_infos ?? []
   const currentInfo = imageInfos[selectedImageIdx]
@@ -1222,6 +1224,91 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
           </div>
         </div>
         </>
+      ) : isTextNote ? (
+        /* ── 文本笔记两栏布局（设计稿 pg-text 对齐） ── */
+        <>
+        <div className="nibi-note-page nibi-note-page--text" ref={notePageRef} style={notePageStyle}>
+
+          {/* ── 左栏：工具栏 + 编辑器 ── */}
+          <div className="nibi-note-left nibi-text-left">
+            <div className="nibi-text-toolbar">
+              {/* TODO Stage 4: 核对 Milkdown 已支持的命令，对齐设计稿工具栏 */}
+              <button className="btn-ghost" disabled title="加粗（Milkdown 已支持，待接入）">B</button>
+              <button className="btn-ghost" disabled title="斜体（Milkdown 已支持，待接入）">I</button>
+              <button className="btn-ghost" disabled title="标题（Milkdown 已支持，待接入）">H</button>
+              <button className="btn-ghost" disabled title="列表（Milkdown 已支持，待接入）">•</button>
+            </div>
+            <div className="nibi-text-editor-content">
+              <div className="nibi-note-editor-panel">
+                <MilkdownEditor key={milkdownKey} markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
+              </div>
+            </div>
+          </div>
+
+          <div
+            className="nibi-note-splitter"
+            role="separator"
+            aria-label="调整左右栏宽度"
+            aria-orientation="vertical"
+            aria-valuemin={VIDEO_SPLIT_MIN}
+            aria-valuemax={VIDEO_SPLIT_MAX}
+            aria-valuenow={Math.round(noteLeftPct)}
+            tabIndex={0}
+            onPointerDown={handleNoteSplitPointerDown}
+            onKeyDown={handleNoteSplitKeyDown}
+          >
+            <span className="nibi-note-splitter-grip" />
+          </div>
+
+          {/* ── 右栏：标题 + 标签 + 总结 + 正文 ── */}
+          <div className="nibi-note-right nibi-text-right">
+            <div className="nibi-note-right-scroll">
+              <div className="note-copy">
+                <div className="note-copy-head">
+                  <h1>{title || '未命名笔记'}</h1>
+                </div>
+                {/* 标签 + meta */}
+                {(hasTags || sourceUrl) && (
+                  <div className="nibi-text-tags">
+                    {hasTags && <TagChips tags={tags} />}
+                    {sourceUrl && <span className="note-meta-inline">{platformLabelFromUrl(sourceUrl)}</span>}
+                  </div>
+                )}
+                {/* 总结版本切换 */}
+                {summaries.length > 0 && (() => {
+                  const TEMPLATE_LABELS: Record<string, string> = { concise: '简洁摘要', detailed: '详细要点', quotes: '金句提取', meeting: '会议纪要', xhs: '小红书风格', longform: '公众号长文', lecture: '教学笔记', interview: '访谈整理', shownotes: '播客 shownotes', standard: '标准总结' }
+                  const tl = (id: string) => TEMPLATE_LABELS[id] ?? id
+                  return (
+                    <div className="note-section" style={{ marginTop: 16 }}>
+                      <h2>内容总结</h2>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>
+                        {[...templateGroups.entries()].map(([tmpl]) => (
+                          <button
+                            key={tmpl}
+                            className="btn-ghost"
+                            onClick={() => { const first = templateGroups.get(tmpl)?.[0]; if (first) handleApplyToNote(first) }}
+                            style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: tmpl === activeTemplate ? 'var(--accl)' : 'var(--bgalt)', color: tmpl === activeTemplate ? 'var(--acc)' : 'var(--mut)', fontWeight: tmpl === activeTemplate ? 600 : 400 }}
+                          >
+                            {tl(tmpl)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
+                {/* 正文 */}
+                <div className="note-section" style={{ marginTop: summaries.length > 0 ? 0 : 16 }}>
+                  <div className="nibi-note-editor-panel">
+                    <MilkdownEditor key={milkdownKey} markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
+                  </div>
+                </div>
+                {/* 保存状态 */}
+                <div style={{ padding: '12px 0', textAlign: 'right' }}>{saveStatusNode}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        </>
       ) : (
         <div className="nibi-note-workbench nibi-note-workbench--generic">
           <div className="nibi-note-main-panel">
@@ -1290,8 +1377,8 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
         </div>
       )}
 
-      {/* 问 AI 悬浮泡泡（视频/音频笔记） */}
-      {(isVideoNote || isAudioNote) && (
+      {/* 问 AI 悬浮泡泡（视频/音频/文本笔记） */}
+      {(isVideoNote || isAudioNote || isTextNote) && (
         <FloatingAskAi
           workspaceId={workspaceId}
           systemPrompt={chatSystemPrompt}

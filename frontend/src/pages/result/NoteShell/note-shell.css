@@ -1278,6 +1278,80 @@
   color: var(--mut, #7c7464);
 }
 
+/* ── Stage 4: 文本笔记形态（设计稿 pg-text 对齐） ── */
+
+.nibi-note-page--text {
+  --note-left-width: 55%;
+}
+
+.nibi-text-left {
+  flex: 0 0 var(--note-left-width);
+  width: var(--note-left-width);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--srf, #fff);
+  overflow: hidden;
+}
+
+/* 工具栏 */
+.nibi-text-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--bdr, #e8e3db);
+  background: var(--bgalt, #f7f4ee);
+}
+
+.nibi-text-toolbar button {
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 4px;
+  color: var(--fg2, #3d3929);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.nibi-text-toolbar button:hover:not(:disabled) {
+  background: var(--accl, rgba(255, 138, 54, 0.1));
+}
+
+.nibi-text-toolbar button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 编辑器内容区 */
+.nibi-text-editor-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.nibi-text-editor-content .nibi-note-editor-panel {
+  height: 100%;
+}
+
+/* 右栏文本笔记特化 */
+.nibi-text-right {
+  flex: 0 0 calc(100% - var(--note-left-width));
+  width: calc(100% - var(--note-left-width));
+}
+
+.nibi-text-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--mut, #7c7464);
+}
+
 /* ── Stage 3: 图文笔记形态（设计稿 pg-image 对齐） ── */
 
 .nibi-note-page--image {
