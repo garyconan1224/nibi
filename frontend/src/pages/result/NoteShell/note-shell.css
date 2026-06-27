@@ -541,6 +541,152 @@
   background-clip: padding-box;
 }
 
+/* ── 左栏视频控制条视觉覆盖（设计稿 .note-controls 对齐） ── */
+.nibi-note-left .ln-video-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--srf, #fff);
+  border-top: none;
+  border-bottom: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  flex-wrap: wrap;
+}
+
+.nibi-note-left .ln-shot-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: var(--rs, 6px);
+  background: transparent;
+  color: var(--fg2, #3d3929);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  font-size: 0;
+}
+
+.nibi-note-left .ln-shot-btn:hover:not(:disabled) {
+  background: var(--bgalt, #f7f3ec);
+  color: var(--fg, #191410);
+  border-color: transparent;
+}
+
+.nibi-note-left .ln-shot-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.nibi-note-left .ln-video-shortcuts {
+  margin-left: auto;
+  font-family: var(--fm, monospace);
+  font-size: 10px;
+  color: var(--mut, #7c7464);
+}
+
+/* ── 转录区头部（设计稿 .note-transcript-head） ── */
+.nibi-note-transcript-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px 8px;
+  font-size: var(--sm, 13px);
+  font-weight: 800;
+  color: var(--fg, #191410);
+  border-bottom: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  flex-shrink: 0;
+}
+
+.nibi-note-transcript-count {
+  font-family: var(--fm, monospace);
+  font-size: var(--xs, 11px);
+  font-weight: 700;
+  color: var(--mut, #7c7464);
+}
+
+/* ── 右栏结构化笔记 section（设计稿 .note-section） ── */
+.nibi-note-right .note-section {
+  margin-top: 30px;
+}
+
+.nibi-note-right .note-section h2 {
+  font-family: var(--fd, var(--font-display, inherit));
+  font-size: var(--2xl, 22px);
+  font-weight: 400;
+  line-height: 1.2;
+  margin-bottom: 14px;
+  color: var(--fg, #191410);
+}
+
+.nibi-note-right .note-section h3 {
+  font-size: var(--lg, 18px);
+  font-weight: 800;
+  margin: 20px 0 8px;
+  color: var(--fg, #191410);
+}
+
+.nibi-note-right .note-section p,
+.nibi-note-right .note-section li {
+  font-size: clamp(16px, 1.45vw, 20px);
+  line-height: 1.9;
+  color: var(--fg2, #3d3929);
+}
+
+.nibi-note-right .note-section ul {
+  padding-left: 24px;
+  margin: 10px 0 18px;
+}
+
+.nibi-note-right .note-section strong {
+  color: var(--fg, #191410);
+  font-weight: 800;
+}
+
+.nibi-note-right .note-quote {
+  margin: 26px 0;
+  padding: 18px 24px;
+  border-left: 5px solid var(--acc, #ff8a36);
+  border-radius: 0 var(--r, 8px) var(--r, 8px) 0;
+  background: var(--accl, rgba(255, 138, 54, 0.1));
+  font-size: clamp(18px, 1.55vw, 22px);
+  font-weight: 700;
+  font-style: italic;
+  color: var(--fg, #191410);
+}
+
+/* ── 右栏 note-copy 容器（设计稿 .note-copy） ── */
+.note-copy {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+.note-copy-head h1 {
+  font-family: var(--font-display, inherit);
+  font-size: var(--2xl, 22px);
+  font-weight: 400;
+  line-height: 1.2;
+  margin: 0 0 12px;
+  color: var(--fg, #191410);
+}
+
+.note-tags-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 8px 0 28px;
+}
+
+.note-meta-inline {
+  color: var(--mut, #7c7464);
+  font-family: var(--fm, monospace);
+  font-size: var(--xs, 11px);
+  white-space: nowrap;
+}
+
 @media (max-width: 920px) {
   .nibi-note-hero {
     align-items: flex-start;

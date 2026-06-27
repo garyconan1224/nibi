@@ -13,7 +13,7 @@
 import { cloneElement, isValidElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Brain, Check, ChevronDown, ChevronRight, Download, FileCode, List, Pencil, Trash2 } from 'lucide-react'
+import { ArrowLeft, BookOpenCheck, Brain, Check, ChevronDown, ChevronRight, Download, FileCode, FileDown, FileText, FileType, Image, List, Pencil, Presentation, Sparkles, Subtitles, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { downloadSubtitles, exportItemNoteObsidian, getItemNote, putItemNote } from '@/services/workspaces'
@@ -714,9 +714,21 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
             <button className="nibi-note-bar-btn" onClick={() => setExportOpen((v) => !v)} title="导出"><Download size={14} /><ChevronDown size={11} /></button>
             {exportOpen && (
               <div style={{ position: 'absolute', right: 0, top: 34, zIndex: 20, minWidth: 180, padding: '4px', border: '1px solid var(--bdr)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', boxShadow: 'var(--shadow-md)' }}>
-                <button className="btn-ghost" onClick={() => { handleExportMarkdown(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}>Markdown (.md)</button>
-                <button className="btn-ghost" onClick={() => { handleExportObsidian(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}>Obsidian ZIP</button>
-                <button className="btn-ghost" onClick={() => { handleExportTranscript(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}>SRT 字幕</button>
+                <button className="btn-ghost" onClick={() => { handleExportMarkdown(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><FileText size={13} /> Markdown</button>
+                <button className="btn-ghost" onClick={() => { handleExportObsidian(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><BookOpenCheck size={13} /> Obsidian 包</button>
+                {isVideoNote && (
+                  <button className="btn-ghost" onClick={() => { handleExportTranscript(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><Subtitles size={13} /> 原文对照（txt）</button>
+                )}
+                {/* 占位导出项（灰显 disabled） */}
+                {[
+                  { icon: <FileDown size={13} />, label: 'PDF' },
+                  { icon: <FileType size={13} />, label: 'Word' },
+                  { icon: <Image size={13} />, label: '长图' },
+                  { icon: <Presentation size={13} />, label: 'PPT' },
+                  { icon: <Sparkles size={13} />, label: '沉浸式笔记' },
+                ].map((item) => (
+                  <button key={item.label} disabled title="敬请期待" style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'not-allowed', color: 'var(--mut)', opacity: 0.45 }}>{item.icon} {item.label}</button>
+                ))}
               </div>
             )}
           </div>
@@ -754,6 +766,10 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
             {/* 转录 */}
             {Array.isArray(note.transcript) && (note.transcript as VideoResultTranscriptLine[]).length > 0 ? (
               <div className="nibi-note-transcript-wrap">
+                <div className="nibi-note-transcript-head">
+                  <span>转录</span>
+                  <span className="nibi-note-transcript-count">{transcriptCount} 条</span>
+                </div>
                 <LNTranscriptPanel
                   transcript={note.transcript as VideoResultTranscriptLine[]}
                   currentTime={currentTime}
@@ -772,36 +788,47 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
           {/* ── 右栏（40%）：标签 + 结构化笔记 ── */}
           <div className="nibi-note-right">
             <div className="nibi-note-right-scroll">
-              {hasTags && (
-                <div style={{ marginBottom: 12 }}><TagChips tags={tags} /></div>
-              )}
-              <section className="nibi-note-side-card" style={{ flex: 'none' }}>
-                <div className="nibi-note-card-kicker">内容总结</div>
-                <h2>{title || '未命名笔记'}</h2>
+              <div className="note-copy">
+                <div className="note-copy-head">
+                  <h1>{title || '未命名笔记'}</h1>
+                </div>
+                {/* 标签 + meta */}
+                {(hasTags || sourceUrl) && (
+                  <div className="note-tags-inline">
+                    {hasTags && <TagChips tags={tags} />}
+                    {sourceUrl && <span className="note-meta-inline">{platformLabelFromUrl(sourceUrl)} · {note.media?.video?.duration ? formatTimecode(note.media.video.duration) : ''}</span>}
+                  </div>
+                )}
                 {/* 总结版本切换 */}
                 {summaries.length > 0 && (() => {
                   const TEMPLATE_LABELS: Record<string, string> = { concise: '简洁摘要', detailed: '详细要点', quotes: '金句提取', meeting: '会议纪要', xhs: '小红书风格', longform: '公众号长文', lecture: '教学笔记', interview: '访谈整理', shownotes: '播客 shownotes', standard: '标准总结' }
                   const tl = (id: string) => TEMPLATE_LABELS[id] ?? id
                   return (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
-                      {[...templateGroups.entries()].map(([tmpl]) => (
-                        <button
-                          key={tmpl}
-                          className="btn-ghost"
-                          onClick={() => { const first = templateGroups.get(tmpl)?.[0]; if (first) handleApplyToNote(first) }}
-                          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: tmpl === activeTemplate ? 'var(--accl)' : 'var(--bgalt)', color: tmpl === activeTemplate ? 'var(--acc)' : 'var(--mut)', fontWeight: tmpl === activeTemplate ? 600 : 400 }}
-                        >
-                          {tl(tmpl)}
-                        </button>
-                      ))}
+                    <div className="note-section" style={{ marginTop: 16 }}>
+                      <h2>内容总结</h2>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>
+                        {[...templateGroups.entries()].map(([tmpl]) => (
+                          <button
+                            key={tmpl}
+                            className="btn-ghost"
+                            onClick={() => { const first = templateGroups.get(tmpl)?.[0]; if (first) handleApplyToNote(first) }}
+                            style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: tmpl === activeTemplate ? 'var(--accl)' : 'var(--bgalt)', color: tmpl === activeTemplate ? 'var(--acc)' : 'var(--mut)', fontWeight: tmpl === activeTemplate ? 600 : 400 }}
+                          >
+                            {tl(tmpl)}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )
                 })()}
-              </section>
-              <div style={{ padding: '8px 0', textAlign: 'right' }}>{saveStatusNode}</div>
-              {/* 正文编辑器 */}
-              <div className="nibi-note-editor-panel" style={{ marginTop: 8 }}>
-                <MilkdownEditor key={milkdownKey} markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
+                {/* 正文（MilkdownEditor 渲染 h2/h3/p/ul/blockquote → 设计稿 .note-section 自动匹配） */}
+                <div className="note-section" style={{ marginTop: summaries.length > 0 ? 0 : 16 }}>
+                  <div className="nibi-note-editor-panel">
+                    <MilkdownEditor key={milkdownKey} markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
+                  </div>
+                </div>
+                {/* 保存状态 */}
+                <div style={{ padding: '12px 0', textAlign: 'right' }}>{saveStatusNode}</div>
               </div>
             </div>
           </div>
