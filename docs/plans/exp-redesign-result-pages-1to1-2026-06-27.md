@@ -199,5 +199,7 @@ status: ready
 
 - （Stage 1）视频画中画 `.note-pip`：待确认是否做真实 PiP / 暂占位。
 - （Stage 1）缩略图轨真实帧数据来源：待确认。
+- （Stage 1）章节标签 `.note-chapter-label`：当前无章节数据源，暂未渲染。
+- （Stage 1）导出菜单缺少 PPTX/PDF 讲义选项（原 handleExportLecture 未移植到 note-bar），待后续补全。
 - （Stage 3）图片「生成参数」对图文 OCR 笔记是否适用：待确认。
 - （后续批次，非首批）合集详情 pg-collection、复刻 pg-replica、资料库 pg-resources、收藏 pg-favorites、知识库 pg-knowledge、搜索 pg-search、设置 pg-settings、主页 pg-home、处理页 pg-processing。
