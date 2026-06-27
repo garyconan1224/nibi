@@ -310,6 +310,9 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   // 7.3: 视频笔记三列布局 — 播放器 + 转录轴联动
   const videoRef = useRef<LNVideoPanelHandle>(null)
   const [currentTime, setCurrentTime] = useState(0)
+  // 驱动 transportNode getter 刷新（LNVideoPanel 状态变化时递增）
+  const [, setTransportVersion] = useState(0)
+  const handleTransportChange = useCallback(() => setTransportVersion(v => v + 1), [])
   const [sourceModalOpen, setSourceModalOpen] = useState(false)
   const [activeSummaryId, setActiveSummaryId] = useState<string | undefined>(undefined)
   // VN4.1 版本下拉 + 风格/版本两层
@@ -761,8 +764,11 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 title=""
                 workspaceId={workspaceId}
                 onTimeUpdate={handleTimeUpdate}
+                onTransportChange={handleTransportChange}
               />
             </div>
+            {/* 控制条 + 时间线（在 player-wrap 外，避免 overflow:hidden 截断） */}
+            {videoRef.current?.transportNode}
             {/* 转录 */}
             {Array.isArray(note.transcript) && (note.transcript as VideoResultTranscriptLine[]).length > 0 ? (
               <div className="nibi-note-transcript-wrap">

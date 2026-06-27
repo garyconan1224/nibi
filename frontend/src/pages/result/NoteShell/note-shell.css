@@ -541,22 +541,29 @@
   background-clip: padding-box;
 }
 
-/* ── 左栏视频控制条视觉覆盖（设计稿 .note-controls 对齐） ── */
-.nibi-note-left .ln-video-toolbar {
+/* ── 自定义视频 transport（设计稿 .note-controls / .note-timeline 对齐） ── */
+
+.nibi-note-left .note-controls {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
   background: var(--srf, #fff);
-  border-top: none;
   border-bottom: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
   flex-wrap: wrap;
 }
 
-.nibi-note-left .ln-shot-btn {
+.nibi-note-left .note-transport {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.nibi-note-left .note-icon-btn {
   width: 30px;
   height: 30px;
-  padding: 0;
   border: none;
   border-radius: var(--rs, 6px);
   background: transparent;
@@ -564,25 +571,220 @@
   display: grid;
   place-items: center;
   cursor: pointer;
-  font-size: 0;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  padding: 0;
 }
 
-.nibi-note-left .ln-shot-btn:hover:not(:disabled) {
+.nibi-note-left .note-icon-btn:hover {
   background: var(--bgalt, #f7f3ec);
   color: var(--fg, #191410);
-  border-color: transparent;
 }
 
-.nibi-note-left .ln-shot-btn svg {
+.nibi-note-left .note-icon-btn.is-on {
+  background: var(--accl, rgba(255, 138, 54, 0.1));
+  color: var(--acc, #ff8a36);
+}
+
+.nibi-note-left .note-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.nibi-note-left .note-icon-btn svg {
   width: 15px;
   height: 15px;
 }
 
-.nibi-note-left .ln-video-shortcuts {
+.nibi-note-left .note-speed {
   margin-left: auto;
+  border: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  border-radius: var(--rs, 6px);
+  background: var(--srf, #fff);
+  padding: 4px 8px;
+  color: var(--fg2, #3d3929);
   font-family: var(--fm, monospace);
   font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.nibi-note-left .note-speed:hover {
+  background: var(--bgalt, #f7f3ec);
+  color: var(--fg, #191410);
+}
+
+.nibi-note-left .note-audio {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.nibi-note-left .note-volume-slider {
+  width: 0;
+  opacity: 0;
+  height: 4px;
+  background: var(--bdr, rgba(25, 20, 16, 0.08));
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.2s;
+  overflow: hidden;
+  position: relative;
+}
+
+.nibi-note-left .note-audio:hover .note-volume-slider {
+  width: 52px;
+  opacity: 1;
+}
+
+.nibi-note-left .note-volume-fill {
+  height: 100%;
+  background: var(--acc, #ff8a36);
+  border-radius: 2px;
+  transition: width 0.1s;
+  pointer-events: none;
+}
+
+/* ── 时间线（设计稿 .note-timeline） ── */
+
+.nibi-note-left .note-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px 0;
+  background: var(--srf, #fff);
+  border-bottom: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+}
+
+.nibi-note-left .note-timeline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.nibi-note-left .note-time {
+  font-family: var(--fm, monospace);
+  font-size: var(--xs, 11px);
   color: var(--mut, #7c7464);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.nibi-note-left .note-timeline-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.nibi-note-left .note-timeline-actions .note-icon-btn {
+  background: var(--bgalt, #f7f3ec);
+}
+
+.nibi-note-left .note-timeline-actions .note-icon-btn:hover:not(:disabled) {
+  background: var(--accl, rgba(255, 138, 54, 0.1));
+  color: var(--acc, #ff8a36);
+}
+
+/* ── 进度条 ── */
+
+.nibi-note-left .note-progress-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.nibi-note-left .note-progress {
+  height: 5px;
+  background: var(--bdr, rgba(25, 20, 16, 0.08));
+  border-radius: 999px;
+  position: relative;
+  cursor: pointer;
+  overflow: visible;
+}
+
+/* 扩大点击/拖拽热区（视觉仍 5px） */
+.nibi-note-left .note-progress::before {
+  content: '';
+  position: absolute;
+  inset: -8px 0;
+  z-index: 0;
+}
+
+.nibi-note-left .note-progress span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: var(--acc, #ff8a36);
+  border-radius: 999px;
+  transition: width 0.1s;
+  pointer-events: none;
+}
+
+.nibi-note-left .note-progress-hover {
+  position: absolute;
+  top: -22px;
+  transform: translateX(-50%);
+  font-size: 10px;
+  font-family: var(--fm, monospace);
+  color: var(--fg, #191410);
+  background: var(--srf, #fff);
+  border: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  border-radius: 4px;
+  padding: 1px 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s;
+  box-shadow: var(--sh1, 0 1px 3px rgba(0,0,0,0.08));
+  white-space: nowrap;
+}
+
+/* ── 全屏样式（.nibi-note-left:fullscreen） ── */
+
+.nibi-note-left:fullscreen {
+  display: flex;
+  flex-direction: column;
+  background: #000;
+  width: 100vw;
+  height: 100vh;
+}
+
+.nibi-note-left:fullscreen .nibi-note-player-wrap {
+  flex: 1;
+  max-height: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+.nibi-note-left:fullscreen .ln-video-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+.nibi-note-left:fullscreen .ln-video-wrapper video {
+  max-width: 100%;
+  max-height: 100%;
+  width: 100%;
+}
+
+.nibi-note-left:fullscreen .note-controls,
+.nibi-note-left:fullscreen .note-timeline {
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.85);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.nibi-note-left:fullscreen .nibi-note-transcript-wrap {
+  max-height: 200px;
+  flex: none;
+  background: rgba(0, 0, 0, 0.7);
 }
 
 /* ── 转录区头部（设计稿 .note-transcript-head） ── */
