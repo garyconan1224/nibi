@@ -11,7 +11,7 @@
  *   - NoteEditor：轻量 CodeMirror 编辑器（注册到 lnEditorStore，复用截图插入能力）
  */
 import { cloneElement, isValidElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactElement, ReactNode } from 'react'
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, BookOpenCheck, Brain, Check, ChevronDown, ChevronRight, Download, FileCode, FileDown, FileText, FileType, Image, List, Pencil, Presentation, Sparkles, Subtitles, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -64,6 +64,14 @@ export function platformLabelFromUrl(url: string): string {
 }
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed'
+const VIDEO_SPLIT_MIN = 42
+const VIDEO_SPLIT_MAX = 72
+const VIDEO_SPLIT_DEFAULT = 60
+const VIDEO_SPLIT_STORAGE_KEY = 'nibi.note.videoLeftPct'
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value))
+}
 
 /** 格式化 HH:mm */
 function formatTime(d: Date): string {
@@ -309,10 +317,21 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
 
   // 7.3: 视频笔记三列布局 — 播放器 + 转录轴联动
   const videoRef = useRef<LNVideoPanelHandle>(null)
+  const notePageRef = useRef<HTMLDivElement>(null)
   const [currentTime, setCurrentTime] = useState(0)
-  // 驱动 transportNode getter 刷新（LNVideoPanel 状态变化时递增）
-  const [, setTransportVersion] = useState(0)
-  const handleTransportChange = useCallback(() => setTransportVersion(v => v + 1), [])
+  const [videoDuration, setVideoDuration] = useState(0)
+  const [noteLeftPct, setNoteLeftPct] = useState(() => {
+    if (typeof window === 'undefined') return VIDEO_SPLIT_DEFAULT
+    const storedRaw = window.localStorage.getItem(VIDEO_SPLIT_STORAGE_KEY)
+    if (!storedRaw) return VIDEO_SPLIT_DEFAULT
+    const stored = Number(storedRaw)
+    return Number.isFinite(stored) ? clampNumber(stored, VIDEO_SPLIT_MIN, VIDEO_SPLIT_MAX) : VIDEO_SPLIT_DEFAULT
+  })
+  const [transportNode, setTransportNode] = useState<ReactNode>(null)
+  const handleTransportChange = useCallback(() => {
+    setTransportNode(videoRef.current?.transportNode ?? null)
+  }, [])
+  const handleVideoDurationChange = useCallback((duration: number) => setVideoDuration(duration), [])
   const [sourceModalOpen, setSourceModalOpen] = useState(false)
   const [activeSummaryId, setActiveSummaryId] = useState<string | undefined>(undefined)
   // VN4.1 版本下拉 + 风格/版本两层
@@ -352,6 +371,69 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     return () => { cancelled = true }
   }, [workspaceId, itemId, activeSummaryId, summariesVersion])
 
+  useEffect(() => {
+    window.localStorage.setItem(VIDEO_SPLIT_STORAGE_KEY, String(Math.round(noteLeftPct)))
+  }, [noteLeftPct])
+
+  const notePageStyle = useMemo<CSSProperties>(
+    () => ({ '--note-left-width': `${noteLeftPct}%` } as CSSProperties),
+    [noteLeftPct],
+  )
+
+  const updateNoteSplitFromClientX = useCallback((clientX: number) => {
+    const el = notePageRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    if (rect.width <= 0) return
+    const next = ((clientX - rect.left) / rect.width) * 100
+    setNoteLeftPct(clampNumber(next, VIDEO_SPLIT_MIN, VIDEO_SPLIT_MAX))
+  }, [])
+
+  const handleNoteSplitPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    const pointerId = event.pointerId
+    const target = event.currentTarget
+    const prevCursor = document.body.style.cursor
+    const prevUserSelect = document.body.style.userSelect
+    updateNoteSplitFromClientX(event.clientX)
+    target.setPointerCapture(pointerId)
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      updateNoteSplitFromClientX(moveEvent.clientX)
+    }
+    const cleanup = () => {
+      window.removeEventListener('pointermove', handleMove)
+      window.removeEventListener('pointerup', cleanup)
+      window.removeEventListener('pointercancel', cleanup)
+      if (target.hasPointerCapture(pointerId)) target.releasePointerCapture(pointerId)
+      document.body.style.cursor = prevCursor
+      document.body.style.userSelect = prevUserSelect
+    }
+
+    window.addEventListener('pointermove', handleMove)
+    window.addEventListener('pointerup', cleanup)
+    window.addEventListener('pointercancel', cleanup)
+  }, [updateNoteSplitFromClientX])
+
+  const handleNoteSplitKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const step = event.shiftKey ? 6 : 3
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault()
+      setNoteLeftPct((value) => clampNumber(value - step, VIDEO_SPLIT_MIN, VIDEO_SPLIT_MAX))
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault()
+      setNoteLeftPct((value) => clampNumber(value + step, VIDEO_SPLIT_MIN, VIDEO_SPLIT_MAX))
+    } else if (event.key === 'Home') {
+      event.preventDefault()
+      setNoteLeftPct(VIDEO_SPLIT_MIN)
+    } else if (event.key === 'End') {
+      event.preventDefault()
+      setNoteLeftPct(VIDEO_SPLIT_MAX)
+    }
+  }, [])
+
   // 点击外部关闭模板下拉
   useEffect(() => {
     if (!templateDropOpen) return
@@ -385,9 +467,30 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     mediaCompanionRef.current?.seekTo(sec)
   }, [])
 
+  const videoFrames = useMemo(() => note?.media?.frames ?? [], [note?.media?.frames])
+  const activeFrameIdx = useMemo(() => {
+    let activeIdx = -1
+    for (let idx = 0; idx < videoFrames.length; idx += 1) {
+      if (videoFrames[idx].sec <= currentTime + 0.5) activeIdx = idx
+    }
+    return activeIdx
+  }, [currentTime, videoFrames])
+
+  const videoSubtitle = useMemo(() => {
+    if (!Array.isArray(note?.transcript)) return ''
+    const lines = note.transcript as VideoResultTranscriptLine[]
+    let active: VideoResultTranscriptLine | null = null
+    for (const line of lines) {
+      if (line.t_sec <= currentTime + 0.35) active = line
+      else break
+    }
+    return active?.text ?? ''
+  }, [currentTime, note?.transcript])
+
   const fetchNote = useCallback(async () => {
     setLoading(true)
     setError(null)
+    setVideoDuration(0)
     try {
       const data = await getItemNote(workspaceId, itemId)
       setNote(data)
@@ -606,6 +709,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const currentInfo = imageInfos[selectedImageIdx]
   const transcriptCount = Array.isArray(note.transcript) ? note.transcript.length : 0
   const sourceLabel = sourceUrl ? platformLabelFromUrl(sourceUrl) : '本地素材'
+  const effectiveVideoDuration = note.media?.video?.duration || videoDuration
   const saveStatusNode = (
     <span className={`nibi-note-save nibi-note-save--${saveStatus}`}>
       {saveStatus === 'saving' && '保存中…'}
@@ -632,7 +736,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
         </button>
         <h1 className="nibi-note-bar-title">{title || '未命名笔记'}</h1>
         {isVideoNote && (
-          <span className="nibi-note-bar-meta">VIDEO{note.media?.video?.duration ? ` · ${formatTimecode(note.media.video.duration)}` : ''}</span>
+          <span className="nibi-note-bar-meta">VIDEO{effectiveVideoDuration ? ` · ${formatTimecode(effectiveVideoDuration)}` : ''}</span>
         )}
         {itemType === 'audio' && (
           <span className="nibi-note-bar-meta">AUDIO</span>
@@ -752,7 +856,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
       {isVideoNote ? (
         <>
         {/* ── 视频笔记两栏布局：.note-page（设计稿 pg-note 对齐） ── */}
-        <div className="nibi-note-page">
+        <div className="nibi-note-page" ref={notePageRef} style={notePageStyle}>
 
           {/* ── 左栏（60%）：播放器 + 控制 + 转录 ── */}
           <div className="nibi-note-left vm-ln-scope">
@@ -764,11 +868,30 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 title=""
                 workspaceId={workspaceId}
                 onTimeUpdate={handleTimeUpdate}
+                onDurationChange={handleVideoDurationChange}
+                markers={videoFrames}
+                subtitle={videoSubtitle}
+                renderTransportInline={false}
                 onTransportChange={handleTransportChange}
               />
             </div>
             {/* 控制条 + 时间线（在 player-wrap 外，避免 overflow:hidden 截断） */}
-            {videoRef.current?.transportNode}
+            {transportNode}
+            {videoFrames.length > 0 && (
+              <div className="note-chapters" aria-label="关键帧轨">
+                {videoFrames.map((frame, idx) => (
+                  <button
+                    key={`${frame.sec}-${frame.url}`}
+                    className={`note-thumb${idx === activeFrameIdx ? ' is-active' : ''}`}
+                    onClick={() => handleSeek(frame.sec)}
+                    title={`跳转到 ${formatTimecode(frame.sec)}`}
+                  >
+                    <img src={frame.url} alt="" loading="lazy" />
+                    <span>{formatTimecode(frame.sec)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             {/* 转录 */}
             {Array.isArray(note.transcript) && (note.transcript as VideoResultTranscriptLine[]).length > 0 ? (
               <div className="nibi-note-transcript-wrap">
@@ -789,6 +912,21 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--mut)', fontSize: 12, padding: 24 }}>暂无字幕</div>
             )}
+          </div>
+
+          <div
+            className="nibi-note-splitter"
+            role="separator"
+            aria-label="调整左右栏宽度"
+            aria-orientation="vertical"
+            aria-valuemin={VIDEO_SPLIT_MIN}
+            aria-valuemax={VIDEO_SPLIT_MAX}
+            aria-valuenow={Math.round(noteLeftPct)}
+            tabIndex={0}
+            onPointerDown={handleNoteSplitPointerDown}
+            onKeyDown={handleNoteSplitKeyDown}
+          >
+            <span className="nibi-note-splitter-grip" />
           </div>
 
           {/* ── 右栏（40%）：标签 + 结构化笔记 ── */}

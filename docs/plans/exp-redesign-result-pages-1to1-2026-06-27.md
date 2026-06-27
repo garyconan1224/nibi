@@ -127,6 +127,17 @@ status: ready
 - **保留不砍**：现有逐句字幕编辑、时间码点击 seek、截图补图、版本栈、导出、问 AI。
 - **占位留待办**：画中画 `.note-pip`、缩略图轨若无真实帧数据 → 占位 + 登记 §7。
 
+#### Stage 1 进度拆分（Codex 审 `e25c9d3` 后细化）
+
+- **Stage 1.1 ✓ done**（commit `e25c9d3`，Codex：通过）：导出菜单灰显占位、转录头「转录 + N 条」、右栏改 `note-copy`/`note-section` 结构。
+- **Stage 1.2 — 视频播放器 transport（⚠️ 难点，先拆细给小米；若反复回归无法收敛则升级 Claude）**：
+  - 现状：`LNVideoPanel.tsx`（`pages/results/LearningNotesPage/`）用浏览器**原生 `<video controls>`** + 截图按钮 + 键盘 ±5s。设计稿要自定义 transport：播放/暂停、±10s、字幕、循环、倍速 `.note-speed`、音量 `.note-volume`，及 timeline（进度条+markers+hover、章节点、缩略图轨）。
+  - **影响三处共享组件**：`NoteShell` 视频形态、`NoteMediaCompanion`、遗产 `LearningNotesPage` 都 import `LNVideoPanel`；改完必须三处都验证不回归（转录联动 `seekTo`/`onTimeUpdate`、截图、键盘快捷键保留）。
+  - 按尺度：做**有真实 video API 支撑**的控件（播放/±10s/倍速/音量/循环/字幕开关/自定义进度条 seek），隐藏原生 controls；**无数据源的（章节点、缩略图轨、画中画、字幕浮层文案）→ 占位/暂不渲染 + §7**，不造假数据。±5s 改 ±10s 对齐设计稿。
+- **Stage 1.3 — 引用块/正文对齐（小米，小修）**：补 `.note-section blockquote` 样式（Codex 意见③）；复核右栏正文已由 `MilkdownEditor` 渲染 h2/h3/ul/blockquote、无前端硬编码「关键要点」（Codex 意见②，`e25c9d3` 已满足，仅复核）。
+
+> ⚠️ **跨 Stage 新发现**：generic workbench（音频/文本）当前是「左正文 + 右素材卡（MATERIAL）」结构（`index.tsx:948-994`），与设计稿 pg-audio（左波形播放器+转录 / 右总结）、pg-text（左编辑器 / 右要点）**差异较大，Stage 2/4 是结构重构，不是微调**，工作量需预留。
+
 ### Stage 2 — 音频笔记形态 1:1（设计稿 pg-audio 2188-2309）
 
 - **涉及文件**：`NoteAudioPanel.tsx`、`NoteMediaCompanion.tsx`（音频分支）、`note-shell.css`（`--audio` 变体）、`index.tsx`（generic workbench 音频段 ~1158）。

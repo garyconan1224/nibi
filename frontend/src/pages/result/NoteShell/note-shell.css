@@ -471,12 +471,10 @@
 .nibi-note-left {
   flex: 0 0 var(--note-left-width);
   width: var(--note-left-width);
-  max-width: var(--note-left-width);
   min-width: 0;
   display: flex;
   flex-direction: column;
   background: var(--srf, #fff);
-  border-right: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
   overflow: hidden;
   container-type: inline-size;
   container-name: note-left;
@@ -495,9 +493,75 @@
 
 .nibi-note-player-wrap {
   flex: 0 0 auto;
-  max-height: 55%;
+  height: clamp(240px, 32vw, 52vh);
+  height: clamp(240px, 56.25cqw, 52vh);
   overflow: hidden;
   background: #050505;
+  display: flex;
+  min-height: 0;
+}
+
+.nibi-note-player-wrap .ln-video-panel {
+  height: 100%;
+  min-height: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: #050505;
+}
+
+.nibi-note-player-wrap .ln-video-wrapper {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.nibi-note-player-wrap .ln-video-wrapper video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.nibi-note-splitter {
+  flex: 0 0 10px;
+  align-self: stretch;
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 -5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+
+.nibi-note-splitter::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 50%;
+  width: 1px;
+  transform: translateX(-0.5px);
+  background: var(--bdr, rgba(25, 20, 16, 0.08));
+}
+
+.nibi-note-splitter-grip {
+  width: 4px;
+  height: 54px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--acc, #ff8a36) 65%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in oklch, var(--acc, #ff8a36) 10%, transparent);
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.nibi-note-splitter:hover .nibi-note-splitter-grip,
+.nibi-note-splitter:focus-visible .nibi-note-splitter-grip {
+  opacity: 1;
 }
 
 .nibi-note-transcript-wrap {
@@ -723,13 +787,25 @@
   z-index: 0;
 }
 
-.nibi-note-left .note-progress span {
+.nibi-note-left .note-progress-fill {
   position: absolute;
   inset: 0 auto 0 0;
   width: 0;
   background: var(--acc, #ff8a36);
   border-radius: 999px;
   transition: width 0.1s;
+  pointer-events: none;
+}
+
+.nibi-note-left .note-progress-marker {
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 100%;
+  transform: translate(-1px, -50%);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 1px var(--bdr, rgba(25, 20, 16, 0.08));
   pointer-events: none;
 }
 
@@ -749,6 +825,61 @@
   transition: opacity 0.1s;
   box-shadow: var(--sh1, 0 1px 3px rgba(0,0,0,0.08));
   white-space: nowrap;
+}
+
+.nibi-note-left .note-chapters {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px 14px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  background: var(--srf, #fff);
+  border-bottom: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  scrollbar-width: thin;
+}
+
+.nibi-note-left .note-thumb {
+  flex: 0 0 78px;
+  height: 50px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: var(--r, 8px);
+  background: var(--bgalt, #f7f3ec);
+  color: #fff;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: none;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+.nibi-note-left .note-thumb:hover,
+.nibi-note-left .note-thumb.is-active {
+  border-color: var(--acc, #ff8a36);
+  box-shadow: 0 0 0 2px var(--accl, rgba(255, 138, 54, 0.1));
+  transform: translateY(-1px);
+}
+
+.nibi-note-left .note-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: saturate(0.9) brightness(0.82);
+}
+
+.nibi-note-left .note-thumb span {
+  position: absolute;
+  left: 5px;
+  bottom: 4px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.58);
+  color: #fff;
+  font-family: var(--fm, monospace);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.4;
 }
 
 /* ── 全屏样式（.nibi-note-left:fullscreen） ── */
@@ -931,6 +1062,10 @@
     width: 100%;
     border-right: none;
     border-bottom: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  }
+
+  .nibi-note-splitter {
+    display: none;
   }
 
   .nibi-note-right {
