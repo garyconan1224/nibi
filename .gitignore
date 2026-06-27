@@ -20,6 +20,7 @@ __pycache__/
 *.swp
 *.zip
 **/.env
+test-results/
 # CodeGraph Index
 # Design source archives (already extracted to docs/design/)
 # Frontend (Vite + React)
