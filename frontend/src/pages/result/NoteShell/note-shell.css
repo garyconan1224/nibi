@@ -336,6 +336,17 @@
   border-radius: 8px;
 }
 
+/* ── Milkdown 编辑器内 blockquote（设计稿 .note-quote 视觉对齐） ── */
+.nibi-note-shell .ProseMirror blockquote {
+  margin: 16px 0;
+  padding: 12px 16px;
+  border-left: 4px solid var(--acc, #ff8a36);
+  border-radius: 0 var(--r, 8px) var(--r, 8px) 0;
+  background: var(--accl, rgba(255, 138, 54, 0.08));
+  font-style: italic;
+  color: var(--fg2, #3d3929);
+}
+
 .nibi-note-shell details summary {
   letter-spacing: normal;
 }
