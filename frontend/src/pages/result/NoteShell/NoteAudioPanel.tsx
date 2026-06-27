@@ -101,7 +101,7 @@ const NoteAudioPanel = forwardRef<NoteAudioPanelHandle, NoteAudioPanelProps>(
       if (a) setSpeed(a.playbackRate)
     }, [])
 
-    useEffect(() => { onTransportChange?.() })
+    useEffect(() => { onTransportChange?.() }, [playing, progress, duration, muted, volume, speed, loop, onTransportChange])
 
     /* ── 交互控制 ── */
     const togglePlay = useCallback(() => {
@@ -201,7 +201,11 @@ const NoteAudioPanel = forwardRef<NoteAudioPanelHandle, NoteAudioPanelProps>(
         if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') return
         if (e.code === 'Space') {
           e.preventDefault()
-          a.paused ? void a.play() : a.pause()
+          if (a.paused) {
+            void a.play()
+          } else {
+            a.pause()
+          }
         } else if (e.code === 'ArrowLeft') {
           e.preventDefault()
           a.currentTime = Math.max(0, a.currentTime - 10)
@@ -290,7 +294,7 @@ const NoteAudioPanel = forwardRef<NoteAudioPanelHandle, NoteAudioPanelProps>(
     )
 
     return (
-      <div className="note-audio-panel" ref={useRef(null)}>
+      <div className="note-audio-panel">
         <audio
           ref={audioRef}
           src={src}
