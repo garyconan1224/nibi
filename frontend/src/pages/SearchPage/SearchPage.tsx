@@ -1,36 +1,54 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Search as SearchIcon, Loader2 } from 'lucide-react'
+import { Loader2, Search as SearchIcon, Sparkles } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { toast } from 'sonner'
-
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { EmptyState } from '@/components/ui/empty-state'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Badge } from '@/components/ui/badge'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 
 import { listWorkspaces } from '@/services/workspaces'
 import { searchGlobal, searchWorkspace, type SearchResponse } from '@/services/search'
 import { ITEM_TYPE_TEXT, type WorkspaceRecord } from '@/types/workspace'
 
-type ScopeKey = '__all__' | string // workspaceId or special
+import './search.css'
+
+/* ── localStorage 搜索历史 ── */
+const HISTORY_KEY = 'nibi_search_history'
+const MAX_HISTORY = 12
+
+function loadHistory(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]')
+  } catch {
+    return []
+  }
+}
+
+function saveToHistory(q: string) {
+  const list = loadHistory().filter(s => s !== q)
+  list.unshift(q)
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, MAX_HISTORY)))
+}
+
+/* ── 类型图标映射 ── */
+const TYPE_ICON: Record<string, string> = {
+  video: '🎬',
+  image: '🖼️',
+  audio: '🎙️',
+  text: '📝',
+}
+
+/* ── scope key ── */
+type ScopeKey = '__all__' | string
 
 export default function SearchPage() {
   const [query, setQuery] = useState('')
   const [scope, setScope] = useState<ScopeKey>('__all__')
+  const [mode, setMode] = useState<'semantic' | 'keyword'>('semantic')
   const [workspaces, setWorkspaces] = useState<WorkspaceRecord[]>([])
   const [result, setResult] = useState<SearchResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [history, setHistory] = useState<string[]>(loadHistory)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     listWorkspaces()
@@ -41,182 +59,309 @@ export default function SearchPage() {
       })
   }, [])
 
-  const scopeLabel = useMemo(() => {
-    if (scope === '__all__') return '全部合集'
-    const ws = workspaces.find(w => w.workspace_id === scope)
-    return ws?.name ?? scope
-  }, [scope, workspaces])
+  const doSearch = useCallback(
+    async (q: string) => {
+      const trimmed = q.trim()
+      if (!trimmed) {
+        toast.warning('请输入查询内容')
+        return
+      }
+      setLoading(true)
+      setSubmitted(true)
+      setResult(null)
+      setQuery(trimmed)
+      saveToHistory(trimmed)
+      setHistory(loadHistory())
+      try {
+        const data =
+          scope === '__all__'
+            ? await searchGlobal(trimmed, { topK: 10 })
+            : await searchWorkspace(scope, trimmed, 5)
+        setResult(data)
+      } catch (err) {
+        console.error(err)
+        const msg = err instanceof Error ? err.message : '检索失败'
+        toast.error(msg)
+      } finally {
+        setLoading(false)
+      }
+    },
+    [scope],
+  )
 
-  async function handleSearch() {
-    const q = query.trim()
-    if (!q) {
-      toast.warning('请输入查询内容')
-      return
-    }
-    setLoading(true)
-    setSubmitted(true)
-    setResult(null)
-    try {
-      const data =
-        scope === '__all__'
-          ? await searchGlobal(q, { topK: 10 })
-          : await searchWorkspace(scope, q, 5)
-      setResult(data)
-    } catch (err) {
-      console.error(err)
-      const msg = err instanceof Error ? err.message : '检索失败'
-      toast.error(msg)
-    } finally {
-      setLoading(false)
-    }
+  function handleSearch() {
+    doSearch(query)
   }
 
-  return (
-    <div className="flex h-full w-full flex-col overflow-hidden bg-[#fbf8f3]">
-      {/* 顶部输入区 */}
-      <div className="border-b border-black/10 bg-gradient-to-br from-[#e9fbf6] to-white/85 px-6 py-5">
-        <div className="mx-auto flex max-w-4xl flex-col gap-3 rounded-lg border border-black/10 bg-white/70 px-5 py-4 shadow-[0_18px_50px_rgba(72,50,20,0.07)]">
-          <h1 className="font-display text-4xl font-normal leading-none text-foreground">知识库检索</h1>
-          <p className="text-xs text-muted-foreground">
-            跨合集语义检索（RAG）。返回带引用的回答和可跳转的来源片段。
-          </p>
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <SearchIcon
-                size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-              />
-              <Input
-                value={query}
-                onChange={e => setQuery(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && !loading) handleSearch()
-                }}
-                placeholder="输入问题，例如：发布会上提到了哪些产品特性？"
-                className="pl-9"
-                disabled={loading}
-              />
-            </div>
-            <Select value={scope} onValueChange={v => setScope(v as ScopeKey)}>
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="范围" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">全部合集</SelectItem>
-                {workspaces.map(ws => (
-                  <SelectItem key={ws.workspace_id} value={ws.workspace_id}>
-                    {ws.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button onClick={handleSearch} disabled={loading || !query.trim()}>
-              {loading ? (
-                <>
-                  <Loader2 size={14} className="mr-1 animate-spin" />
-                  检索中
-                </>
-              ) : (
-                '搜索'
-              )}
-            </Button>
+  function handleHistoryClick(q: string) {
+    setQuery(q)
+    doSearch(q)
+  }
+
+  /* ── Hero ── */
+  const hero = (
+    <div className="search-hero">
+      <div className="search-hero-inner">
+        <span className="search-kicker">AI Search · RAG Powered</span>
+        <h1 className="search-title">语义搜索，跨库全局检索</h1>
+        <p className="search-subtitle">
+          基于 RAG 的跨合集语义检索，返回带引用的综合回答与可跳转的来源片段。
+        </p>
+
+        <div className="search-input-row">
+          <div className="search-input-wrap">
+            <SearchIcon size={16} />
+            <input
+              ref={inputRef}
+              className="search-input"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !loading) handleSearch()
+              }}
+              placeholder="输入问题，例如：发布会上提到了哪些产品特性？"
+              disabled={loading}
+            />
           </div>
-          <div className="text-xs text-muted-foreground">
-            范围：<span className="font-medium text-foreground">{scopeLabel}</span>
-          </div>
+          <button
+            className="search-btn"
+            onClick={handleSearch}
+            disabled={loading || !query.trim()}
+          >
+            {loading ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                检索中
+              </>
+            ) : (
+              '搜索'
+            )}
+          </button>
         </div>
-      </div>
 
-      {/* 结果区 */}
-      <div className="flex-1 overflow-y-auto px-6 py-6">
-        <div className="mx-auto flex max-w-4xl flex-col gap-6">
-          {loading && (
-            <div className="flex flex-col gap-3">
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-16 w-full" />
-              <Skeleton className="h-16 w-full" />
-            </div>
-          )}
+        <div className="search-options">
+          <select
+            className="search-scope-select"
+            value={scope}
+            onChange={e => setScope(e.target.value as ScopeKey)}
+          >
+            <option value="__all__">全部合集</option>
+            {workspaces.map(ws => (
+              <option key={ws.workspace_id} value={ws.workspace_id}>
+                {ws.name}
+              </option>
+            ))}
+          </select>
 
-          {!loading && !submitted && (
-            <EmptyState
-              illustration={<SearchIcon className="size-6" />}
-              title="开始你的第一次检索"
-              description="在上方输入框中输入问题，按回车或点击搜索。"
-            />
-          )}
+          {/* 语义/关键词模式 — 服务端暂不支持 mode，先占位 disabled */}
+          <div className="search-mode-group">
+            <button
+              className="search-mode-btn"
+              data-active={mode === 'semantic'}
+              onClick={() => setMode('semantic')}
+              disabled
+              title="服务端暂未支持模式切换，后续接入"
+            >
+              语义
+            </button>
+            <button
+              className="search-mode-btn"
+              data-active={mode === 'keyword'}
+              onClick={() => setMode('keyword')}
+              disabled
+              title="服务端暂未支持模式切换，后续接入"
+            >
+              关键词
+            </button>
+          </div>
 
-          {!loading && submitted && result && (
-            <SearchResultView result={result} />
-          )}
-
-          {!loading && submitted && !result && (
-            <EmptyState
-              illustration={<SearchIcon className="size-6" />}
-              title="未返回结果"
-              description="可能是网络异常或后端报错，请查看控制台或稍后重试。"
-            />
-          )}
+          <span className="search-rag-badge">
+            <Sparkles size={10} />
+            RAG
+          </span>
         </div>
       </div>
     </div>
   )
+
+  /* ── 结果 ── */
+  const results = (
+    <div className="search-results">
+      <div className="search-results-inner">
+        {/* 加载态 */}
+        {loading && (
+          <div className="search-skeleton">
+            <div className="search-skeleton-line" />
+            <div className="search-skeleton-line" style={{ width: '75%' }} />
+            <div className="search-skeleton-line" style={{ width: '50%' }} />
+          </div>
+        )}
+
+        {/* 未搜索空态 */}
+        {!loading && !submitted && (
+          <>
+            <SearchEmpty
+              icon={<SearchIcon size={20} />}
+              title="开始你的第一次检索"
+              desc="在上方输入框中输入问题，按回车或点击搜索。"
+            />
+            {history.length > 0 && (
+              <SearchHistory items={history} onClick={handleHistoryClick} />
+            )}
+          </>
+        )}
+
+        {/* 有结果 */}
+        {!loading && submitted && result && (
+          <SearchResultView result={result} onHistoryClick={handleHistoryClick} history={history} />
+        )}
+
+        {/* 无结果 */}
+        {!loading && submitted && !result && (
+          <SearchEmpty
+            icon={<SearchIcon size={20} />}
+            title="未返回结果"
+            desc="可能是网络异常或后端报错，请查看控制台或稍后重试。"
+          />
+        )}
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="nibi-search-scope">
+      {hero}
+      {results}
+    </div>
+  )
 }
 
-function SearchResultView({ result }: { result: SearchResponse }) {
+/* ── 结果子组件 ── */
+
+function SearchResultView({
+  result,
+  onHistoryClick,
+  history,
+}: {
+  result: SearchResponse
+  onHistoryClick: (q: string) => void
+  history: string[]
+}) {
   return (
     <>
-      <Card className="p-4">
-        <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          回答
-        </div>
-        <div className="prose prose-sm max-w-none dark:prose-invert">
+      {/* AI 综合回答 */}
+      <div className="search-answer">
+        <div className="search-answer-label">AI 综合回答</div>
+        <div className="search-answer-body">
           <ReactMarkdown>{result.answer || '（模型未返回内容）'}</ReactMarkdown>
         </div>
-      </Card>
+      </div>
 
+      {/* 引用 citations */}
+      {result.sources.length > 0 && (
+        <div>
+          <div className="search-citations">
+            {result.sources.map((_, idx) => (
+              <span key={idx} className="search-citation-chip">
+                [{idx + 1}]
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 来源文档 */}
       <div>
-        <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          来源（{result.sources.length}）
+        <div className="search-sources-heading">
+          来源文档（{result.sources.length}）
         </div>
         {result.sources.length === 0 ? (
-          <EmptyState
-            illustration={<SearchIcon className="size-6" />}
+          <SearchEmpty
+            icon={<SearchIcon size={20} />}
             title="无引用来源"
-            description="模型未能在选定范围内匹配到相关片段。"
+            desc="模型未能在选定范围内匹配到相关片段。"
           />
         ) : (
-          <ul className="flex flex-col gap-2">
+          <ul className="search-source-list">
             {result.sources.map((s, idx) => (
               <li key={`${s.workspace_id}-${s.item_id}-${idx}`}>
-                <Link
-                  to={s.jump_url}
-                  className="block rounded-lg border border-border bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent/40"
-                >
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className="font-mono text-foreground">[{idx + 1}]</span>
-                    <Badge variant="secondary" className="px-1.5 py-0">
-                      {ITEM_TYPE_TEXT[s.item_type] ?? s.item_type}
-                    </Badge>
-                    <span className="truncate">{s.workspace_name}</span>
-                    <span className="ml-auto font-mono">
-                      score {s.score.toFixed(3)}
-                    </span>
+                <Link to={s.jump_url} className="search-source-item">
+                  <div className="search-source-cover">
+                    {TYPE_ICON[s.item_type] ?? '📄'}
                   </div>
-                  <div className="mt-1 text-sm font-medium text-foreground">
-                    {s.item_title || '（无标题）'}
-                  </div>
-                  {s.chunk_excerpt && (
-                    <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                      {s.chunk_excerpt}
+                  <div className="search-source-info">
+                    <div className="search-source-title">
+                      {s.item_title || '（无标题）'}
                     </div>
-                  )}
+                    <div className="search-source-meta">
+                      <span className="search-source-badge">
+                        {ITEM_TYPE_TEXT[s.item_type] ?? s.item_type}
+                      </span>
+                      <span>{s.workspace_name}</span>
+                    </div>
+                    {s.chunk_excerpt && (
+                      <div className="search-source-excerpt">{s.chunk_excerpt}</div>
+                    )}
+                    <div className="search-score-bar-wrap">
+                      <div className="search-score-bar-track">
+                        <div
+                          className="search-score-bar-fill"
+                          style={{ width: `${Math.min(s.score * 100, 100)}%` }}
+                        />
+                      </div>
+                      <span className="search-score-label">{s.score.toFixed(2)}</span>
+                    </div>
+                  </div>
                 </Link>
               </li>
             ))}
           </ul>
         )}
       </div>
+
+      {/* 最近搜索 */}
+      {history.length > 0 && (
+        <SearchHistory items={history} onClick={onHistoryClick} />
+      )}
     </>
+  )
+}
+
+function SearchEmpty({
+  icon,
+  title,
+  desc,
+}: {
+  icon: React.ReactNode
+  title: string
+  desc: string
+}) {
+  return (
+    <div className="search-empty">
+      <div className="search-empty-icon">{icon}</div>
+      <div className="search-empty-title">{title}</div>
+      <div className="search-empty-desc">{desc}</div>
+    </div>
+  )
+}
+
+function SearchHistory({
+  items,
+  onClick,
+}: {
+  items: string[]
+  onClick: (q: string) => void
+}) {
+  return (
+    <div className="search-history">
+      <div className="search-history-label">最近搜索</div>
+      <div className="search-history-chips">
+        {items.map(q => (
+          <button key={q} className="search-history-chip" onClick={() => onClick(q)}>
+            {q}
+          </button>
+        ))}
+      </div>
+    </div>
   )
 }
