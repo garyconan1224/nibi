@@ -22,14 +22,14 @@
 ```
 
 `dev.sh` 内置健康探测（轮询 `/health` + 前端 200），确认就绪后才退出。  
-**端口**从 `.env` 读取（`BACKEND_PORT` 默认 8000，`VITE_PORT` 默认 5173）——**不要在命令里硬编码端口**。
+**端口**从 `.env` 读取（`BACKEND_PORT` 默认 8000，`VITE_PORT` 默认 5177）——**不要在命令里硬编码端口**。
 
 验证服务已就绪（在 `dev.sh` 已确认的前提下也可手动再查）：
 
 ```bash
 # 一行读 .env 端口 + 同时探两端
 BPORT=$(grep -E '^BACKEND_PORT=' .env 2>/dev/null | tail -1 | cut -d= -f2 | tr -d '"' | tr -d "'"); BPORT=${BPORT:-8000}
-FPORT=$(grep -E '^VITE_PORT=' .env 2>/dev/null | tail -1 | cut -d= -f2 | tr -d '"' | tr -d "'"); FPORT=${FPORT:-5173}
+FPORT=$(grep -E '^VITE_PORT=' .env 2>/dev/null | tail -1 | cut -d= -f2 | tr -d '"' | tr -d "'"); FPORT=${FPORT:-5177}
 curl -s "http://localhost:$BPORT/health"
 curl -so /dev/null -w "%{http_code}" "http://localhost:$FPORT/"
 ```
@@ -40,7 +40,7 @@ curl -so /dev/null -w "%{http_code}" "http://localhost:$FPORT/"
 # 后端（端口看 .env BACKEND_PORT，默认 8000）
 .venv/bin/uvicorn backend.app.main:app --reload --port "${BACKEND_PORT:-8000}"
 
-# 前端（端口看 .env VITE_PORT，默认 5173）
+# 前端（端口看 .env VITE_PORT，默认 5177）
 cd frontend && pnpm dev
 ```
 
@@ -65,9 +65,9 @@ cd frontend && pnpm build       # tsc -b && vite build
 .venv/bin/python tests/e2e_qa.py
 
 # 浏览器结构化冒烟（优先于读取截图）
-.venv/bin/python scripts/browser_smoke.py --url http://localhost:${VITE_PORT:-5175}/library --library --screenshot /tmp/nibi-library.png
-.venv/bin/python scripts/browser_smoke.py --url http://localhost:${VITE_PORT:-5175}/taskboard --taskboard
-.venv/bin/python scripts/browser_smoke.py --url http://localhost:${VITE_PORT:-5175}/processing/<task_id> --processing
+.venv/bin/python scripts/browser_smoke.py --url http://localhost:${VITE_PORT:-5177}/library --library --screenshot /tmp/nibi-library.png
+.venv/bin/python scripts/browser_smoke.py --url http://localhost:${VITE_PORT:-5177}/taskboard --taskboard
+.venv/bin/python scripts/browser_smoke.py --url http://localhost:${VITE_PORT:-5177}/processing/<task_id> --processing
 ```
 
 > 注：本仓库使用项目内 `.venv` 作为标准 Python 入口。新增后端测试时遵循「每个端点 1 个 happy path + 1 个错误路径」。
@@ -88,7 +88,7 @@ cd frontend && pnpm build       # tsc -b && vite build
   - `/api`（notes.py，bilinote 兼容接口）
   - 无前缀：`download_config.py`、`transcriber_config.py`
 - `lifespan` 钩子在启动时把 `.env` 里的 `SILICONFLOW_API_KEY` 自动 seed 成一个 ProviderProfile（写进 `shared/settings_store`）。
-- CORS 白名单通过 `_build_cors_origins()` 动态生成，优先级：`CORS_ALLOW_ORIGINS` > `VITE_PORT` 推导 > 5173 兜底。
+- CORS 白名单通过 `_build_cors_origins()` 动态生成，优先级：`CORS_ALLOW_ORIGINS` > `VITE_PORT` 推导 > 5177 兜底。
 - **任务执行**：`backend/app/services/task_runner.py` 是基于 `ThreadPoolExecutor` 的后台执行器，task 记录写 `task_store`；同 project + 同 URL 的下载任务做幂等去重；状态变化通过 SSE / WebSocket 推给前端。
 
 ### 2.2 前后端共享层（`shared/`）
@@ -130,7 +130,7 @@ cd frontend && pnpm build       # tsc -b && vite build
 
 - 单一来源 `.env`，前后端都读它：
   - `BACKEND_PORT`（默认 8000）
-  - `VITE_PORT`（默认 5173）
+  - `VITE_PORT`（默认 5177）
 - 前端编译时通过 `VITE_BACKEND_BASE_URL` 知道后端地址（`start.sh` 启前端前会注入）。
 - README、`.env.example` 和 `start.sh` 应保持同一默认端口；如本机 `.env` 覆盖端口，**以 `.env` 实际值为准**。
 

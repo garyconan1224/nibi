@@ -28,6 +28,7 @@ import MilkdownEditor from './MilkdownEditor'
 import LNVideoPanel, { type LNVideoPanelHandle } from '@/pages/results/LearningNotesPage/LNVideoPanel'
 import LNTranscriptPanel from '@/pages/results/LearningNotesPage/LNTranscriptPanel'
 import '@/pages/results/LearningNotesPage/learning-notes.css'
+import './note-shell.css'
 import { NewSummaryModal } from '@/components/NewSummaryModal'
 import NoteChatDrawer from '@/components/NoteChatDrawer'
 import { SourceMdModal } from './SourceMdModal'
@@ -589,22 +590,35 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const images = note.media?.images ?? []
   const imageInfos = note.media?.image_infos ?? []
   const currentInfo = imageInfos[selectedImageIdx]
+  const transcriptCount = Array.isArray(note.transcript) ? note.transcript.length : 0
+  const sourceLabel = sourceUrl ? platformLabelFromUrl(sourceUrl) : '本地素材'
+  const noteLead = itemType === 'audio'
+    ? '音频转写、说话人线索与总结版本集中在同一个工作台里。'
+    : itemType === 'image'
+      ? '图文识别、OCR 与提示词结构在左中右三栏中联动。'
+      : itemType === 'video'
+        ? '视频、字幕时间轴、结构化笔记和 AI 工具在同一屏协作。'
+        : '文本正文、来源依据与总结版本在这里整理。'
+  const saveStatusNode = (
+    <span className={`nibi-note-save nibi-note-save--${saveStatus}`}>
+      {saveStatus === 'saving' && '保存中…'}
+      {saveStatus === 'saved' && `已保存 ${savedAt}`}
+      {saveStatus === 'failed' && '保存失败'}
+      {saveStatus === 'idle' && '自动保存'}
+    </span>
+  )
 
   // ── 提取正文 JSX（视频 / 非视频布局复用）──
   const noteContent = (
-    <div style={{
-      flex: 1, minWidth: 0,
-      padding: '20px 24px',
-      overflowY: 'auto',
-    }}>
+    <div className="nibi-note-editor-panel">
       <MilkdownEditor key={milkdownKey} markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
     </div>
   )
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+    <div className={`nibi-note-shell nibi-note-shell--${itemType}`}>
       {/* ════════ 顶栏 ════════ */}
-      <div className="vd-nav" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 20px', flexShrink: 0 }}>
+      <div className="vd-nav nibi-note-topbar" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 20px', flexShrink: 0 }}>
         <button className="btn-ghost" onClick={() => navigate(-1)} style={{ height: 28, padding: '0 10px', fontSize: 12 }}>
           <ArrowLeft size={13} /> 返回
         </button>
@@ -882,9 +896,22 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
 
       </div>
 
+      <section className="nibi-note-hero">
+        <div className="nibi-note-hero-copy">
+          <div className="eyebrow">{itemType.toUpperCase()} NOTE · {sourceLabel}</div>
+          <h1>{title || '未命名笔记'}</h1>
+          <p>{noteLead}</p>
+        </div>
+        <div className="nibi-note-stats" aria-label="note-stats">
+          <span>{TYPE_LABEL[itemType] ?? itemType}</span>
+          <span>{transcriptCount > 0 ? `${transcriptCount} 句` : '无转写'}</span>
+          <span>{summaries.length > 0 ? `${summaries.length} 总结` : '可生成总结'}</span>
+        </div>
+      </section>
+
       {/* ════════ 标签概览（所有笔记类型通用）════════ */}
       {hasTags && (
-        <div style={{ padding: '4px 20px 2px', flexShrink: 0 }}>
+        <div className="nibi-note-tags">
           <TagChips tags={tags} />
         </div>
       )}
@@ -894,18 +921,12 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
         /* ── 视频笔记 banner + 三列布局 ── */
         <>
           {/* ── 视频 banner：标题 + 平台 + 原视频链接 + 标签 ── */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
-            padding: '6px 20px',
-            borderBottom: '1px solid var(--bdr)',
-            background: 'var(--bgalt)',
-            flexShrink: 0,
-          }}>
-            <span style={{ fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div className="nibi-note-context-bar">
+            <span className="nibi-note-context-title">
               {title}
             </span>
             {sourceUrl && (
-              <span className="kw mono" style={{ fontSize: 10, flexShrink: 0 }}>
+              <span className="kw mono nibi-note-context-chip">
                 {platformLabelFromUrl(sourceUrl)}
               </span>
             )}
@@ -924,10 +945,10 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
           </div>
 
         {/* ── 视频笔记三列布局（蓝图 §3.5）：左播放器+字幕 / 中正文 / 右操作 ── */}
-        <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex', position: 'relative' }}>
+        <div className="nibi-note-workbench nibi-note-workbench--video">
 
           {/* ── 左列：视频播放器 + 实时字幕 ── */}
-          <div className="vm-ln-scope" style={{
+          <div className="vm-ln-scope nibi-note-media-rail" style={{
             width: '30%', minWidth: 260, maxWidth: 420, flexShrink: 0,
             display: 'flex', flexDirection: 'column',
             borderRight: '1px solid var(--bdr)',
@@ -965,17 +986,14 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
           </div>
 
           {/* ── 中列：正文（视频无 tab 切换）+ TOC ── */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+          <div className="nibi-note-main-panel">
             {/* 保存状态（顶栏右侧） */}
-            <div style={{ display: 'flex', alignItems: 'center', padding: '0 24px', flexShrink: 0, borderBottom: '1px solid var(--bdr)', height: 36 }}>
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--mut)' }}>
-                {saveStatus === 'saving' && '保存中…'}
-                {saveStatus === 'saved' && `已保存 ${savedAt}`}
-                {saveStatus === 'failed' && <span style={{ color: 'var(--accent)' }}>保存失败</span>}
-              </span>
+            <div className="nibi-note-panel-head">
+              <span>标准总结</span>
+              {saveStatusNode}
             </div>
             {/* 正文 */}
-            <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
+            <div className="nibi-note-editor-scroll">
               {noteContent}
             </div>
           </div>
@@ -985,10 +1003,10 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
         /* ── 图文笔记三列布局：左图片浏览 / 中正文 / 右操作区 ── */
         (() => {
           return (
-            <div style={{ flex: 1, overflow: 'hidden', minHeight: 0, display: 'flex', position: 'relative' }}>
+            <div className="nibi-note-workbench nibi-note-workbench--image">
 
               {/* ── 左列：图片浏览区 ── */}
-              <div style={{
+              <div className="nibi-note-media-rail nibi-note-image-rail" style={{
                 width: '25%', minWidth: 200, maxWidth: 380, flexShrink: 0,
                 display: 'flex', flexDirection: 'column',
                 borderRight: '1px solid var(--bdr)',
@@ -1050,15 +1068,12 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
               </div>
 
               {/* ── 中列：正文（图文/视频统一，无 tab 切换）+ TOC ── */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', padding: '0 24px', flexShrink: 0, borderBottom: '1px solid var(--bdr)', height: 36 }}>
-                  <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--mut)' }}>
-                    {saveStatus === 'saving' && '保存中…'}
-                    {saveStatus === 'saved' && `已保存 ${savedAt}`}
-                    {saveStatus === 'failed' && <span style={{ color: 'var(--accent)' }}>保存失败</span>}
-                  </span>
+              <div className="nibi-note-main-panel">
+                <div className="nibi-note-panel-head">
+                  <span>图文笔记</span>
+                  {saveStatusNode}
                 </div>
-                <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
+                <div className="nibi-note-editor-scroll">
                   {noteContent}
                 </div>
               </div>
@@ -1071,7 +1086,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 overflow: 'hidden', background: 'var(--srf)',
               }}>
                 <div style={{ padding: '10px 14px 8px', borderBottom: '1px solid var(--bdr)', flexShrink: 0 }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--acc)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--mono)' }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--acc)', textTransform: 'uppercase', letterSpacing: 'normal', fontFamily: 'var(--mono)' }}>
                     操作区
                   </span>
                 </div>
@@ -1095,11 +1110,41 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
           )
         })()
       ) : (
-        <>
-          <div style={{ flex: 1, display: 'flex', position: 'relative', overflow: 'hidden', minHeight: 0 }}>
-            {noteContent}
+        <div className="nibi-note-workbench nibi-note-workbench--generic">
+          <div className="nibi-note-main-panel">
+            <div className="nibi-note-panel-head">
+              <span>{itemType === 'audio' ? '音频笔记' : '笔记正文'}</span>
+              {saveStatusNode}
+            </div>
+            <div className="nibi-note-editor-scroll">
+              {noteContent}
+            </div>
           </div>
-          <div style={{ flexShrink: 0, maxHeight: '40%', overflowY: 'auto' }}>
+
+          <aside className="nibi-note-aside">
+            <section className="nibi-note-side-card">
+              <div className="nibi-note-card-kicker">MATERIAL</div>
+              <h2>{title || '未命名素材'}</h2>
+              <dl>
+                <div>
+                  <dt>类型</dt>
+                  <dd>{TYPE_LABEL[itemType] ?? itemType}</dd>
+                </div>
+                <div>
+                  <dt>来源</dt>
+                  <dd>{sourceLabel}</dd>
+                </div>
+                <div>
+                  <dt>转写</dt>
+                  <dd>{transcriptCount > 0 ? `${transcriptCount} 句` : '暂无'}</dd>
+                </div>
+                <div>
+                  <dt>总结</dt>
+                  <dd>{summaries.length > 0 ? `${summaries.length} 个版本` : '可生成'}</dd>
+                </div>
+              </dl>
+            </section>
+
             {chatOpen && (
               <div style={{ height: 320, borderTop: '1px solid var(--bdr)', display: 'flex', overflow: 'hidden' }}>
                 <NoteChatDrawer
@@ -1111,18 +1156,25 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
               </div>
             )}
             {(itemType === 'audio' && note.media?.audio) && (
-              <NoteMediaCompanion
-                ref={mediaCompanionRef}
-                media={note.media}
-                transcript={Array.isArray(note.transcript) ? note.transcript as never : []}
-                workspaceId={workspaceId}
-                itemId={itemId}
-                sourceUrl={(note.frontmatter as Record<string, unknown>)?.source_url as string || ''}
-              />
+              <section className="nibi-note-side-card nibi-note-media-card">
+                <div className="nibi-note-card-kicker">AUDIO SOURCE</div>
+                <NoteMediaCompanion
+                  ref={mediaCompanionRef}
+                  media={note.media}
+                  transcript={Array.isArray(note.transcript) ? note.transcript as never : []}
+                  workspaceId={workspaceId}
+                  itemId={itemId}
+                  sourceUrl={(note.frontmatter as Record<string, unknown>)?.source_url as string || ''}
+                />
+              </section>
             )}
-            <SourcePanel sourceMd={note.source_md} />
-          </div>
-        </>
+            {note.source_md && (
+              <section className="nibi-note-side-card nibi-note-source-card">
+                <SourcePanel sourceMd={note.source_md} open />
+              </section>
+            )}
+          </aside>
+        </div>
       )}
 
       {/* 问 AI 悬浮泡泡（点6：仅视频笔记，仿 FloatingTaskQueue） */}

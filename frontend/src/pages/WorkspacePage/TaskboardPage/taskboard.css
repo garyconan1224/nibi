@@ -1,4 +1,4 @@
-/* ─── Taskboard layout (extracted from VidMirror.html) ─── */
+/* ─── Taskboard layout (extracted from legacy prototype) ─── */
 
 .tb-wrap {
   max-width: 1400px;
@@ -380,7 +380,7 @@
   background: var(--bg-sunken);
 }
 .qp-row[data-state='error'] {
-  background: rgba(255, 77, 126, 0.04);
+  background: var(--errl);
 }
 .qp-dot {
   width: 8px;
@@ -536,7 +536,7 @@
   letter-spacing: 0.06em;
 }
 .tag-badge.auto {
-  background: rgba(60, 119, 251, 0.12);
+  background: var(--accl);
   color: var(--accent-3);
 }
 .tag-badge.manual {

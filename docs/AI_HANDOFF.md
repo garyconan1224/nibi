@@ -319,7 +319,7 @@ git branch --show-current
   - 简单/模板/git/CSS → ⭐ deepseek v4-pro（Claude Code + ccswitch，便宜优先；v4-flash 太弱别当默认）
   - 中等多文件 React → Sonnet 4.6
   - 跨 5+ 文件 / 状态机 / 加密 → Opus 4.7
-- **设计稿源**：`docs/design/components/*.jsx` + `styles.css` + `VidMirror.html`（Taskboard CSS 大部分在 HTML 不在 styles.css）
+- **设计稿源**：当前 Nibi 视觉以 Open Design 导出的本地原型和 `frontend/src/styles/nibi-tokens.css` 为准；`docs/design/` 只作为旧设计快照参考
 
 ---
 

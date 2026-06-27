@@ -90,11 +90,12 @@ export default function FavoritesPage() {
   )
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-4 p-6">
-      <header className="flex items-center justify-between">
+    <div className="h-full w-full overflow-auto bg-[#fbf8f3] p-6">
+      <div className="mx-auto w-full max-w-6xl space-y-4">
+      <header className="flex items-center justify-between rounded-lg border border-black/10 bg-gradient-to-br from-[#fff1f4] to-white/85 px-6 py-5 shadow-[0_18px_50px_rgba(72,50,20,0.07)]">
         <div className="flex items-center gap-2">
           <Star className="h-5 w-5 text-amber-500" />
-          <h1 className="text-xl font-semibold">收藏夹</h1>
+          <h1 className="font-display text-4xl font-normal leading-none text-foreground">收藏夹</h1>
           <span className="text-sm text-muted-foreground">
             {loading ? '加载中…' : `共 ${favorites.length} 项`}
           </span>
@@ -126,9 +127,9 @@ export default function FavoritesPage() {
         {TAB_DEFS.map((t) => (
           <TabsContent key={t.key} value={t.key} className="mt-3">
             {loading ? (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {[0, 1, 2].map((i) => (
-                  <Skeleton key={i} className="h-24 w-full" />
+                  <Skeleton key={i} className="h-32 w-full rounded-lg" />
                 ))}
               </div>
             ) : filtered.length === 0 ? (
@@ -137,7 +138,7 @@ export default function FavoritesPage() {
                 description="在工作区里点击星标即可把素材收藏到这里。"
               />
             ) : (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {filtered.map((entry) => (
                   <FavoriteCard key={entry.item.item_id} entry={entry} />
                 ))}
@@ -146,6 +147,7 @@ export default function FavoritesPage() {
           </TabsContent>
         ))}
       </Tabs>
+      </div>
     </div>
   )
 }
@@ -154,7 +156,7 @@ function FavoriteCard({ entry }: { entry: FavoriteEntry }) {
   const { workspace, item } = entry
   return (
     <Link to={resultRouteFor(entry)}>
-      <Card className="group flex h-full flex-col gap-2 p-3 transition-colors hover:border-violet-400">
+      <Card className="group flex h-full flex-col gap-2 rounded-lg border-black/10 bg-white/80 p-4 transition-colors hover:border-orange-300 hover:shadow-[0_18px_42px_rgba(36,28,18,0.12)]">
         <div className="flex items-start justify-between gap-2">
           <span className="line-clamp-2 text-sm font-medium">
             {item.name || item.source_value}

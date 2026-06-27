@@ -1,8 +1,8 @@
 /* 结果页局部 token 映射层。
    将原型 video_detail.jsx 的 --accent / --bg-elev / --ink / --line 等命名
-   映射到 Nibi 全局 token，不再使用 Instrument Serif 或硬编码 hex。 */
+   映射到 Nibi 全局 token，不再使用旧显示字体或硬编码 hex。 */
 
-.vm-video-result-scope {
+.nibi-video-result-scope {
   --accent:       var(--color-accent);
   --accent-2:     var(--color-accent);
   --accent-3:     var(--color-accent);
@@ -27,7 +27,7 @@
   font-family: var(--font-body);
 }
 
-.vm-video-result-scope .eyebrow {
+.nibi-video-result-scope .eyebrow {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   letter-spacing: 0.07em;
@@ -35,11 +35,11 @@
   color: var(--color-muted);
 }
 
-.vm-video-result-scope .mono {
+.nibi-video-result-scope .mono {
   font-family: var(--font-mono);
 }
 
-.vm-video-result-scope .kw {
+.nibi-video-result-scope .kw {
   display: inline-flex;
   align-items: center;
   padding: 2px 7px;
@@ -50,7 +50,7 @@
   font-size: var(--text-xs);
 }
 
-.vm-video-result-scope .tr-line {
+.nibi-video-result-scope .tr-line {
   display: flex;
   gap: 10px;
   padding: 6px 10px;
@@ -61,15 +61,15 @@
   color: var(--color-fg-2);
   transition: background 120ms;
 }
-.vm-video-result-scope .tr-line:hover {
+.nibi-video-result-scope .tr-line:hover {
   background: var(--color-bg-alt);
 }
-.vm-video-result-scope .tr-line[data-active='true'] {
+.nibi-video-result-scope .tr-line[data-active='true'] {
   background: var(--color-bg-alt);
   color: var(--color-fg);
   font-weight: 600;
 }
-.vm-video-result-scope .tr-line .ts {
+.nibi-video-result-scope .tr-line .ts {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   color: var(--color-muted);
@@ -77,15 +77,15 @@
   margin-top: 3px;
   min-width: 38px;
 }
-.vm-video-result-scope .tr-line[data-active='true'] .ts {
+.nibi-video-result-scope .tr-line[data-active='true'] .ts {
   color: var(--color-accent);
 }
-.vm-video-result-scope .tr-line .txt {
+.nibi-video-result-scope .tr-line .txt {
   flex: 1;
   word-break: break-word;
 }
 
-.vm-video-result-scope .btn-ghost {
+.nibi-video-result-scope .btn-ghost {
   background: transparent;
   border: 1px solid transparent;
   color: var(--color-fg-2);
@@ -95,6 +95,6 @@
   align-items: center;
   gap: 6px;
 }
-.vm-video-result-scope .btn-ghost:hover {
+.nibi-video-result-scope .btn-ghost:hover {
   background: var(--color-bg-alt);
 }

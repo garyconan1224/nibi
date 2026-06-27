@@ -337,7 +337,7 @@
   padding: 14px;
   border: none;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--accent, #FF4D7E), var(--accent-2, #B84CFF));
+  background: linear-gradient(135deg, var(--acc), var(--wrn));
   color: #fff;
   font-size: 14px;
   font-weight: 600;
@@ -397,7 +397,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--accent, #FF4D7E);
+  background: var(--acc);
   opacity: 0.7;
   cursor: pointer;
   transition: opacity 120ms, transform 120ms;
@@ -442,7 +442,7 @@
 .vm-overview-scope .ov-audio-seg-ts {
   font-family: var(--mono);
   font-size: 11px;
-  color: var(--accent, #FF4D7E);
+  color: var(--acc);
   flex-shrink: 0;
   min-width: 42px;
 }

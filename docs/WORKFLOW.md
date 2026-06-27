@@ -18,7 +18,7 @@
 |---|---|---|
 | **1** | [`docs/SPEC.md`](SPEC.md) + [`docs/spec/`](spec/) | **产品需求规范**（8 模块 + 附录 C 执行路线），所有产品决议以此为准 |
 | **2** | [`docs/EXECUTION_PLAN.md`](EXECUTION_PLAN.md) | **工程执行计划**（Phase 打勾 + 当前在哪一步） |
-| **3** | [`docs/design/`](design/) | **设计稿源文件**（VidMirror.html + 19 个 jsx 组件 + styles.css + v1.1 设计契约），视觉与交互细节以此为准 |
+| **3** | [`docs/DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) + [`frontend/src/styles/nibi-tokens.css`](../frontend/src/styles/nibi-tokens.css) | **Nibi 当前 UI 真相源**；`docs/design/` 仅作为旧设计快照参考 |
 | **4** | 当前工作目录代码 | 实际实现，与 spec 偏差时**优先反映到 spec 或新建差异 phase**，不静默修改代码 |
 | ~~5~~ | ~~`docs/archive/spec-v2.md`~~ | ⚠️ DEPRECATED，仅历史归档 |
 | ~~6~~ | ~~`docs/archive/system_design_v3_final.md`~~ | ⚠️ DEPRECATED |

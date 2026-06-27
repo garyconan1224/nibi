@@ -1,7 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ThemeProvider } from 'next-themes'
-import './styles/design-tokens.css'
 import './index.css'
 import '@/locales/i18n'
 import App from './App.tsx'

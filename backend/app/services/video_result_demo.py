@@ -6,8 +6,8 @@ from __future__ import annotations
 `GET /workspaces/{ws}/items/{id}/result` 退化到本模块给出的固定示例，
 让前端三轨时间轴能跑通。
 
-数据原型取自 vidmirror-handoff/project/components/video_detail.jsx
-的 VD_PROMPTS + storyboard VM_DATA.FRAMES + TRANSCRIPT，对齐 v1.1 §5.1 JSON schema。
+数据原型取自旧 handoff 原型中的提示词、分镜帧和字幕数据，
+对齐 v1.1 §5.1 JSON schema。
 """
 
 from typing import Any, Dict, List

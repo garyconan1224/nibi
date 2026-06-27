@@ -162,23 +162,27 @@ export function SettingsShell({
     [tabs, t],
   )
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden">
-      <header className="flex h-16 items-center justify-between border-b border-border bg-background px-6">
+    <div className="flex h-full w-full flex-col overflow-hidden bg-[#fbf8f3]">
+      <header className="flex h-16 items-center justify-between border-b border-black/10 bg-gradient-to-br from-[#fff4e8] to-white/85 px-6">
         <Link
           to="/"
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           aria-label={t('layout.backHome', '返回首页')}
         >
           <ArrowLeft className="size-4" />
-          <span className="text-base font-semibold text-foreground">VidMirror</span>
+          <span className="text-base font-semibold text-foreground" style={{ fontFamily: 'var(--fd)' }}>
+            Nibi
+          </span>
         </Link>
         <LangSwitcher />
       </header>
 
       <TabBar tabs={effectiveTabs} />
 
-      <main className="flex-1 overflow-auto bg-muted/40">
-        <Outlet />
+      <main className="flex-1 overflow-auto p-6">
+        <div className="mx-auto max-w-6xl rounded-lg border border-black/10 bg-white/80 shadow-[0_18px_50px_rgba(72,50,20,0.07)]">
+          <Outlet />
+        </div>
       </main>
 
       <SaveBar state={effectiveSaveBar} />
@@ -187,4 +191,3 @@ export function SettingsShell({
 }
 
 export default SettingsShell
-

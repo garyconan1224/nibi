@@ -1,4 +1,4 @@
-# VidMirror QA 验收脚本说明
+# Nibi QA 验收脚本说明
 
 本目录下的 `e2e_qa.py` 用于离线验收核心流程（新建项目 → 视频分析 mock → 创作知识库加载），不依赖真实 API。
 
@@ -45,7 +45,7 @@ python3 tests/e2e_qa.py
 执行后会打印类似：
 
 ```text
-=== VidMirror QA 验收报告 ===
+=== Nibi QA 验收报告 ===
 [PASS] #01 ...
 ...
 通过 12/12  失败 0/12

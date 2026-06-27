@@ -11,13 +11,13 @@ import {
 } from 'recharts'
 import type { MusicSegmentData } from '@/services/workspaces'
 
-// 颜色方案（对应 design-tokens.css 语义色，5 色轮转）
+// 颜色方案（对应 Nibi token 语义色，5 色轮转）
 const COLORS = [
-  '#FF4D7E', // accent-pink — input/output layer
-  '#B84CFF', // accent-purple — AI analysis layer
-  '#3C77FB', // accent-blue — structured layer
-  '#FFB84C', // accent-warm — storyboard layer
-  '#22D39A', // accent-green — completion state
+  'var(--acc)',
+  'var(--wrn)',
+  'var(--ok)',
+  'var(--fg2)',
+  'var(--mut)',
 ]
 
 interface MusicReportProps {

@@ -21,22 +21,21 @@
 
 ---
 
-## 3. 前端 UI 与设计规范（Remix 版 · 唯一真相源）
+## 3. 前端 UI 与设计规范（Nibi 版 · 唯一真相源）
 
 > **铁律：写任何 UI 之前先读 [`docs/DESIGN_TOKENS.md`](../DESIGN_TOKENS.md)。**
-> 该文件是 ~200 行 token + class 速查；详细 spec 看 `docs/design/`（设计稿镜像，2026-05-25 起以 `/Users/conan/Downloads/vidmirror (Remix)` 同步入仓）。
+> 当前 token 和通用 class 以 `frontend/src/styles/nibi-tokens.css`、`frontend/src/styles/nibi-components.css` 为准。
+> `docs/design/` 是旧设计快照，只在追溯历史交互时参考。
 
 ### 3.1 3 个权威路径（按使用频率）
 
 | 想做什么 | 看哪 |
 |---|---|
 | 写新 UI 前查 token / class 词典 | [`docs/DESIGN_TOKENS.md`](../DESIGN_TOKENS.md) ⭐ |
-| 看具体页面长什么样 | `docs/design/check/*.png`（10+ 张页面截图）|
-| 看组件 jsx 实现（19 个）| `docs/design/components/<page>.jsx` |
-| 看完整 CSS 152 个 class | `docs/design/styles.css` |
-| 看业务规则 / 状态机 / 级联 | `docs/design/system_design_v1.1.md` |
-| 浮动队列 §11.3 实现 | `docs/design/components/p1_features.jsx` L160-370 |
-| 前置配置 §4 实现 | `docs/design/components/preflight.jsx` |
+| 看当前 token | `frontend/src/styles/nibi-tokens.css` |
+| 看通用 class | `frontend/src/styles/nibi-components.css` |
+| 看历史页面快照 | `docs/design/check/*.png` |
+| 查业务规则 / 状态机 / 级联 | `docs/rules/business-contract.md` |
 
 ### 3.2 5 条不可破铁律
 

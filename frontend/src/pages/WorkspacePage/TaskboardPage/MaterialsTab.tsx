@@ -26,7 +26,7 @@ interface MaterialsTabProps {
 
 /**
  * Materials tab — 素材网格 + 添加素材卡。
- * 设计稿来源：taskboard.jsx TBMaterials + VidMirror.html .tb-mat-grid / .mat-add。
+ * 设计稿来源：taskboard.jsx TBMaterials + legacy prototype .tb-mat-grid / .mat-add。
  */
 export function MaterialsTab({ items, workspaceId, onAddMaterial, onNavigateToCompare, onSelectedIdsChange }: MaterialsTabProps) {
   const tasks = useTaskStore((s) => s.tasks)

@@ -28,7 +28,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 echo "=========================================="
-echo "VidMirror 版本发布流程"
+echo "Nibi 版本发布流程"
 echo "=========================================="
 echo "目标版本：$VERSION"
 echo "仓库路径：$REPO_ROOT"
@@ -202,4 +202,3 @@ echo ""
 echo "后续操作（可选）："
 echo "  推送到远程：git push origin main --tags"
 echo ""
-

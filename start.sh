@@ -1,6 +1,6 @@
 #!/bin/bash
 # ══════════════════════════════════════════════════════════════════
-#  VidMirror 一键启动器  v2.0
+#  Nibi 一键启动器  v2.0
 #  ─ 完全可移植，无硬编码路径 ─
 #  ─ 自动检测并安装：Homebrew / Python 3.10+ / ffmpeg / Node.js ─
 #  ─ Python 虚拟环境隔离依赖，换电脑开箱即用 ─
@@ -23,7 +23,7 @@ fail()    { printf "${RED}✘  %s${NC}\n" "$*" >&2; }
 section() { printf "\n${BOLD}${BLUE}▶ %s${NC}\n" "$*"; }
 
 printf "\n${BOLD}══════════════════════════════════════════════${NC}\n"
-printf "${BOLD}   VidMirror 启动器   %s${NC}\n" "$(date '+%Y-%m-%d %H:%M:%S')"
+printf "${BOLD}   Nibi 启动器   %s${NC}\n" "$(date '+%Y-%m-%d %H:%M:%S')"
 printf "${BOLD}══════════════════════════════════════════════${NC}\n"
 info "项目目录: $PROJECT"
 
@@ -234,7 +234,7 @@ fi
 if [[ -f "$PROJECT/.env" ]]; then
     set -a; source "$PROJECT/.env"; set +a
 fi
-VITE_PORT="${VITE_PORT:-5173}"
+VITE_PORT="${VITE_PORT:-5177}"
 BACKEND_PORT="${BACKEND_PORT:-8000}"
 info "后端端口: $BACKEND_PORT  |  前端端口: $VITE_PORT"
 

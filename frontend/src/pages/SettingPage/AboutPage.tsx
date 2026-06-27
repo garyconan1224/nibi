@@ -197,7 +197,7 @@ export default function AboutPage() {
                   {t('about.githubDescription')}
                 </p>
                 <a
-                  href="https://github.com/your-org/VidMirror"
+                  href="https://github.com/your-org/nibi"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-violet-600 hover:text-violet-700"
@@ -213,4 +213,3 @@ export default function AboutPage() {
     </div>
   )
 }
-

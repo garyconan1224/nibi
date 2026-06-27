@@ -366,3 +366,48 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-pink) 20%, transparent);
 }
 
+/* ─── Open Design visual migration ─── */
+.vm-audio-scope {
+  background:
+    radial-gradient(circle at 92% 8%, rgba(34, 211, 154, 0.12), transparent 28%),
+    linear-gradient(180deg, #fbf8f3 0%, #f7f3ec 100%);
+}
+
+.vm-audio-scope > .vd-nav {
+  background:
+    linear-gradient(135deg, rgba(236, 252, 247, 0.98), rgba(255, 255, 255, 0.86)) !important;
+  border-bottom: 1px solid rgba(25, 20, 16, 0.08) !important;
+}
+
+.vm-audio-scope .vd-title {
+  font-family: var(--fd);
+  font-size: clamp(24px, 2.8vw, 42px);
+  font-weight: 400;
+  color: var(--fg);
+}
+
+.vm-audio-scope .ad-player-area {
+  margin: 16px 20px 12px;
+  border: 1px solid rgba(25, 20, 16, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 18px 42px rgba(36, 28, 18, 0.08);
+}
+
+.vm-audio-scope .ad-tabs {
+  padding: 0 20px 12px;
+}
+
+.vm-audio-scope .ad-content {
+  margin: 0 20px 20px;
+  border: 1px solid rgba(25, 20, 16, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.80);
+  overflow: hidden;
+}
+
+.vm-audio-scope .ad-speaker-card,
+.vm-audio-scope .im-section,
+.vm-audio-scope .ad-info-banner {
+  border-radius: 8px !important;
+}

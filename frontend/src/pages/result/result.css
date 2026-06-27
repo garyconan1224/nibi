@@ -1,6 +1,6 @@
 /* VideoResultPage 组件样式（tokens 在 tokens.css） */
 
-.vm-video-result-scope.vd-layout {
+.nibi-video-result-scope.vd-layout {
   display: grid;
   grid-template-columns: 1fr 320px;
   height: 100%;
@@ -8,13 +8,13 @@
 }
 
 /* ─── Left: player + tracks ─── */
-.vm-video-result-scope .vd-left {
+.nibi-video-result-scope .vd-left {
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-.vm-video-result-scope .vd-nav {
+.nibi-video-result-scope .vd-nav {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -24,7 +24,7 @@
   background: var(--srf);
 }
 
-.vm-video-result-scope .vd-nav .vd-title {
+.nibi-video-result-scope .vd-nav .vd-title {
   font-weight: 600;
   font-size: 13px;
   flex: 1;
@@ -34,7 +34,7 @@
   white-space: nowrap;
 }
 
-.vm-video-result-scope .vd-nav .vd-sep {
+.nibi-video-result-scope .vd-nav .vd-sep {
   width: 1px;
   height: 16px;
   background: var(--bdr);
@@ -42,7 +42,7 @@
 }
 
 /* ── 学习/复刻 toggle ──────────────────────────── */
-.vm-video-result-scope .vd-mode-toggle {
+.nibi-video-result-scope .vd-mode-toggle {
   display: flex;
   align-items: center;
   gap: 2px;
@@ -52,7 +52,7 @@
   flex-shrink: 0;
 }
 
-.vm-video-result-scope .vd-mode-btn {
+.nibi-video-result-scope .vd-mode-btn {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -67,24 +67,24 @@
   transition: all 0.15s;
 }
 
-.vm-video-result-scope .vd-mode-btn:hover {
+.nibi-video-result-scope .vd-mode-btn:hover {
   color: var(--fg2);
   background: var(--srf);
 }
 
-.vm-video-result-scope .vd-mode-btn[data-active="true"] {
+.nibi-video-result-scope .vd-mode-btn[data-active="true"] {
   color: var(--fg);
   background: var(--srf);
   box-shadow: 0 1px 2px rgba(0,0,0,0.06);
 }
 
 /* ─── Video player ─── */
-.vm-video-result-scope .vd-player-wrap {
+.nibi-video-result-scope .vd-player-wrap {
   padding: 14px 20px 10px;
   flex-shrink: 0;
 }
 
-.vm-video-result-scope .vd-player {
+.nibi-video-result-scope .vd-player {
   position: relative;
   border-radius: 16px;
   overflow: hidden;
@@ -94,14 +94,14 @@
   max-height: 260px;
 }
 
-.vm-video-result-scope .vd-player video {
+.nibi-video-result-scope .vd-player video {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
 
-.vm-video-result-scope .vd-player .vd-overlay {
+.nibi-video-result-scope .vd-player .vd-overlay {
   position: absolute;
   bottom: 0;
   left: 0;
@@ -110,26 +110,26 @@
   background: linear-gradient(0deg, rgba(0, 0, 0, 0.78) 0%, transparent);
 }
 
-.vm-video-result-scope .vd-player .vd-overlay .vd-ov-meta {
+.nibi-video-result-scope .vd-player .vd-overlay .vd-ov-meta {
   font-family: var(--mono);
   font-size: 10px;
   color: rgba(255, 255, 255, 0.6);
 }
 
-.vm-video-result-scope .vd-player .vd-overlay .vd-ov-title {
+.nibi-video-result-scope .vd-player .vd-overlay .vd-ov-title {
   font-size: 15px;
   font-weight: 700;
   color: #fff;
   margin-top: 2px;
 }
 
-.vm-video-result-scope .vd-player .vd-overlay .vd-ov-sub {
+.nibi-video-result-scope .vd-player .vd-overlay .vd-ov-sub {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.6);
   margin-top: 1px;
 }
 
-.vm-video-result-scope .vd-player .vd-play-btn {
+.nibi-video-result-scope .vd-player .vd-play-btn {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -143,7 +143,7 @@
   color: #000;
 }
 
-.vm-video-result-scope .vd-player .vd-progress {
+.nibi-video-result-scope .vd-player .vd-progress {
   position: absolute;
   bottom: 0;
   left: 0;
@@ -152,13 +152,13 @@
   background: rgba(255, 255, 255, 0.15);
 }
 
-.vm-video-result-scope .vd-player .vd-progress .vd-progress-fill {
+.nibi-video-result-scope .vd-player .vd-progress .vd-progress-fill {
   height: 100%;
   background: var(--err);
   transition: width 200ms linear;
 }
 
-.vm-video-result-scope .vd-controls {
+.nibi-video-result-scope .vd-controls {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -166,7 +166,7 @@
 }
 
 /* ─── Right: floating panel ─── */
-.vm-video-result-scope .vd-right {
+.nibi-video-result-scope .vd-right {
   border-left: 1px solid var(--bdr);
   display: flex;
   flex-direction: column;
@@ -174,7 +174,7 @@
   overflow: hidden;
 }
 
-.vm-video-result-scope .vd-frame-preview {
+.nibi-video-result-scope .vd-frame-preview {
   position: relative;
   flex-shrink: 0;
   aspect-ratio: 16/9;
@@ -182,14 +182,14 @@
   overflow: hidden;
 }
 
-.vm-video-result-scope .vd-frame-preview img {
+.nibi-video-result-scope .vd-frame-preview img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
 
-.vm-video-result-scope .vd-frame-preview .vd-frame-badge {
+.nibi-video-result-scope .vd-frame-preview .vd-frame-badge {
   position: absolute;
   bottom: 8px;
   left: 10px;
@@ -201,31 +201,31 @@
   border-radius: 5px;
 }
 
-.vm-video-result-scope .vd-frame-preview .vd-frame-star {
+.nibi-video-result-scope .vd-frame-preview .vd-frame-star {
   position: absolute;
   top: 8px;
   right: 10px;
 }
 
-.vm-video-result-scope .vd-frame-info {
+.nibi-video-result-scope .vd-frame-info {
   padding: 12px 14px;
   border-bottom: 1px solid var(--bdr);
   flex-shrink: 0;
 }
 
-.vm-video-result-scope .vd-frame-info .vd-fi-title {
+.nibi-video-result-scope .vd-frame-info .vd-fi-title {
   font-size: 14px;
   font-weight: 700;
   line-height: 1.3;
 }
 
-.vm-video-result-scope .vd-frame-info .vd-fi-sub {
+.nibi-video-result-scope .vd-frame-info .vd-fi-sub {
   font-size: 12px;
   color: var(--mut);
   margin-top: 2px;
 }
 
-.vm-video-result-scope .vd-frame-info .vd-fi-tags {
+.nibi-video-result-scope .vd-frame-info .vd-fi-tags {
   display: flex;
   gap: 4px;
   flex-wrap: wrap;
@@ -233,7 +233,7 @@
 }
 
 /* ─── Prompt tabs ─── */
-.vm-video-result-scope .vd-tabs-bar {
+.nibi-video-result-scope .vd-tabs-bar {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -243,7 +243,7 @@
   background: var(--bgalt);
 }
 
-.vm-video-result-scope .vd-tabs-row {
+.nibi-video-result-scope .vd-tabs-row {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -254,7 +254,7 @@
   overflow-x: auto;
 }
 
-.vm-video-result-scope .vd-tab-btn {
+.nibi-video-result-scope .vd-tab-btn {
   height: 26px;
   padding: 0 10px;
   border-radius: 6px;
@@ -269,19 +269,19 @@
   color: var(--mut);
 }
 
-.vm-video-result-scope .vd-tab-btn[data-active='true'] {
+.nibi-video-result-scope .vd-tab-btn[data-active='true'] {
   background: var(--fg);
   color: var(--bg);
 }
 
 /* ─── Prompt area ─── */
-.vm-video-result-scope .vd-prompt-area {
+.nibi-video-result-scope .vd-prompt-area {
   flex: 1;
   overflow-y: auto;
   padding: 12px 14px;
 }
 
-.vm-video-result-scope .vd-prompt-text {
+.nibi-video-result-scope .vd-prompt-text {
   font-family: var(--mono);
   font-size: 11.5px;
   line-height: 1.72;
@@ -295,7 +295,7 @@
 }
 
 /* ─── Actions ─── */
-.vm-video-result-scope .vd-actions {
+.nibi-video-result-scope .vd-actions {
   padding: 10px 12px;
   border-top: 1px solid var(--bdr);
   display: flex;
@@ -304,7 +304,7 @@
   flex-shrink: 0;
 }
 
-.vm-video-result-scope .vd-btn-main {
+.nibi-video-result-scope .vd-btn-main {
   width: 100%;
   height: 36px;
   border-radius: 10px;
@@ -320,7 +320,7 @@
   color: var(--bg);
 }
 
-.vm-video-result-scope .vd-btn-sub {
+.nibi-video-result-scope .vd-btn-sub {
   width: 100%;
   height: 36px;
   border-radius: 10px;
@@ -336,18 +336,18 @@
   color: var(--fg2);
 }
 
-.vm-video-result-scope .vd-btn-sub[data-favored='true'] {
+.nibi-video-result-scope .vd-btn-sub[data-favored='true'] {
   background: rgba(255, 184, 76, 0.12);
   color: var(--wrn);
 }
 
-.vm-video-result-scope .vd-frame-nav {
+.nibi-video-result-scope .vd-frame-nav {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.vm-video-result-scope .vd-frame-nav-btn {
+.nibi-video-result-scope .vd-frame-nav-btn {
   width: 26px;
   height: 26px;
   padding: 0;
@@ -360,26 +360,26 @@
   color: var(--fg2);
 }
 
-.vm-video-result-scope .vd-frame-nav-btn:hover {
+.nibi-video-result-scope .vd-frame-nav-btn:hover {
   background: var(--bgalt);
 }
 
 /* ─── N7b 路径 1：字幕总结模式 ─── */
 
-.vm-video-result-scope.vd-subtitle-layout {
+.nibi-video-result-scope.vd-subtitle-layout {
   display: flex;
   flex-direction: column;
   height: 100%;
   overflow: hidden;
 }
 
-.vm-video-result-scope .vd-subtitle-content {
+.nibi-video-result-scope .vd-subtitle-content {
   flex: 1;
   overflow: auto;
   padding: 16px 20px;
 }
 
-.vm-video-result-scope .vd-card {
+.nibi-video-result-scope .vd-card {
   background: var(--srf);
   border: 1px solid var(--bdr);
   border-radius: 12px;
@@ -387,24 +387,24 @@
   margin-bottom: 16px;
 }
 
-.vm-video-result-scope .vd-card:last-child {
+.nibi-video-result-scope .vd-card:last-child {
   margin-bottom: 0;
 }
 
-.vm-video-result-scope .vd-card-head {
+.nibi-video-result-scope .vd-card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
 }
 
-.vm-video-result-scope .vd-card-head h2 {
+.nibi-video-result-scope .vd-card-head h2 {
   font-size: 14px;
   font-weight: 600;
   margin: 0;
 }
 
-.vm-video-result-scope .vd-summary-text {
+.nibi-video-result-scope .vd-summary-text {
   font-size: 13px;
   line-height: 1.7;
   color: var(--fg);
@@ -412,18 +412,18 @@
   word-break: break-word;
 }
 
-.vm-video-result-scope .vd-transcript-line {
+.nibi-video-result-scope .vd-transcript-line {
   display: flex;
   gap: 12px;
   padding: 8px 0;
   border-bottom: 1px solid var(--bdr);
 }
 
-.vm-video-result-scope .vd-transcript-line:last-child {
+.nibi-video-result-scope .vd-transcript-line:last-child {
   border-bottom: none;
 }
 
-.vm-video-result-scope .vd-transcript-ts {
+.nibi-video-result-scope .vd-transcript-ts {
   font-family: var(--mono);
   font-size: 11px;
   color: var(--mut);
@@ -431,12 +431,12 @@
   min-width: 40px;
 }
 
-.vm-video-result-scope .vd-transcript-text {
+.nibi-video-result-scope .vd-transcript-text {
   font-size: 13px;
   line-height: 1.6;
 }
 
-.vm-video-result-scope .vd-insert-frame-btn {
+.nibi-video-result-scope .vd-insert-frame-btn {
   margin-left: auto;
   background: none;
   border: 1px solid var(--bdr);
@@ -449,12 +449,12 @@
   transition: opacity 0.15s;
 }
 
-.vm-video-result-scope .vd-insert-frame-btn:hover {
+.nibi-video-result-scope .vd-insert-frame-btn:hover {
   opacity: 1;
   border-color: var(--err);
 }
 
-.vm-video-result-scope .vd-inline-frame {
+.nibi-video-result-scope .vd-inline-frame {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -462,19 +462,19 @@
   border-bottom: 1px solid var(--bdr);
 }
 
-.vm-video-result-scope .vd-inline-frame-img {
+.nibi-video-result-scope .vd-inline-frame-img {
   width: 120px;
   border-radius: 4px;
   object-fit: cover;
 }
 
-.vm-video-result-scope .vd-inline-frame-ts {
+.nibi-video-result-scope .vd-inline-frame-ts {
   font-family: var(--mono);
   font-size: 11px;
   color: var(--mut);
 }
 
-.vm-video-result-scope .vd-inline-frame-del {
+.nibi-video-result-scope .vd-inline-frame-del {
   background: none;
   border: none;
   font-size: 14px;
@@ -483,13 +483,13 @@
   padding: 2px 6px;
 }
 
-.vm-video-result-scope .vd-inline-frame-del:hover {
+.nibi-video-result-scope .vd-inline-frame-del:hover {
   color: var(--err);
 }
 
 /* ═══════ C-1：主帧大图 + 缩略图轨道 + lightbox ═══════ */
 
-.vm-video-result-scope .vd-main-frame-area {
+.nibi-video-result-scope .vd-main-frame-area {
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -500,7 +500,7 @@
 }
 
 /* 主帧大图 */
-.vm-video-result-scope .vd-main-frame {
+.nibi-video-result-scope .vd-main-frame {
   position: relative;
   flex: 1;
   min-height: 0;
@@ -513,14 +513,14 @@
   justify-content: center;
 }
 
-.vm-video-result-scope .vd-main-frame img {
+.nibi-video-result-scope .vd-main-frame img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
   display: block;
 }
 
-.vm-video-result-scope .vd-main-frame-fallback {
+.nibi-video-result-scope .vd-main-frame-fallback {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -533,7 +533,7 @@
   line-height: 1.5;
 }
 
-.vm-video-result-scope .vd-main-frame-info {
+.nibi-video-result-scope .vd-main-frame-info {
   position: absolute;
   bottom: 0;
   left: 0;
@@ -545,18 +545,18 @@
   gap: 2px;
 }
 
-.vm-video-result-scope .vd-main-frame-info .mono {
+.nibi-video-result-scope .vd-main-frame-info .mono {
   font-size: 10px;
   color: rgba(255, 255, 255, 0.6);
 }
 
-.vm-video-result-scope .vd-main-frame-title {
+.nibi-video-result-scope .vd-main-frame-title {
   font-size: 13px;
   font-weight: 700;
   color: #fff;
 }
 
-.vm-video-result-scope .vd-main-frame-expand {
+.nibi-video-result-scope .vd-main-frame-expand {
   position: absolute;
   top: 10px;
   right: 10px;
@@ -571,12 +571,12 @@
   transition: opacity 0.15s;
 }
 
-.vm-video-result-scope .vd-main-frame:hover .vd-main-frame-expand {
+.nibi-video-result-scope .vd-main-frame:hover .vd-main-frame-expand {
   opacity: 1;
 }
 
 /* 缩略图轨道 */
-.vm-video-result-scope .vd-thumb-track {
+.nibi-video-result-scope .vd-thumb-track {
   display: flex;
   gap: 6px;
   padding: 10px 0;
@@ -587,16 +587,16 @@
   scrollbar-color: var(--bdr) transparent;
 }
 
-.vm-video-result-scope .vd-thumb-track::-webkit-scrollbar {
+.nibi-video-result-scope .vd-thumb-track::-webkit-scrollbar {
   height: 4px;
 }
 
-.vm-video-result-scope .vd-thumb-track::-webkit-scrollbar-thumb {
+.nibi-video-result-scope .vd-thumb-track::-webkit-scrollbar-thumb {
   background: var(--bdr);
   border-radius: 2px;
 }
 
-.vm-video-result-scope .vd-thumb {
+.nibi-video-result-scope .vd-thumb {
   flex-shrink: 0;
   width: 80px;
   height: 60px;
@@ -609,14 +609,14 @@
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.vm-video-result-scope .vd-thumb img {
+.nibi-video-result-scope .vd-thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
 
-.vm-video-result-scope .vd-thumb-fallback {
+.nibi-video-result-scope .vd-thumb-fallback {
   width: 100%;
   height: 100%;
   display: grid;
@@ -626,23 +626,23 @@
   font-family: var(--mono);
 }
 
-.vm-video-result-scope .vd-thumb[data-active='true'] {
+.nibi-video-result-scope .vd-thumb[data-active='true'] {
   border-color: var(--err);
   box-shadow: 0 0 0 1px var(--err), 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
-.vm-video-result-scope .vd-thumb:hover:not([data-active='true']) {
+.nibi-video-result-scope .vd-thumb:hover:not([data-active='true']) {
   border-color: var(--bdr);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 /* C-3: 帧多选样式 */
-.vm-video-result-scope .vd-thumb[data-selected='true'] {
+.nibi-video-result-scope .vd-thumb[data-selected='true'] {
   border-color: var(--accent-warm, #f59e0b);
   box-shadow: 0 0 0 1px var(--accent-warm, #f59e0b);
 }
 
-.vm-video-result-scope .vd-thumb-check {
+.nibi-video-result-scope .vd-thumb-check {
   position: absolute;
   top: 2px;
   right: 2px;
@@ -658,20 +658,20 @@
   z-index: 2;
 }
 
-.vm-video-result-scope .vd-thumb:hover .vd-thumb-check,
-.vm-video-result-scope .vd-thumb[data-selected='true'] .vd-thumb-check {
+.nibi-video-result-scope .vd-thumb:hover .vd-thumb-check,
+.nibi-video-result-scope .vd-thumb[data-selected='true'] .vd-thumb-check {
   opacity: 1;
 }
 
-.vm-video-result-scope .vd-thumb[data-selected='true'] .vd-thumb-check {
+.nibi-video-result-scope .vd-thumb[data-selected='true'] .vd-thumb-check {
   color: var(--accent-warm, #f59e0b);
 }
 
-.vm-video-result-scope .vd-thumb {
+.nibi-video-result-scope .vd-thumb {
   position: relative;
 }
 
-.vm-video-result-scope .vd-select-bar {
+.nibi-video-result-scope .vd-select-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -680,7 +680,7 @@
   flex-shrink: 0;
 }
 
-.vm-video-result-scope .vd-btn-tool {
+.nibi-video-result-scope .vd-btn-tool {
   height: 26px;
   padding: 0 8px;
   border-radius: 6px;
@@ -696,23 +696,23 @@
   transition: background 0.15s, color 0.15s;
 }
 
-.vm-video-result-scope .vd-btn-tool:hover {
+.nibi-video-result-scope .vd-btn-tool:hover {
   background: var(--bgalt);
   color: var(--ink-1);
 }
 
-.vm-video-result-scope .vd-btn-tool:disabled {
+.nibi-video-result-scope .vd-btn-tool:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
 /* 视频播放器（缩小） */
-.vm-video-result-scope .vd-player-mini-wrap {
+.nibi-video-result-scope .vd-player-mini-wrap {
   flex-shrink: 0;
   padding: 0 0 6px;
 }
 
-.vm-video-result-scope .vd-player-mini {
+.nibi-video-result-scope .vd-player-mini {
   position: relative;
   border-radius: 8px;
   overflow: hidden;
@@ -722,14 +722,14 @@
   max-height: 100px;
 }
 
-.vm-video-result-scope .vd-player-mini video {
+.nibi-video-result-scope .vd-player-mini video {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
 
-.vm-video-result-scope .vd-play-btn-mini {
+.nibi-video-result-scope .vd-play-btn-mini {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -743,7 +743,7 @@
   color: #000;
 }
 
-.vm-video-result-scope .vd-progress-mini {
+.nibi-video-result-scope .vd-progress-mini {
   position: absolute;
   bottom: 0;
   left: 0;
@@ -752,13 +752,13 @@
   background: rgba(255, 255, 255, 0.15);
 }
 
-.vm-video-result-scope .vd-progress-mini-fill {
+.nibi-video-result-scope .vd-progress-mini-fill {
   height: 100%;
   background: var(--err);
   transition: width 200ms linear;
 }
 
-.vm-video-result-scope .vd-controls-mini {
+.nibi-video-result-scope .vd-controls-mini {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -766,7 +766,7 @@
 }
 
 /* Lightbox */
-.vm-video-result-scope .vd-lightbox {
+.nibi-video-result-scope .vd-lightbox {
   position: fixed;
   inset: 0;
   z-index: 100;
@@ -777,7 +777,7 @@
   cursor: pointer;
 }
 
-.vm-video-result-scope .vd-lightbox-close {
+.nibi-video-result-scope .vd-lightbox-close {
   position: absolute;
   top: 16px;
   right: 16px;
@@ -794,11 +794,11 @@
   transition: background 0.15s;
 }
 
-.vm-video-result-scope .vd-lightbox-close:hover {
+.nibi-video-result-scope .vd-lightbox-close:hover {
   background: rgba(255, 255, 255, 0.25);
 }
 
-.vm-video-result-scope .vd-lightbox-img {
+.nibi-video-result-scope .vd-lightbox-img {
   max-width: 92vw;
   max-height: 88vh;
   object-fit: contain;
@@ -806,7 +806,7 @@
   cursor: default;
 }
 
-.vm-video-result-scope .vd-lightbox-info {
+.nibi-video-result-scope .vd-lightbox-info {
   position: absolute;
   bottom: 20px;
   left: 50%;
@@ -818,4 +818,50 @@
   padding: 4px 14px;
   border-radius: 6px;
   white-space: nowrap;
+}
+
+/* ─── Open Design visual migration ─── */
+.nibi-video-result-scope {
+  background:
+    radial-gradient(circle at 92% 8%, rgba(255, 138, 54, 0.10), transparent 28%),
+    linear-gradient(180deg, #fbf8f3 0%, #f7f3ec 100%);
+}
+
+.nibi-video-result-scope .vd-nav {
+  background:
+    linear-gradient(135deg, rgba(255, 247, 234, 0.98), rgba(255, 255, 255, 0.86)) !important;
+  border-bottom: 1px solid rgba(25, 20, 16, 0.08) !important;
+}
+
+.nibi-video-result-scope .vd-title {
+  font-family: var(--fd);
+  font-size: clamp(24px, 2.8vw, 42px);
+  font-weight: 400;
+  color: var(--fg);
+}
+
+.nibi-video-result-scope .vd-left,
+.nibi-video-result-scope .vd-right,
+.nibi-video-result-scope .vd-subtitle-content {
+  background: transparent;
+}
+
+.nibi-video-result-scope .vd-main-frame,
+.nibi-video-result-scope .vd-frame-preview,
+.nibi-video-result-scope .vd-frame-info,
+.nibi-video-result-scope .vd-prompt-area,
+.nibi-video-result-scope .vd-card,
+.nibi-video-result-scope .vd-thumb,
+.nibi-video-result-scope .vd-player-mini,
+.nibi-video-result-scope .vd-dropdown-menu {
+  border-radius: 8px !important;
+  border-color: rgba(25, 20, 16, 0.08) !important;
+}
+
+.nibi-video-result-scope .vd-main-frame,
+.nibi-video-result-scope .vd-frame-info,
+.nibi-video-result-scope .vd-prompt-area,
+.nibi-video-result-scope .vd-card {
+  background: rgba(255, 255, 255, 0.80) !important;
+  box-shadow: 0 18px 42px rgba(36, 28, 18, 0.08);
 }

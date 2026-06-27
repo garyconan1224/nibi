@@ -1,25 +1,28 @@
-# Nibi / VidMirror
+# Nibi
 
 ![v1.0.0-mvp](https://img.shields.io/badge/version-v1.0.0--mvp-blue)
 
-> 本地优先的视频复刻分析工具：把一段视频拆成镜头 / 字幕 / 提示词，重新生成可改写的脚本与图像。
+> 本地优先的多媒体内容分析与创作蓝图工具：把视频、图文、音频和文字素材整理成结构化笔记、分镜与可复刻提示词。
 
 ---
 
 ## 快速开始
 
 ```bash
-# 1. 启动（自动检测/安装依赖）
+# 1. 首次启动（自动检测/安装依赖）
 ./start.sh
 
+# 日常开发快速启动
+./dev.sh
+
 # 2. 浏览器打开
-open http://localhost:5173
+open http://localhost:5177
 ```
 
 启动脚本会自动：
 - 检测/安装 brew、Python 3.10+、ffmpeg、Node、pnpm
 - 创建 `.venv` 并安装依赖
-- 并行启动 FastAPI 后端（8000）+ Vite 前端（5173）
+- 并行启动 FastAPI 后端（8000）+ Vite 前端（5177，可用 .env 覆盖）
 
 ---
 
@@ -55,7 +58,7 @@ open http://localhost:5173
 # 后端（默认 8000，改端口看 .env 里的 BACKEND_PORT）
 uvicorn backend.app.main:app --reload --port 8000
 
-# 前端（默认 5173，改端口看 .env 里的 VITE_PORT）
+# 前端（默认 5177，改端口看 .env 里的 VITE_PORT）
 cd frontend && pnpm dev
 ```
 
@@ -79,7 +82,7 @@ python3 tests/e2e_qa.py
 
 ### UI 与设计规范
 
-本项目前端使用 **Remix 设计体系 (Bold AI-creative vibe)**。在修改 UI 或创建新页面时，请开发者及 AI 严格参考：
+本项目前端使用 **Nibi Open Design 设计体系**。在修改 UI 或创建新页面时，请开发者及 AI 严格参考：
 - **设计令牌与样式规范**：[docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)
 - **业务流程与运行时契约**：[CLAUDE.md](CLAUDE.md) 中的相关章节
 - **视觉源文件与 CSS**：在 `docs/design/` 下，包含 JSX 组件原型以及 `styles.css`
@@ -96,7 +99,7 @@ python3 tests/e2e_qa.py
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `BACKEND_PORT` | `8000` | 后端端口 |
-| `VITE_PORT` | `5173` | 前端端口 |
+| `VITE_PORT` | `5177` | 前端端口 |
 | `SILICONFLOW_API_KEY` | - | 硅基流动 API Key（用于模型调用） |
 
 ---

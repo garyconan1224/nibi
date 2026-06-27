@@ -343,7 +343,7 @@
   font-size: 9px;
   color: var(--ink-4);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: normal;
   margin-bottom: 4px;
 }
 
@@ -575,4 +575,44 @@
 
 .vm-text-scope .tx-export-menu button:hover {
   background: var(--bg-sunken);
+}
+
+/* ─── Open Design visual migration ─── */
+.vm-text-scope {
+  background:
+    radial-gradient(circle at 92% 8%, rgba(148, 163, 184, 0.12), transparent 28%),
+    linear-gradient(180deg, #fbf8f3 0%, #f7f3ec 100%);
+}
+
+.vm-text-scope .vd-nav {
+  background:
+    linear-gradient(135deg, rgba(242, 244, 246, 0.98), rgba(255, 255, 255, 0.86)) !important;
+  border-bottom: 1px solid rgba(25, 20, 16, 0.08) !important;
+}
+
+.vm-text-scope .vd-title {
+  font-family: var(--fd);
+  font-size: clamp(24px, 2.8vw, 42px);
+  font-weight: 400;
+  color: var(--fg);
+}
+
+.vm-text-scope .tx-left,
+.vm-text-scope .tx-right {
+  background: transparent;
+}
+
+.vm-text-scope .tx-content-scroll,
+.vm-text-scope .tx-right-scroll,
+.vm-text-scope .im-section,
+.vm-text-scope .tx-export-menu,
+.vm-text-scope .tx-compare-panel {
+  border-radius: 8px !important;
+  border-color: rgba(25, 20, 16, 0.08) !important;
+  background: rgba(255, 255, 255, 0.80) !important;
+}
+
+.vm-text-scope .tx-right-header,
+.vm-text-scope .tx-actions {
+  background: rgba(255, 255, 255, 0.72);
 }

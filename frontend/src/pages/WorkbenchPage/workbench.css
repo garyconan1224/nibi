@@ -1,5 +1,5 @@
 /* WorkbenchPage — page-level styles.
-   Generic tokens (.btn, .chip, .display, etc.) live in styles/design-tokens.css.
+   Generic tokens (.btn, .chip, .display, etc.) live in styles/nibi-components.css.
    Source: docs/design/styles.css — hero / composer / pp-* / examples sections. */
 
 /* ─── Workbench scroll container ─── */
@@ -41,7 +41,7 @@
   margin: 0 0 12px;
   font-family: var(--display);
   line-height: 1.05;
-  letter-spacing: -0.02em;
+  letter-spacing: normal;
   color: var(--ink);
 }
 .hero h1 .accent-pink  { color: var(--accent-pink); }

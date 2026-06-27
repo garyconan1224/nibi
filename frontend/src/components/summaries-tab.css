@@ -501,7 +501,7 @@
 
 .sm-template-card.active {
   border-color: var(--accent-pink);
-  background: rgba(255, 77, 126, 0.04);
+  background: var(--accl);
 }
 
 .sm-template-card-label {

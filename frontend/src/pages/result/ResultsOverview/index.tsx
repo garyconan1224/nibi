@@ -274,7 +274,7 @@ export default function ResultsOverview() {
           <span className="ov-title">任务失败</span>
         </div>
         <div className="ov-main" style={{ alignItems: 'center', justifyContent: 'center' }}>
-          <div className="ov-card" style={{ maxWidth: 480, textAlign: 'center', borderColor: 'rgba(255, 77, 126, 0.2)' }}>
+          <div className="ov-card" style={{ maxWidth: 480, textAlign: 'center', borderColor: 'var(--err)' }}>
             <AlertTriangle size={32} style={{ color: 'var(--accent-pink)', marginBottom: 12 }} />
             <h2 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 8px' }}>处理失败</h2>
             <p style={{ fontSize: 13, color: 'var(--ink-3)', margin: '0 0 16px', lineHeight: 1.6 }}>
@@ -365,7 +365,7 @@ export default function ResultsOverview() {
         <span
           className="ov-status-chip"
           style={{
-            background: item.status === 'done' ? 'rgba(34, 211, 154, 0.12)' : item.status === 'failed' ? 'rgba(255, 77, 126, 0.12)' : 'var(--bg-sunken)',
+            background: item.status === 'done' ? 'var(--okl)' : item.status === 'failed' ? 'var(--errl)' : 'var(--bg-sunken)',
             color: item.status === 'done' ? 'var(--accent-green)' : item.status === 'failed' ? 'var(--accent-pink)' : 'var(--ink-3)',
           }}
         >

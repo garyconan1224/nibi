@@ -41,7 +41,7 @@ from shared.settings_store import ProviderProfile, load_settings, save_settings
 # 应用启动时间（UTC 时间戳），用于计算 uptime
 _APP_START_TS: float = time.time()
 # 应用版本号；与 FastAPI title/version 保持一致，供 /health 回显
-_APP_VERSION: str = "0.2.0"
+_APP_VERSION: str = "v0.3 BETA"
 
 
 def _seed_siliconflow_provider() -> None:
@@ -88,21 +88,21 @@ def _build_cors_origins() -> list[str]:
     优先级：
       1. ``CORS_ALLOW_ORIGINS``  — 逗号分隔完整 origin 列表，若非空则直接使用
       2. ``VITE_PORT``           — 单一端口号，自动展开 localhost/127.0.0.1 两种 origin
-      3. 默认                    — 端口回退 5173
+      3. 默认                    — 端口回退 5177
     """
     explicit = os.getenv("CORS_ALLOW_ORIGINS", "").strip()
     if explicit:
         return [o.strip() for o in explicit.split(",") if o.strip()]
 
-    raw_port = os.getenv("VITE_PORT", "5173").strip()
+    raw_port = os.getenv("VITE_PORT", "5177").strip()
     try:
         port = int(raw_port)
     except ValueError:
-        port = 5173
+        port = 5177
     return [f"http://localhost:{port}", f"http://127.0.0.1:{port}"]
 
 
-app = FastAPI(title="VidMirror API", version=_APP_VERSION, lifespan=lifespan)
+app = FastAPI(title="Nibi API", version=_APP_VERSION, lifespan=lifespan)
 
 # 静态文件挂载：/static → data/ 目录（关键帧图片、项目资源等）
 app.mount("/static", StaticFiles(directory=str(_ROOT_DIR / "data")), name="static")

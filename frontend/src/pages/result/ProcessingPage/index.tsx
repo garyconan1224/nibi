@@ -459,7 +459,7 @@ export default function ProcessingPage() {
             <>
               {/* VN3: 简洁处理中 — 5 步进度 + 预计剩余 + 友好提示 */}
               <div style={{ padding: '38px 40px 14px', textAlign: 'center' }}>
-                <div style={{ fontSize: 19, fontWeight: 700, marginBottom: 26, letterSpacing: '-0.01em' }}>
+                <div style={{ fontSize: 19, fontWeight: 700, marginBottom: 26, letterSpacing: 'normal' }}>
                   {isSuccess ? '生成完成 ✓' : '正在生成笔记'}
                   {etaSec > 0 && !isSuccess && (
                     <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--ink-3)', marginLeft: 8 }}>

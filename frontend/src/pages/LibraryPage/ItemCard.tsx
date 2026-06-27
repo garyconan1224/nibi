@@ -31,6 +31,33 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
   const srcLabel = extractDomain(item.source_value)
 
   const isDone = state === 'done'
+  const stateText: Record<string, string> = {
+    done: '已完成',
+    running: '运行中',
+    queued: '等待中',
+    error: '失败',
+  }
+  const typeText: Record<string, string> = {
+    video: '视频',
+    audio: '音频',
+    image: '图文',
+    text: '文本',
+  }
+  const summaryBits: string[] = []
+  if (item.results_summary.has_transcript) summaryBits.push('已转写')
+  if (item.results_summary.has_summary) summaryBits.push('已总结')
+  if (item.has_chapters) summaryBits.push('章节')
+  if (item.type === 'video' && (item.frames_count ?? 0) > 0) summaryBits.push(`${item.frames_count} 帧`)
+  if (item.has_subtitle) summaryBits.push('字幕')
+  const summaryLine = summaryBits.length > 0
+    ? summaryBits.join(' · ')
+    : state === 'error'
+      ? '处理失败，请检查链接或重新提交。'
+      : state === 'running'
+        ? '正在生成结构化笔记与素材索引。'
+        : '等待开始分析。'
+  const actionLabel = isDone ? (item.preflight?.intent === 'replica' ? '查看' : '打开') : '进度'
+  const progressWidth = state === 'done' ? '100%' : state === 'running' ? '46%' : state === 'error' ? '100%' : '18%'
 
   const handleCardClick = () => {
     if (selectMode && onToggleSelect) {
@@ -100,7 +127,7 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
         {/* state badge — bottom-right */}
         <div className="ex-badge">
           <span className="ex-state-dot" style={{ background: stateColor }} />
-          {stateLabel}
+          {stateText[state] ?? stateLabel}
         </div>
 
         {/* top-right */}
@@ -149,30 +176,35 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
       {/* ── Meta ── */}
       <div className="ex-meta">
         <div className="ex-title-row">
-          <Icon size={14} strokeWidth={1.5} style={{ color: 'var(--mut)', flexShrink: 0, marginTop: 2 }} />
+          <span className="ex-title-dot" aria-hidden="true" />
           <span className="ex-title" title={item.name}>
             {item.name || '未命名'}
           </span>
         </div>
+        <p className="ex-summary" title={summaryLine}>
+          {summaryLine}
+        </p>
         <div className="ex-sub-row">
-          <span className="ex-src-label">{srcLabel}</span>
+          <span className="ex-src-label">{srcLabel || item.source}</span>
           <span className="ex-ws-name">{item.workspace_name}</span>
         </div>
+        <div className="ex-progress" data-state={state}>
+          <span style={{ width: progressWidth }} />
+        </div>
         {(() => {
-          const chips: string[] = []
-          if (item.results_summary.has_transcript) chips.push('转写')
-          if (item.has_chapters) chips.push('章节')
-          if (item.type === 'video' && (item.frames_count ?? 0) > 0) chips.push(`${item.frames_count} 帧`)
-          if (item.has_subtitle) chips.push('字幕')
-          if (item.results_summary.has_summary) chips.push('摘要')
+          const chips: string[] = [typeText[item.type] ?? item.type]
+          if (hasDur) chips.push(dur)
+          chips.push(item.source === 'local' ? '本地' : '链接')
           if (item.type === 'image' && item.results_summary.has_summary) chips.push('提示词')
           const visible = chips.slice(0, 3)
-          if (visible.length === 0) return null
           return (
-            <div className="ex-chip-row">
-              {visible.map((c) => (
-                <span key={c} className="ex-chip">{c}</span>
-              ))}
+            <div className="ex-card-foot">
+              <div className="ex-chip-row">
+                {visible.map((c) => (
+                  <span key={c} className="ex-chip">{c}</span>
+                ))}
+              </div>
+              <span className="ex-open-link">{actionLabel}</span>
             </div>
           )
         })()}

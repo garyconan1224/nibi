@@ -10,7 +10,7 @@ import type { VideoResultFrame, VideoResultTranscriptLine } from '@/services/wor
  *   轨道内部只负责 auto-scroll 到 active，并把点击事件抛给父组件。
  */
 
-const TRACK_COLORS = ['#FF4D7E', '#B84CFF', '#3C77FB', '#FFB84C', '#22D39A']
+const TRACK_COLORS = ['var(--acc)', 'var(--wrn)', 'var(--ok)', 'var(--fg2)', 'var(--mut)']
 
 export interface TripleTrackProps {
   frames: VideoResultFrame[]
@@ -287,4 +287,3 @@ export function TripleTrack({
     </div>
   )
 }
-

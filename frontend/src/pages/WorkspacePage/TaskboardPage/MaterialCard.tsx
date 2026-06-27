@@ -59,7 +59,7 @@ interface MaterialCardProps {
 
 /**
  * 单张素材卡片。
- * 设计稿来源：taskboard.jsx MaterialCard + VidMirror.html .mat-* 类。
+ * 设计稿来源：taskboard.jsx MaterialCard + legacy prototype .mat-* 类。
  */
 export function MaterialCard({ item, workspaceId, progress, selected, onSelect }: MaterialCardProps) {
   const navigate = useNavigate()

@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════
    Nibi Component Classes — 通用组件样式层
-   优先级高于 design-tokens.css 中的旧版同类类。
+   承接旧样式层中仍被页面使用的通用类。
    组件样式层放在 token 之后、页面迁移之前，
    确保页面迁移时有类可复用，避免每页重复手写。
    ═══════════════════════════════════════════════ */
@@ -10,7 +10,7 @@
   font-family: var(--fd);
   font-weight: 400;
   line-height: 1.08;
-  letter-spacing: normal;  /* 覆盖 design-tokens.css 的负值，得意黑自带字距 */
+  letter-spacing: normal;
 }
 
 .eyebrow {
@@ -23,6 +23,12 @@
 
 .mono {
   font-family: var(--fm);
+}
+
+.lede {
+  font-size: 17px;
+  line-height: 1.55;
+  color: var(--fg2);
 }
 
 /* ── Buttons ── */
@@ -116,6 +122,45 @@
   font-family: var(--fm);
   background: color-mix(in oklch, var(--fg) 6%, transparent);
   color: var(--fg2);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--rf);
+  background: var(--bgalt);
+  border: 1px solid var(--bdr);
+  font-size: 12px;
+  color: var(--fg2);
+}
+
+.chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--rf);
+  background: var(--ok);
+}
+
+.chip-dot.amber {
+  background: var(--wrn);
+}
+
+.chip-dot.red {
+  background: var(--err);
+}
+
+.kw {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--fm);
+  font-size: 10.5px;
+  padding: 2px 6px;
+  border-radius: var(--rs);
+  background: var(--bgalt);
+  color: var(--mut);
 }
 
 /* ── Input ── */

@@ -303,18 +303,32 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
       ? '去工作台添加复刻素材，开始创作吧'
       : '去工作台添加笔记，或粘贴一个链接开始吧'
 
+  const pageTone = kind === 'replica' ? 'replica' : kind === 'note' ? 'note' : 'library'
+  const pageKicker = kind === 'replica'
+    ? 'REPLICA LIBRARY'
+    : kind === 'note'
+      ? 'NOTE LIBRARY'
+      : 'MATERIAL LIBRARY'
+
   return (
-    <div className="lib-page">
+    <div className={`lib-page lib-page--${pageTone}`}>
       {/* ── 顶部栏 ── */}
       <div className="lib-page-header">
         <div>
-          <div className="eyebrow">{pageTitle.toUpperCase()} · {statLabel} · LOCAL</div>
+          <div className="eyebrow">{pageKicker} · {statLabel} · LOCAL</div>
           <h1 className="display lib-title">
             {pageTitle}
           </h1>
           <p className="lib-desc">
             {pageDesc}
           </p>
+          <div className="lib-mini-stats" aria-label="library-stats">
+            <span>全部 {chipCounts?.all ?? 0}</span>
+            <span>视频 {chipCounts?.video ?? 0}</span>
+            <span>音频 {chipCounts?.audio ?? 0}</span>
+            <span>图片 {chipCounts?.image ?? 0}</span>
+            <span>文字 {chipCounts?.text ?? 0}</span>
+          </div>
         </div>
         <div className="lib-actions">
           {/* 选择控制 */}

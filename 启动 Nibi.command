@@ -1,5 +1,5 @@
 #!/bin/bash
-# 双击启动 VidMirror（一键重启前后端）。
+# 双击启动 Nibi（一键重启前后端）。
 # Finder 会用「终端 Terminal.app」打开这个文件并执行。
 
 cd "$(dirname "$0")" || exit 1

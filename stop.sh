@@ -7,7 +7,7 @@ cd "$SCRIPT_DIR"
 BACKEND_PORT=$(grep -E '^BACKEND_PORT=' .env 2>/dev/null | tail -1 | cut -d= -f2 | tr -d '"' | tr -d "'")
 VITE_PORT=$(grep -E '^VITE_PORT=' .env 2>/dev/null | tail -1 | cut -d= -f2 | tr -d '"' | tr -d "'")
 BACKEND_PORT=${BACKEND_PORT:-8000}
-VITE_PORT=${VITE_PORT:-5173}
+VITE_PORT=${VITE_PORT:-5177}
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 

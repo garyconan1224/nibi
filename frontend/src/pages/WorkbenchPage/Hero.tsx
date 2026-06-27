@@ -7,7 +7,7 @@ export function Hero({ backendUrl = '127.0.0.1:8000' }: HeroProps) {
     <section className="hero">
       <div className="hero-eyebrow">
         <span className="hb-pill">v0.3 BETA</span>
-        VidMirror ·{' '}
+        Nibi ·{' '}
         <span className="hero-backend-url">{backendUrl}</span>
         <span className="hero-status-dot" />
         本地版 · 无文件大小限制
@@ -21,7 +21,7 @@ export function Hero({ backendUrl = '127.0.0.1:8000' }: HeroProps) {
       </h1>
 
       <p className="lede">
-        粘贴链接或拖入文件 — VidMirror 自动识别类型并提取创作蓝图。
+        粘贴链接或拖入文件 — Nibi 自动识别类型并提取创作蓝图。
       </p>
     </section>
   )

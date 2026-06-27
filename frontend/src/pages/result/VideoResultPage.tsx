@@ -616,7 +616,7 @@ export default function VideoResultPage() {
 
   if (fetchState.kind === 'loading') {
     return (
-      <div className="vm-video-result-scope" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
+      <div className="nibi-video-result-scope" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
         <span className="mono" style={{ color: 'var(--mut)' }}>加载视频结果…</span>
       </div>
     )
@@ -624,7 +624,7 @@ export default function VideoResultPage() {
   if (fetchState.kind === 'error' || !result) {
     return (
       <div
-        className="vm-video-result-scope"
+        className="nibi-video-result-scope"
         style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}
       >
         <span style={{ color: 'var(--err)', fontWeight: 600 }}>
@@ -642,7 +642,7 @@ export default function VideoResultPage() {
   const isVisualOnly = result.summary_path === 'visual_only'
   if (isSubtitlePath) {
     return (
-      <div className="vm-video-result-scope vd-subtitle-layout">
+      <div className="nibi-video-result-scope vd-subtitle-layout">
         {/* Nav bar */}
         <div className="vd-nav">
           <button className="btn-ghost" onClick={() => navigate(-1)} style={{ height: 28, padding: '0 10px', fontSize: 12 }}>
@@ -836,7 +836,7 @@ export default function VideoResultPage() {
   if (!frame) {
     return (
       <div
-        className="vm-video-result-scope"
+        className="nibi-video-result-scope"
         style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}
       >
         <span style={{ color: 'var(--err)', fontWeight: 600 }}>没有可显示的视频结果</span>
@@ -850,7 +850,7 @@ export default function VideoResultPage() {
   const progress = totalSec > 0 ? Math.min(1, currentSec / totalSec) : 0
 
   return (
-    <div className="vm-video-result-scope vd-layout">
+    <div className="nibi-video-result-scope vd-layout">
       {/* ════════ 左：播放器 + 三轨 ════════ */}
       <div className="vd-left">
         {/* 顶部导航 */}

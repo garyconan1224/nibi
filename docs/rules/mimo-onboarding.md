@@ -141,9 +141,9 @@ git status --short --branch && git log --oneline -15
 # 停止所有服务
 ./stop.sh
 
-# 验证已就绪（从 .env 读端口，默认 8000 / 5173）
+# 验证已就绪（从 .env 读端口，默认 8000 / 5177）
 BACKEND_PORT=$(grep -E '^BACKEND_PORT=' .env 2>/dev/null | tail -1 | cut -d= -f2 | tr -d '"' | tr -d "'"); BACKEND_PORT=${BACKEND_PORT:-8000}
-VITE_PORT=$(grep -E '^VITE_PORT=' .env 2>/dev/null | tail -1 | cut -d= -f2 | tr -d '"' | tr -d "'"); VITE_PORT=${VITE_PORT:-5173}
+VITE_PORT=$(grep -E '^VITE_PORT=' .env 2>/dev/null | tail -1 | cut -d= -f2 | tr -d '"' | tr -d "'"); VITE_PORT=${VITE_PORT:-5177}
 curl -s "http://localhost:$BACKEND_PORT/health" && echo "" && curl -so /dev/null -w "%{http_code}" "http://localhost:$VITE_PORT/"
 
 # ── 测试 ─────────────────────────────────────────────────────────

@@ -57,13 +57,14 @@
   --color-error:         oklch(56% 0.20 25);
   --color-error-light:   oklch(94% 0.04 25);
 
-  /* ── Radius（Nibi 短名） ── */
-  /* 注意：--radius-sm / --radius-md / --radius-lg / --radius-xl
-     由 Tailwind v4 @theme inline 管理，此处不重复定义。 */
-  --rs: 6px;
-  --r:  10px;
-  --rl: 14px;
-  --rf: 9999px;
+  /* ── Radius ── */
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-base: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-pill: 9999px;
   --radius-full: 9999px;
 
   /* ── Shadows ── */
@@ -106,7 +107,7 @@
   --errl: var(--color-error-light);
 
   --rs: var(--radius-sm);
-  --r:  var(--radius);
+  --r:  var(--radius-base);
   --rl: var(--radius-lg);
   --rf: var(--radius-full);
 
@@ -115,13 +116,23 @@
   --sh3: var(--shadow-lg);
   --shf: var(--shadow-focus);
 
-  /* ── 过渡层：旧 VidMirror token 指向 Nibi（Goal 2+ 逐步移除） ── */
+  /* ── 过渡层：旧业务 token 指向 Nibi（Goal 2+ 逐步移除） ── */
   --vm-display: var(--fd);
   --vm-sans:    var(--fb);
   --vm-mono:    var(--fm);
   --vm-accent:  var(--acc);
 
-  /* ── 过渡层：旧 design-tokens.css token 指向 Nibi ── */
+  /* ── 过渡层：旧页面 token 指向 Nibi ── */
+  --display: var(--fd);
+  --sans:    var(--fb);
+  --mono:    var(--fm);
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
   --bg-elev:     var(--color-surface);
   --bg-sunken:   var(--color-bg-alt);
   --ink:         var(--color-fg);
@@ -138,6 +149,8 @@
   --accent-warm:  var(--color-warning);
   --accent-amber: var(--color-warning);
   --accent-green: var(--color-success);
+  --pill-bg: var(--color-fg);
+  --pill-ink: var(--color-bg);
 }
 
 /* ── 深色模式 ── */

@@ -1,5 +1,5 @@
 #!/bin/bash
-# 双击停止 VidMirror。
+# 双击停止 Nibi。
 cd "$(dirname "$0")" || exit 1
 ./stop.sh
 echo

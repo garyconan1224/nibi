@@ -72,11 +72,11 @@ export default function SearchPage() {
   }
 
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden">
+    <div className="flex h-full w-full flex-col overflow-hidden bg-[#fbf8f3]">
       {/* 顶部输入区 */}
-      <div className="border-b border-border bg-background px-6 py-4">
-        <div className="mx-auto flex max-w-3xl flex-col gap-3">
-          <h1 className="text-lg font-semibold">知识库检索</h1>
+      <div className="border-b border-black/10 bg-gradient-to-br from-[#e9fbf6] to-white/85 px-6 py-5">
+        <div className="mx-auto flex max-w-4xl flex-col gap-3 rounded-lg border border-black/10 bg-white/70 px-5 py-4 shadow-[0_18px_50px_rgba(72,50,20,0.07)]">
+          <h1 className="font-display text-4xl font-normal leading-none text-foreground">知识库检索</h1>
           <p className="text-xs text-muted-foreground">
             跨合集语义检索（RAG）。返回带引用的回答和可跳转的来源片段。
           </p>
@@ -129,7 +129,7 @@ export default function SearchPage() {
 
       {/* 结果区 */}
       <div className="flex-1 overflow-y-auto px-6 py-6">
-        <div className="mx-auto flex max-w-3xl flex-col gap-6">
+        <div className="mx-auto flex max-w-4xl flex-col gap-6">
           {loading && (
             <div className="flex flex-col gap-3">
               <Skeleton className="h-24 w-full" />

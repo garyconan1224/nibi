@@ -237,7 +237,7 @@ def _build_readme(title: str, item_type: str) -> str:
 3. 结合 transcript.txt 做进一步编辑
 
 ---
-由 Nibi / VidMirror 自动生成
+由 Nibi 自动生成
 """
     if item_type == "文本":
         return f"""# 复刻工作包
@@ -264,7 +264,7 @@ def _build_readme(title: str, item_type: str) -> str:
 3. 根据 prompts.json 中的提示词进行二次创作
 
 ---
-由 Nibi / VidMirror 自动生成
+由 Nibi 自动生成
 """
     return f"""# 复刻工作包
 
@@ -297,7 +297,7 @@ def _build_readme(title: str, item_type: str) -> str:
 4. 根据需要微调提示词中的关键词
 
 ---
-由 Nibi / VidMirror 自动生成
+由 Nibi 自动生成
 """
 
 
