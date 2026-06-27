@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Loader2, Search as SearchIcon, Sparkles } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
@@ -48,7 +48,6 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [history, setHistory] = useState<string[]>(loadHistory)
-  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     listWorkspaces()
@@ -112,7 +111,6 @@ export default function SearchPage() {
           <div className="search-input-wrap">
             <SearchIcon size={16} />
             <input
-              ref={inputRef}
               className="search-input"
               value={query}
               onChange={e => setQuery(e.target.value)}
