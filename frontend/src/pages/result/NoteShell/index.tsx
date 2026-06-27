@@ -1098,115 +1098,130 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
         </div>
         </>
       ) : isImageNote ? (
-        /* ── 图文笔记三列布局：左图片浏览 / 中正文 / 右操作区 ── */
-        (() => {
-          return (
-            <div className="nibi-note-workbench nibi-note-workbench--image">
+        /* ── 图文笔记两栏布局（设计稿 pg-image 对齐） ── */
+        <>
+        <div className="nibi-note-page nibi-note-page--image" ref={notePageRef} style={notePageStyle}>
 
-              {/* ── 左列：图片浏览区 ── */}
-              <div className="nibi-note-media-rail nibi-note-image-rail" style={{
-                width: '25%', minWidth: 200, maxWidth: 380, flexShrink: 0,
-                display: 'flex', flexDirection: 'column',
-                borderRight: '1px solid var(--bdr)',
-                overflow: 'hidden', background: 'var(--bgalt)',
-              }}>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 12, minHeight: 0 }}>
-                  {/* 大图预览 */}
-                  <div style={{
-                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'var(--bg)', borderRadius: 8, overflow: 'hidden', minHeight: 0,
-                  }}>
-                    {imageLoadError[selectedImageIdx] ? (
-                      <span style={{ color: 'var(--mut)', fontSize: 12 }}>图片加载失败</span>
-                    ) : (
-                      <img
-                        src={images[selectedImageIdx]}
-                        alt={title ? `${title}（${selectedImageIdx + 1}）` : `图片 ${selectedImageIdx + 1}`}
-                        style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-                        onError={() => setImageLoadError((prev) => ({ ...prev, [selectedImageIdx]: true }))}
-                      />
-                    )}
-                  </div>
-                  {/* 缩略图列表 */}
-                  {images.length > 1 && (
-                    <div style={{
-                      display: 'flex', gap: 4, overflowX: 'auto', paddingTop: 8, flexShrink: 0,
-                    }}>
-                      {images.map((img, idx) => (
-                        <button
-                          key={idx}
-                          onClick={() => setSelectedImageIdx(idx)}
-                          style={{
-                            flexShrink: 0, width: 44, height: 44, padding: 0, border: 'none', borderRadius: 4,
-                            overflow: 'hidden', cursor: 'pointer', opacity: idx === selectedImageIdx ? 1 : 0.5,
-                            outline: idx === selectedImageIdx ? '2px solid var(--acc)' : 'none',
-                          }}
-                        >
-                          <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {images.length > 1 && (
-                    <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--mut)', marginTop: 4 }}>
-                      {selectedImageIdx + 1} / {images.length}
-                    </div>
-                  )}
-                  {/* 源 md 入口（移自右列操作区） */}
-                  {note.source_md && (
+          {/* ── 左栏：画廊 + meta ── */}
+          <div className="nibi-note-left nibi-image-left">
+            <div className="nibi-image-gallery">
+              {/* 主图 */}
+              <div className="nibi-image-main">
+                {imageLoadError[selectedImageIdx] ? (
+                  <span style={{ color: 'var(--mut)', fontSize: 12 }}>图片加载失败</span>
+                ) : (
+                  <img
+                    src={images[selectedImageIdx]}
+                    alt={title ? `${title}（${selectedImageIdx + 1}）` : `图片 ${selectedImageIdx + 1}`}
+                    onError={() => setImageLoadError((prev) => ({ ...prev, [selectedImageIdx]: true }))}
+                  />
+                )}
+              </div>
+              {/* 缩略图列表 */}
+              {images.length > 1 && (
+                <div className="nibi-image-thumbs">
+                  {images.map((img, idx) => (
                     <button
-                      className="btn-ghost"
-                      onClick={() => setSourceModalOpen(true)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center', height: 28, fontSize: 11, marginTop: 6, flexShrink: 0 }}
+                      key={idx}
+                      className={`nibi-image-thumb${idx === selectedImageIdx ? ' is-active' : ''}`}
+                      onClick={() => setSelectedImageIdx(idx)}
                     >
-                      <FileCode size={12} /> 源 md
+                      <img src={img} alt="" />
                     </button>
-                  )}
+                  ))}
                 </div>
+              )}
+              {/* 计数 */}
+              {images.length > 1 && (
+                <div className="nibi-image-counter">
+                  {selectedImageIdx + 1} / {images.length}
+                </div>
+              )}
+            </div>
+            {/* meta：来源 / 创建时间 / OCR 识别文本 */}
+            <div className="nibi-image-meta">
+              <div className="nibi-image-meta-row">
+                <span className="nibi-image-meta-label">来源</span>
+                <span className="nibi-image-meta-value">{sourceLabel}</span>
               </div>
+              {/* OCR 识别文本（仅当非空时显示） */}
+              {currentInfo?.ocr_text && (
+                <details style={{ marginTop: 2 }}>
+                  <summary style={{ fontSize: 10, color: 'var(--mut)', cursor: 'pointer', userSelect: 'none', padding: '2px 0' }}>
+                    识别文本
+                  </summary>
+                  <div style={{ fontSize: 11, color: 'var(--fg2)', lineHeight: 1.5, whiteSpace: 'pre-wrap', maxHeight: 160, overflowY: 'auto', padding: '4px 0' }}>
+                    {currentInfo.ocr_text}
+                  </div>
+                </details>
+              )}
+            </div>
+          </div>
 
-              {/* ── 中列：正文（图文/视频统一，无 tab 切换）+ TOC ── */}
-              <div className="nibi-note-main-panel">
-                <div className="nibi-note-panel-head">
-                  <span>图文笔记</span>
-                  {saveStatusNode}
+          <div
+            className="nibi-note-splitter"
+            role="separator"
+            aria-label="调整左右栏宽度"
+            aria-orientation="vertical"
+            aria-valuemin={VIDEO_SPLIT_MIN}
+            aria-valuemax={VIDEO_SPLIT_MAX}
+            aria-valuenow={Math.round(noteLeftPct)}
+            tabIndex={0}
+            onPointerDown={handleNoteSplitPointerDown}
+            onKeyDown={handleNoteSplitKeyDown}
+          >
+            <span className="nibi-note-splitter-grip" />
+          </div>
+
+          {/* ── 右栏：标题 + 标签 + 总结 + 正文 ── */}
+          <div className="nibi-note-right">
+            <div className="nibi-note-right-scroll">
+              <div className="note-copy">
+                <div className="note-copy-head">
+                  <h1>{title || '未命名笔记'}</h1>
                 </div>
-                <div className="nibi-note-editor-scroll">
-                  {noteContent}
-                </div>
-              </div>
-
-              {/* ── 右列：操作区（图文笔记） ── */}
-              <div style={{
-                width: 280, flexShrink: 0,
-                borderLeft: '1px solid var(--bdr)',
-                display: 'flex', flexDirection: 'column',
-                overflow: 'hidden', background: 'var(--srf)',
-              }}>
-                <div style={{ padding: '10px 14px 8px', borderBottom: '1px solid var(--bdr)', flexShrink: 0 }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--acc)', textTransform: 'uppercase', letterSpacing: 'normal', fontFamily: 'var(--mono)' }}>
-                    操作区
-                  </span>
-                </div>
-
-                <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', display: 'flex', flexDirection: 'column', padding: '12px 14px', gap: 8 }}>
-
-                  {/* OCR 识别文本（默认折叠，仅当非空时显示） */}
-                  {currentInfo?.ocr_text && (
-                    <details style={{ marginTop: 4 }}>
-                      <summary style={{ fontSize: 11, color: 'var(--mut)', cursor: 'pointer', userSelect: 'none', padding: '4px 0' }}>
-                        识别文本
-                      </summary>
-                      <div style={{ fontSize: 12, color: 'var(--fg2)', lineHeight: 1.5, whiteSpace: 'pre-wrap', maxHeight: 200, overflowY: 'auto', padding: '4px 0' }}>
-                        {currentInfo.ocr_text}
+                {/* 标签 + meta */}
+                {(hasTags || sourceUrl) && (
+                  <div className="note-tags-inline">
+                    {hasTags && <TagChips tags={tags} />}
+                    {sourceUrl && <span className="note-meta-inline">{platformLabelFromUrl(sourceUrl)}</span>}
+                  </div>
+                )}
+                {/* 总结版本切换 */}
+                {summaries.length > 0 && (() => {
+                  const TEMPLATE_LABELS: Record<string, string> = { concise: '简洁摘要', detailed: '详细要点', quotes: '金句提取', meeting: '会议纪要', xhs: '小红书风格', longform: '公众号长文', lecture: '教学笔记', interview: '访谈整理', shownotes: '播客 shownotes', standard: '标准总结' }
+                  const tl = (id: string) => TEMPLATE_LABELS[id] ?? id
+                  return (
+                    <div className="note-section" style={{ marginTop: 16 }}>
+                      <h2>内容总结</h2>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>
+                        {[...templateGroups.entries()].map(([tmpl]) => (
+                          <button
+                            key={tmpl}
+                            className="btn-ghost"
+                            onClick={() => { const first = templateGroups.get(tmpl)?.[0]; if (first) handleApplyToNote(first) }}
+                            style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: tmpl === activeTemplate ? 'var(--accl)' : 'var(--bgalt)', color: tmpl === activeTemplate ? 'var(--acc)' : 'var(--mut)', fontWeight: tmpl === activeTemplate ? 600 : 400 }}
+                          >
+                            {tl(tmpl)}
+                          </button>
+                        ))}
                       </div>
-                    </details>
-                  )}
+                    </div>
+                  )
+                })()}
+                {/* 正文 */}
+                <div className="note-section" style={{ marginTop: summaries.length > 0 ? 0 : 16 }}>
+                  <div className="nibi-note-editor-panel">
+                    <MilkdownEditor key={milkdownKey} markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
+                  </div>
                 </div>
+                {/* 保存状态 */}
+                <div style={{ padding: '12px 0', textAlign: 'right' }}>{saveStatusNode}</div>
               </div>
             </div>
-          )
-        })()
+          </div>
+        </div>
+        </>
       ) : (
         <div className="nibi-note-workbench nibi-note-workbench--generic">
           <div className="nibi-note-main-panel">

@@ -351,16 +351,8 @@
   letter-spacing: normal;
 }
 
-.nibi-note-workbench--video .nibi-note-media-rail,
-.nibi-note-workbench--image .nibi-note-media-rail {
+.nibi-note-workbench--video .nibi-note-media-rail {
   background: rgba(255, 255, 255, 0.72) !important;
-}
-
-.nibi-note-workbench--image > div:last-child {
-  border: 1px solid rgba(25, 20, 16, 0.08) !important;
-  border-radius: 8px !important;
-  background: rgba(255, 255, 255, 0.82) !important;
-  box-shadow: 0 18px 42px rgba(36, 28, 18, 0.08);
 }
 
 /* ══════════════════════════════════════════
@@ -1286,6 +1278,123 @@
   color: var(--mut, #7c7464);
 }
 
+/* ── Stage 3: 图文笔记形态（设计稿 pg-image 对齐） ── */
+
+.nibi-note-page--image {
+  --note-left-width: 50%;
+}
+
+.nibi-image-left {
+  flex: 0 0 var(--note-left-width);
+  width: var(--note-left-width);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--srf, #fff);
+  overflow: hidden;
+}
+
+/* 画廊区域：主图 + 缩略图 */
+.nibi-image-gallery {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+}
+
+.nibi-image-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg, #fbf8f3);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.nibi-image-main img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.nibi-image-thumbs {
+  flex-shrink: 0;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding-top: 8px;
+}
+
+.nibi-image-thumb {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  opacity: 0.5;
+}
+
+.nibi-image-thumb.is-active {
+  opacity: 1;
+  outline: 2px solid var(--acc, #ff8a36);
+}
+
+.nibi-image-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.nibi-image-counter {
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 10px;
+  color: var(--mut, #7c7464);
+  margin-top: 4px;
+  font-family: var(--fm, monospace);
+}
+
+/* 左栏底部 meta（来源 / 创建时间） */
+.nibi-image-meta {
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--mut, #7c7464);
+  background: var(--srf, #fff);
+}
+
+.nibi-image-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nibi-image-meta-label {
+  color: var(--mut, #7c7464);
+  font-family: var(--fm, monospace);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.nibi-image-meta-value {
+  color: var(--fg2, #4a4540);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── 响应式 ── */
 
 @media (max-width: 920px) {
@@ -1315,6 +1424,13 @@
   }
 
   .nibi-note-left {
+    flex: 0 0 auto;
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  }
+
+  .nibi-image-left {
     flex: 0 0 auto;
     width: 100%;
     border-right: none;
