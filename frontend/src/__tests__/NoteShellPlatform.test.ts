@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { platformLabelFromUrl } from '@/pages/result/NoteShell'
+import { platformLabelFromUrl } from '@/pages/result/NoteShell/note-shell-utils'
 
 describe('platformLabelFromUrl', () => {
   it.each([

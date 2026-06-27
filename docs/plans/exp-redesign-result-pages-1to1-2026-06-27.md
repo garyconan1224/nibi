@@ -206,11 +206,16 @@ status: ready
 
 ## 7. 后续待办（设计稿有、当前无数据/功能支撑，逐步完善）
 
-> 小米执行各 Stage 时把「设计稿有但暂占位」的项追加到这里，作为后续批次。
+> Stage 5+6 验收后最终清单（2026-06-28）。详见 `docs/test-reports/stage5-6-acceptance-2026-06-28.md`。
 
-- （Stage 1）视频画中画 `.note-pip`：待确认是否做真实 PiP / 暂占位。
-- （Stage 1）缩略图轨真实帧数据来源：待确认。
-- （Stage 1）章节标签 `.note-chapter-label`：当前无章节数据源，暂未渲染。
-- （Stage 1）导出菜单缺少 PPTX/PDF 讲义选项（原 handleExportLecture 未移植到 note-bar），待后续补全。
-- （Stage 3）图片「生成参数」对图文 OCR 笔记是否适用：待确认。
-- （后续批次，非首批）合集详情 pg-collection、复刻 pg-replica、资料库 pg-resources、收藏 pg-favorites、知识库 pg-knowledge、搜索 pg-search、设置 pg-settings、主页 pg-home、处理页 pg-processing。
+| # | 来源 | 占位项 | 状态 | 建议 |
+|---|---|---|---|---|
+| §7-1 | Stage 1 | 视频画中画 `.note-pip` | 未渲染 | 后续做 — 需确认浏览器 PiP API |
+| §7-2 | Stage 1 | 缩略图轨真实帧数据 | ✅ 已接真实 videoFrames | 可移除 |
+| §7-3 | Stage 1 | 章节标签 `.note-chapter-label` | 未渲染（无数据源） | 后续做 — 需后端章节数据 |
+| §7-4 | Stage 1 | 导出 PPTX/PDF/Word/长图/沉浸式 | disabled 灰显占位 | 后续批次逐个接入 |
+| §7-5 | Stage 3 | 图片「生成参数」 | 不适用于图文 OCR 笔记 | 建议移除 |
+| §7-6 | Stage 3 | 图片「创建时间」meta | ItemNote 无 created_at | 后续做 — 需 API 变更 |
+| §7-7 | Stage 4 | 文本笔记工具栏 B/I/H/• | disabled 占位 | 后续做 — Milkdown 命令接入 |
+| §7-8 | Stage 5 | AI 工具：思维导图/海报 | disabled 灰显 | 后续做 |
+| §7-9 | 后续 | 合集/复刻/资料库/收藏/知识库/搜索/设置/主页/处理页 | 非首批范围 | P2+ 批次 |

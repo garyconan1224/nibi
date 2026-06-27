@@ -10,8 +10,8 @@
  *   - SourcePanel：source.md 只读区（可折叠）
  *   - NoteEditor：轻量 CodeMirror 编辑器（注册到 lnEditorStore，复用截图插入能力）
  */
-import { cloneElement, isValidElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, ReactElement, ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, BookOpenCheck, Brain, Check, ChevronDown, ChevronRight, Download, FileCode, FileDown, FileText, FileType, Image, List, Pencil, Presentation, Sparkles, Subtitles, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -20,7 +20,7 @@ import { downloadSubtitles, exportItemNoteObsidian, getItemNote, putItemNote } f
 import type { VideoResultTranscriptLine } from '@/services/workspaces'
 import type { ItemNote } from '@/types/workspace'
 import { createSummary, deleteSummary, listSummaries, renameSummary, type ItemSummary } from '@/services/summaries'
-import { TS_RE, parseTs } from '@/pages/results/LearningNotesPage/HtmlView'
+import { platformLabelFromUrl } from './note-shell-utils'
 import { Badge } from '@/components/ui/badge'
 import { SYSTEM_TAG_DIMENSIONS } from '@/constants/tagDimensions'
 import NoteMediaCompanion, { type NoteMediaCompanionHandle } from './NoteMediaCompanion'
@@ -54,15 +54,16 @@ const TYPE_LABEL: Record<string, string> = {
   image: '图片',
 }
 
-// 从 source_url 域名派生视频平台显示名。
-export function platformLabelFromUrl(url: string): string {
-  const host = url.replace(/^https?:\/\//, '').split('/')[0].toLowerCase()
-  if (host.includes('bilibili')) return 'Bilibili'
-  if (host.includes('youtube') || host.includes('youtu.be')) return 'YouTube'
-  if (host.includes('douyin')) return '抖音'
-  if (host.includes('xiaohongshu') || host.includes('xhslink')) return '小红书'
-  return '网页'
+/** 总结模板 ID → 中文显示名（唯一定义，顶栏+右栏共用）。 */
+const TEMPLATE_LABELS: Record<string, string> = {
+  concise: '简洁摘要', detailed: '详细要点', quotes: '金句提取',
+  meeting: '会议纪要', xhs: '小红书风格', longform: '公众号长文',
+  lecture: '教学笔记', interview: '访谈整理', shownotes: '播客 shownotes',
+  oral: '口播稿', steps: '步骤教程', outline: '大纲',
+  qa: '问答卡(Anki)', actions: '行动清单', tool_recommendation: '工具推荐',
+  science_popularization: '知识科普', standard: '标准总结',
 }
+const tl = (id: string) => TEMPLATE_LABELS[id] ?? id
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed'
 const VIDEO_SPLIT_MIN = 42
@@ -135,71 +136,6 @@ function downloadMarkdownFile(markdown: string, title: string): void {
   a.remove()
   URL.revokeObjectURL(url)
 }
-
-/** 把 ReactMarkdown children 里的 [mm:ss] / [mm:ss~mm:ss] 渲染为可点击跳转 chip。 */
-export function renderNoteTimestampChildren(
-  children: ReactNode,
-  onSeek: (sec: number) => void,
-): ReactNode {
-  if (typeof children === 'string') {
-    return replaceNoteTimestampString(children, onSeek)
-  }
-  if (Array.isArray(children)) {
-    return children.map((child, idx) => (
-      <span key={`ts-child-${idx}`}>
-        {renderNoteTimestampChildren(child, onSeek)}
-      </span>
-    ))
-  }
-  if (isValidElement(children)) {
-    if (children.type === 'code' || children.type === 'pre') return children
-    const el = children as ReactElement<{ children?: ReactNode }>
-    const nextChildren = renderNoteTimestampChildren(el.props.children, onSeek)
-    if (nextChildren === el.props.children) return children
-    return cloneElement(el, undefined, nextChildren)
-  }
-  return children
-}
-
-function replaceNoteTimestampString(text: string, onSeek: (sec: number) => void): ReactNode {
-  const parts: ReactNode[] = []
-  let lastIdx = 0
-  let match: RegExpExecArray | null
-
-  TS_RE.lastIndex = 0
-  while ((match = TS_RE.exec(text)) !== null) {
-    if (match.index > lastIdx) {
-      parts.push(text.slice(lastIdx, match.index))
-    }
-
-    const ts = match[1]
-    const sec = parseTs(ts)
-    const display = match[0]
-
-    parts.push(
-      <button
-        key={`note-ts-${match.index}`}
-        type="button"
-        className="ln-ts-chip"
-        onClick={(event) => {
-          event.preventDefault()
-          onSeek(sec)
-        }}
-        title={match[2] ? `跳转到 ${ts}（区间 ${ts} ~ ${match[2]}）` : `跳转到 ${ts}`}
-      >
-        {display}
-      </button>,
-    )
-    lastIdx = match.index + match[0].length
-  }
-
-  if (lastIdx < text.length) {
-    parts.push(text.slice(lastIdx))
-  }
-
-  return parts.length > 0 ? parts : text
-}
-
 
 /** 视频笔记视图标签：中列只展示「标准总结」，两种格式（蓝图 §3.5）。
  *  富文本 = 渲染态（ReactMarkdown）；md格式 = 源码态（CodeMirror，可编辑）。
@@ -764,15 +700,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
         <div className="nibi-note-bar-tools">
           {/* 总结风格 + 版本 合并下拉 */}
           {summaries.length > 0 && (() => {
-            const TEMPLATE_LABELS: Record<string, string> = {
-              concise: '简洁摘要', detailed: '详细要点', quotes: '金句提取',
-              meeting: '会议纪要', xhs: '小红书风格', longform: '公众号长文',
-              lecture: '教学笔记', interview: '访谈整理', shownotes: '播客 shownotes',
-              oral: '口播稿', steps: '步骤教程', outline: '大纲',
-              qa: '问答卡(Anki)', actions: '行动清单', tool_recommendation: '工具推荐',
-              science_popularization: '知识科普', standard: '标准总结',
-            }
-            const tl = (id: string) => TEMPLATE_LABELS[id] ?? id
             const activeS = summaries.find(x => x.summary_id === activeSummaryId)
             const activeVersionLabel = activeS ? (activeS.name || `v${activeS.version}`) : ''
             return (
@@ -829,7 +756,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
             )
           })()}
           {sourceUrl && (
-            <a className="nibi-note-bar-btn" href={sourceUrl} target="_blank" rel="noreferrer" title="原视频">↗</a>
+            <a className="nibi-note-bar-btn" href={sourceUrl} target="_blank" rel="noreferrer" title="原链接">↗</a>
           )}
           {note.source_md && (
             <button className="nibi-note-bar-btn" onClick={() => setSourceModalOpen(true)} title="源 md"><FileCode size={14} /></button>
@@ -962,8 +889,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 )}
                 {/* 总结版本切换 */}
                 {summaries.length > 0 && (() => {
-                  const TEMPLATE_LABELS: Record<string, string> = { concise: '简洁摘要', detailed: '详细要点', quotes: '金句提取', meeting: '会议纪要', xhs: '小红书风格', longform: '公众号长文', lecture: '教学笔记', interview: '访谈整理', shownotes: '播客 shownotes', standard: '标准总结' }
-                  const tl = (id: string) => TEMPLATE_LABELS[id] ?? id
+
                   return (
                     <div className="note-section" style={{ marginTop: 16 }}>
                       <h2>内容总结</h2>
@@ -1066,8 +992,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 )}
                 {/* 总结版本切换 */}
                 {summaries.length > 0 && (() => {
-                  const TEMPLATE_LABELS: Record<string, string> = { concise: '简洁摘要', detailed: '详细要点', quotes: '金句提取', meeting: '会议纪要', xhs: '小红书风格', longform: '公众号长文', lecture: '教学笔记', interview: '访谈整理', shownotes: '播客 shownotes', standard: '标准总结' }
-                  const tl = (id: string) => TEMPLATE_LABELS[id] ?? id
+
                   return (
                     <div className="note-section" style={{ marginTop: 16 }}>
                       <h2>内容总结</h2>
@@ -1191,8 +1116,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 )}
                 {/* 总结版本切换 */}
                 {summaries.length > 0 && (() => {
-                  const TEMPLATE_LABELS: Record<string, string> = { concise: '简洁摘要', detailed: '详细要点', quotes: '金句提取', meeting: '会议纪要', xhs: '小红书风格', longform: '公众号长文', lecture: '教学笔记', interview: '访谈整理', shownotes: '播客 shownotes', standard: '标准总结' }
-                  const tl = (id: string) => TEMPLATE_LABELS[id] ?? id
+
                   return (
                     <div className="note-section" style={{ marginTop: 16 }}>
                       <h2>内容总结</h2>
@@ -1269,15 +1193,14 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 </div>
                 {/* 标签 + meta */}
                 {(hasTags || sourceUrl) && (
-                  <div className="nibi-text-tags">
+                  <div className="note-tags-inline">
                     {hasTags && <TagChips tags={tags} />}
                     {sourceUrl && <span className="note-meta-inline">{platformLabelFromUrl(sourceUrl)}</span>}
                   </div>
                 )}
                 {/* 总结版本切换 */}
                 {summaries.length > 0 && (() => {
-                  const TEMPLATE_LABELS: Record<string, string> = { concise: '简洁摘要', detailed: '详细要点', quotes: '金句提取', meeting: '会议纪要', xhs: '小红书风格', longform: '公众号长文', lecture: '教学笔记', interview: '访谈整理', shownotes: '播客 shownotes', standard: '标准总结' }
-                  const tl = (id: string) => TEMPLATE_LABELS[id] ?? id
+
                   return (
                     <div className="note-section" style={{ marginTop: 16 }}>
                       <h2>内容总结</h2>

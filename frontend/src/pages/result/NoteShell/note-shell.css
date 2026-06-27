@@ -1343,14 +1343,6 @@
   width: calc(100% - var(--note-left-width));
 }
 
-.nibi-text-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 12px;
-  font-size: 12px;
-  color: var(--mut, #7c7464);
-}
 
 /* ── Stage 3: 图文笔记形态（设计稿 pg-image 对齐） ── */
 

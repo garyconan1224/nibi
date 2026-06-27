@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { renderNoteTimestampChildren } from '@/pages/result/NoteShell'
+import { renderNoteTimestampChildren } from '@/pages/result/NoteShell/note-shell-utils'
 
 describe('renderNoteTimestampChildren', () => {
   it('把阅读态时间戳渲染为可点击 seek chip', () => {
