@@ -27,6 +27,7 @@ import NoteMediaCompanion, { type NoteMediaCompanionHandle } from './NoteMediaCo
 import MilkdownEditor from './MilkdownEditor'
 import LNVideoPanel, { type LNVideoPanelHandle } from '@/pages/results/LearningNotesPage/LNVideoPanel'
 import LNTranscriptPanel from '@/pages/results/LearningNotesPage/LNTranscriptPanel'
+import NoteAudioPanel, { type NoteAudioPanelHandle } from './NoteAudioPanel'
 import '@/pages/results/LearningNotesPage/learning-notes.css'
 import './note-shell.css'
 import { NewSummaryModal } from '@/components/NewSummaryModal'
@@ -332,6 +333,16 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     setTransportNode(videoRef.current?.transportNode ?? null)
   }, [])
   const handleVideoDurationChange = useCallback((duration: number) => setVideoDuration(duration), [])
+
+  // Stage 2: 音频笔记双栏布局 — 播放器 + 转录联动
+  const audioRef = useRef<NoteAudioPanelHandle>(null)
+  const [audioDuration, setAudioDuration] = useState(0)
+  const [audioTransportNode, setAudioTransportNode] = useState<ReactNode>(null)
+  const handleAudioTransportChange = useCallback(() => {
+    setAudioTransportNode(audioRef.current?.transportNode ?? null)
+  }, [])
+  const handleAudioDurationChange = useCallback((d: number) => setAudioDuration(d), [])
+
   const [sourceModalOpen, setSourceModalOpen] = useState(false)
   const [activeSummaryId, setActiveSummaryId] = useState<string | undefined>(undefined)
   // VN4.1 版本下拉 + 风格/版本两层
@@ -464,6 +475,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const handleTimeUpdate = useCallback((t: number) => setCurrentTime(t), [])
   const handleSeek = useCallback((sec: number) => {
     videoRef.current?.seekTo(sec)
+    audioRef.current?.seekTo(sec)
     mediaCompanionRef.current?.seekTo(sec)
   }, [])
 
@@ -702,6 +714,8 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
 
   // 7.3: 视频笔记三列布局标志
   const isVideoNote = itemType === 'video' && !!note.media?.video?.url
+  // Stage 2: 音频笔记双栏布局标志
+  const isAudioNote = itemType === 'audio' && !!note.media?.audio
   // 图文笔记三列布局标志
   const isImageNote = itemType === 'image' && (note.media?.images?.length ?? 0) > 0
   const images = note.media?.images ?? []
@@ -710,6 +724,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const transcriptCount = Array.isArray(note.transcript) ? note.transcript.length : 0
   const sourceLabel = sourceUrl ? platformLabelFromUrl(sourceUrl) : '本地素材'
   const effectiveVideoDuration = note.media?.video?.duration || videoDuration
+  const effectiveAudioDuration = audioDuration
   const saveStatusNode = (
     <span className={`nibi-note-save nibi-note-save--${saveStatus}`}>
       {saveStatus === 'saving' && '保存中…'}
@@ -739,7 +754,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
           <span className="nibi-note-bar-meta">VIDEO{effectiveVideoDuration ? ` · ${formatTimecode(effectiveVideoDuration)}` : ''}</span>
         )}
         {itemType === 'audio' && (
-          <span className="nibi-note-bar-meta">AUDIO</span>
+          <span className="nibi-note-bar-meta">AUDIO{effectiveAudioDuration ? ` · ${formatTimecode(effectiveAudioDuration)}` : ''}</span>
         )}
         {!isVideoNote && itemType !== 'audio' && (
           <span className="nibi-note-bar-meta">{(TYPE_LABEL[itemType] ?? itemType).toUpperCase()}</span>
@@ -823,7 +838,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
               <div style={{ position: 'absolute', right: 0, top: 34, zIndex: 20, minWidth: 180, padding: '4px', border: '1px solid var(--bdr)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', boxShadow: 'var(--shadow-md)' }}>
                 <button className="btn-ghost" onClick={() => { handleExportMarkdown(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><FileText size={13} /> Markdown</button>
                 <button className="btn-ghost" onClick={() => { handleExportObsidian(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><BookOpenCheck size={13} /> Obsidian 包</button>
-                {isVideoNote && (
+                {(isVideoNote || isAudioNote) && (
                   <button className="btn-ghost" onClick={() => { handleExportTranscript(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><Subtitles size={13} /> 原文对照（txt）</button>
                 )}
                 {/* 占位导出项（灰显 disabled） */}
@@ -978,6 +993,110 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
           </div>
         </div>
         </>
+      ) : isAudioNote ? (
+        <>
+        {/* ── 音频笔记两栏布局：.note-page（设计稿 pg-audio 对齐） ── */}
+        <div className="nibi-note-page nibi-note-page--audio" ref={notePageRef} style={notePageStyle}>
+
+          {/* ── 左栏：播放器 + 波形 + 控制 + 转录 ── */}
+          <div className="nibi-note-left nibi-audio-left">
+            <div className="nibi-audio-player-wrap">
+              <NoteAudioPanel
+                ref={audioRef}
+                src={note.media!.audio!}
+                onTimeUpdate={handleTimeUpdate}
+                onDurationChange={handleAudioDurationChange}
+                onTransportChange={handleAudioTransportChange}
+              />
+            </div>
+            {/* 波形 + 时间 + 控制条（player 外，overflow 安全） */}
+            {audioTransportNode}
+            {/* 转录 */}
+            {Array.isArray(note.transcript) && (note.transcript as VideoResultTranscriptLine[]).length > 0 ? (
+              <div className="nibi-note-transcript-wrap">
+                <div className="nibi-note-transcript-head">
+                  <span>转录文本</span>
+                  <span className="nibi-note-transcript-count">{transcriptCount} 条</span>
+                </div>
+                <LNTranscriptPanel
+                  transcript={note.transcript as VideoResultTranscriptLine[]}
+                  currentTime={currentTime}
+                  onSeek={handleSeek}
+                  workspaceId={workspaceId}
+                  itemId={itemId}
+                  onSaved={refreshAfterTranscriptEdit}
+                  sourceMd={note.source_md ?? undefined}
+                />
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--mut)', fontSize: 12, padding: 24 }}>暂无转录</div>
+            )}
+          </div>
+
+          <div
+            className="nibi-note-splitter"
+            role="separator"
+            aria-label="调整左右栏宽度"
+            aria-orientation="vertical"
+            aria-valuemin={VIDEO_SPLIT_MIN}
+            aria-valuemax={VIDEO_SPLIT_MAX}
+            aria-valuenow={Math.round(noteLeftPct)}
+            tabIndex={0}
+            onPointerDown={handleNoteSplitPointerDown}
+            onKeyDown={handleNoteSplitKeyDown}
+          >
+            <span className="nibi-note-splitter-grip" />
+          </div>
+
+          {/* ── 右栏：标题 + 标签 + 总结 + 正文 ── */}
+          <div className="nibi-note-right">
+            <div className="nibi-note-right-scroll">
+              <div className="note-copy">
+                <div className="note-copy-head">
+                  <h1>{title || '未命名笔记'}</h1>
+                </div>
+                {/* 标签 + meta */}
+                {(hasTags || sourceUrl) && (
+                  <div className="note-tags-inline">
+                    {hasTags && <TagChips tags={tags} />}
+                    {sourceUrl && <span className="note-meta-inline">{platformLabelFromUrl(sourceUrl)}{effectiveAudioDuration ? ` · ${formatTimecode(effectiveAudioDuration)}` : ''}</span>}
+                  </div>
+                )}
+                {/* 总结版本切换 */}
+                {summaries.length > 0 && (() => {
+                  const TEMPLATE_LABELS: Record<string, string> = { concise: '简洁摘要', detailed: '详细要点', quotes: '金句提取', meeting: '会议纪要', xhs: '小红书风格', longform: '公众号长文', lecture: '教学笔记', interview: '访谈整理', shownotes: '播客 shownotes', standard: '标准总结' }
+                  const tl = (id: string) => TEMPLATE_LABELS[id] ?? id
+                  return (
+                    <div className="note-section" style={{ marginTop: 16 }}>
+                      <h2>内容总结</h2>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 12 }}>
+                        {[...templateGroups.entries()].map(([tmpl]) => (
+                          <button
+                            key={tmpl}
+                            className="btn-ghost"
+                            onClick={() => { const first = templateGroups.get(tmpl)?.[0]; if (first) handleApplyToNote(first) }}
+                            style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: tmpl === activeTemplate ? 'var(--accl)' : 'var(--bgalt)', color: tmpl === activeTemplate ? 'var(--acc)' : 'var(--mut)', fontWeight: tmpl === activeTemplate ? 600 : 400 }}
+                          >
+                            {tl(tmpl)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
+                {/* 正文 */}
+                <div className="note-section" style={{ marginTop: summaries.length > 0 ? 0 : 16 }}>
+                  <div className="nibi-note-editor-panel">
+                    <MilkdownEditor key={milkdownKey} markdown={editingBody} onMarkdownChange={handleEditorChange} onSeek={handleSeek} />
+                  </div>
+                </div>
+                {/* 保存状态 */}
+                <div style={{ padding: '12px 0', textAlign: 'right' }}>{saveStatusNode}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        </>
       ) : isImageNote ? (
         /* ── 图文笔记三列布局：左图片浏览 / 中正文 / 右操作区 ── */
         (() => {
@@ -1092,7 +1211,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
         <div className="nibi-note-workbench nibi-note-workbench--generic">
           <div className="nibi-note-main-panel">
             <div className="nibi-note-panel-head">
-              <span>{itemType === 'audio' ? '音频笔记' : '笔记正文'}</span>
+              <span>笔记正文</span>
               {saveStatusNode}
             </div>
             <div className="nibi-note-editor-scroll">
@@ -1156,8 +1275,8 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
         </div>
       )}
 
-      {/* 问 AI 悬浮泡泡（点6：仅视频笔记，仿 FloatingTaskQueue） */}
-      {isVideoNote && (
+      {/* 问 AI 悬浮泡泡（视频/音频笔记） */}
+      {(isVideoNote || isAudioNote) && (
         <FloatingAskAi
           workspaceId={workspaceId}
           systemPrompt={chatSystemPrompt}

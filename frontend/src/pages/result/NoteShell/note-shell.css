@@ -1031,6 +1031,263 @@
   white-space: nowrap;
 }
 
+/* ── Stage 2: 音频笔记形态 ───────────────────── */
+
+.nibi-note-page--audio {
+  /* 复用 nibi-note-page 基础 flex 布局，无额外覆盖 */
+}
+
+.nibi-audio-left {
+  flex: 0 0 var(--note-left-width);
+  width: var(--note-left-width);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--srf, #fff);
+  overflow: hidden;
+}
+
+.nibi-audio-player-wrap {
+  flex: 0 0 auto;
+  padding: 16px 20px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ── NoteAudioPanel 内壳 ── */
+
+.note-audio-panel {
+  position: relative;
+  width: 100%;
+}
+
+.note-audio-panel audio {
+  display: none; /* 隐藏原生 controls，用自定义 transport */
+}
+
+.note-audio-big-play {
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 999px;
+  background: var(--acc, #ff8a36);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  transition: transform 0.15s, opacity 0.15s;
+  z-index: 2;
+}
+
+.note-audio-big-play:hover {
+  transform: translateX(-50%) scale(1.06);
+}
+
+/* ── 波形 ── */
+
+.note-audio-waveform {
+  width: 100%;
+  padding: 0 20px;
+  box-sizing: border-box;
+}
+
+.note-audio-progress {
+  position: relative;
+  height: 52px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.note-audio-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+}
+
+.note-audio-bars span {
+  flex: 1 1 0;
+  height: var(--bar-h, 50%);
+  border-radius: 1px;
+  min-width: 0;
+}
+
+.note-audio-bars--bg span {
+  background: var(--bdr, rgba(25, 20, 16, 0.12));
+}
+
+.note-audio-bars--fill {
+  clip-path: inset(0 calc(100% - var(--audio-progress, 0%)) 0 0);
+}
+
+.note-audio-bars--fill span {
+  background: var(--acc, #ff8a36);
+}
+
+/* ── 时间 ── */
+
+.note-audio-time {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 20px 0;
+  font-family: var(--mono, var(--fm, monospace));
+  font-size: 11px;
+  color: var(--ink-4, #a09888);
+}
+
+.note-audio-time-sep {
+  opacity: 0.4;
+}
+
+/* ── 控制条 ── */
+
+.note-audio-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px 14px;
+}
+
+.note-audio-ctrl {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--r, 8px);
+  background: transparent;
+  color: var(--ink-2, #7c7464);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.note-audio-ctrl:hover {
+  background: var(--bgalt, #f7f3ec);
+  color: var(--ink, #1a1612);
+}
+
+.note-audio-ctrl.is-on {
+  background: var(--accl, rgba(255, 138, 54, 0.1));
+  color: var(--acc, #ff8a36);
+}
+
+.note-audio-ctrl svg {
+  width: 15px;
+  height: 15px;
+}
+
+.note-audio-play {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 999px;
+  background: var(--ink, #1a1612);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform 0.12s, opacity 0.12s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.note-audio-play:hover {
+  transform: scale(1.04);
+}
+
+.note-audio-speed {
+  margin-left: auto;
+  border: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  border-radius: var(--r, 8px);
+  background: var(--srf, #fff);
+  padding: 4px 10px;
+  color: var(--ink-2, #7c7464);
+  font-family: var(--mono, var(--fm, monospace));
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.12s, color 0.12s;
+}
+
+.note-audio-speed:hover {
+  background: var(--bgalt, #f7f3ec);
+  color: var(--ink, #1a1612);
+}
+
+.note-audio-volume {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.note-audio-volume-slider {
+  width: 0;
+  opacity: 0;
+  height: 4px;
+  background: var(--bdr, rgba(25, 20, 16, 0.12));
+  border-radius: 999px;
+  cursor: pointer;
+  transition: width 0.2s, opacity 0.2s;
+  overflow: hidden;
+  position: relative;
+}
+
+.note-audio-volume:hover .note-audio-volume-slider {
+  width: 56px;
+  opacity: 1;
+}
+
+.note-audio-volume-fill {
+  height: 100%;
+  background: var(--acc, #ff8a36);
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+/* ── 音频左栏转录区 ── */
+
+.nibi-audio-left .nibi-note-transcript-wrap {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+}
+
+.nibi-audio-left .nibi-note-transcript-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink, #1a1612);
+}
+
+.nibi-audio-left .nibi-note-transcript-count {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--mut, #7c7464);
+}
+
+/* ── 响应式 ── */
+
 @media (max-width: 920px) {
   .nibi-note-hero {
     align-items: flex-start;
