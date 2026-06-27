@@ -36,8 +36,8 @@
 }
 
 .vm-processing-scope .proc-main {
-  background: var(--bg-elev);
-  border: 1px solid var(--line);
+  background: var(--srf);
+  border: 1px solid var(--bdr);
   border-radius: var(--radius-lg);
   overflow: hidden;
   display: flex;
@@ -47,7 +47,7 @@
 /* ─── Hero ─── */
 .vm-processing-scope .proc-hero {
   padding: 28px 32px 20px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--bdr);
   display: flex;
   align-items: flex-start;
   gap: 20px;
@@ -145,7 +145,7 @@
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--mut);
 }
 
 .vm-processing-scope .proc-hero .info .title {
@@ -158,7 +158,7 @@
 .vm-processing-scope .proc-hero .info .src {
   font-family: var(--mono);
   font-size: 11px;
-  color: var(--ink-3);
+  color: var(--mut);
   word-break: break-all;
 }
 
@@ -167,11 +167,11 @@
   gap: 18px;
   margin-top: 14px;
   font-size: 12px;
-  color: var(--ink-3);
+  color: var(--mut);
 }
 
 .vm-processing-scope .proc-hero .info .stats span strong {
-  color: var(--ink);
+  color: var(--fg);
   font-weight: 600;
 }
 
@@ -186,10 +186,10 @@
 .vm-processing-scope .btn {
   height: 32px;
   padding: 0 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--bdr);
   border-radius: 8px;
-  background: var(--bg-elev);
-  color: var(--ink-2);
+  background: var(--srf);
+  color: var(--fg2);
   font-size: 13px;
   cursor: pointer;
   display: inline-flex;
@@ -199,13 +199,13 @@
 }
 
 .vm-processing-scope .btn:hover {
-  background: var(--bg-sunken);
+  background: var(--bgalt);
 }
 
 .vm-processing-scope .btn-primary {
-  background: var(--ink);
+  background: var(--fg);
   color: var(--bg);
-  border-color: var(--ink);
+  border-color: var(--fg);
 }
 
 .vm-processing-scope .btn-primary:hover {
@@ -266,29 +266,29 @@
   width: 30px;
   height: 30px;
   border-radius: 99px;
-  border: 2px solid var(--line);
-  background: var(--bg-elev);
+  border: 2px solid var(--bdr);
+  background: var(--srf);
   display: grid;
   place-items: center;
-  color: var(--ink-4);
+  color: var(--mut);
   position: relative;
   z-index: 1;
   transition: all 280ms ease;
 }
 .vm-processing-scope .step-node[data-state='done'] .dot {
-  background: var(--accent-2);
-  border-color: var(--accent-2);
+  background: var(--acc);
+  border-color: var(--acc);
   color: #fff;
 }
 .vm-processing-scope .step-node[data-state='running'] .dot {
-  border-color: var(--accent-2);
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent-2) 15%, transparent);
+  border-color: var(--acc);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--acc) 15%, transparent);
 }
 .vm-processing-scope .step-node[data-state='running'] .ping {
   width: 9px;
   height: 9px;
   border-radius: 99px;
-  background: var(--accent-2);
+  background: var(--acc);
   animation: vm-pulse 1.3s ease-in-out infinite;
 }
 
@@ -297,7 +297,7 @@
   position: absolute;
   top: 50%;
   height: 2px;
-  background: var(--line);
+  background: var(--bdr);
   transform: translateY(-50%);
   transition: background 360ms ease;
 }
@@ -310,41 +310,41 @@
   right: 0;
 }
 .vm-processing-scope .step-node[data-state='done'] .connector {
-  background: var(--accent-2);
+  background: var(--acc);
 }
 .vm-processing-scope .step-node[data-state='running'] .connector.left {
-  background: var(--accent-2);
+  background: var(--acc);
 }
 
 .vm-processing-scope .step-node .node-label {
   font-size: 13px;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--fg);
   text-align: center;
   letter-spacing: -0.01em;
   transition: color 260ms ease;
 }
 .vm-processing-scope .step-node[data-state='queued'] .node-label {
-  color: var(--ink-4);
+  color: var(--mut);
   font-weight: 500;
 }
 .vm-processing-scope .step-node[data-state='running'] .node-label {
-  color: var(--accent-2);
+  color: var(--acc);
 }
 
 .vm-processing-scope .step-node .node-sub {
   font-family: var(--mono);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
-  color: var(--ink-4);
+  color: var(--mut);
   min-height: 13px;
 }
 .vm-processing-scope .step-node[data-state='running'] .node-sub {
-  color: var(--accent-2);
+  color: var(--acc);
   font-weight: 600;
 }
 .vm-processing-scope .step-node[data-state='done'] .node-sub {
-  color: var(--accent-green);
+  color: var(--ok);
 }
 
 /* ─── Spinner ─── */
@@ -369,8 +369,8 @@
 }
 
 .vm-processing-scope .side-card {
-  background: var(--bg-elev);
-  border: 1px solid var(--line);
+  background: var(--srf);
+  border: 1px solid var(--bdr);
   border-radius: var(--radius);
   padding: 18px 20px;
 }
@@ -380,7 +380,7 @@
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--mut);
   font-family: var(--mono);
   display: flex;
   align-items: center;
@@ -401,7 +401,7 @@
 
 .vm-processing-scope .proc-error p {
   font-size: 13px;
-  color: var(--ink-3);
+  color: var(--mut);
   margin-bottom: 20px;
   max-width: 400px;
   margin-left: auto;
@@ -411,8 +411,8 @@
 .vm-processing-scope .proc-error .error-log {
   font-family: var(--mono);
   font-size: 11px;
-  color: var(--accent-pink);
-  background: var(--bg-sunken);
+  color: var(--err);
+  background: var(--bgalt);
   border-radius: 8px;
   padding: 12px 16px;
   text-align: left;
@@ -429,7 +429,7 @@
 }
 
 .vm-processing-scope .tasklet:hover {
-  background: var(--bg-sunken) !important;
+  background: var(--bgalt) !important;
 }
 
 .vm-processing-scope .tl-thumb {

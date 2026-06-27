@@ -193,6 +193,50 @@
   box-shadow: var(--sh1);
 }
 
+/* ── Dropdown menu ── */
+.nibi-dropdown {
+  position: absolute;
+  right: 0;
+  top: 34px;
+  z-index: 20;
+  min-width: 160px;
+  padding: 4px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--rs);
+  background: var(--srf);
+  box-shadow: var(--sh2);
+}
+
+.nibi-dropdown-item {
+  width: 100%;
+  justify-content: flex-start;
+  height: 30px;
+  padding: 0 10px;
+  font-size: var(--text-xs);
+}
+
+.nibi-dropdown-item:disabled {
+  color: var(--mut);
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: none;
+  border: none;
+}
+
+.nibi-dropdown-sep {
+  height: 1px;
+  background: var(--bdr);
+  margin: 2px 0;
+}
+
+/* ── View separator ── */
+.nibi-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--bdr);
+  flex-shrink: 0;
+}
+
 /* ── Motion & reduced-motion ── */
 @media (prefers-reduced-motion: reduce) {
   .btn,

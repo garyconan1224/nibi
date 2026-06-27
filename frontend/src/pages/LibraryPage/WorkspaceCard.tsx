@@ -2,17 +2,17 @@ import { useNavigate } from 'react-router-dom'
 import type { LibraryWorkspace, LibraryItem } from '@/services/library'
 
 const TYPE_TONE: Record<string, { c: string; l: string }> = {
-  video: { c: 'var(--accent-2)', l: '视频' },
-  audio: { c: 'var(--accent-green)', l: '音频' },
-  image: { c: 'var(--accent-3)', l: '图片' },
-  text: { c: 'var(--ink-3)', l: '文字' },
+  video: { c: 'var(--acc)', l: '视频' },
+  audio: { c: 'var(--ok)', l: '音频' },
+  image: { c: 'var(--acc)', l: '图片' },
+  text: { c: 'var(--mut)', l: '文字' },
 }
 
-const WS_STATE: Record<string, { l: string; c: string }> = {
-  done: { l: '已完成', c: 'var(--accent-green)' },
-  running: { l: '处理中', c: 'var(--accent-pink)' },
-  queued: { l: '等待中', c: 'var(--ink-4)' },
-  error: { l: '有错误', c: 'var(--accent-pink)' },
+const WS_STATE: Record<string, { l: string; c: string; pillClass: string }> = {
+  done:    { l: '已完成', c: 'var(--ok)',  pillClass: 'ws-status-pill--done' },
+  running: { l: '处理中', c: 'var(--err)', pillClass: 'ws-status-pill--running' },
+  queued:  { l: '等待中', c: 'var(--mut)', pillClass: '' },
+  error:   { l: '有错误', c: 'var(--err)', pillClass: 'ws-status-pill--error' },
 }
 
 function dominantType(cnt: Record<string, number>): string {
@@ -56,17 +56,17 @@ export function WorkspaceCard({ workspace, items, selectMode, selected, onToggle
   const comp = workspace.items_count_by_type || {}
   const total = workspace.items_count
   const dom = dominantType(comp)
-  const stripeColor = TYPE_TONE[dom]?.c ?? 'var(--ink-3)'
+  const stripeColor = TYPE_TONE[dom]?.c ?? 'var(--mut)'
   const st = WS_STATE[workspace.status] ?? WS_STATE.queued
 
   const thumbs = items
     .filter((it) => it.thumbnail)
     .slice(0, 4)
-    const more = Math.max(0, total - thumbs.length)
+  const more = Math.max(0, total - thumbs.length)
 
   return (
     <div
-      className="ws-card"
+      className={`ws-card${selected ? ' ws-card--selected' : ''}`}
       onClick={() => {
         if (selectMode) {
           onToggleSelect?.(workspace.workspace_id)
@@ -74,13 +74,9 @@ export function WorkspaceCard({ workspace, items, selectMode, selected, onToggle
           navigate(`/workspaces/${workspace.workspace_id}`)
         }
       }}
-      style={{
-        position: 'relative',
-        borderColor: selected ? 'var(--ink)' : 'var(--line)',
-      }}
     >
       {/* ── 顶部操作栏（选择或删除） ── */}
-      <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}>
+      <div className="ws-card-top-actions">
         {selectMode ? (
           <span
             onClick={(e) => {
@@ -90,7 +86,7 @@ export function WorkspaceCard({ workspace, items, selectMode, selected, onToggle
             className="ex-select-dot"
             style={{
               background: selected ? '#fff' : 'rgba(0,0,0,0.5)',
-              color: selected ? 'var(--ink)' : '#fff',
+              color: selected ? 'var(--fg)' : '#fff',
               borderColor: selected ? '#fff' : 'rgba(255,255,255,0.6)',
             }}
           >
@@ -119,50 +115,32 @@ export function WorkspaceCard({ workspace, items, selectMode, selected, onToggle
       </div>
 
       {/* 主色顶条 */}
-      <div
-        style={{ height: 4, background: stripeColor, flexShrink: 0 }}
-      />
+      <div className="ws-card-stripe" style={{ background: stripeColor }} />
 
       <div className="ws-card-body">
         {/* ── Title row ── */}
-        <div style={{
-          display: 'flex', alignItems: 'flex-start', gap: 10,
-        }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="ws-title-row">
+          <div className="ws-title-col">
             <div className="ws-title">{workspace.name}</div>
-            <div style={{
-              fontFamily: 'var(--mono)',
-              fontSize: 10.5,
-              color: 'var(--ink-3)',
-              letterSpacing: '0.04em',
-              marginTop: 6,
-              display: 'flex', gap: 8, flexWrap: 'wrap',
-            }}>
+            <div className="ws-meta-line">
               <span>{total} 个笔记</span>
               {workspace.updated_at && (
                 <>
-                  <span style={{ opacity: 0.4 }}>·</span>
+                  <span className="ws-meta-sep">·</span>
                   <span>{formatRelative(workspace.updated_at)}活跃</span>
                 </>
               )}
             </div>
           </div>
           {/* 状态圆点 */}
-          <span style={{
-            width: 8, height: 8, borderRadius: 99, background: st.c,
-            flexShrink: 0, marginTop: 6,
-          }} title={st.l} />
+          <span className="ws-status-dot" style={{ background: st.c }} title={st.l} />
         </div>
 
         {/* ── Thumb row ── */}
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div className="ws-thumb-row">
           {thumbs.map((it, i) => (
             <div key={i} className="ws-thumb-cell">
-              <img
-                src={it.thumbnail!}
-                alt=""
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-              />
+              <img src={it.thumbnail!} alt="" />
             </div>
           ))}
           {more > 0 && (
@@ -170,7 +148,7 @@ export function WorkspaceCard({ workspace, items, selectMode, selected, onToggle
           )}
           {/* 不足 4 个时补空白格 */}
           {Array.from({ length: Math.max(0, 4 - thumbs.length - (more > 0 ? 1 : 0)) }).map((_, i) => (
-            <div key={`sp-${i}`} className="ws-thumb-cell" style={{ background: 'transparent' }} />
+            <div key={`sp-${i}`} className="ws-thumb-spacer" />
           ))}
         </div>
 
@@ -178,33 +156,16 @@ export function WorkspaceCard({ workspace, items, selectMode, selected, onToggle
         <div className="ws-card-footer">
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {Object.entries(comp).map(([t, n]) => (
-              <span key={t} style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontSize: 11.5, color: 'var(--ink-2)',
-              }}>
-                <span style={{
-                  width: 6, height: 6, borderRadius: 99,
-                  background: TYPE_TONE[t]?.c ?? 'var(--ink-4)',
-                }} />
-                <b style={{ fontFamily: 'var(--mono)', fontWeight: 600 }}>{n}</b>
-                <span style={{ color: 'var(--ink-3)' }}>{TYPE_TONE[t]?.l ?? t}</span>
+              <span key={t} className="ws-comp-item">
+                <span className="ws-comp-dot" style={{ background: TYPE_TONE[t]?.c ?? 'var(--mut)' }} />
+                <b className="ws-comp-count">{n}</b>
+                <span className="ws-comp-label">{TYPE_TONE[t]?.l ?? t}</span>
               </span>
             ))}
           </div>
           {/* Status pill */}
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 5,
-            padding: '3px 9px', borderRadius: 99,
-            background:
-              workspace.status === 'running' ? 'rgba(255,77,126,0.10)' :
-              workspace.status === 'done' ? 'rgba(34,211,154,0.12)' :
-              workspace.status === 'error' ? 'rgba(255,77,126,0.12)' :
-              'var(--bg-sunken)',
-            border: '1px solid var(--line)',
-            color: st.c, fontSize: 10.5, fontWeight: 600,
-            whiteSpace: 'nowrap',
-          }}>
-            <span style={{ width: 5, height: 5, borderRadius: 99, background: st.c }} />
+          <span className={`ws-status-pill ${st.pillClass}`}>
+            <span className="ex-state-dot" style={{ background: st.c }} />
             {st.l}
           </span>
         </div>

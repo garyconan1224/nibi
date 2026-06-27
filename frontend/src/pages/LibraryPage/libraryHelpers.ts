@@ -15,10 +15,10 @@ export const STATE_LABEL: Record<string, string> = {
 }
 
 export const STATE_COLOR: Record<string, string> = {
-  done: 'var(--accent-green)',
-  running: 'var(--ink)',
-  error: 'var(--accent-pink)',
-  queued: 'var(--ink-4)',
+  done: 'var(--ok)',
+  running: 'var(--fg)',
+  error: 'var(--err)',
+  queued: 'var(--mut)',
 }
 
 export const STATE_ORDER: Record<string, number> = {

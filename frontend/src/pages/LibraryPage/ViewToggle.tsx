@@ -5,15 +5,7 @@ export function ViewToggle() {
   const setViewMode = useLibraryStore((s) => s.setViewMode)
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 4,
-        padding: 3,
-        background: 'var(--bg-sunken)',
-        borderRadius: 10,
-      }}
-    >
+    <div className="view-toggle">
       {([
         { id: 'grid' as ViewMode, title: '网格视图' },
         { id: 'list' as ViewMode, title: '列表视图' },
@@ -24,18 +16,7 @@ export function ViewToggle() {
             key={id}
             onClick={() => setViewMode(id)}
             title={title}
-            style={{
-              padding: '6px 10px',
-              borderRadius: 7,
-              fontSize: 12,
-              background: on ? 'var(--bg-elev)' : 'transparent',
-              color: on ? 'var(--ink)' : 'var(--ink-3)',
-              boxShadow: on ? 'var(--shadow-sm)' : 'none',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'inline-grid',
-              placeItems: 'center',
-            }}
+            className={`view-toggle-btn${on ? ' view-toggle-btn--active' : ''}`}
           >
             {id === 'grid' ? (
               <svg width="13" height="13" viewBox="0 0 13 13" fill="none">

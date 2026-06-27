@@ -233,7 +233,7 @@ export default function ImageResultPage() {
   if (fetchState.kind === 'loading') {
     return (
       <div className="vm-image-scope" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
-        <span className="mono" style={{ color: 'var(--ink-3)' }}>加载图片结果…</span>
+        <span className="mono" style={{ color: 'var(--mut)' }}>加载图片结果…</span>
       </div>
     )
   }
@@ -243,7 +243,7 @@ export default function ImageResultPage() {
         className="vm-image-scope"
         style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}
       >
-        <span style={{ color: 'var(--accent-pink)', fontWeight: 600 }}>
+        <span style={{ color: 'var(--err)', fontWeight: 600 }}>
           {fetchState.kind === 'error' ? fetchState.message : '没有可显示的图片结果'}
         </span>
         <button className="btn-ghost" style={{ padding: '6px 12px' }} onClick={() => navigate(-1)}>
@@ -274,7 +274,7 @@ export default function ImageResultPage() {
             <FileText size={12} /> 统一笔记 <span style={{ fontSize: 9, opacity: 0.6 }}>beta</span>
           </button>
           {result.source === 'demo_fixture' && (
-            <span className="mono" style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'var(--accent-warm)', color: '#fff', fontWeight: 600 }} title="demo fixture">DEMO</span>
+            <span className="mono" style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'var(--wrn)', color: '#fff', fontWeight: 600 }} title="demo fixture">DEMO</span>
           )}
         </div>
 
@@ -310,7 +310,7 @@ export default function ImageResultPage() {
             总结
           </button>
           {!tabs.length && contentTab !== 'summary' && (
-            <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>（提示词格式未加载）</span>
+            <span className="mono" style={{ fontSize: 10, color: 'var(--mut)' }}>（提示词格式未加载）</span>
           )}
         </div>
 
@@ -442,8 +442,8 @@ export default function ImageResultPage() {
           >
             <Star
               size={14}
-              fill={favored ? 'var(--accent-warm)' : 'none'}
-              color={favored ? 'var(--accent-warm)' : 'currentColor'}
+              fill={favored ? 'var(--wrn)' : 'none'}
+              color={favored ? 'var(--wrn)' : 'currentColor'}
             />
             {favored ? '已收藏此图 ★' : '收藏此图'}
           </button>

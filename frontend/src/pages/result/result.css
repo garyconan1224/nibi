@@ -19,9 +19,9 @@
   align-items: center;
   gap: 10px;
   padding: 10px 20px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--bdr);
   flex-shrink: 0;
-  background: var(--bg-elev);
+  background: var(--srf);
 }
 
 .vm-video-result-scope .vd-nav .vd-title {
@@ -37,7 +37,7 @@
 .vm-video-result-scope .vd-nav .vd-sep {
   width: 1px;
   height: 16px;
-  background: var(--line);
+  background: var(--bdr);
   flex-shrink: 0;
 }
 
@@ -47,7 +47,7 @@
   align-items: center;
   gap: 2px;
   padding: 2px;
-  background: var(--bg-sunken);
+  background: var(--bgalt);
   border-radius: var(--radius-sm);
   flex-shrink: 0;
 }
@@ -60,7 +60,7 @@
   border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 500;
-  color: var(--ink-3);
+  color: var(--mut);
   background: none;
   border: none;
   cursor: pointer;
@@ -68,13 +68,13 @@
 }
 
 .vm-video-result-scope .vd-mode-btn:hover {
-  color: var(--ink-2);
-  background: var(--bg-elev);
+  color: var(--fg2);
+  background: var(--srf);
 }
 
 .vm-video-result-scope .vd-mode-btn[data-active="true"] {
-  color: var(--ink);
-  background: var(--bg-elev);
+  color: var(--fg);
+  background: var(--srf);
   box-shadow: 0 1px 2px rgba(0,0,0,0.06);
 }
 
@@ -89,7 +89,7 @@
   border-radius: 16px;
   overflow: hidden;
   cursor: pointer;
-  background: linear-gradient(135deg, var(--accent-pink), var(--accent-2));
+  background: linear-gradient(135deg, var(--err), var(--acc));
   aspect-ratio: 16/9;
   max-height: 260px;
 }
@@ -154,7 +154,7 @@
 
 .vm-video-result-scope .vd-player .vd-progress .vd-progress-fill {
   height: 100%;
-  background: var(--accent-pink);
+  background: var(--err);
   transition: width 200ms linear;
 }
 
@@ -167,10 +167,10 @@
 
 /* ─── Right: floating panel ─── */
 .vm-video-result-scope .vd-right {
-  border-left: 1px solid var(--line);
+  border-left: 1px solid var(--bdr);
   display: flex;
   flex-direction: column;
-  background: var(--bg-elev);
+  background: var(--srf);
   overflow: hidden;
 }
 
@@ -178,7 +178,7 @@
   position: relative;
   flex-shrink: 0;
   aspect-ratio: 16/9;
-  background: linear-gradient(135deg, var(--accent-2), var(--accent-3));
+  background: linear-gradient(135deg, var(--acc), var(--acc));
   overflow: hidden;
 }
 
@@ -209,7 +209,7 @@
 
 .vm-video-result-scope .vd-frame-info {
   padding: 12px 14px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--bdr);
   flex-shrink: 0;
 }
 
@@ -221,7 +221,7 @@
 
 .vm-video-result-scope .vd-frame-info .vd-fi-sub {
   font-size: 12px;
-  color: var(--ink-3);
+  color: var(--mut);
   margin-top: 2px;
 }
 
@@ -238,9 +238,9 @@
   align-items: center;
   gap: 4px;
   padding: 8px 12px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--bdr);
   flex-shrink: 0;
-  background: var(--bg-sunken);
+  background: var(--bgalt);
 }
 
 .vm-video-result-scope .vd-tabs-row {
@@ -248,9 +248,9 @@
   align-items: center;
   gap: 4px;
   padding: 6px 12px 8px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--bdr);
   flex-shrink: 0;
-  background: var(--bg-sunken);
+  background: var(--bgalt);
   overflow-x: auto;
 }
 
@@ -266,11 +266,11 @@
   white-space: nowrap;
   flex-shrink: 0;
   background: transparent;
-  color: var(--ink-3);
+  color: var(--mut);
 }
 
 .vm-video-result-scope .vd-tab-btn[data-active='true'] {
-  background: var(--ink);
+  background: var(--fg);
   color: var(--bg);
 }
 
@@ -285,11 +285,11 @@
   font-family: var(--mono);
   font-size: 11.5px;
   line-height: 1.72;
-  background: var(--bg-sunken);
+  background: var(--bgalt);
   padding: 12px 13px;
   border-radius: 12px;
-  border: 1px solid var(--line);
-  color: var(--ink);
+  border: 1px solid var(--bdr);
+  color: var(--fg);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -297,7 +297,7 @@
 /* ─── Actions ─── */
 .vm-video-result-scope .vd-actions {
   padding: 10px 12px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--bdr);
   display: flex;
   flex-direction: column;
   gap: 7px;
@@ -316,7 +316,7 @@
   gap: 7px;
   cursor: pointer;
   border: none;
-  background: var(--ink);
+  background: var(--fg);
   color: var(--bg);
 }
 
@@ -331,14 +331,14 @@
   justify-content: center;
   gap: 7px;
   cursor: pointer;
-  border: 1px solid var(--line);
-  background: var(--bg-sunken);
-  color: var(--ink-2);
+  border: 1px solid var(--bdr);
+  background: var(--bgalt);
+  color: var(--fg2);
 }
 
 .vm-video-result-scope .vd-btn-sub[data-favored='true'] {
   background: rgba(255, 184, 76, 0.12);
-  color: var(--accent-warm);
+  color: var(--wrn);
 }
 
 .vm-video-result-scope .vd-frame-nav {
@@ -354,14 +354,14 @@
   display: grid;
   place-items: center;
   background: transparent;
-  border: 1px solid var(--line);
+  border: 1px solid var(--bdr);
   border-radius: 6px;
   cursor: pointer;
-  color: var(--ink-2);
+  color: var(--fg2);
 }
 
 .vm-video-result-scope .vd-frame-nav-btn:hover {
-  background: var(--bg-sunken);
+  background: var(--bgalt);
 }
 
 /* ─── N7b 路径 1：字幕总结模式 ─── */
@@ -380,8 +380,8 @@
 }
 
 .vm-video-result-scope .vd-card {
-  background: var(--bg-elev);
-  border: 1px solid var(--line);
+  background: var(--srf);
+  border: 1px solid var(--bdr);
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 16px;
@@ -407,7 +407,7 @@
 .vm-video-result-scope .vd-summary-text {
   font-size: 13px;
   line-height: 1.7;
-  color: var(--ink);
+  color: var(--fg);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -416,7 +416,7 @@
   display: flex;
   gap: 12px;
   padding: 8px 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--bdr);
 }
 
 .vm-video-result-scope .vd-transcript-line:last-child {
@@ -426,7 +426,7 @@
 .vm-video-result-scope .vd-transcript-ts {
   font-family: var(--mono);
   font-size: 11px;
-  color: var(--ink-4);
+  color: var(--mut);
   flex-shrink: 0;
   min-width: 40px;
 }
@@ -439,7 +439,7 @@
 .vm-video-result-scope .vd-insert-frame-btn {
   margin-left: auto;
   background: none;
-  border: 1px solid var(--line);
+  border: 1px solid var(--bdr);
   border-radius: 4px;
   padding: 2px 6px;
   font-size: 12px;
@@ -451,7 +451,7 @@
 
 .vm-video-result-scope .vd-insert-frame-btn:hover {
   opacity: 1;
-  border-color: var(--accent-pink);
+  border-color: var(--err);
 }
 
 .vm-video-result-scope .vd-inline-frame {
@@ -459,7 +459,7 @@
   align-items: center;
   gap: 8px;
   padding: 6px 0 6px 52px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--bdr);
 }
 
 .vm-video-result-scope .vd-inline-frame-img {
@@ -471,7 +471,7 @@
 .vm-video-result-scope .vd-inline-frame-ts {
   font-family: var(--mono);
   font-size: 11px;
-  color: var(--ink-4);
+  color: var(--mut);
 }
 
 .vm-video-result-scope .vd-inline-frame-del {
@@ -479,12 +479,12 @@
   border: none;
   font-size: 14px;
   cursor: pointer;
-  color: var(--ink-4);
+  color: var(--mut);
   padding: 2px 6px;
 }
 
 .vm-video-result-scope .vd-inline-frame-del:hover {
-  color: var(--accent-pink);
+  color: var(--err);
 }
 
 /* ═══════ C-1：主帧大图 + 缩略图轨道 + lightbox ═══════ */
@@ -507,7 +507,7 @@
   border-radius: var(--radius-sm);
   overflow: hidden;
   cursor: pointer;
-  background: var(--bg-sunken);
+  background: var(--bgalt);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -525,7 +525,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: var(--ink-3);
+  color: var(--mut);
   font-family: var(--display);
   font-size: 16px;
   text-align: center;
@@ -584,7 +584,7 @@
   overflow-y: hidden;
   flex-shrink: 0;
   scrollbar-width: thin;
-  scrollbar-color: var(--line) transparent;
+  scrollbar-color: var(--bdr) transparent;
 }
 
 .vm-video-result-scope .vd-thumb-track::-webkit-scrollbar {
@@ -592,7 +592,7 @@
 }
 
 .vm-video-result-scope .vd-thumb-track::-webkit-scrollbar-thumb {
-  background: var(--line);
+  background: var(--bdr);
   border-radius: 2px;
 }
 
@@ -605,7 +605,7 @@
   border: 2px solid transparent;
   cursor: pointer;
   padding: 0;
-  background: var(--bg-sunken);
+  background: var(--bgalt);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
@@ -622,17 +622,17 @@
   display: grid;
   place-items: center;
   font-size: 10px;
-  color: var(--ink-4);
+  color: var(--mut);
   font-family: var(--mono);
 }
 
 .vm-video-result-scope .vd-thumb[data-active='true'] {
-  border-color: var(--accent-pink);
-  box-shadow: 0 0 0 1px var(--accent-pink), 0 2px 8px rgba(0, 0, 0, 0.12);
+  border-color: var(--err);
+  box-shadow: 0 0 0 1px var(--err), 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
 .vm-video-result-scope .vd-thumb:hover:not([data-active='true']) {
-  border-color: var(--line);
+  border-color: var(--bdr);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
@@ -686,9 +686,9 @@
   border-radius: 6px;
   font-size: 10px;
   font-family: var(--mono);
-  border: 1px solid var(--line);
+  border: 1px solid var(--bdr);
   background: transparent;
-  color: var(--ink-3);
+  color: var(--mut);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -697,7 +697,7 @@
 }
 
 .vm-video-result-scope .vd-btn-tool:hover {
-  background: var(--bg-sunken);
+  background: var(--bgalt);
   color: var(--ink-1);
 }
 
@@ -717,7 +717,7 @@
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
-  background: linear-gradient(135deg, var(--accent-pink), var(--accent-2));
+  background: linear-gradient(135deg, var(--err), var(--acc));
   aspect-ratio: 16/9;
   max-height: 100px;
 }
@@ -754,7 +754,7 @@
 
 .vm-video-result-scope .vd-progress-mini-fill {
   height: 100%;
-  background: var(--accent-pink);
+  background: var(--err);
   transition: width 200ms linear;
 }
 

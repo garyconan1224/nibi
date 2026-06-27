@@ -68,7 +68,7 @@ const NoteMediaCompanion = forwardRef<NoteMediaCompanionHandle, NoteMediaCompani
     const externalUrl = !isPlayableVideo ? (sourceUrl || videoUrl) : undefined
 
     return (
-      <div className="vm-ln-scope" style={{ display: 'flex', flexDirection: 'column', gap: 0, borderTop: '1px solid var(--line)' }}>
+      <div className="vm-ln-scope" style={{ display: 'flex', flexDirection: 'column', gap: 0, borderTop: '1px solid var(--bdr)' }}>
         {/* 播放器 */}
         <div style={{ maxHeight: 240, overflow: 'hidden' }}>
           <LNVideoPanel
@@ -82,7 +82,7 @@ const NoteMediaCompanion = forwardRef<NoteMediaCompanionHandle, NoteMediaCompani
         </div>
         {/* 转录轴 */}
         {transcript.length > 0 && (
-          <div style={{ maxHeight: 200, overflowY: 'auto', borderTop: '1px solid var(--line)' }}>
+          <div style={{ maxHeight: 200, overflowY: 'auto', borderTop: '1px solid var(--bdr)' }}>
             <LNTranscriptPanel
               transcript={transcript}
               currentTime={currentTime}
@@ -99,7 +99,7 @@ const NoteMediaCompanion = forwardRef<NoteMediaCompanionHandle, NoteMediaCompani
   // R3.3: audio 分支
   if (media.audio) {
     return (
-      <div className="vm-ln-scope" style={{ display: 'flex', flexDirection: 'column', gap: 0, borderTop: '1px solid var(--line)' }}>
+      <div className="vm-ln-scope" style={{ display: 'flex', flexDirection: 'column', gap: 0, borderTop: '1px solid var(--bdr)' }}>
         {/* 音频播放器 */}
         <div style={{ padding: '8px 16px' }}>
           <NoteAudioPanel
@@ -110,7 +110,7 @@ const NoteMediaCompanion = forwardRef<NoteMediaCompanionHandle, NoteMediaCompani
         </div>
         {/* 转录轴 */}
         {transcript.length > 0 && (
-          <div style={{ maxHeight: 200, overflowY: 'auto', borderTop: '1px solid var(--line)' }}>
+          <div style={{ maxHeight: 200, overflowY: 'auto', borderTop: '1px solid var(--bdr)' }}>
             <LNTranscriptPanel
               transcript={transcript}
               currentTime={currentTime}

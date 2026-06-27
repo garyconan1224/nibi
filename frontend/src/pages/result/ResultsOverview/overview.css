@@ -30,14 +30,14 @@
   align-items: center;
   gap: 10px;
   padding: 10px 20px;
-  border-bottom: 1px solid var(--line);
-  background: var(--bg-elev);
+  border-bottom: 1px solid var(--bdr);
+  background: var(--srf);
   flex-shrink: 0;
 }
 .vm-overview-scope .ov-nav .btn-ghost {
   background: transparent;
   border: 1px solid transparent;
-  color: var(--ink-2);
+  color: var(--fg2);
   cursor: pointer;
   border-radius: 8px;
   display: inline-flex;
@@ -48,17 +48,17 @@
   font-size: 12px;
 }
 .vm-overview-scope .ov-nav .btn-ghost:hover {
-  background: var(--bg-sunken);
+  background: var(--bgalt);
 }
 .vm-overview-scope .ov-nav .ov-sep {
   width: 1px;
   height: 16px;
-  background: var(--line-strong);
+  background: var(--bdrs);
 }
 .vm-overview-scope .ov-nav .ov-title {
   font-size: 14px;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--fg);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -69,8 +69,8 @@
   align-items: center;
   padding: 2px 7px;
   border-radius: 6px;
-  background: var(--bg-sunken);
-  color: var(--ink-2);
+  background: var(--bgalt);
+  color: var(--fg2);
   font-family: var(--mono);
   font-size: 10px;
 }
@@ -84,7 +84,7 @@
   font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--mut);
 }
 
 /* Main content */
@@ -99,8 +99,8 @@
 
 /* Summary card */
 .vm-overview-scope .ov-card {
-  background: var(--bg-elev);
-  border: 1px solid var(--line);
+  background: var(--srf);
+  border: 1px solid var(--bdr);
   border-radius: 12px;
   padding: 20px 24px;
 }
@@ -118,7 +118,7 @@
 .vm-overview-scope .ov-card .ov-summary-text {
   font-size: 14px;
   line-height: 1.7;
-  color: var(--ink-2);
+  color: var(--fg2);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -129,12 +129,12 @@
   gap: 24px;
   margin-top: 16px;
   padding-top: 14px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--bdr);
 }
 .vm-overview-scope .ov-stat-cell .label {
   font-size: 10px;
   font-family: var(--mono);
-  color: var(--ink-4);
+  color: var(--mut);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin-bottom: 2px;
@@ -142,7 +142,7 @@
 .vm-overview-scope .ov-stat-cell .value {
   font-size: 16px;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--fg);
 }
 
 /* Timeline card */
@@ -162,22 +162,22 @@
   transition: border-color 120ms;
 }
 .vm-overview-scope .ov-tl-frame:hover {
-  border-color: var(--line-strong);
+  border-color: var(--bdrs);
 }
 .vm-overview-scope .ov-tl-frame .ov-tl-thumb {
   width: 80px;
   height: 48px;
-  background: var(--bg-sunken);
+  background: var(--bgalt);
   display: grid;
   place-items: center;
   font-size: 9px;
-  color: var(--ink-4);
+  color: var(--mut);
   font-family: var(--mono);
 }
 .vm-overview-scope .ov-tl-frame .ov-tl-ts {
   font-size: 9px;
   font-family: var(--mono);
-  color: var(--ink-4);
+  color: var(--mut);
   text-align: center;
   padding: 2px 0;
 }
@@ -186,7 +186,7 @@
 .vm-overview-scope .ov-transcript-preview {
   font-size: 13px;
   line-height: 1.7;
-  color: var(--ink-2);
+  color: var(--fg2);
   max-height: 200px;
   overflow: hidden;
   position: relative;
@@ -198,7 +198,7 @@
   left: 0;
   right: 0;
   height: 48px;
-  background: linear-gradient(transparent, var(--bg-elev));
+  background: linear-gradient(transparent, var(--srf));
 }
 .vm-overview-scope .ov-transcript-line {
   display: flex;
@@ -208,7 +208,7 @@
 .vm-overview-scope .ov-transcript-line .ts {
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--ink-4);
+  color: var(--mut);
   flex-shrink: 0;
   min-width: 36px;
 }
@@ -223,8 +223,8 @@
   gap: 12px;
 }
 .vm-overview-scope .ov-action-card {
-  background: var(--bg-elev);
-  border: 1px solid var(--line);
+  background: var(--srf);
+  border: 1px solid var(--bdr);
   border-radius: 12px;
   padding: 16px 18px;
   cursor: pointer;
@@ -234,27 +234,27 @@
   transition: border-color 120ms, box-shadow 120ms;
 }
 .vm-overview-scope .ov-action-card:hover {
-  border-color: var(--accent-pink);
+  border-color: var(--err);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 .vm-overview-scope .ov-action-card .ov-action-icon {
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  background: var(--bg-sunken);
+  background: var(--bgalt);
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  color: var(--ink-2);
+  color: var(--fg2);
 }
 .vm-overview-scope .ov-action-card .ov-action-text .title {
   font-size: 13px;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--fg);
 }
 .vm-overview-scope .ov-action-card .ov-action-text .desc {
   font-size: 11px;
-  color: var(--ink-4);
+  color: var(--mut);
   margin-top: 2px;
 }
 
@@ -306,8 +306,8 @@
 
 .vm-overview-scope .ov-stat-mini {
   flex: 1;
-  background: var(--bg-elev);
-  border: 1px solid var(--line);
+  background: var(--srf);
+  border: 1px solid var(--bdr);
   border-radius: 10px;
   padding: 12px 14px;
 }
@@ -315,7 +315,7 @@
 .vm-overview-scope .ov-stat-mini .label {
   font-size: 10px;
   font-family: var(--mono);
-  color: var(--ink-4);
+  color: var(--mut);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   margin-bottom: 4px;
@@ -324,7 +324,7 @@
 .vm-overview-scope .ov-stat-mini .value {
   font-size: 18px;
   font-weight: 700;
-  color: var(--ink);
+  color: var(--fg);
 }
 
 /* 打开详情大按钮 */
@@ -364,7 +364,7 @@
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: var(--ink-2);
+  color: var(--fg2);
   font-size: 13px;
   cursor: pointer;
   transition: background 120ms;
@@ -373,7 +373,7 @@
 }
 
 .vm-overview-scope .ov-side-action:hover {
-  background: var(--bg-sunken);
+  background: var(--bgalt);
 }
 
 /* ── 音频时间轴（水平 bar + 圆点） ────────────────────── */
@@ -385,7 +385,7 @@
 .vm-overview-scope .ov-audio-bar {
   position: relative;
   height: 6px;
-  background: var(--bg-sunken);
+  background: var(--bgalt);
   border-radius: 3px;
   margin: 0 0 4px;
 }
@@ -414,7 +414,7 @@
   justify-content: space-between;
   font-size: 10px;
   font-family: var(--mono);
-  color: var(--ink-4);
+  color: var(--mut);
 }
 
 .vm-overview-scope .ov-audio-seg-list {
@@ -422,7 +422,7 @@
   flex-direction: column;
   gap: 0;
   margin-top: 8px;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--bdr);
   padding-top: 8px;
 }
 
@@ -436,7 +436,7 @@
 }
 
 .vm-overview-scope .ov-audio-seg-item:hover {
-  background: var(--bg-sunken);
+  background: var(--bgalt);
 }
 
 .vm-overview-scope .ov-audio-seg-ts {
@@ -449,7 +449,7 @@
 
 .vm-overview-scope .ov-audio-seg-text {
   font-size: 12px;
-  color: var(--ink-2);
+  color: var(--fg2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

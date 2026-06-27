@@ -444,7 +444,7 @@ export function AddMaterialModal({
                       onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                     />
                   ) : (
-                    <PlayCircle size={20} style={{ color: 'var(--ink-3)' }} />
+                    <PlayCircle size={20} style={{ color: 'var(--mut)' }} />
                   )}
                 </div>
                 <div className="sniff-meta">
@@ -491,7 +491,7 @@ export function AddMaterialModal({
               </div>
             )}
             {effectiveSniff && effectiveSniff.confident === false && (
-              <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 6 }}>
+              <div style={{ fontSize: 12, color: 'var(--mut)', marginTop: 6 }}>
                 无法确认链接类型，将自动识别
               </div>
             )}
@@ -506,7 +506,7 @@ export function AddMaterialModal({
                       onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                     />
                   ) : (
-                    <ImageIcon size={20} style={{ color: 'var(--ink-3)' }} />
+                    <ImageIcon size={20} style={{ color: 'var(--mut)' }} />
                   )}
                   {effectiveSniff.primary_type === 'video' && <PlayCircle size={22} className="sniff-play" />}
                 </div>
@@ -531,7 +531,7 @@ export function AddMaterialModal({
               </div>
             )}
             {sniffFailed && !effectiveSniff && effectiveUrl && (
-              <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 6 }}>
+              <div style={{ fontSize: 12, color: 'var(--mut)', marginTop: 6 }}>
                 无法识别该链接，可仍尝试提交
               </div>
             )}
@@ -541,7 +541,7 @@ export function AddMaterialModal({
           <div className="m-section">
             <div className="eyebrow" style={{ marginBottom: 10 }}>② 你要做什么</div>
             {workspaceKind && (
-              <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 8 }}>
+              <div style={{ fontSize: 12, color: 'var(--mut)', marginBottom: 8 }}>
                 🔒 动作已锁定为「{workspaceKind === 'replica' ? '复刻' : '笔记'}」合集类型
               </div>
             )}
@@ -589,7 +589,7 @@ export function AddMaterialModal({
                   disabled
                   style={{ opacity: 0.5, cursor: 'not-allowed' }}
                 >
-                  <div className="ntc-l"><Film size={16} style={{ display: 'inline', verticalAlign: '-3px', marginRight: 4 }} /> 拉片分析 <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>即将上线</span></div>
+                  <div className="ntc-l"><Film size={16} style={{ display: 'inline', verticalAlign: '-3px', marginRight: 4 }} /> 拉片分析 <span style={{ fontSize: 11, color: 'var(--mut)' }}>即将上线</span></div>
                   <div className="ntc-d">逐镜头拆解景别/构图/运镜/转场</div>
                 </button>
                 <button
@@ -599,7 +599,7 @@ export function AddMaterialModal({
                   disabled
                   style={{ opacity: 0.5, cursor: 'not-allowed' }}
                 >
-                  <div className="ntc-l"><Target size={16} style={{ display: 'inline', verticalAlign: '-3px', marginRight: 4 }} /> 竞品对标 <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>即将上线</span></div>
+                  <div className="ntc-l"><Target size={16} style={{ display: 'inline', verticalAlign: '-3px', marginRight: 4 }} /> 竞品对标 <span style={{ fontSize: 11, color: 'var(--mut)' }}>即将上线</span></div>
                   <div className="ntc-d">内容结构/爆点/钩子/节奏拆解</div>
                 </button>
               </div>
@@ -614,9 +614,9 @@ export function AddMaterialModal({
                   type="button"
                   style={{
                     display: 'flex', alignItems: 'center', gap: 4,
-                    padding: '6px 10px', fontSize: 12, color: 'var(--ink-3)',
-                    border: '1px dashed var(--border)', borderRadius: 6,
-                    background: 'var(--bg-subtle)'
+                    padding: '6px 10px', fontSize: 12, color: 'var(--mut)',
+                    border: '1px dashed var(--bdr)', borderRadius: 6,
+                    background: 'var(--bgalt)'
                   }}
                   onClick={() => toast('该功能即将上线')}
                 >
@@ -654,21 +654,21 @@ export function AddMaterialModal({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
-                          <SelectLabel style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>常用风格</SelectLabel>
+                          <SelectLabel style={{ fontSize: 11, color: 'var(--mut)' }}>常用风格</SelectLabel>
                           {PRIMARY_STYLES.map(opt => (
                             <SelectItem key={opt.id} value={opt.id}>
                               {opt.label}
-                              <span style={{ fontSize: 11, color: 'var(--ink-3)', marginLeft: 6 }}>{STYLE_DESCRIPTIONS[opt.id]}</span>
+                              <span style={{ fontSize: 11, color: 'var(--mut)', marginLeft: 6 }}>{STYLE_DESCRIPTIONS[opt.id]}</span>
                             </SelectItem>
                           ))}
                         </SelectGroup>
                         <SelectSeparator />
                         <SelectGroup>
-                          <SelectLabel style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>更多风格</SelectLabel>
+                          <SelectLabel style={{ fontSize: 11, color: 'var(--mut)' }}>更多风格</SelectLabel>
                           {MORE_STYLES.map(opt => (
                             <SelectItem key={opt.id} value={opt.id}>
                               {opt.label}
-                              <span style={{ fontSize: 11, color: 'var(--ink-3)', marginLeft: 6 }}>{STYLE_DESCRIPTIONS[opt.id]}</span>
+                              <span style={{ fontSize: 11, color: 'var(--mut)', marginLeft: 6 }}>{STYLE_DESCRIPTIONS[opt.id]}</span>
                             </SelectItem>
                           ))}
                         </SelectGroup>
@@ -701,7 +701,7 @@ export function AddMaterialModal({
                     </div>
                   )}
                   {embedFrames && !hasVisionModel && (
-                    <span className="kw" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                    <span className="kw" style={{ fontSize: 11, color: 'var(--mut)' }}>
                       未检测到视觉模型，将使用纯文字总结。可在「设置 → 模型」中添加。
                     </span>
                   )}
@@ -715,7 +715,7 @@ export function AddMaterialModal({
                         <div className="gen-card-grid">
                           <div className="gen-card" data-on={captureMode === 'auto'} onClick={() => setCaptureMode('auto')}>
                             <div className="gen-card-head">
-                              <Wand2 size={15} style={{ color: 'var(--accent-warm)' }} />
+                              <Wand2 size={15} style={{ color: 'var(--wrn)' }} />
                               <span className="gen-card-title">智能</span>
                             </div>
                             <div className="kw" style={{ fontSize: 11 }}>按时长自动</div>
@@ -725,7 +725,7 @@ export function AddMaterialModal({
                           </div>
                           <div className="gen-card" data-on={captureMode === 'manual'} onClick={() => setCaptureMode('manual')}>
                             <div className="gen-card-head">
-                              <Settings2 size={15} style={{ color: captureMode === 'manual' ? 'var(--accent-warm)' : 'var(--ink-3)' }} />
+                              <Settings2 size={15} style={{ color: captureMode === 'manual' ? 'var(--wrn)' : 'var(--mut)' }} />
                               <span className="gen-card-title">手动</span>
                             </div>
                             <div className="kw" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -744,7 +744,7 @@ export function AddMaterialModal({
                           </div>
                         </div>
                         {videoDuration > 0 && (
-                          <div className="kw" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                          <div className="kw" style={{ fontSize: 11, color: 'var(--mut)' }}>
                             视频时长 {formatDuration(videoDuration)} · 识别时获取
                           </div>
                         )}

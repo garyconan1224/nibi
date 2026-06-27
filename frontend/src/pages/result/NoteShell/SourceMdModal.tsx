@@ -34,7 +34,7 @@ export function SourceMdModal({ open, sourceMd, onClose }: SourceMdModalProps) {
           maxHeight: '80vh',
           background: 'var(--bg)',
           borderRadius: 'var(--radius-lg, 16px)',
-          border: '1px solid var(--line)',
+          border: '1px solid var(--bdr)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -48,11 +48,11 @@ export function SourceMdModal({ open, sourceMd, onClose }: SourceMdModalProps) {
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '14px 18px',
-            borderBottom: '1px solid var(--line)',
+            borderBottom: '1px solid var(--bdr)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <FileCode size={16} style={{ color: 'var(--accent-2)' }} />
+            <FileCode size={16} style={{ color: 'var(--acc)' }} />
             <span style={{ fontWeight: 600, fontSize: 14 }}>源 Markdown</span>
           </div>
           <button
@@ -67,7 +67,7 @@ export function SourceMdModal({ open, sourceMd, onClose }: SourceMdModalProps) {
               border: 'none',
               background: 'none',
               cursor: 'pointer',
-              color: 'var(--ink-3)',
+              color: 'var(--mut)',
             }}
           >
             <X size={16} />
@@ -83,7 +83,7 @@ export function SourceMdModal({ open, sourceMd, onClose }: SourceMdModalProps) {
             padding: '14px 18px',
             fontSize: 13,
             lineHeight: 1.7,
-            color: 'var(--ink-2)',
+            color: 'var(--fg2)',
           }}
         >
           <style>{`.source-md-body img { max-width: 100%; height: auto; border-radius: 8px; display: block; margin: 8px 0; }`}</style>
@@ -96,7 +96,7 @@ export function SourceMdModal({ open, sourceMd, onClose }: SourceMdModalProps) {
             display: 'flex',
             justifyContent: 'flex-end',
             padding: '12px 18px',
-            borderTop: '1px solid var(--line)',
+            borderTop: '1px solid var(--bdr)',
           }}
         >
           <button
@@ -104,7 +104,7 @@ export function SourceMdModal({ open, sourceMd, onClose }: SourceMdModalProps) {
             style={{
               padding: '8px 16px',
               borderRadius: 8,
-              border: '1px solid var(--line)',
+              border: '1px solid var(--bdr)',
               background: 'var(--bg)',
               cursor: 'pointer',
               fontSize: 13,

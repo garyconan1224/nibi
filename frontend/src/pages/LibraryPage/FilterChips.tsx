@@ -9,7 +9,7 @@ export function FilterChips({ counts }: FilterChipsProps) {
   const toggleFilter = useLibraryStore((s) => s.toggleFilter)
 
   return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
+    <div className="lib-chips">
       {FILTER_OPTIONS.map(({ key, label }) => {
         const active = selectedFilters.includes(key)
         const count = counts?.[key]
@@ -17,28 +17,11 @@ export function FilterChips({ counts }: FilterChipsProps) {
           <button
             key={key}
             onClick={() => toggleFilter(key)}
-            className="chip"
-            style={{
-              cursor: 'pointer',
-              gap: 7,
-              background: active ? 'var(--pill-bg)' : 'var(--bg-sunken)',
-              color: active ? 'var(--pill-ink)' : 'var(--ink-2)',
-              borderColor: active ? 'var(--pill-bg)' : 'var(--line)',
-              transition: 'all 140ms ease',
-            }}
+            className={`lib-chip${active ? ' lib-chip--active' : ''}`}
           >
             {label}
             {count != null && (
-              <span
-                style={{
-                  fontFamily: 'var(--mono)',
-                  fontSize: 10,
-                  opacity: 0.7,
-                  fontWeight: 500,
-                }}
-              >
-                {count}
-              </span>
+              <span className="lib-chip-count">{count}</span>
             )}
           </button>
         )

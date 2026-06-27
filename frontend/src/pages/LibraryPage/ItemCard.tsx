@@ -50,10 +50,7 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
 
   return (
     <div
-      className="ex-card"
-      style={{
-        borderColor: selected ? 'var(--ink)' : 'var(--line)',
-      }}
+      className={`ex-card${selected ? ' ex-card--selected' : ''}`}
       onClick={handleCardClick}
     >
       {/* ── Thumbnail 16/9 ── */}
@@ -93,23 +90,16 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
               style={{
                 height: '100%',
                 width: '40%',
-                background: 'var(--accent-3)',
+                background: 'var(--acc)',
                 transition: 'width 400ms',
               }}
             />
           </div>
         )}
 
-        {/* state badge — top-left */}
+        {/* state badge — bottom-right */}
         <div className="ex-badge">
-          <span
-            style={{
-              width: 5,
-              height: 5,
-              borderRadius: 99,
-              background: stateColor,
-            }}
-          />
+          <span className="ex-state-dot" style={{ background: stateColor }} />
           {stateLabel}
         </div>
 
@@ -124,7 +114,7 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
               className="ex-select-dot"
               style={{
                 background: selected ? '#fff' : 'rgba(0,0,0,0.5)',
-                color: selected ? 'var(--ink)' : '#fff',
+                color: selected ? 'var(--fg)' : '#fff',
                 borderColor: selected ? '#fff' : 'rgba(255,255,255,0.6)',
               }}
             >
@@ -159,7 +149,7 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
       {/* ── Meta ── */}
       <div className="ex-meta">
         <div className="ex-title-row">
-          <Icon size={14} strokeWidth={1.5} style={{ color: 'var(--ink-3)', flexShrink: 0, marginTop: 2 }} />
+          <Icon size={14} strokeWidth={1.5} style={{ color: 'var(--mut)', flexShrink: 0, marginTop: 2 }} />
           <span className="ex-title" title={item.name}>
             {item.name || '未命名'}
           </span>

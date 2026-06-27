@@ -290,65 +290,47 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
     }
   }, [navigate])
 
+  const pageDesc = kind === 'note'
+    ? '学习笔记、总结、要点，按类型或状态找。'
+    : kind === 'replica'
+      ? '帧格截图、提示词、复刻素材，按类型或状态找。'
+      : '横切所有合集的笔记池。按类型筛、按时长/状态排，找到该用的那一个。'
+
+  const emptyTitle = kind === 'note' ? '暂无笔记' : kind === 'replica' ? '暂无复刻' : '暂无笔记'
+  const emptyDesc = kind === 'note'
+    ? '去工作台添加学习素材，或粘贴一个链接开始吧'
+    : kind === 'replica'
+      ? '去工作台添加复刻素材，开始创作吧'
+      : '去工作台添加笔记，或粘贴一个链接开始吧'
+
   return (
-    <div style={{ padding: '28px 32px', overflow: 'auto', height: '100%' }}>
+    <div className="lib-page">
       {/* ── 顶部栏 ── */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          marginBottom: 24,
-        }}
-      >
+      <div className="lib-page-header">
         <div>
           <div className="eyebrow">{pageTitle.toUpperCase()} · {statLabel} · LOCAL</div>
-          <h1
-            className="display"
-            style={{
-              fontSize: 'clamp(56px, 7vw, 92px)',
-              lineHeight: 0.98,
-              margin: '10px 0 4px',
-              letterSpacing: '-0.02em',
-            }}
-          >
+          <h1 className="display lib-title">
             {pageTitle}
           </h1>
-          <p
-            style={{
-              fontSize: 16,
-              color: 'var(--ink-3)',
-              maxWidth: 560,
-              margin: '12px 0 0',
-              lineHeight: 1.55,
-            }}
-          >
-            {kind
-              ? `按类型筛、按时长/状态排，找到该用的那一个。`
-              : '横切所有合集的笔记池。按类型筛、按时长/状态排，找到该用的那一个。'}
+          <p className="lib-desc">
+            {pageDesc}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div className="lib-actions">
           {/* 选择控制 */}
           {(filteredItems.length > 0 || (filteredWorkspaces && filteredWorkspaces.length > 0)) && (
             <>
               {selectMode ? (
                 <>
-                  <button className="btn" style={{ fontSize: 12, height: 32 }} onClick={selectAll}>
+                  <button className="btn btn-sm" onClick={selectAll}>
                     全选
                   </button>
-                  <button className="btn" style={{ fontSize: 12, height: 32 }} onClick={clearSelection}>
+                  <button className="btn btn-sm" onClick={clearSelection}>
                     取消
                   </button>
                   <button
-                    className="btn"
-                    style={{
-                      fontSize: 12,
-                      height: 32,
-                      color: selectedSet.size > 0 ? 'var(--accent-pink)' : 'var(--ink-4)',
-                      borderColor: selectedSet.size > 0 ? 'var(--accent-pink)' : 'var(--line)',
-                      opacity: deleting || selectedSet.size === 0 ? 0.5 : 1,
-                    }}
+                    className={`btn btn-sm${selectedSet.size > 0 ? ' btn-danger' : ''}`}
+                    style={{ opacity: deleting || selectedSet.size === 0 ? 0.5 : 1 }}
                     onClick={handleBatchDelete}
                     disabled={deleting || selectedSet.size === 0}
                   >
@@ -356,14 +338,8 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
                     删除 {selectedSet.size > 0 ? `(${selectedSet.size})` : ''}
                   </button>
                   <button
-                    className="btn"
-                    style={{
-                      fontSize: 12,
-                      height: 32,
-                      color: selectedSet.size > 0 ? 'var(--accent-3)' : 'var(--ink-4)',
-                      borderColor: selectedSet.size > 0 ? 'var(--accent-3)' : 'var(--line)',
-                      opacity: analyzing || selectedSet.size === 0 ? 0.5 : 1,
-                    }}
+                    className={`btn btn-sm${selectedSet.size > 0 ? ' btn-secondary' : ''}`}
+                    style={{ opacity: analyzing || selectedSet.size === 0 ? 0.5 : 1 }}
                     onClick={handleBatchAnalyze}
                     disabled={analyzing || selectedSet.size === 0}
                     title="仅对选中的图片笔记触发分析（按已存配置），进度见右上角任务队列"
@@ -373,7 +349,7 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
                   </button>
                 </>
               ) : (
-                <button className="btn" style={{ fontSize: 12, height: 32 }} onClick={enterSelectMode}>
+                <button className="btn btn-sm" onClick={enterSelectMode}>
                   选择
                 </button>
               )}
@@ -388,8 +364,7 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
 
           {/* 导入按钮 — 跳转工作台 */}
           <button
-            className="btn btn-primary"
-            style={{ height: 32, fontSize: 12 }}
+            className="btn btn-primary btn-sm"
             onClick={() => navigate('/')}
             title="去工作台新建合集"
           >
@@ -411,9 +386,9 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
       )}
 
       {error && (
-        <div className="empty-state" style={{ color: 'var(--accent-pink)' }}>
+        <div className="empty-state lib-error">
           <div className="empty-state-title">{error}</div>
-          <button className="btn" style={{ marginTop: 8, fontSize: 12 }} onClick={load}>
+          <button className="btn btn-sm" style={{ marginTop: 8 }} onClick={load}>
             重试
           </button>
         </div>
@@ -467,14 +442,10 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
                     <Inbox size={24} strokeWidth={1.5} />
                   </div>
                   <div className="empty-state-title">
-                    {showAll && data.items.length === 0
-                      ? '暂无笔记'
-                      : '没有匹配的笔记'}
+                    {showAll && data.items.length === 0 ? emptyTitle : '没有匹配的笔记'}
                   </div>
                   <div className="empty-state-desc">
-                    {showAll && data.items.length === 0
-                      ? '去工作台添加笔记，或粘贴一个链接开始吧'
-                      : '试试切换筛选条件或清除 chip'}
+                    {showAll && data.items.length === 0 ? emptyDesc : '试试切换筛选条件或清除 chip'}
                   </div>
                 </div>
               ) : viewMode === 'list' ? (

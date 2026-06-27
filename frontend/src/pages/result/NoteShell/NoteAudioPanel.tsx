@@ -56,7 +56,7 @@ const NoteAudioPanel = forwardRef<NoteAudioPanelHandle, NoteAudioPanelProps>(
 
     if (!src) {
       return (
-        <div style={{ padding: 16, textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+        <div style={{ padding: 16, textAlign: 'center', color: 'var(--mut)', fontSize: 13 }}>
           暂无可用音频源
         </div>
       )
@@ -72,7 +72,7 @@ const NoteAudioPanel = forwardRef<NoteAudioPanelHandle, NoteAudioPanelProps>(
           onTimeUpdate={handleTimeUpdate}
           style={{ width: '100%' }}
         />
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 12, fontSize: 11, color: 'var(--ink-3)' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 12, fontSize: 11, color: 'var(--mut)' }}>
           <span>Space 暂停/播放</span>
           <span>← → 快退/快进 5s</span>
         </div>

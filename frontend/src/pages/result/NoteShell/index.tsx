@@ -237,21 +237,21 @@ function SourcePanel({ sourceMd, open: controlledOpen, onToggle }: SourcePanelPr
   if (!sourceMd) return null
 
   return (
-    <div style={{ borderTop: '1px solid var(--line)' }}>
+    <div style={{ borderTop: '1px solid var(--bdr)' }}>
       <button
         onClick={toggle}
         style={{
           display: 'flex', alignItems: 'center', gap: 6,
           width: '100%', padding: '10px 20px',
           background: 'none', border: 'none', cursor: 'pointer',
-          fontSize: 13, fontWeight: 600, color: 'var(--ink-2)',
+          fontSize: 13, fontWeight: 600, color: 'var(--fg2)',
         }}
       >
         {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         Source（原始依据）
       </button>
       {open && (
-        <div style={{ padding: '0 20px 16px', fontSize: 13, lineHeight: 1.7, color: 'var(--ink-3)' }}>
+        <div style={{ padding: '0 20px 16px', fontSize: 13, lineHeight: 1.7, color: 'var(--mut)' }}>
           <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', margin: 0 }}>
             {sourceMd}
           </pre>
@@ -556,7 +556,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   // ─── loading / error ───
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--ink-3)' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--mut)' }}>
         加载中…
       </div>
     )
@@ -564,7 +564,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   if (error || !note) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100%', gap: 12 }}>
-        <span style={{ color: 'var(--accent-pink)', fontWeight: 600 }}>
+        <span style={{ color: 'var(--err)', fontWeight: 600 }}>
           {error ?? '没有可显示的笔记'}
         </span>
         <button className="btn-ghost" style={{ padding: '6px 12px' }} onClick={() => navigate(-1)}>
@@ -634,7 +634,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
               <button
                 className="btn-ghost"
                 onClick={() => setTemplateDropOpen((v) => !v)}
-                style={{ height: 28, padding: '0 10px', fontSize: 12, color: 'var(--accent-2)' }}
+                style={{ height: 28, padding: '0 10px', fontSize: 12, color: 'var(--acc)' }}
                 title="切换总结风格 / 版本"
               >
                 <List size={13} /> {tl(activeTemplate)}{activeVersionLabel ? ` · ${activeVersionLabel}` : ''}
@@ -645,14 +645,14 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                   position: 'absolute', left: 0, top: 34, zIndex: 20,
                   minWidth: 240, maxHeight: 360, overflowY: 'auto',
                   padding: '4px',
-                  border: '1px solid var(--line)', borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--bdr)', borderRadius: 'var(--radius-sm)',
                   background: 'var(--bg)', boxShadow: 'var(--shadow-md)',
                 }}>
                   {[...templateGroups.entries()].map(([tmpl, versions], gi) => {
                     const isCurrentTmpl = tmpl === activeTemplate
                     return (
                       <div key={tmpl}>
-                        {gi > 0 && <div style={{ height: 1, background: 'var(--line)', margin: '2px 0' }} />}
+                        {gi > 0 && <div style={{ height: 1, background: 'var(--bdr)', margin: '2px 0' }} />}
                         {/* 风格标题行 */}
                         <button
                           className="btn-ghost"
@@ -664,12 +664,12 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                           style={{
                             width: '100%', justifyContent: 'space-between', height: 30,
                             padding: '0 10px', fontSize: 12,
-                            color: isCurrentTmpl ? 'var(--accent-2)' : undefined,
+                            color: isCurrentTmpl ? 'var(--acc)' : undefined,
                             fontWeight: isCurrentTmpl ? 600 : undefined,
                           }}
                         >
                           <span>{tl(tmpl)}</span>
-                          <span style={{ color: 'var(--ink-4)', fontSize: 10 }}>({versions.length})</span>
+                          <span style={{ color: 'var(--mut)', fontSize: 10 }}>({versions.length})</span>
                         </button>
                         {/* 版本列表 */}
                         {versions.map((s) => {
@@ -684,7 +684,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                                   onChange={(e) => setRenameName(e.target.value)}
                                   onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') { setRenameTargetId(null); setRenameName('') } }}
                                   onBlur={commitRename}
-                                  style={{ flex: 1, height: 28, padding: '0 8px', fontSize: 12, border: '1px solid var(--accent-2)', borderRadius: 4, background: 'var(--bg)', outline: 'none' }}
+                                  style={{ flex: 1, height: 28, padding: '0 8px', fontSize: 12, border: '1px solid var(--acc)', borderRadius: 4, background: 'var(--bg)', outline: 'none' }}
                                 />
                               ) : (
                                 <button
@@ -693,7 +693,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                                   style={{
                                     flex: 1, justifyContent: 'flex-start', height: 28,
                                     padding: '0 8px', fontSize: 12,
-                                    color: isActive ? 'var(--accent-2)' : undefined,
+                                    color: isActive ? 'var(--acc)' : undefined,
                                     fontWeight: isActive ? 600 : undefined,
                                   }}
                                 >
@@ -715,7 +715,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                                     className="btn-ghost"
                                     title="删除"
                                     onClick={(e) => { e.stopPropagation(); handleDeleteSummary(s.summary_id) }}
-                                    style={{ padding: 4, height: 22, width: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'var(--ink-4)' }}
+                                    style={{ padding: 4, height: 22, width: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'var(--mut)' }}
                                   >
                                     <Trash2 size={11} />
                                   </button>
@@ -727,7 +727,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                       </div>
                     )
                   })}
-                  <div style={{ height: 1, background: 'var(--line)', margin: '4px 0' }} />
+                  <div style={{ height: 1, background: 'var(--bdr)', margin: '4px 0' }} />
                   <button
                     className="btn-ghost"
                     onClick={() => { if (!creatingSummary) { setShowNewSummaryModal(true); setTemplateDropOpen(false) } }}
@@ -780,7 +780,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 zIndex: 20,
                 minWidth: 160,
                 padding: '4px',
-                border: '1px solid var(--line)',
+                border: '1px solid var(--bdr)',
                 borderRadius: 'var(--radius-sm)',
                 background: 'var(--bg)',
                 boxShadow: 'var(--shadow-md)',
@@ -825,7 +825,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                     width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12,
                     display: 'flex', alignItems: 'center', gap: 6,
                     background: 'none', border: 'none', cursor: 'not-allowed',
-                    color: 'var(--ink-3)', opacity: 0.45,
+                    color: 'var(--mut)', opacity: 0.45,
                   }}
                 >
                   {item.icon} {item.label}
@@ -851,7 +851,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
               style={{
                 position: 'absolute', right: 0, top: 34, zIndex: 20,
                 minWidth: 160, padding: '4px',
-                border: '1px solid var(--line)',
+                border: '1px solid var(--bdr)',
                 borderRadius: 'var(--radius-sm)',
                 background: 'var(--bg)',
                 boxShadow: 'var(--shadow-md)',
@@ -870,7 +870,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                     width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12,
                     display: 'flex', alignItems: 'center', gap: 6,
                     background: 'none', border: 'none', cursor: 'not-allowed',
-                    color: 'var(--ink-3)', opacity: 0.45,
+                    color: 'var(--mut)', opacity: 0.45,
                   }}
                 >
                   {item.icon} {item.label}
@@ -897,8 +897,8 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
             padding: '6px 20px',
-            borderBottom: '1px solid var(--line)',
-            background: 'var(--bg-sunken)',
+            borderBottom: '1px solid var(--bdr)',
+            background: 'var(--bgalt)',
             flexShrink: 0,
           }}>
             <span style={{ fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -930,9 +930,9 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
           <div className="vm-ln-scope" style={{
             width: '30%', minWidth: 260, maxWidth: 420, flexShrink: 0,
             display: 'flex', flexDirection: 'column',
-            borderRight: '1px solid var(--line)',
+            borderRight: '1px solid var(--bdr)',
             overflow: 'hidden',
-            background: 'var(--bg-sunken)',
+            background: 'var(--bgalt)',
           }}>
             <div style={{ flex: '0 0 auto', maxHeight: '55%', overflow: 'hidden' }}>
               <LNVideoPanel
@@ -946,7 +946,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
             </div>
             {/* 字幕区 — 独立挂载，不受中列 re-render 影响 */}
             {Array.isArray(note.transcript) && (note.transcript as VideoResultTranscriptLine[]).length > 0 ? (
-              <div style={{ flex: 1, overflowY: 'auto', borderTop: '1px solid var(--line)' }}>
+              <div style={{ flex: 1, overflowY: 'auto', borderTop: '1px solid var(--bdr)' }}>
                 <LNTranscriptPanel
                   transcript={note.transcript as VideoResultTranscriptLine[]}
                   currentTime={currentTime}
@@ -958,7 +958,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 />
               </div>
             ) : (
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-4)', fontSize: 12, borderTop: '1px solid var(--line)' }}>
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--mut)', fontSize: 12, borderTop: '1px solid var(--bdr)' }}>
                 暂无字幕
               </div>
             )}
@@ -967,8 +967,8 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
           {/* ── 中列：正文（视频无 tab 切换）+ TOC ── */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
             {/* 保存状态（顶栏右侧） */}
-            <div style={{ display: 'flex', alignItems: 'center', padding: '0 24px', flexShrink: 0, borderBottom: '1px solid var(--line)', height: 36 }}>
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-4)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', padding: '0 24px', flexShrink: 0, borderBottom: '1px solid var(--bdr)', height: 36 }}>
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--mut)' }}>
                 {saveStatus === 'saving' && '保存中…'}
                 {saveStatus === 'saved' && `已保存 ${savedAt}`}
                 {saveStatus === 'failed' && <span style={{ color: 'var(--accent)' }}>保存失败</span>}
@@ -991,8 +991,8 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
               <div style={{
                 width: '25%', minWidth: 200, maxWidth: 380, flexShrink: 0,
                 display: 'flex', flexDirection: 'column',
-                borderRight: '1px solid var(--line)',
-                overflow: 'hidden', background: 'var(--bg-sunken)',
+                borderRight: '1px solid var(--bdr)',
+                overflow: 'hidden', background: 'var(--bgalt)',
               }}>
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 12, minHeight: 0 }}>
                   {/* 大图预览 */}
@@ -1001,7 +1001,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                     background: 'var(--bg)', borderRadius: 8, overflow: 'hidden', minHeight: 0,
                   }}>
                     {imageLoadError[selectedImageIdx] ? (
-                      <span style={{ color: 'var(--ink-4)', fontSize: 12 }}>图片加载失败</span>
+                      <span style={{ color: 'var(--mut)', fontSize: 12 }}>图片加载失败</span>
                     ) : (
                       <img
                         src={images[selectedImageIdx]}
@@ -1023,7 +1023,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                           style={{
                             flexShrink: 0, width: 44, height: 44, padding: 0, border: 'none', borderRadius: 4,
                             overflow: 'hidden', cursor: 'pointer', opacity: idx === selectedImageIdx ? 1 : 0.5,
-                            outline: idx === selectedImageIdx ? '2px solid var(--accent-2)' : 'none',
+                            outline: idx === selectedImageIdx ? '2px solid var(--acc)' : 'none',
                           }}
                         >
                           <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -1032,7 +1032,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                     </div>
                   )}
                   {images.length > 1 && (
-                    <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--ink-4)', marginTop: 4 }}>
+                    <div style={{ textAlign: 'center', fontSize: 10, color: 'var(--mut)', marginTop: 4 }}>
                       {selectedImageIdx + 1} / {images.length}
                     </div>
                   )}
@@ -1051,8 +1051,8 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
 
               {/* ── 中列：正文（图文/视频统一，无 tab 切换）+ TOC ── */}
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', padding: '0 24px', flexShrink: 0, borderBottom: '1px solid var(--line)', height: 36 }}>
-                  <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--ink-4)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', padding: '0 24px', flexShrink: 0, borderBottom: '1px solid var(--bdr)', height: 36 }}>
+                  <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--mut)' }}>
                     {saveStatus === 'saving' && '保存中…'}
                     {saveStatus === 'saved' && `已保存 ${savedAt}`}
                     {saveStatus === 'failed' && <span style={{ color: 'var(--accent)' }}>保存失败</span>}
@@ -1066,12 +1066,12 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
               {/* ── 右列：操作区（图文笔记） ── */}
               <div style={{
                 width: 280, flexShrink: 0,
-                borderLeft: '1px solid var(--line)',
+                borderLeft: '1px solid var(--bdr)',
                 display: 'flex', flexDirection: 'column',
-                overflow: 'hidden', background: 'var(--bg-elev)',
+                overflow: 'hidden', background: 'var(--srf)',
               }}>
-                <div style={{ padding: '10px 14px 8px', borderBottom: '1px solid var(--line)', flexShrink: 0 }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-2)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--mono)' }}>
+                <div style={{ padding: '10px 14px 8px', borderBottom: '1px solid var(--bdr)', flexShrink: 0 }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--acc)', textTransform: 'uppercase', letterSpacing: '0.06em', fontFamily: 'var(--mono)' }}>
                     操作区
                   </span>
                 </div>
@@ -1081,10 +1081,10 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                   {/* OCR 识别文本（默认折叠，仅当非空时显示） */}
                   {currentInfo?.ocr_text && (
                     <details style={{ marginTop: 4 }}>
-                      <summary style={{ fontSize: 11, color: 'var(--ink-4)', cursor: 'pointer', userSelect: 'none', padding: '4px 0' }}>
+                      <summary style={{ fontSize: 11, color: 'var(--mut)', cursor: 'pointer', userSelect: 'none', padding: '4px 0' }}>
                         识别文本
                       </summary>
-                      <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5, whiteSpace: 'pre-wrap', maxHeight: 200, overflowY: 'auto', padding: '4px 0' }}>
+                      <div style={{ fontSize: 12, color: 'var(--fg2)', lineHeight: 1.5, whiteSpace: 'pre-wrap', maxHeight: 200, overflowY: 'auto', padding: '4px 0' }}>
                         {currentInfo.ocr_text}
                       </div>
                     </details>
@@ -1101,7 +1101,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
           </div>
           <div style={{ flexShrink: 0, maxHeight: '40%', overflowY: 'auto' }}>
             {chatOpen && (
-              <div style={{ height: 320, borderTop: '1px solid var(--line)', display: 'flex', overflow: 'hidden' }}>
+              <div style={{ height: 320, borderTop: '1px solid var(--bdr)', display: 'flex', overflow: 'hidden' }}>
                 <NoteChatDrawer
                   workspaceId={workspaceId}
                   systemPrompt={chatSystemPrompt}

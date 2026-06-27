@@ -617,7 +617,7 @@ export default function VideoResultPage() {
   if (fetchState.kind === 'loading') {
     return (
       <div className="vm-video-result-scope" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
-        <span className="mono" style={{ color: 'var(--ink-3)' }}>加载视频结果…</span>
+        <span className="mono" style={{ color: 'var(--mut)' }}>加载视频结果…</span>
       </div>
     )
   }
@@ -627,7 +627,7 @@ export default function VideoResultPage() {
         className="vm-video-result-scope"
         style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}
       >
-        <span style={{ color: 'var(--accent-pink)', fontWeight: 600 }}>
+        <span style={{ color: 'var(--err)', fontWeight: 600 }}>
           {fetchState.kind === 'error' ? fetchState.message : '没有可显示的视频结果'}
         </span>
         <button className="btn-ghost" style={{ padding: '6px 12px' }} onClick={() => navigate(-1)}>
@@ -653,7 +653,7 @@ export default function VideoResultPage() {
           <span className="kw mono" style={{ fontSize: 10, flexShrink: 0 }}>
             VIDEO · 字幕总结模式
           </span>
-          <span className="kw" style={{ fontSize: 10, background: 'var(--accent-green)', color: '#fff', padding: '2px 8px', borderRadius: 6 }}>
+          <span className="kw" style={{ fontSize: 10, background: 'var(--ok)', color: '#fff', padding: '2px 8px', borderRadius: 6 }}>
             {result.detected_template ? `自动识别：${result.detected_template}` : (result.video_template || '其它')}
           </span>
           <button
@@ -688,7 +688,7 @@ export default function VideoResultPage() {
               <Download size={13} /> 字幕
             </button>
             {exportOpen && (
-              <div className="vd-dropdown-menu" style={{ position: 'absolute', right: 0, top: 36, zIndex: 50, background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 8, padding: '4px 0', minWidth: 140, boxShadow: '0 4px 16px rgba(0,0,0,.12)' }}>
+              <div className="vd-dropdown-menu" style={{ position: 'absolute', right: 0, top: 36, zIndex: 50, background: 'var(--srf)', border: '1px solid var(--bdr)', borderRadius: 8, padding: '4px 0', minWidth: 140, boxShadow: '0 4px 16px rgba(0,0,0,.12)' }}>
                 {(['srt', 'vtt', 'ass'] as const).map((fmt) => (
                   <button
                     key={fmt}
@@ -710,7 +710,7 @@ export default function VideoResultPage() {
         </div>
 
         {/* 内容/总结 tab 切换 */}
-        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--line)', padding: '0 20px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--bdr)', padding: '0 20px', flexShrink: 0 }}>
           <button
             className="vd-tab-btn"
             data-active={contentTab === 'content'}
@@ -740,7 +740,7 @@ export default function VideoResultPage() {
             <div className="vd-card">
               <div className="vd-card-head">
                 <h2>内容摘要</h2>
-                <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>
+                <span style={{ fontSize: 11, color: 'var(--mut)' }}>
                   {result.detected_template ? `自动识别：${result.detected_template}` : (result.video_template || '其它')} · {transcript.length} 段转录
                 </span>
               </div>
@@ -753,7 +753,7 @@ export default function VideoResultPage() {
             <div className="vd-card">
               <div className="vd-card-head">
                 <h2>转录内容</h2>
-                <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>
+                <span style={{ fontSize: 11, color: 'var(--mut)' }}>
                   {transcript.length} 段
                 </span>
               </div>
@@ -806,7 +806,7 @@ export default function VideoResultPage() {
 
           {/* Empty state */}
           {!result.summary && transcript.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--ink-4)' }}>
+            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--mut)' }}>
               暂无摘要和转录内容
             </div>
           )}
@@ -839,7 +839,7 @@ export default function VideoResultPage() {
         className="vm-video-result-scope"
         style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}
       >
-        <span style={{ color: 'var(--accent-pink)', fontWeight: 600 }}>没有可显示的视频结果</span>
+        <span style={{ color: 'var(--err)', fontWeight: 600 }}>没有可显示的视频结果</span>
         <button className="btn-ghost" style={{ padding: '6px 12px' }} onClick={() => navigate(-1)}>
           <ArrowLeft size={14} /> 返回
         </button>
@@ -864,7 +864,7 @@ export default function VideoResultPage() {
             VIDEO · {result.video.duration_str || formatSec(totalSec)}
           </span>
           {result.source === 'demo_fixture' && (
-            <span className="mono" style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'var(--accent-warm)', color: '#fff', fontWeight: 600 }} title="results 尚未填充，正在使用 demo fixture">
+            <span className="mono" style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'var(--wrn)', color: '#fff', fontWeight: 600 }} title="results 尚未填充，正在使用 demo fixture">
               DEMO
             </span>
           )}
@@ -908,7 +908,7 @@ export default function VideoResultPage() {
               <Download size={13} /> 字幕
             </button>
             {exportOpen && (
-              <div className="vd-dropdown-menu" style={{ position: 'absolute', right: 0, top: 36, zIndex: 50, background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 8, padding: '4px 0', minWidth: 140, boxShadow: '0 4px 16px rgba(0,0,0,.12)' }}>
+              <div className="vd-dropdown-menu" style={{ position: 'absolute', right: 0, top: 36, zIndex: 50, background: 'var(--srf)', border: '1px solid var(--bdr)', borderRadius: 8, padding: '4px 0', minWidth: 140, boxShadow: '0 4px 16px rgba(0,0,0,.12)' }}>
                 {(['srt', 'vtt', 'ass'] as const).map((fmt) => (
                   <button
                     key={fmt}
@@ -955,7 +955,7 @@ export default function VideoResultPage() {
           {/* C-3: 帧多选工具栏 */}
           {selectedFrames.size > 0 && (
             <div className="vd-select-bar">
-              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+              <span className="mono" style={{ fontSize: 11, color: 'var(--mut)' }}>
                 已选 {selectedFrames.size} / {frames.length} 帧
               </span>
               <div style={{ display: 'flex', gap: 4 }}>
@@ -1011,7 +1011,7 @@ export default function VideoResultPage() {
           {/* 视频播放器（缩小，次要位置） */}
           {isVisualOnly ? (
             <div className="vd-player-mini-wrap" style={{ display: 'grid', placeItems: 'center', padding: '8px 0' }}>
-              <span className="mono" style={{ fontSize: 11, color: 'var(--ink-4)' }}>仅画面分析模式 · 不含视频播放</span>
+              <span className="mono" style={{ fontSize: 11, color: 'var(--mut)' }}>仅画面分析模式 · 不含视频播放</span>
             </div>
           ) : (
             <div className="vd-player-mini-wrap">
@@ -1031,7 +1031,7 @@ export default function VideoResultPage() {
                 </div>
               </div>
               <div className="vd-controls-mini">
-                <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>
+                <span className="mono" style={{ fontSize: 10, color: 'var(--mut)' }}>
                   {formatSec(currentSec)} / {formatSec(totalSec)}
                 </span>
               </div>
@@ -1064,7 +1064,7 @@ export default function VideoResultPage() {
           <div className="vd-frame-badge mono">{frame.ts} · {frame.shot_type}</div>
           {favored[activeFrame] && (
             <div className="vd-frame-star">
-              <Star size={16} fill="var(--accent-warm)" color="var(--accent-warm)" />
+              <Star size={16} fill="var(--wrn)" color="var(--wrn)" />
             </div>
           )}
         </div>
@@ -1079,11 +1079,11 @@ export default function VideoResultPage() {
                 autoFocus
                 style={{
                   flex: 1, height: 28, fontSize: 13, fontFamily: 'var(--display)',
-                  padding: '0 8px', borderRadius: 6, border: '1px solid var(--accent-pink)',
+                  padding: '0 8px', borderRadius: 6, border: '1px solid var(--err)',
                   background: 'var(--bg-card, #fff)', color: 'var(--ink-1)', outline: 'none',
                 }}
               />
-              <button className="vd-btn-tool" onClick={saveTitleEdit} style={{ background: 'var(--accent-pink)', color: '#fff', border: 'none' }}>
+              <button className="vd-btn-tool" onClick={saveTitleEdit} style={{ background: 'var(--err)', color: '#fff', border: 'none' }}>
                 <Check size={11} />
               </button>
               <button className="vd-btn-tool" onClick={cancelTitleEdit}>
@@ -1107,7 +1107,7 @@ export default function VideoResultPage() {
         {isLearning && suggestedFrames.length > 0 && (
           <button
             className="btn-ghost"
-            style={{ margin: '0 16px', height: 28, fontSize: 11, borderRadius: 6, border: '1px dashed var(--line)', color: 'var(--ink-3)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
+            style={{ margin: '0 16px', height: 28, fontSize: 11, borderRadius: 6, border: '1px dashed var(--bdr)', color: 'var(--mut)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
             onClick={() => { setFramePickerSegmentIdx(activeFrame); setFramePickerOpen(true) }}
             title="从推荐帧中插入截图"
           >
@@ -1119,7 +1119,7 @@ export default function VideoResultPage() {
         <div className="vd-tabs-bar">
           <span className="eyebrow" style={{ flex: 1 }}>提示词格式</span>
           <button onClick={openPicker} title="选择 3 个图片类格式作为 tabs（JSON 自动附加）"
-            style={{ height: 26, padding: '0 8px', borderRadius: 6, fontSize: 10, fontFamily: 'var(--mono)', border: '1px solid var(--line)', background: 'transparent', color: 'var(--ink-3)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            style={{ height: 26, padding: '0 8px', borderRadius: 6, fontSize: 10, fontFamily: 'var(--mono)', border: '1px solid var(--bdr)', background: 'transparent', color: 'var(--mut)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <Settings2 size={11} /> 选择
           </button>
         </div>
@@ -1133,7 +1133,7 @@ export default function VideoResultPage() {
             总结
           </button>
           {!tabs.length && contentTab !== 'summary' && (
-            <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>（提示词格式未加载）</span>
+            <span className="mono" style={{ fontSize: 10, color: 'var(--mut)' }}>（提示词格式未加载）</span>
           )}
         </div>
 
@@ -1166,7 +1166,7 @@ export default function VideoResultPage() {
                   lineHeight: 1.5,
                   padding: '8px 10px',
                   borderRadius: 6,
-                  border: '1px solid var(--line)',
+                  border: '1px solid var(--bdr)',
                   background: 'var(--bg-card, #fff)',
                   color: 'var(--ink-1)',
                   outline: 'none',
@@ -1174,7 +1174,7 @@ export default function VideoResultPage() {
               />
               <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
                 <button className="vd-btn-tool" onClick={cancelEdit}>取消</button>
-                <button className="vd-btn-tool" onClick={saveEdit} style={{ background: 'var(--accent-pink)', color: '#fff', border: 'none' }}>
+                <button className="vd-btn-tool" onClick={saveEdit} style={{ background: 'var(--err)', color: '#fff', border: 'none' }}>
                   <Check size={11} /> 保存为新版本
                 </button>
               </div>
@@ -1198,12 +1198,12 @@ export default function VideoResultPage() {
             {copied ? '已复制！' : '一键复制提示词'}
           </button>
           <button className="vd-btn-sub" data-favored={!!favored[activeFrame]} onClick={handleFavorite}>
-            <Star size={14} fill={favored[activeFrame] ? 'var(--accent-warm)' : 'none'} color={favored[activeFrame] ? 'var(--accent-warm)' : 'currentColor'} />
+            <Star size={14} fill={favored[activeFrame] ? 'var(--wrn)' : 'none'} color={favored[activeFrame] ? 'var(--wrn)' : 'currentColor'} />
             {favored[activeFrame] ? '已收藏此帧 ★' : '收藏此帧'}
           </button>
 
           <div className="vd-frame-nav">
-            <span className="mono" style={{ fontSize: 10, color: 'var(--ink-4)' }}>
+            <span className="mono" style={{ fontSize: 10, color: 'var(--mut)' }}>
               帧 {activeFrame + 1} / {frames.length} · {frame.shot_type}
             </span>
             <div style={{ display: 'flex', gap: 4 }}>
@@ -1286,8 +1286,8 @@ function FormatPicker({ allFormats, selection, onToggle, onCancel, onSave }: For
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: 'var(--bg-elev)',
-          border: '1px solid var(--line)',
+          background: 'var(--srf)',
+          border: '1px solid var(--bdr)',
           borderRadius: 14,
           padding: 18,
           width: 420,
@@ -1299,7 +1299,7 @@ function FormatPicker({ allFormats, selection, onToggle, onCancel, onSave }: For
       >
         <div>
           <div style={{ fontSize: 15, fontWeight: 700 }}>选择 3 个图片类格式</div>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
+          <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 4 }}>
             JSON 永远附加在末尾，不在此处枚举。已选 {selection.length} / 3。
           </div>
         </div>
@@ -1316,7 +1316,7 @@ function FormatPicker({ allFormats, selection, onToggle, onCancel, onSave }: For
                   gap: 10,
                   padding: '8px 10px',
                   borderRadius: 8,
-                  border: `1px solid ${checked ? 'var(--accent-pink)' : 'var(--line)'}`,
+                  border: `1px solid ${checked ? 'var(--err)' : 'var(--bdr)'}`,
                   cursor: 'pointer',
                   background: checked ? 'rgba(255,77,126,0.08)' : 'transparent',
                 }}
@@ -1330,13 +1330,13 @@ function FormatPicker({ allFormats, selection, onToggle, onCancel, onSave }: For
                   <div style={{ fontSize: 13, fontWeight: 600 }}>
                     {f.name}
                     {index !== null && (
-                      <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--accent-pink)' }}>
+                      <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--err)' }}>
                         #{index}
                       </span>
                     )}
                   </div>
                   {f.description && (
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+                    <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 2 }}>
                       {f.description}
                     </div>
                   )}
@@ -1357,8 +1357,8 @@ function FormatPicker({ allFormats, selection, onToggle, onCancel, onSave }: For
               borderRadius: 8,
               border: 'none',
               cursor: selection.length === 3 ? 'pointer' : 'not-allowed',
-              background: selection.length === 3 ? 'var(--ink)' : 'var(--bg-sunken)',
-              color: selection.length === 3 ? 'var(--bg)' : 'var(--ink-4)',
+              background: selection.length === 3 ? 'var(--fg)' : 'var(--bgalt)',
+              color: selection.length === 3 ? 'var(--bg)' : 'var(--mut)',
               fontWeight: 600,
               fontSize: 13,
             }}

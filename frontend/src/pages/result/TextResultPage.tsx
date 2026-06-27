@@ -389,7 +389,7 @@ export default function TextResultPage() {
   if (fetchState.kind === 'loading') {
     return (
       <div className="vm-text-scope" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
-        <span className="mono" style={{ color: 'var(--ink-3)' }}>加载笔记…</span>
+        <span className="mono" style={{ color: 'var(--mut)' }}>加载笔记…</span>
       </div>
     )
   }
@@ -399,7 +399,7 @@ export default function TextResultPage() {
         className="vm-text-scope"
         style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}
       >
-        <span style={{ color: 'var(--accent-pink)', fontWeight: 600 }}>
+        <span style={{ color: 'var(--err)', fontWeight: 600 }}>
           {fetchState.kind === 'error' ? fetchState.message : '没有可显示的笔记'}
         </span>
         <button className="btn-ghost" style={{ padding: '6px 12px' }} onClick={() => navigate(-1)}>
@@ -666,8 +666,8 @@ export default function TextResultPage() {
           >
             <Star
               size={14}
-              fill={favored ? 'var(--accent-warm)' : 'none'}
-              color={favored ? 'var(--accent-warm)' : 'currentColor'}
+              fill={favored ? 'var(--wrn)' : 'none'}
+              color={favored ? 'var(--wrn)' : 'currentColor'}
             />
             {favored ? '已收藏' : '收藏'}
           </button>
@@ -734,12 +734,12 @@ function TextCompareContent({ data }: { data: TextCompareResult }) {
         <div
           style={{
             padding: '14px 18px',
-            background: 'var(--bg-sunken)',
+            background: 'var(--bgalt)',
             borderRadius: 'var(--radius)',
             marginBottom: 16,
             fontSize: 13,
             lineHeight: 1.7,
-            color: 'var(--ink-2)',
+            color: 'var(--fg2)',
           }}
         >
           <span className="eyebrow" style={{ display: 'block', marginBottom: 6 }}>
@@ -764,12 +764,12 @@ function TextCompareContent({ data }: { data: TextCompareResult }) {
             <tr key={t.item_id} data-current={t.is_current}>
               <td className="name-cell" data-current={t.is_current}>{t.name}</td>
               <td className="summary-cell" style={{ fontSize: 12, maxWidth: 280 }}>
-                {(typeof t.summary === 'string' ? t.summary : t.summary?.abstract) || <span style={{ color: 'var(--ink-4)' }}>—</span>}
+                {(typeof t.summary === 'string' ? t.summary : t.summary?.abstract) || <span style={{ color: 'var(--mut)' }}>—</span>}
               </td>
               <td style={{ fontSize: 12, maxWidth: 300 }}>
-                {t.content_preview || <span style={{ color: 'var(--ink-4)' }}>—</span>}
+                {t.content_preview || <span style={{ color: 'var(--mut)' }}>—</span>}
               </td>
-              <td style={{ fontSize: 12, color: 'var(--ink-3)', textAlign: 'right' }}>{t.char_count.toLocaleString()}</td>
+              <td style={{ fontSize: 12, color: 'var(--mut)', textAlign: 'right' }}>{t.char_count.toLocaleString()}</td>
             </tr>
           ))}
         </tbody>

@@ -26,7 +26,7 @@ export function FloatingAskAi({ workspaceId, systemPrompt, scopeHint }: Floating
             position: 'fixed', right: 24, bottom: 80, zIndex: 38,
             display: 'flex', alignItems: 'center', gap: 8,
             padding: '10px 16px',
-            background: 'var(--accent-2)', color: '#fff',
+            background: 'var(--acc)', color: '#fff',
             borderRadius: 99, border: 'none', cursor: 'pointer',
             boxShadow: 'var(--shadow-lg)',
             fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 600,
@@ -46,7 +46,7 @@ export function FloatingAskAi({ workspaceId, systemPrompt, scopeHint }: Floating
           style={{
             position: 'fixed', right: 24, bottom: 80, zIndex: 38,
             width: 400, height: '60vh',
-            background: 'var(--bg-elev)', border: '1px solid var(--line)',
+            background: 'var(--srf)', border: '1px solid var(--bdr)',
             borderRadius: 16, boxShadow: 'var(--shadow-lg)',
             display: 'flex', flexDirection: 'column', overflow: 'hidden',
           }}
@@ -56,11 +56,11 @@ export function FloatingAskAi({ workspaceId, systemPrompt, scopeHint }: Floating
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '10px 16px',
-              borderBottom: '1px solid var(--line)',
+              borderBottom: '1px solid var(--bdr)',
               flexShrink: 0,
             }}
           >
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--accent-2)' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--acc)' }}>
               <MessageCircle size={14} /> 问 AI
             </span>
             <button
@@ -69,7 +69,7 @@ export function FloatingAskAi({ workspaceId, systemPrompt, scopeHint }: Floating
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 width: 26, height: 26,
                 borderRadius: 8, border: 'none', background: 'none',
-                cursor: 'pointer', color: 'var(--ink-3)',
+                cursor: 'pointer', color: 'var(--mut)',
               }}
             >
               <X size={14} />

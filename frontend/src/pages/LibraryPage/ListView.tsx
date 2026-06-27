@@ -18,48 +18,20 @@ interface ListViewProps {
   onDelete: (item: LibraryItem) => void
 }
 
-const TH: React.CSSProperties = {
-  padding: '10px 14px',
-  textAlign: 'left',
-  fontWeight: 500,
-  fontFamily: 'var(--mono)',
-  fontSize: 10.5,
-  letterSpacing: '0.08em',
-  color: 'var(--ink-3)',
-  textTransform: 'uppercase',
-  background: 'var(--bg-sunken)',
-}
-
-const TD: React.CSSProperties = { padding: '12px 14px', fontSize: 13 }
-
-const MONO_TD: React.CSSProperties = {
-  padding: '12px 14px',
-  fontFamily: 'var(--mono)',
-  fontSize: 11,
-  color: 'var(--ink-3)',
-}
-
 export function ListView({ items, selectMode, selectedSet, selectionKey, onToggle, onOpen, onDelete }: ListViewProps) {
   return (
-    <div
-      style={{
-        borderRadius: 'var(--radius)',
-        border: '1px solid var(--line)',
-        overflow: 'hidden',
-        background: 'var(--bg-elev)',
-      }}
-    >
+    <div className="lv-wrapper">
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr>
-            {selectMode && <th style={{ ...TH, width: 36 }}></th>}
-            <th style={TH}>名称</th>
-            <th style={{ ...TH, width: 80 }}>类型</th>
-            <th style={{ ...TH, width: 110 }}>状态</th>
-            <th style={{ ...TH, width: 80 }}>时长</th>
-            <th style={{ ...TH, width: 160 }}>合集</th>
-            <th style={{ ...TH, width: 100 }}>创建时间</th>
-            <th style={{ ...TH, width: 40 }}></th>
+            {selectMode && <th className="lv-th" style={{ width: 36 }}></th>}
+            <th className="lv-th">名称</th>
+            <th className="lv-th" style={{ width: 80 }}>类型</th>
+            <th className="lv-th" style={{ width: 110 }}>状态</th>
+            <th className="lv-th" style={{ width: 80 }}>时长</th>
+            <th className="lv-th" style={{ width: 160 }}>合集</th>
+            <th className="lv-th" style={{ width: 100 }}>创建时间</th>
+            <th className="lv-th" style={{ width: 40 }}></th>
           </tr>
         </thead>
         <tbody>
@@ -73,34 +45,14 @@ export function ListView({ items, selectMode, selectedSet, selectionKey, onToggl
             return (
               <tr
                 key={`${item.workspace_id}:${item.item_id}`}
+                className="lv-row"
                 onClick={() => (selectMode ? onToggle(item.item_id, item.workspace_id) : onOpen(item))}
-                style={{
-                  cursor: 'pointer',
-                  borderTop: '1px solid var(--line)',
-                  transition: 'background 120ms',
-                }}
-                onMouseEnter={(e) => {
-                  ;(e.currentTarget as HTMLElement).style.background = 'var(--bg-sunken)'
-                }}
-                onMouseLeave={(e) => {
-                  ;(e.currentTarget as HTMLElement).style.background = ''
-                }}
               >
                 {selectMode && (
-                  <td style={TD} onClick={(e) => e.stopPropagation()}>
+                  <td className="lv-td" onClick={(e) => e.stopPropagation()}>
                     <span
+                      className={`lv-select-dot${isSel ? ' lv-select-dot--selected' : ''}`}
                       onClick={() => onToggle(item.item_id, item.workspace_id)}
-                      style={{
-                        display: 'grid',
-                        placeItems: 'center',
-                        width: 18,
-                        height: 18,
-                        borderRadius: 99,
-                        background: isSel ? 'var(--ink)' : 'transparent',
-                        color: isSel ? 'var(--bg)' : 'var(--ink-3)',
-                        border: '1.5px solid',
-                        borderColor: isSel ? 'var(--ink)' : 'var(--line-strong)',
-                      }}
                     >
                       {isSel && (
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -110,69 +62,31 @@ export function ListView({ items, selectMode, selectedSet, selectionKey, onToggl
                     </span>
                   </td>
                 )}
-                <td style={TD}>
+                <td className="lv-td">
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <Icon size={16} strokeWidth={1.4} style={{ color: 'var(--ink-3)', flexShrink: 0 }} />
-                    <span
-                      style={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
+                    <Icon size={16} strokeWidth={1.4} style={{ color: 'var(--mut)', flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {item.name || '未命名'}
                     </span>
                   </div>
                 </td>
-                <td style={MONO_TD}>{item.type}</td>
-                <td style={{ padding: '12px 14px' }}>
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 5,
-                      fontSize: 11,
-                      fontFamily: 'var(--mono)',
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 5,
-                        height: 5,
-                        borderRadius: 99,
-                        background: stateColor,
-                        flexShrink: 0,
-                      }}
-                    />
+                <td className="lv-td-mono">{item.type}</td>
+                <td className="lv-td">
+                  <span className="lv-status-cell">
+                    <span className="ex-state-dot" style={{ background: stateColor }} />
                     {stateLabel}
                   </span>
                 </td>
-                <td style={MONO_TD}>{formatDuration(item.duration_seconds)}</td>
-                <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--ink-2)' }}>
+                <td className="lv-td-mono">{formatDuration(item.duration_seconds)}</td>
+                <td className="lv-td" style={{ fontSize: 12, color: 'var(--fg2)' }}>
                   {item.workspace_name}
                 </td>
-                <td style={MONO_TD}>{formatDate(item.created_at)}</td>
-                <td style={{ padding: '12px 14px' }} onClick={(e) => e.stopPropagation()}>
+                <td className="lv-td-mono">{formatDate(item.created_at)}</td>
+                <td className="lv-td" onClick={(e) => e.stopPropagation()}>
                   <button
+                    className="lv-delete-btn"
                     onClick={() => onDelete(item)}
                     title="删除"
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: 'var(--ink-4)',
-                      display: 'grid',
-                      placeItems: 'center',
-                      padding: 4,
-                      borderRadius: 4,
-                      transition: 'color 120ms',
-                    }}
-                    onMouseEnter={(e) => {
-                      ;(e.currentTarget as HTMLElement).style.color = 'var(--accent-pink)'
-                    }}
-                    onMouseLeave={(e) => {
-                      ;(e.currentTarget as HTMLElement).style.color = 'var(--ink-4)'
-                    }}
                   >
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />

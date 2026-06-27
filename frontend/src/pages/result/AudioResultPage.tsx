@@ -337,14 +337,14 @@ export default function AudioResultPage() {
   if (fetchState.kind === 'loading') {
     return (
       <div className="vm-audio-scope" style={{ height: '100%', display: 'grid', placeItems: 'center' }}>
-        <span className="mono" style={{ color: 'var(--ink-3)' }}>加载音频结果…</span>
+        <span className="mono" style={{ color: 'var(--mut)' }}>加载音频结果…</span>
       </div>
     )
   }
   if (fetchState.kind === 'error' || !result) {
     return (
       <div className="vm-audio-scope" style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-        <span style={{ color: 'var(--accent-pink)', fontWeight: 600 }}>
+        <span style={{ color: 'var(--err)', fontWeight: 600 }}>
           {fetchState.kind === 'error' ? fetchState.message : '没有可显示的音频结果'}
         </span>
         <button className="btn-ghost" style={{ padding: '6px 12px' }} onClick={() => navigate(-1)}>
@@ -357,7 +357,7 @@ export default function AudioResultPage() {
   return (
     <div className="vm-audio-scope" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       {/* Nav bar */}
-      <div className="vd-nav" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 20px', borderBottom: '1px solid var(--line)', flexShrink: 0, background: 'var(--bg-elev)' }}>
+      <div className="vd-nav" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 20px', borderBottom: '1px solid var(--bdr)', flexShrink: 0, background: 'var(--srf)' }}>
         <button className="btn-ghost" onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/overview`)} style={{ height: 28, padding: '0 10px', fontSize: 12 }}>
           <ArrowLeft size={13} /> 返回总览
         </button>
@@ -373,7 +373,7 @@ export default function AudioResultPage() {
           <FileText size={12} /> 统一笔记 <span style={{ fontSize: 9, opacity: 0.6 }}>beta</span>
         </button>
         {result.source === 'demo_fixture' && (
-          <span className="mono" style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'var(--accent-warm)', color: '#fff', fontWeight: 600 }} title="demo fixture">DEMO</span>
+          <span className="mono" style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'var(--wrn)', color: '#fff', fontWeight: 600 }} title="demo fixture">DEMO</span>
         )}
         <div style={{ marginLeft: 'auto' }} />
         <div style={{ position: 'relative' }}>
@@ -381,15 +381,15 @@ export default function AudioResultPage() {
             <Download size={13} /> 字幕
           </button>
           {exportOpen && (
-            <div className="vd-dropdown-menu" style={{ position: 'absolute', right: 0, top: 36, zIndex: 50, background: 'var(--bg-elev)', border: '1px solid var(--line)', borderRadius: 8, padding: '4px 0', minWidth: 160, boxShadow: '0 4px 16px rgba(0,0,0,.12)' }}>
+            <div className="vd-dropdown-menu" style={{ position: 'absolute', right: 0, top: 36, zIndex: 50, background: 'var(--srf)', border: '1px solid var(--bdr)', borderRadius: 8, padding: '4px 0', minWidth: 160, boxShadow: '0 4px 16px rgba(0,0,0,.12)' }}>
               {/* 带说话人标注开关 */}
               {hasSpeakers && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer', borderBottom: '1px solid var(--line)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', fontSize: 12, cursor: 'pointer', borderBottom: '1px solid var(--bdr)' }}>
                   <input
                     type="checkbox"
                     checked={exportWithSpeaker}
                     onChange={(e) => setExportWithSpeaker(e.target.checked)}
-                    style={{ accentColor: 'var(--accent-pink)' }}
+                    style={{ accentColor: 'var(--err)' }}
                   />
                   带说话人标注
                 </label>
@@ -413,9 +413,9 @@ export default function AudioResultPage() {
       {result.source === 'demo_fixture' && !demoBannerDismissed && (
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '8px 20px', background: 'color-mix(in srgb, var(--accent-warm) 8%, transparent)',
-          borderBottom: '1px solid color-mix(in srgb, var(--accent-warm) 25%, transparent)',
-          fontSize: 12, color: 'var(--ink-2)', flexShrink: 0,
+          padding: '8px 20px', background: 'color-mix(in srgb, var(--wrn) 8%, transparent)',
+          borderBottom: '1px solid color-mix(in srgb, var(--wrn) 25%, transparent)',
+          fontSize: 12, color: 'var(--fg2)', flexShrink: 0,
         }}>
           <span>当前为示例数据（任务未完成 / 未上传）。完成上传或处理后将自动显示真实结果。</span>
           <button
@@ -435,7 +435,7 @@ export default function AudioResultPage() {
             {playing ? <Pause size={16} /> : <Play size={16} style={{ marginLeft: 2 }} />}
           </button>
           <Waveform progress={progress} height={48} bars={100} onClick={handleWaveformClick} />
-          <div className="mono" style={{ fontSize: 12, color: 'var(--ink-3)', flexShrink: 0, minWidth: 80, textAlign: 'right' }}>
+          <div className="mono" style={{ fontSize: 12, color: 'var(--mut)', flexShrink: 0, minWidth: 80, textAlign: 'right' }}>
             {formatSec(currentSec)} / {result.audio?.duration_str || formatSec(totalSec)}
           </div>
         </div>
@@ -465,7 +465,7 @@ export default function AudioResultPage() {
             gap: 8,
           }}
         >
-          <Music size={16} style={{ color: 'var(--accent-warm)' }} />
+          <Music size={16} style={{ color: 'var(--wrn)' }} />
           <span>已自动切换为音乐分析模式（未检测到足够人声）</span>
         </div>
       )}
@@ -528,7 +528,7 @@ export default function AudioResultPage() {
             )}
             <div className="ad-transcript-scroll">
               {transcriptSegments.length === 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, color: 'var(--ink-4)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, color: 'var(--mut)' }}>
                   <FileText size={32} style={{ opacity: 0.3 }} />
                   <span style={{ fontSize: 13 }}>等待真实数据</span>
                   <span style={{ fontSize: 11 }}>转录结果将在分析完成后显示</span>
@@ -554,7 +554,7 @@ export default function AudioResultPage() {
                       <span className="ad-tr-time">{line.t_str}</span>
                       <div
                         className="ad-tr-avatar"
-                        style={{ background: line.speaker ? speakerColor(line.speaker) : 'var(--ink-3)' }}
+                        style={{ background: line.speaker ? speakerColor(line.speaker) : 'var(--mut)' }}
                       >
                         {line.speaker
                           ? speakerDisplayName(line.speaker, speakerMap).charAt(0)
@@ -646,38 +646,38 @@ export default function AudioResultPage() {
                         <div className="ad-speaker-bar">
                           <div className="ad-speaker-bar-fill" style={{ width: `${pct}%`, background: speakerColor(spkId) }} />
                         </div>
-                        <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 4 }}>
+                        <div style={{ fontSize: 11, color: 'var(--mut)', marginTop: 4 }}>
                           {stats.count} 段 · {formatSec(stats.durationSec)}
                         </div>
                       </div>
                     )
                   })}
-                  <hr style={{ border: 'none', borderTop: '1px solid var(--line)', margin: '16px 0' }} />
+                  <hr style={{ border: 'none', borderTop: '1px solid var(--bdr)', margin: '16px 0' }} />
                 </>
               ) : (
                 <div className="eyebrow" style={{ marginBottom: 14 }}>转录统计</div>
               )}
-              <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.8 }}>
+              <div style={{ fontSize: 13, color: 'var(--fg2)', lineHeight: 1.8 }}>
                 <div>转录行数：<strong>{transcriptSegments.length}</strong></div>
                 <div>总时长：<strong>{result.audio?.duration_str || formatSec(totalSec)}</strong></div>
                 {hasSpeakers && <div>说话人数：<strong>{speakerStats.size}</strong></div>}
               </div>
               {!hasSpeakers && (
-                <div style={{ marginTop: 12, fontSize: 11, color: 'var(--ink-4)' }}>
+                <div style={{ marginTop: 12, fontSize: 11, color: 'var(--mut)' }}>
                   提示：勾选「说话人音色区分」后可自动识别说话人
                 </div>
               )}
 
               {/* 音频元信息卡（A-5） */}
-              <hr style={{ border: 'none', borderTop: '1px solid var(--line)', margin: '16px 0' }} />
+              <hr style={{ border: 'none', borderTop: '1px solid var(--bdr)', margin: '16px 0' }} />
               <div className="eyebrow" style={{ marginBottom: 10 }}>音频信息</div>
-              <div style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 2 }}>
-                <div>时长：<strong style={{ color: 'var(--ink-2)' }}>{result.audio?.duration_str || formatSec(totalSec)}</strong></div>
-                <div>来源：<span style={{ color: 'var(--ink-2)' }}>{result.audio?.url ? '外部链接' : '本地文件'}</span></div>
-                {result.audio?.filename && <div>文件名：<span style={{ color: 'var(--ink-2)' }}>{result.audio.filename}</span></div>}
+              <div style={{ fontSize: 12, color: 'var(--mut)', lineHeight: 2 }}>
+                <div>时长：<strong style={{ color: 'var(--fg2)' }}>{result.audio?.duration_str || formatSec(totalSec)}</strong></div>
+                <div>来源：<span style={{ color: 'var(--fg2)' }}>{result.audio?.url ? '外部链接' : '本地文件'}</span></div>
+                {result.audio?.filename && <div>文件名：<span style={{ color: 'var(--fg2)' }}>{result.audio.filename}</span></div>}
                 {result.audio?.url && (
                   <div style={{ wordBreak: 'break-all' }}>
-                    URL：<a href={result.audio.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-pink)', fontSize: 11 }}>{result.audio.url.slice(0, 60)}{result.audio.url.length > 60 ? '…' : ''}</a>
+                    URL：<a href={result.audio.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--err)', fontSize: 11 }}>{result.audio.url.slice(0, 60)}{result.audio.url.length > 60 ? '…' : ''}</a>
                   </div>
                 )}
               </div>
@@ -685,7 +685,7 @@ export default function AudioResultPage() {
               {result.summary && (
                 <div style={{ marginTop: 20 }}>
                   <div className="eyebrow" style={{ marginBottom: 8 }}>摘要预览</div>
-                  <div style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--ink-3)' }}>
+                  <div style={{ fontSize: 12, lineHeight: 1.6, color: 'var(--mut)' }}>
                     {result.summary.slice(0, 200)}{result.summary.length > 200 ? '…' : ''}
                   </div>
                 </div>
@@ -705,13 +705,13 @@ export default function AudioResultPage() {
                 <div className="eyebrow" style={{ marginBottom: 8 }}>人声音频</div>
                 <audio controls src={result.vocal_url} style={{ width: '100%', marginTop: 8 }} />
                 {result.vocal_path && (
-                  <div style={{ marginTop: 12, fontSize: 12, color: 'var(--ink-4)' }}>
+                  <div style={{ marginTop: 12, fontSize: 12, color: 'var(--mut)' }}>
                     文件：{result.vocal_path}
                   </div>
                 )}
               </>
             ) : (
-              <span className="mono" style={{ fontSize: 12, color: 'var(--ink-4)' }}>
+              <span className="mono" style={{ fontSize: 12, color: 'var(--mut)' }}>
                 未勾选「输出人声音频」或后端能力开发中
               </span>
             )}
@@ -734,14 +734,14 @@ export default function AudioResultPage() {
             {result.music_transcription ? (
               <>
                 <div className="eyebrow" style={{ marginBottom: 8 }}>音乐转写</div>
-                <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--ink-2)' }}>
+                <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--fg2)' }}>
                   <ReactMarkdown remarkPlugins={remarkPlugins}>
                     {result.music_transcription}
                   </ReactMarkdown>
                 </div>
               </>
             ) : (
-              <span className="mono" style={{ fontSize: 12, color: 'var(--ink-4)' }}>
+              <span className="mono" style={{ fontSize: 12, color: 'var(--mut)' }}>
                 未勾选「音乐转写」或后端能力开发中
               </span>
             )}
@@ -753,14 +753,14 @@ export default function AudioResultPage() {
             {result.prompt_output ? (
               <>
                 <div className="eyebrow" style={{ marginBottom: 8 }}>提示词输出</div>
-                <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--ink-2)' }}>
+                <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--fg2)' }}>
                   <ReactMarkdown remarkPlugins={remarkPlugins}>
                     {result.prompt_output}
                   </ReactMarkdown>
                 </div>
               </>
             ) : (
-              <span className="mono" style={{ fontSize: 12, color: 'var(--ink-4)' }}>
+              <span className="mono" style={{ fontSize: 12, color: 'var(--mut)' }}>
                 未勾选「提示词输出」或后端能力开发中
               </span>
             )}
