@@ -91,9 +91,15 @@
 本次无工作区数据（数据库为空），无法执行四类手测。以下为代码级确认：
 
 - ✓ 顶栏四类形态共享，meta 标签正确显示类型+时长
-- ✓ 分栏比例：video 60% / audio 60% / image 50% / text 55%
+- ✓ 分栏比例：四类共享 `notePageStyle`（inline `--note-left-width`），默认 60%，用户可拖拽（42-72%），localStorage 持久化。CSS 中 image 50% / text 55% 的默认值被 inline 覆盖，属死代码
 - ✓ 四类右栏结构统一（title → tags → 总结 → editor → save status）
 - ✓ 播放器/波形/画廊/编辑器各自组件引用正确
-- ✓ 转录面板四类统一（LNTranscriptPanel）
+- ✓ 转录面板仅 video/audio 渲染（LNTranscriptPanel），image/text 无转录（符合设计稿：image 左栏=画廊+meta，text 左栏=编辑器）
 - ✓ 导出/AI 工具菜单统一（enabled/disabled 区分）
 - ⚠ 未验证：真实数据下渲染效果、播放/波形/画廊交互、转录跳转、保存/导出流程
+
+### 4.5 Codex 复验（2026-06-28）
+
+- ✓ build / test / eslint / *ResultPage 未波及 — 全部通过
+- ✓ 报告 §4.4 两处修正已采纳：(1) 分栏比例实际为共享 `notePageStyle` inline 覆盖；(2) 转录面板仅 video/audio
+- **结论**：代码验证通过，报告已修正为准确描述。真实数据下四类手测仍未完成。
