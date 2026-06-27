@@ -10,7 +10,7 @@
   font-family: var(--fd);
   font-weight: 400;
   line-height: 1.08;
-  /* 无负 letter-spacing：得意黑自带字距，不需要手动调 */
+  letter-spacing: normal;  /* 覆盖 design-tokens.css 的负值，得意黑自带字距 */
 }
 
 .eyebrow {

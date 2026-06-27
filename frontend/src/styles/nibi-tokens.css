@@ -106,7 +106,7 @@
   --errl: var(--color-error-light);
 
   --rs: var(--radius-sm);
-  --r:  var(--radius-base);
+  --r:  var(--radius);
   --rl: var(--radius-lg);
   --rf: var(--radius-full);
 
