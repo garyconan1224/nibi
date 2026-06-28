@@ -274,13 +274,6 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
     }
   }, [data])
 
-  const pageTitle = kind === 'note' ? '笔记' : kind === 'replica' ? '复刻' : '资料库'
-
-  const statLabel =
-    showWorkspace && typeFilters.length === 0
-      ? `${filteredWorkspaces?.length ?? 0} 合集`
-      : `${filteredItems.length} 笔记`
-
   const handleOpenItem = useCallback((item: LibraryItem) => {
     if (item.status === 'done') {
       navigate(resolveItemRoute(item.workspace_id, item))
@@ -289,12 +282,6 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
       toast.info('该笔记尚在分析中，请从任务面板查看进度')
     }
   }, [navigate])
-
-  const pageDesc = kind === 'note'
-    ? '学习笔记、总结、要点，按类型或状态找。'
-    : kind === 'replica'
-      ? '帧格截图、提示词、复刻素材，按类型或状态找。'
-      : '横切所有合集的笔记池。按类型筛、按时长/状态排，找到该用的那一个。'
 
   const emptyTitle = kind === 'note' ? '暂无笔记' : kind === 'replica' ? '暂无复刻' : '暂无笔记'
   const emptyDesc = kind === 'note'
@@ -312,16 +299,34 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
 
   return (
     <div className={`lib-page lib-page--${pageTone}`}>
-      {/* ── 顶部栏 ── */}
+      {/* ── Hero ── */}
       <div className="lib-page-header">
         <div>
-          <div className="eyebrow">{pageKicker} · {statLabel} · LOCAL</div>
-          <h1 className="display lib-title">
-            {pageTitle}
-          </h1>
-          <p className="lib-desc">
-            {pageDesc}
+          <div className="lib-kicker">{pageKicker} · LOCAL</div>
+          <h2>
+            {kind === 'note'
+              ? '所有做过的笔记，都在这里汇总。'
+              : kind === 'replica'
+                ? '逐帧复刻，画面里的每个细节。'
+                : '所有参考资料，一键检索引用。'}
+          </h2>
+          <p>
+            {kind === 'note'
+              ? '视频、音频、图片和文本都保留各自入口，只把最需要的操作放在第一层。'
+              : kind === 'replica'
+                ? '对视频和图片进行逐帧拆解与结构分析，沉淀可复用的视觉参考和分镜脚本。'
+                : '导入 PDF、论文、网页和文档，AI 自动建立知识图谱并在笔记和分镜中关联引用。'}
           </p>
+          <div className="lib-hero-actions">
+            <button className="lib-cta lib-cta-primary" onClick={() => navigate('/')}>
+              <Plus size={15} />
+              {kind === 'replica' ? '新建复刻' : kind === 'note' ? '导入内容' : '上传资料'}
+            </button>
+            <button className="lib-cta lib-cta-secondary" onClick={() => navigate('/')}>
+              <Plus size={15} />
+              查看合集
+            </button>
+          </div>
           <div className="lib-mini-stats" aria-label="library-stats">
             <span>全部 {chipCounts?.all ?? 0}</span>
             <span>视频 {chipCounts?.video ?? 0}</span>
@@ -331,31 +336,24 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
           </div>
         </div>
         <div className="lib-actions">
-          {/* 选择控制 */}
           {(filteredItems.length > 0 || (filteredWorkspaces && filteredWorkspaces.length > 0)) && (
             <>
               {selectMode ? (
                 <>
-                  <button className="btn btn-sm" onClick={selectAll}>
-                    全选
-                  </button>
-                  <button className="btn btn-sm" onClick={clearSelection}>
-                    取消
-                  </button>
+                  <button className="btn btn-sm" onClick={selectAll}>全选</button>
+                  <button className="btn btn-sm" onClick={clearSelection}>取消</button>
                   <button
                     className={`btn btn-sm${selectedSet.size > 0 ? ' btn-danger' : ''}`}
-                    style={{ opacity: deleting || selectedSet.size === 0 ? 0.5 : 1 }}
-                    onClick={handleBatchDelete}
                     disabled={deleting || selectedSet.size === 0}
+                    onClick={handleBatchDelete}
                   >
                     <Trash2 size={13} />
                     删除 {selectedSet.size > 0 ? `(${selectedSet.size})` : ''}
                   </button>
                   <button
                     className={`btn btn-sm${selectedSet.size > 0 ? ' btn-secondary' : ''}`}
-                    style={{ opacity: analyzing || selectedSet.size === 0 ? 0.5 : 1 }}
-                    onClick={handleBatchAnalyze}
                     disabled={analyzing || selectedSet.size === 0}
+                    onClick={handleBatchAnalyze}
                     title="仅对选中的图片笔记触发分析（按已存配置），进度见右上角任务队列"
                   >
                     <Sparkles size={13} />
@@ -363,33 +361,26 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
                   </button>
                 </>
               ) : (
-                <button className="btn btn-sm" onClick={enterSelectMode}>
-                  选择
-                </button>
+                <button className="btn btn-sm" onClick={enterSelectMode}>选择</button>
               )}
             </>
           )}
-
-          {/* 排序下拉 */}
           <SortMenu />
-
-          {/* grid/list 切换 */}
           <ViewToggle />
-
-          {/* 导入按钮 — 跳转工作台 */}
-          <button
-            className="btn btn-primary btn-sm"
-            onClick={() => navigate('/')}
-            title="去工作台新建合集"
-          >
-            <Plus size={14} />
-            导入
-          </button>
         </div>
       </div>
 
-      {/* ── Chip 筛选 ── */}
-      <FilterChips counts={chipCounts} />
+      {/* ── Toolbar ── */}
+      <div className="lib-toolbar">
+        <FilterChips counts={chipCounts} />
+        <div className="lib-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+          </svg>
+          <input type="text" placeholder="搜索标题、来源、摘要..." />
+        </div>
+        <ViewToggle />
+      </div>
 
       {/* ── 内容区 ── */}
       {loading && (
@@ -414,14 +405,11 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
           {filteredWorkspaces && filteredWorkspaces.length > 0 && (
             <>
               {typeFilters.length > 0 && (
-                <div className="eyebrow" style={{ marginBottom: 12, marginTop: 4 }}>
-                  合集 · {filteredWorkspaces.length}
+                <div className="sec-h" style={{ marginBottom: 8 }}>
+                  <h3 className="sec-title">合集 · {filteredWorkspaces.length}</h3>
                 </div>
               )}
-              <div
-                className="ex-grid"
-                style={{ marginBottom: typeFilters.length > 0 ? 28 : 0 }}
-              >
+              <div className="note-grid">
                 {filteredWorkspaces.map((ws) => {
                   const wsItems = data.items.filter(
                     (it) => it.workspace_id === ws.workspace_id,
@@ -446,8 +434,8 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
           {!(showWorkspace && typeFilters.length === 0) && (
             <>
               {showWorkspace && typeFilters.length > 0 && filteredItems.length > 0 && (
-                <div className="eyebrow" style={{ marginBottom: 12 }}>
-                  笔记 · {filteredItems.length}
+                <div className="sec-h" style={{ marginBottom: 8 }}>
+                  <h3 className="sec-title">笔记 · {filteredItems.length}</h3>
                 </div>
               )}
               {filteredItems.length === 0 ? (
@@ -473,7 +461,7 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
                   onDelete={handleDeleteOne}
                 />
               ) : (
-                <div className="ex-grid">
+                <div className="note-grid">
                   {filteredItems.map((item) => (
                     <ItemCard
                       key={`${item.workspace_id}:${item.item_id}`}

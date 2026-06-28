@@ -485,8 +485,9 @@
 
 .nibi-note-player-wrap {
   flex: 0 0 auto;
-  height: clamp(240px, 32vw, 52vh);
-  height: clamp(240px, 56.25cqw, 52vh);
+  width: 100%;
+  /* 对齐设计稿 .note-player：宽度驱动的 16:9 盒子，跟随分栏自动缩放、无黑边 */
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   background: #050505;
   display: flex;
@@ -874,51 +875,13 @@
   line-height: 1.4;
 }
 
-/* ── 全屏样式（.nibi-note-left:fullscreen） ── */
+/* ── 全屏样式（对齐设计稿：整个工作台 .nibi-note-page 全屏） ── */
 
-.nibi-note-left:fullscreen {
-  display: flex;
-  flex-direction: column;
-  background: #000;
+.nibi-note-page:fullscreen {
   width: 100vw;
   height: 100vh;
-}
-
-.nibi-note-left:fullscreen .nibi-note-player-wrap {
-  flex: 1;
   max-height: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 0;
-}
-
-.nibi-note-left:fullscreen .ln-video-wrapper {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 0;
-}
-
-.nibi-note-left:fullscreen .ln-video-wrapper video {
-  max-width: 100%;
-  max-height: 100%;
-  width: 100%;
-}
-
-.nibi-note-left:fullscreen .note-controls,
-.nibi-note-left:fullscreen .note-timeline {
-  flex-shrink: 0;
-  background: rgba(0, 0, 0, 0.85);
-  border-color: rgba(255, 255, 255, 0.1);
-  color: #fff;
-}
-
-.nibi-note-left:fullscreen .nibi-note-transcript-wrap {
-  max-height: 200px;
-  flex: none;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--bg, #fbf8f3);
 }
 
 /* ── 转录区头部（设计稿 .note-transcript-head） ── */

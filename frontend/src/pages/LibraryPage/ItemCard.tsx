@@ -1,16 +1,21 @@
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import type { LibraryItem } from '@/services/library'
-import { Mic, Music } from 'lucide-react'
+import { Mic, Music, Play } from 'lucide-react'
 import { resolveItemRoute } from '@/lib/resolveItemRoute'
 import {
-  TYPE_ICON,
-  STATE_COLOR,
   STATE_LABEL,
   primaryStatusToState,
   formatDuration,
   extractDomain,
 } from './libraryHelpers'
+
+const TYPE_LABEL: Record<string, string> = {
+  video: 'VIDEO',
+  audio: 'AUDIO',
+  image: 'IMAGE',
+  text:  'TEXT',
+}
 
 interface ItemCardProps {
   item: LibraryItem
@@ -23,26 +28,22 @@ interface ItemCardProps {
 export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete }: ItemCardProps) {
   const navigate = useNavigate()
   const state = primaryStatusToState(item.primary_task_status)
-  const stateColor = STATE_COLOR[state] || STATE_COLOR.queued
   const stateLabel = STATE_LABEL[state] || 'queued'
-  const Icon = TYPE_ICON[item.type] || TYPE_ICON.text
   const dur = formatDuration(item.duration_seconds)
   const hasDur = item.duration_seconds != null && item.duration_seconds > 0
   const srcLabel = extractDomain(item.source_value)
 
   const isDone = state === 'done'
-  const stateText: Record<string, string> = {
+  const isRunning = state === 'running'
+  const isError = state === 'error'
+
+  const statusText: Record<string, string> = {
     done: '已完成',
     running: '运行中',
     queued: '等待中',
     error: '失败',
   }
-  const typeText: Record<string, string> = {
-    video: '视频',
-    audio: '音频',
-    image: '图文',
-    text: '文本',
-  }
+
   const summaryBits: string[] = []
   if (item.results_summary.has_transcript) summaryBits.push('已转写')
   if (item.results_summary.has_summary) summaryBits.push('已总结')
@@ -53,11 +54,12 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
     ? summaryBits.join(' · ')
     : state === 'error'
       ? '处理失败，请检查链接或重新提交。'
-      : state === 'running'
+      : isRunning
         ? '正在生成结构化笔记与素材索引。'
         : '等待开始分析。'
-  const actionLabel = isDone ? (item.preflight?.intent === 'replica' ? '查看' : '打开') : '进度'
-  const progressWidth = state === 'done' ? '100%' : state === 'running' ? '46%' : state === 'error' ? '100%' : '18%'
+
+  const actionLabel = isDone ? '打开' : '进度'
+  const progressPct = isDone ? 100 : isRunning ? 46 : isError ? 100 : 18
 
   const handleCardClick = () => {
     if (selectMode && onToggleSelect) {
@@ -65,7 +67,6 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
     } else if (isDone) {
       navigate(resolveItemRoute(item.workspace_id, item))
     } else {
-      // 未完成 → 进 ProcessingPage；用首个关联 task 兜底
       const tid = item.related_task_ids?.[0] ?? ''
       if (tid) {
         navigate(`/processing/${tid}`)
@@ -75,74 +76,76 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
     }
   }
 
+  const hasThumb = !!item.thumbnail
+  const coverClass = hasThumb ? '' : `cover-${item.type}` || 'cover-video'
+  const pillClass = isDone ? 'status-pill status-done'
+    : isRunning ? 'status-pill status-run'
+    : isError ? 'status-pill status-error'
+    : 'status-pill'
+  const typeLabel = TYPE_LABEL[item.type] || 'ITEM'
+
+  const metaLabels: string[] = [srcLabel || item.source]
+  if (hasDur) metaLabels.push(dur)
+  if (item.type === 'video' && (item.frames_count ?? 0) > 0) metaLabels.push(`${item.frames_count} 帧`)
+
   return (
-    <div
-      className={`ex-card${selected ? ' ex-card--selected' : ''}`}
+    <article
+      className={`note-card${selected ? ' note-card--selected' : ''}`}
       onClick={handleCardClick}
+      data-kind={item.type}
     >
-      {/* ── Thumbnail 16/9 ── */}
-      <div className="ex-thumb">
-        {item.thumbnail ? (
-          <img src={item.thumbnail} alt={item.name} referrerPolicy="no-referrer" />
-        ) : (
-          <Icon size={32} strokeWidth={1.2} style={{ color: 'rgba(255,255,255,0.45)' }} />
+      {/* Cover */}
+      <div className={`note-cover ${coverClass}`}>
+        {hasThumb ? (
+          <img src={item.thumbnail ?? undefined} alt={item.name} referrerPolicy="no-referrer"
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : null}
+        <span className="media-chip">{typeLabel}</span>
+        <span className={pillClass}>{statusText[state] ?? stateLabel}</span>
+        {!hasThumb && item.type === 'video' && (
+          <div className="cover-icon"><Play fill="currentColor" /></div>
+        )}
+        {!hasThumb && item.type === 'audio' && (
+          <div className="audio-wave">
+            {Array.from({ length: 7 }, (_, i) => <i key={i} />)}
+          </div>
+        )}
+        {!hasThumb && item.type === 'image' && (
+          <div className="image-cluster">
+            {Array.from({ length: 4 }, (_, i) => <span key={i} />)}
+          </div>
+        )}
+        {!hasThumb && item.type === 'text' && (
+          <div className="doc-lines">
+            {Array.from({ length: 4 }, (_, i) => <i key={i} />)}
+          </div>
         )}
 
-        {/* type badge — top-left */}
-        <span className={`ex-type-badge ex-type-badge--${item.type}`}>
-          {item.type.toUpperCase()}
-        </span>
-
-        {/* audio nature badge — bottom-left */}
+        {/* audio nature badge */}
         {item.type === 'audio' && item.audio_nature && (
-          <span className="ex-nature-badge">
-            {item.audio_nature === 'speech' ? <Mic size={12} /> : <Music size={12} />}
+          <span style={{
+            position: 'absolute', left: 9, bottom: 9, zIndex: 1,
+            borderRadius: 'var(--rs)', background: 'oklch(0% 0 0 / .55)',
+            color: 'oklch(100% 0 0)', fontSize: 10, fontFamily: 'var(--fm)',
+            fontWeight: 800, padding: '3px 7px', display: 'inline-flex',
+            alignItems: 'center', gap: 4,
+          }}>
+            {item.audio_nature === 'speech' ? <Mic size={11} /> : <Music size={11} />}
             {item.audio_nature === 'speech' ? '人声' : '音乐'}
           </span>
         )}
 
-        {/* running progress bar */}
-        {state === 'running' && (
-          <div
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: 3,
-              background: 'rgba(255,255,255,0.18)',
-            }}
-          >
-            <div
-              style={{
-                height: '100%',
-                width: '40%',
-                background: 'var(--acc)',
-                transition: 'width 400ms',
-              }}
-            />
-          </div>
-        )}
-
-        {/* state badge — bottom-right */}
-        <div className="ex-badge">
-          <span className="ex-state-dot" style={{ background: stateColor }} />
-          {stateText[state] ?? stateLabel}
-        </div>
-
-        {/* top-right */}
-        <div className="ex-top-right">
+        {/* selection / actions overlay */}
+        <div style={{ position: 'absolute', top: 9, right: 9, zIndex: 2, display: 'flex', gap: 6 }}>
           {selectMode ? (
             <span
-              onClick={(e) => {
-                e.stopPropagation()
-                onToggleSelect?.(item.item_id, item.workspace_id)
-              }}
-              className="ex-select-dot"
+              onClick={(e) => { e.stopPropagation(); onToggleSelect?.(item.item_id, item.workspace_id) }}
               style={{
-                background: selected ? '#fff' : 'rgba(0,0,0,0.5)',
-                color: selected ? 'var(--fg)' : '#fff',
-                borderColor: selected ? '#fff' : 'rgba(255,255,255,0.6)',
+                width: 22, height: 22, borderRadius: 99, display: 'grid', placeItems: 'center',
+                cursor: 'pointer', fontSize: 11,
+                background: selected ? 'oklch(100% 0 0)' : 'oklch(0% 0 0 / .45)',
+                color: selected ? 'var(--fg)' : 'oklch(100% 0 0)',
+                border: selected ? '1.5px solid oklch(100% 0 0)' : '1.5px solid oklch(100% 0 0 / .5)',
               }}
             >
               {selected && (
@@ -154,61 +157,60 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
           ) : (
             <>
               <button
-                className="ex-delete-btn"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onDelete?.(item)
-                }}
+                onClick={(e) => { e.stopPropagation(); onDelete?.(item) }}
                 title="删除"
+                style={{
+                  width: 28, height: 28, borderRadius: 'var(--rs)', border: 'none',
+                  background: 'oklch(0% 0 0 / .45)', color: 'oklch(100% 0 0)',
+                  display: 'grid', placeItems: 'center', cursor: 'pointer',
+                  opacity: 0, transition: 'all .15s',
+                }}
+                className="card-delete-btn"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
                 </svg>
               </button>
               {hasDur && (
-                <span className="ex-dur-badge">{dur}</span>
+                <span style={{
+                  borderRadius: 'var(--rs)', background: 'oklch(0% 0 0 / .55)',
+                  color: 'oklch(100% 0 0)', fontSize: 10, fontFamily: 'var(--fm)',
+                  fontWeight: 700, padding: '3px 6px', display: 'inline-flex',
+                  alignItems: 'center',
+                }}>{dur}</span>
               )}
             </>
           )}
         </div>
       </div>
 
-      {/* ── Meta ── */}
-      <div className="ex-meta">
-        <div className="ex-title-row">
-          <span className="ex-title-dot" aria-hidden="true" />
-          <span className="ex-title" title={item.name}>
-            {item.name || '未命名'}
-          </span>
+      {/* Body */}
+      <div className="note-card-body">
+        <div className="note-title-row">
+          <span className="note-type-dot" />
+          <h3>{item.name || '未命名'}</h3>
         </div>
-        <p className="ex-summary" title={summaryLine}>
-          {summaryLine}
-        </p>
-        <div className="ex-sub-row">
-          <span className="ex-src-label">{srcLabel || item.source}</span>
-          <span className="ex-ws-name">{item.workspace_name}</span>
+
+        <p className="note-summary">{summaryLine}</p>
+
+        <div className="note-meta-row">
+          {metaLabels.map((label, i) => (
+            <span key={i}>{label}</span>
+          ))}
+          <span>{item.workspace_name}</span>
         </div>
-        <div className="ex-progress" data-state={state}>
-          <span style={{ width: progressWidth }} />
+
+        <div className="note-progress-mini">
+          <span style={{ width: `${progressPct}%` }} />
         </div>
-        {(() => {
-          const chips: string[] = [typeText[item.type] ?? item.type]
-          if (hasDur) chips.push(dur)
-          chips.push(item.source === 'local' ? '本地' : '链接')
-          if (item.type === 'image' && item.results_summary.has_summary) chips.push('提示词')
-          const visible = chips.slice(0, 3)
-          return (
-            <div className="ex-card-foot">
-              <div className="ex-chip-row">
-                {visible.map((c) => (
-                  <span key={c} className="ex-chip">{c}</span>
-                ))}
-              </div>
-              <span className="ex-open-link">{actionLabel}</span>
-            </div>
-          )
-        })()}
+
+        <div className="note-card-actions">
+          <span>{isDone ? summaryBits[0] || '已完成' : isRunning ? '生成中…' : ''}</span>
+          <button className="note-open" onClick={(e) => { e.stopPropagation(); handleCardClick() }}>
+            {actionLabel}
+          </button>
+        </div>
       </div>
-    </div>
+    </article>
   )
 }

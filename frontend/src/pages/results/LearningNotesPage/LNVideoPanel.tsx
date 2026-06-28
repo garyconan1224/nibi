@@ -86,12 +86,15 @@ const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
     const [hoverTime, setHoverTime] = useState<number | null>(null)
     const [hoverX, setHoverX] = useState(0)
     const [isFullscreen, setIsFullscreen] = useState(false)
+    const [isPip, setIsPip] = useState(false)
+    const [subtitlesOn, setSubtitlesOn] = useState(true)
 
     const insertAtCursor = useLnEditorStore((s) => s.insertAtCursor)
 
     const getFullscreenTarget = useCallback((): Element | null => {
       const v = videoRef.current
-      return v?.closest('.nibi-note-left') ?? panelRef.current
+      // 对齐设计稿：全屏整个工作台（视频 + 转录 + 右侧笔记），而非仅左栏
+      return v?.closest('.nibi-note-page') ?? v?.closest('.nibi-note-left') ?? panelRef.current
     }, [])
 
     /* ── video 原生事件驱动 state 同步 ── */
@@ -136,6 +139,21 @@ const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
       document.addEventListener('fullscreenchange', onFsChange)
       return () => document.removeEventListener('fullscreenchange', onFsChange)
     }, [getFullscreenTarget])
+
+    /* ── 画中画监听 ── */
+
+    useEffect(() => {
+      const v = videoRef.current
+      if (!v) return
+      const onEnter = () => setIsPip(true)
+      const onLeave = () => setIsPip(false)
+      v.addEventListener('enterpictureinpicture', onEnter)
+      v.addEventListener('leavepictureinpicture', onLeave)
+      return () => {
+        v.removeEventListener('enterpictureinpicture', onEnter)
+        v.removeEventListener('leavepictureinpicture', onLeave)
+      }
+    }, [src])
 
     /* ── 交互控制 ── */
 
@@ -185,6 +203,24 @@ const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
         fullscreenTarget.requestFullscreen()
       }
     }, [getFullscreenTarget])
+
+    const togglePip = useCallback(async () => {
+      const v = videoRef.current
+      if (!v) return
+      try {
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture()
+        } else {
+          await v.requestPictureInPicture()
+        }
+      } catch {
+        /* 浏览器不支持或被拒绝时静默忽略 */
+      }
+    }, [])
+
+    const toggleSubtitles = useCallback(() => {
+      setSubtitlesOn((on) => !on)
+    }, [])
 
     /* ── 进度条交互 ── */
 
@@ -323,7 +359,7 @@ const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
     /* ── 通知父组件状态变化（驱动 transportNode getter 刷新） ── */
     useEffect(() => {
       onTransportChange?.()
-    }, [playing, speed, muted, volume, loop, progress, duration, hoverTime, hoverX, isFullscreen, shooting, onTransportChange])
+    }, [playing, speed, muted, volume, loop, progress, duration, hoverTime, hoverX, isFullscreen, isPip, subtitlesOn, shooting, onTransportChange])
 
     function renderTransportNode() {
       return (
@@ -339,7 +375,7 @@ const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
               <button className="note-icon-btn" onClick={() => skip(10)} title="前进 10 秒">
                 <svg viewBox="0 0 24 24"><path d="M11.5 8V4l4.5 4-4.5 4V8a6 6 0 1 0 6 6" /><text x="12" y="16" fontSize="7" fill="currentColor" textAnchor="middle" stroke="none" fontFamily="var(--fm)" fontWeight="700">10</text></svg>
               </button>
-              <button className="note-icon-btn" disabled title="字幕开关（暂无字幕轨）">
+              <button className={`note-icon-btn${subtitlesOn ? ' is-on' : ''}`} onClick={toggleSubtitles} disabled={!subtitle} title={!subtitle ? '暂无字幕轨' : subtitlesOn ? '隐藏字幕' : '显示字幕'}>
                 <Subtitles size={15} />
               </button>
               <button className={`note-icon-btn${loop ? ' is-on' : ''}`} onClick={toggleLoop} title="循环播放">
@@ -369,7 +405,7 @@ const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
                 <button className="note-icon-btn" onClick={handleScreenshot} disabled={shooting} title="截取当前帧">
                   <Camera size={15} />
                 </button>
-                <button className="note-icon-btn" disabled title="画中画（敬请期待）">
+                <button className={`note-icon-btn${isPip ? ' is-on' : ''}`} onClick={togglePip} disabled={!src} title={isPip ? '退出画中画' : '画中画'}>
                   <PictureInPicture2 size={15} />
                 </button>
                 <button className="note-icon-btn" onClick={toggleFullscreen} title={isFullscreen ? '退出全屏' : '全屏'}>
@@ -465,7 +501,7 @@ const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
               <Play size={24} fill="currentColor" />
             </button>
           )}
-          {subtitle && <div className="note-subtitle">{subtitle}</div>}
+          {subtitlesOn && subtitle && <div className="note-subtitle">{subtitle}</div>}
         </div>
         {renderTransportInline && renderTransportNode()}
         {/* 遗产标题（非 NoteShell 时可能需要，保留） */}
