@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, BookOpenCheck, Brain, Check, ChevronDown, ChevronRight, Download, FileCode, FileDown, FileText, FileType, Image, List, Pencil, Presentation, Sparkles, Subtitles, Trash2 } from 'lucide-react'
+import { ArrowLeft, Bold, BookOpenCheck, Brain, Check, ChevronDown, ChevronRight, Download, FileCode, FileDown, FileText, FileType, Image, List, Minus, Pencil, Plus, Presentation, Sparkles, Subtitles, Trash2, Type } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { downloadSubtitles, exportItemNoteObsidian, getItemNote, putItemNote } from '@/services/workspaces'
@@ -34,6 +34,7 @@ import { NewSummaryModal } from '@/components/NewSummaryModal'
 import NoteChatDrawer from '@/components/NoteChatDrawer'
 import { SourceMdModal } from './SourceMdModal'
 import { FloatingAskAi } from './FloatingAskAi'
+import { useLnEditorStore } from '@/store/lnEditorStore'
 
 /* ────────────────── helpers ────────────────── */
 
@@ -70,6 +71,59 @@ const VIDEO_SPLIT_MIN = 20
 const VIDEO_SPLIT_MAX = 72
 const VIDEO_SPLIT_DEFAULT = 60
 const VIDEO_SPLIT_STORAGE_KEY = 'nibi.note.videoLeftPct'
+const EDITOR_PREFS_STORAGE_KEY = 'nibi.note.editorPrefs'
+
+type NoteEditorPrefs = {
+  fontFamily: 'sans' | 'serif' | 'mono'
+  fontSize: number
+  lineHeight: 1.6 | 1.8 | 2
+  textTone: 'ink' | 'muted' | 'soft'
+  fontWeight: 'regular' | 'medium' | 'bold'
+}
+
+const DEFAULT_EDITOR_PREFS: NoteEditorPrefs = {
+  fontFamily: 'sans',
+  fontSize: 15,
+  lineHeight: 1.8,
+  textTone: 'ink',
+  fontWeight: 'medium',
+}
+
+const FONT_FAMILY_VALUE: Record<NoteEditorPrefs['fontFamily'], string> = {
+  sans: 'var(--fb)',
+  serif: 'var(--fd)',
+  mono: 'var(--fm)',
+}
+
+const TEXT_TONE_VALUE: Record<NoteEditorPrefs['textTone'], string> = {
+  ink: 'var(--fg2)',
+  muted: 'var(--mut)',
+  soft: 'var(--ink-2)',
+}
+
+const FONT_WEIGHT_VALUE: Record<NoteEditorPrefs['fontWeight'], number> = {
+  regular: 400,
+  medium: 500,
+  bold: 700,
+}
+
+function readEditorPrefs(): NoteEditorPrefs {
+  if (typeof window === 'undefined') return DEFAULT_EDITOR_PREFS
+  try {
+    const raw = window.localStorage.getItem(EDITOR_PREFS_STORAGE_KEY)
+    if (!raw) return DEFAULT_EDITOR_PREFS
+    const parsed = JSON.parse(raw) as Partial<NoteEditorPrefs>
+    return {
+      fontFamily: parsed.fontFamily === 'serif' || parsed.fontFamily === 'mono' ? parsed.fontFamily : 'sans',
+      fontSize: typeof parsed.fontSize === 'number' ? clampNumber(parsed.fontSize, 13, 20) : DEFAULT_EDITOR_PREFS.fontSize,
+      lineHeight: parsed.lineHeight === 1.6 || parsed.lineHeight === 2 ? parsed.lineHeight : 1.8,
+      textTone: parsed.textTone === 'muted' || parsed.textTone === 'soft' ? parsed.textTone : 'ink',
+      fontWeight: parsed.fontWeight === 'regular' || parsed.fontWeight === 'bold' ? parsed.fontWeight : 'medium',
+    }
+  } catch {
+    return DEFAULT_EDITOR_PREFS
+  }
+}
 
 function clampNumber(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
@@ -237,6 +291,9 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   // 新建总结（复用 NewSummaryModal）
   const [showNewSummaryModal, setShowNewSummaryModal] = useState(false)
   const [creatingSummary, setCreatingSummary] = useState(false)
+  const [editorPrefsOpen, setEditorPrefsOpen] = useState(false)
+  const editorPrefsRef = useRef<HTMLDivElement>(null)
+  const [editorPrefs, setEditorPrefs] = useState<NoteEditorPrefs>(readEditorPrefs)
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [savedAt, setSavedAt] = useState<string>('')
@@ -322,9 +379,20 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     window.localStorage.setItem(VIDEO_SPLIT_STORAGE_KEY, String(Math.round(noteLeftPct)))
   }, [noteLeftPct])
 
+  useEffect(() => {
+    window.localStorage.setItem(EDITOR_PREFS_STORAGE_KEY, JSON.stringify(editorPrefs))
+  }, [editorPrefs])
+
   const notePageStyle = useMemo<CSSProperties>(
-    () => ({ '--note-left-width': `${noteLeftPct}%` } as CSSProperties),
-    [noteLeftPct],
+    () => ({
+      '--note-left-width': `${noteLeftPct}%`,
+      '--note-copy-font-family': FONT_FAMILY_VALUE[editorPrefs.fontFamily],
+      '--note-copy-font-size': `${editorPrefs.fontSize}px`,
+      '--note-copy-line-height': String(editorPrefs.lineHeight),
+      '--note-copy-color': TEXT_TONE_VALUE[editorPrefs.textTone],
+      '--note-copy-font-weight': String(FONT_WEIGHT_VALUE[editorPrefs.fontWeight]),
+    } as CSSProperties),
+    [noteLeftPct, editorPrefs],
   )
 
   const updateNoteSplitFromClientX = useCallback((clientX: number) => {
@@ -404,6 +472,17 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     document.addEventListener('mousedown', handle)
     return () => document.removeEventListener('mousedown', handle)
   }, [aiToolsOpen])
+
+  useEffect(() => {
+    if (!editorPrefsOpen) return
+    const handle = (e: MouseEvent) => {
+      if (editorPrefsRef.current && !editorPrefsRef.current.contains(e.target as Node)) {
+        setEditorPrefsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [editorPrefsOpen])
 
   // 图文笔记：图片索引 + 加载错误
   const [selectedImageIdx, setSelectedImageIdx] = useState(0)
@@ -622,6 +701,30 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     }
   }, [renameTargetId, renameName, workspaceId, itemId, refreshSummaries])
 
+  const updateEditorPrefs = useCallback((patch: Partial<NoteEditorPrefs>) => {
+    setEditorPrefs((current) => ({ ...current, ...patch }))
+  }, [])
+
+  const adjustEditorFontSize = useCallback((delta: number) => {
+    setEditorPrefs((current) => ({
+      ...current,
+      fontSize: clampNumber(current.fontSize + delta, 13, 20),
+    }))
+  }, [])
+
+  const handleResetEditorPrefs = useCallback(() => {
+    setEditorPrefs(DEFAULT_EDITOR_PREFS)
+  }, [])
+
+  const handleApplyBold = useCallback(() => {
+    const applied = useLnEditorStore.getState().wrapSelection('**', '**')
+    if (!applied) {
+      toast.error('未找到可编辑的笔记正文')
+      return
+    }
+    toast.success('已插入加粗标记')
+  }, [])
+
   // ─── loading / error ───
   if (loading) {
     return (
@@ -758,6 +861,104 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
               </div>
             )
           })()}
+          <div style={{ position: 'relative' }} ref={editorPrefsRef}>
+            <button className="nibi-note-bar-btn nibi-note-bar-btn--label" onClick={() => setEditorPrefsOpen((value) => !value)} title="正文设置">
+              <Type size={14} /> Aa 设置<ChevronDown size={11} />
+            </button>
+            {editorPrefsOpen && (
+              <div className="nibi-note-pref-panel">
+                <div className="nibi-note-pref-group">
+                  <span className="nibi-note-pref-label">字体</span>
+                  <div className="nibi-note-pref-segment">
+                    {[
+                      { key: 'sans', label: 'Sans' },
+                      { key: 'serif', label: 'Serif' },
+                      { key: 'mono', label: 'Mono' },
+                    ].map((option) => (
+                      <button
+                        key={option.key}
+                        className={`nibi-note-pref-chip${editorPrefs.fontFamily === option.key ? ' is-active' : ''}`}
+                        onClick={() => updateEditorPrefs({ fontFamily: option.key as NoteEditorPrefs['fontFamily'] })}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="nibi-note-pref-group">
+                  <span className="nibi-note-pref-label">字号</span>
+                  <div className="nibi-note-pref-stepper">
+                    <button className="nibi-note-pref-icon-btn" onClick={() => adjustEditorFontSize(-1)} title="减小字号">
+                      <Minus size={13} />
+                    </button>
+                    <strong>{editorPrefs.fontSize}px</strong>
+                    <button className="nibi-note-pref-icon-btn" onClick={() => adjustEditorFontSize(1)} title="增大字号">
+                      <Plus size={13} />
+                    </button>
+                  </div>
+                </div>
+                <div className="nibi-note-pref-group">
+                  <span className="nibi-note-pref-label">行高</span>
+                  <div className="nibi-note-pref-segment">
+                    {[1.6, 1.8, 2].map((value) => (
+                      <button
+                        key={value}
+                        className={`nibi-note-pref-chip${editorPrefs.lineHeight === value ? ' is-active' : ''}`}
+                        onClick={() => updateEditorPrefs({ lineHeight: value as NoteEditorPrefs['lineHeight'] })}
+                      >
+                        {value}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="nibi-note-pref-group">
+                  <span className="nibi-note-pref-label">颜色</span>
+                  <div className="nibi-note-pref-swatches">
+                    {[
+                      { key: 'ink', color: 'var(--fg2)', label: '深' },
+                      { key: 'muted', color: 'var(--mut)', label: '柔' },
+                      { key: 'soft', color: 'var(--ink-2)', label: '浅' },
+                    ].map((option) => (
+                      <button
+                        key={option.key}
+                        className={`nibi-note-pref-swatch${editorPrefs.textTone === option.key ? ' is-active' : ''}`}
+                        onClick={() => updateEditorPrefs({ textTone: option.key as NoteEditorPrefs['textTone'] })}
+                        style={{ '--swatch-color': option.color } as CSSProperties}
+                        title={option.label}
+                      >
+                        <span>{option.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="nibi-note-pref-group">
+                  <span className="nibi-note-pref-label">字重</span>
+                  <div className="nibi-note-pref-segment">
+                    {[
+                      { key: 'regular', label: '常规' },
+                      { key: 'medium', label: '中' },
+                      { key: 'bold', label: '粗' },
+                    ].map((option) => (
+                      <button
+                        key={option.key}
+                        className={`nibi-note-pref-chip${editorPrefs.fontWeight === option.key ? ' is-active' : ''}`}
+                        onClick={() => updateEditorPrefs({ fontWeight: option.key as NoteEditorPrefs['fontWeight'] })}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="nibi-note-pref-actions">
+                  <button className="nibi-note-pref-ghost" onClick={handleResetEditorPrefs}>重置</button>
+                  <button className="nibi-note-pref-ghost nibi-note-pref-ghost--accent" onClick={handleApplyBold}>
+                    <Bold size={13} />
+                    加粗选中
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
           {sourceUrl && (
             <a className="nibi-note-bar-btn" href={sourceUrl} target="_blank" rel="noreferrer" title="原链接">↗</a>
           )}

@@ -476,9 +476,145 @@
   border-color: var(--acc, #ff8a36);
 }
 
+.nibi-note-pref-panel {
+  position: absolute;
+  right: 0;
+  top: 34px;
+  z-index: 24;
+  width: 280px;
+  padding: 12px;
+  border: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  border-radius: 12px;
+  background: var(--bg, #fff);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.nibi-note-pref-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nibi-note-pref-label {
+  color: var(--mut, #7c7464);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.nibi-note-pref-segment,
+.nibi-note-pref-swatches,
+.nibi-note-pref-stepper,
+.nibi-note-pref-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nibi-note-pref-segment {
+  flex-wrap: wrap;
+}
+
+.nibi-note-pref-chip,
+.nibi-note-pref-ghost,
+.nibi-note-pref-icon-btn {
+  border: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  background: var(--srf, #fff);
+  color: var(--fg2, #3d3929);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.nibi-note-pref-chip {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.nibi-note-pref-chip.is-active,
+.nibi-note-pref-ghost--accent {
+  border-color: var(--acc, #ff8a36);
+  background: var(--accl, rgba(255, 138, 54, 0.12));
+  color: var(--acc, #ff8a36);
+}
+
+.nibi-note-pref-stepper {
+  justify-content: space-between;
+}
+
+.nibi-note-pref-stepper strong {
+  min-width: 54px;
+  text-align: center;
+  color: var(--fg, #191410);
+  font-size: 12px;
+}
+
+.nibi-note-pref-icon-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nibi-note-pref-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  background: var(--swatch-color);
+  color: transparent;
+  cursor: pointer;
+  position: relative;
+}
+
+.nibi-note-pref-swatch span {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: transparent;
+}
+
+.nibi-note-pref-swatch.is-active {
+  box-shadow: 0 0 0 2px var(--accl, rgba(255, 138, 54, 0.12));
+}
+
+.nibi-note-pref-swatch.is-active span {
+  color: oklch(100% 0 0);
+}
+
+.nibi-note-pref-actions {
+  justify-content: space-between;
+}
+
+.nibi-note-pref-ghost {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* ── 两栏布局：.note-page（设计稿 .note-page） ── */
 .nibi-note-page {
   --note-left-width: 60%;
+  --note-copy-font-family: var(--fb);
+  --note-copy-font-size: 15px;
+  --note-copy-line-height: 1.8;
+  --note-copy-color: var(--fg2);
+  --note-copy-font-weight: 500;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -967,11 +1103,14 @@
   color: var(--fg, #191410);
 }
 
+.nibi-note-right .ProseMirror,
 .nibi-note-right .note-section p,
 .nibi-note-right .note-section li {
-  font-size: clamp(16px, 1.45vw, 20px);
-  line-height: 1.9;
-  color: var(--fg2, #3d3929);
+  font-family: var(--note-copy-font-family);
+  font-size: var(--note-copy-font-size);
+  line-height: var(--note-copy-line-height);
+  color: var(--note-copy-color);
+  font-weight: var(--note-copy-font-weight);
 }
 
 .nibi-note-right .note-section ul {
@@ -990,7 +1129,8 @@
   border-left: 5px solid var(--acc, #ff8a36);
   border-radius: 0 var(--r, 8px) var(--r, 8px) 0;
   background: var(--accl, rgba(255, 138, 54, 0.1));
-  font-size: clamp(18px, 1.55vw, 22px);
+  font-family: var(--note-copy-font-family);
+  font-size: calc(var(--note-copy-font-size) + 2px);
   font-weight: 700;
   font-style: italic;
   color: var(--fg, #191410);

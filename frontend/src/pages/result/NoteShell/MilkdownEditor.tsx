@@ -10,6 +10,7 @@
  */
 import { useEffect, useRef } from 'react'
 import { Editor, rootCtx, defaultValueCtx, prosePluginsCtx, editorViewCtx } from '@milkdown/core'
+import { TextSelection } from '@milkdown/prose/state'
 import { Milkdown, MilkdownProvider, useEditor, useInstance } from '@milkdown/react'
 import { commonmark } from '@milkdown/preset-commonmark'
 import { gfm } from '@milkdown/preset-gfm'
@@ -97,7 +98,27 @@ function MilkdownEditorInner({
       })
       return true
     })
-    return () => useLnEditorStore.getState().setInsertFn(null)
+    useLnEditorStore.getState().setWrapSelectionFn((before, after) => {
+      const editor = getEditor()
+      if (!editor) return false
+      editor.action((ctx: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+        const view = ctx.get(editorViewCtx)
+        const { state } = view
+        const { from, to, empty } = state.selection.main
+        const selected = state.doc.textBetween(from, to, '\n')
+        const insert = `${before}${selected}${after}`
+        const cursor = from + before.length + (empty ? 0 : selected.length)
+        const tr = state.tr.insertText(insert, from, to)
+        tr.setSelection(TextSelection.create(tr.doc, cursor))
+        view.dispatch(tr)
+        view.focus()
+      })
+      return true
+    })
+    return () => {
+      useLnEditorStore.getState().setInsertFn(null)
+      useLnEditorStore.getState().setWrapSelectionFn(null)
+    }
   }, [getEditor])
 
   return <Milkdown />
