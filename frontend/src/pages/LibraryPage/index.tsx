@@ -5,12 +5,10 @@ import { toast } from 'sonner'
 import { fetchLibrary, deleteItem, batchDeleteItems, type LibraryItem, type LibraryResponse } from '@/services/library'
 import { deleteWorkspace, startItemPipeline } from '@/services/workspaces'
 import { useLibraryStore, type SortBy } from '@/store/libraryStore'
-import { resolveItemRoute } from '@/lib/resolveItemRoute'
 import { FilterChips } from './FilterChips'
 import { SortMenu } from './SortMenu'
 import { ViewToggle } from './ViewToggle'
 import { ItemCard } from './ItemCard'
-import { ListView } from './ListView'
 import { WorkspaceCard } from './WorkspaceCard'
 import {
   STATE_ORDER,
@@ -274,15 +272,6 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
     }
   }, [data])
 
-  const handleOpenItem = useCallback((item: LibraryItem) => {
-    if (item.status === 'done') {
-      navigate(resolveItemRoute(item.workspace_id, item))
-    } else {
-      // 未完成 → 不进结果页，提示用户
-      toast.info('该笔记尚在分析中，请从任务面板查看进度')
-    }
-  }, [navigate])
-
   const emptyTitle = kind === 'note' ? '暂无笔记' : kind === 'replica' ? '暂无复刻' : '暂无笔记'
   const emptyDesc = kind === 'note'
     ? '去工作台添加学习素材，或粘贴一个链接开始吧'
@@ -409,7 +398,7 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
                   <h3 className="sec-title">合集 · {filteredWorkspaces.length}</h3>
                 </div>
               )}
-              <div className="note-grid">
+              <div className={`note-grid${viewMode === 'list' ? ' is-list' : ''}`}>
                 {filteredWorkspaces.map((ws) => {
                   const wsItems = data.items.filter(
                     (it) => it.workspace_id === ws.workspace_id,
@@ -450,18 +439,8 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
                     {showAll && data.items.length === 0 ? emptyDesc : '试试切换筛选条件或清除 chip'}
                   </div>
                 </div>
-              ) : viewMode === 'list' ? (
-                <ListView
-                  items={filteredItems}
-                  selectMode={selectMode}
-                  selectedSet={selectedSet}
-                  selectionKey={selectionKey}
-                  onToggle={toggleSelect}
-                  onOpen={handleOpenItem}
-                  onDelete={handleDeleteOne}
-                />
               ) : (
-                <div className="note-grid">
+                <div className={`note-grid${viewMode === 'list' ? ' is-list' : ''}`}>
                   {filteredItems.map((item) => (
                     <ItemCard
                       key={`${item.workspace_id}:${item.item_id}`}
