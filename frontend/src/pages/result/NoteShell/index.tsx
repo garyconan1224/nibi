@@ -565,25 +565,28 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const handleCreateSummary = useCallback(async (opts: {
     template: string; background: string; providerId: string; model: string; searchWeb: boolean
   }) => {
+    const toastId = 'note-summary-creating'
     setCreatingSummary(true)
     setShowNewSummaryModal(false)
+    toast.loading('正在生成总结…', { id: toastId })
     try {
       const s = await createSummary(workspaceId, itemId, opts.template, opts.background, {
         provider_id: opts.providerId,
         model: opts.model,
         search_web: opts.searchWeb,
       })
-      toast.success(`v${s.version} 总结生成完成`)
+      toast.success(`v${s.version} 总结生成完成`, { id: toastId })
       refreshSummaries()
     } catch (err: unknown) {
       const axiosData = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
       if (axiosData && axiosData.includes('chat model')) {
         toast.error('请先在设置中配置 LLM 模型', {
+          id: toastId,
           action: { label: '去设置', onClick: () => navigate('/settings/models') },
         })
       } else {
         const msg = err instanceof Error ? err.message : '生成失败'
-        toast.error(msg)
+        toast.error(msg, { id: toastId })
       }
     } finally {
       setCreatingSummary(false)
@@ -749,7 +752,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                       )
                     })}
                     <div style={{ height: 1, background: 'var(--bdr)', margin: '4px 0' }} />
-                    <button className="btn-ghost" onClick={() => { if (!creatingSummary) { setShowNewSummaryModal(true); setTemplateDropOpen(false) } }} disabled={creatingSummary} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12, ...(creatingSummary ? { color: 'var(--accent)', opacity: 0.7 } : undefined) }}>+ 新建总结…</button>
+                    <button className="btn-ghost" onClick={() => { if (!creatingSummary) { setShowNewSummaryModal(true); setTemplateDropOpen(false) } }} disabled={creatingSummary} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12, ...(creatingSummary ? { color: 'var(--accent)', opacity: 0.7 } : undefined) }}>{creatingSummary ? '生成中…' : '+ 新建总结…'}</button>
                   </div>
                 )}
               </div>
@@ -787,7 +790,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
             <button className="nibi-note-bar-btn nibi-note-bar-btn--label nibi-note-bar-btn--accent" onClick={() => setAiToolsOpen((v) => !v)} title="AI 工具"><Brain size={14} /> AI 工具<ChevronDown size={11} /></button>
             {aiToolsOpen && (
               <div style={{ position: 'absolute', right: 0, top: 34, zIndex: 20, minWidth: 180, padding: '4px', border: '1px solid var(--bdr)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', boxShadow: 'var(--shadow-md)' }}>
-                <button className="btn-ghost" onClick={() => { setShowNewSummaryModal(true); setAiToolsOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}>新建总结</button>
                 <button className="btn-ghost" disabled title="即将上线" style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12, color: 'var(--mut)', cursor: 'not-allowed' }}>敬请期待</button>
               </div>
             )}
