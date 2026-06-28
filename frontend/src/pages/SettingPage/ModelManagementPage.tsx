@@ -303,15 +303,15 @@ const ModelManagementPage = () => {
           padding: 10,
           marginBottom: 16,
           borderRadius: 'var(--r)',
-          border: '1px solid #fca5a5',
-          background: '#fef2f2',
-          color: '#b91c1c',
+          border: '1px solid var(--err)',
+          background: 'var(--errl)',
+          color: 'var(--err)',
           fontSize: 'var(--xs)',
         }}>
           <AlertCircle className="size-4 shrink-0" />
           <span>{error}</span>
           <button
-            style={{ marginLeft: 'auto', color: '#f87171' }}
+            style={{ marginLeft: 'auto', color: 'var(--err)' }}
             onClick={() => setError(null)}
           >
             ✕

@@ -4,6 +4,7 @@ import ScreenshotPage from './ScreenshotPage'
 import TranscriberPage from './TranscriberPage'
 import PromptFormatPage from './PromptFormatPage'
 import PerformanceTierPage from './PerformanceTierPage'
+import { useSettingsShellStore } from '@/store/settingsShellStore'
 
 type TabKey = 'performance' | 'screenshot' | 'transcriber' | 'prompt' | 'defaults'
 
@@ -12,15 +13,57 @@ type TabKey = 'performance' | 'screenshot' | 'transcriber' | 'prompt' | 'default
  *
  * 合并原 ScreenshotPage + TranscriberPage + PromptFormatPage + 任务勾选默认偏好
  * 为一个设置页，内部用 Tabs 切换子视图。
+ *
+ * 保存/重置入口：子页面继续通过 useSettingsShellStore 推送 SaveBar；
+ * 本组件订阅 store 并在页头渲染 settings-save-btn / settings-reset-btn。
  */
 export default function AnalysisDefaultsPage() {
   const { t } = useTranslation('settings')
   const [tab, setTab] = useState<TabKey>('performance')
 
+  // 订阅 SaveBar state：子页 push，本组件渲染按钮
+  const saveBar = useSettingsShellStore((s) => s.saveBarState)
+  const dirty = saveBar.dirtyCount > 0
+  const saving = saveBar.saving ?? false
+
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div className="settings-panel">
+      {/* 页头：标题 + 保存/重置 */}
+      <div className="settings-header">
+        <div>
+          <h2>分析默认偏好</h2>
+          <div className="settings-header-desc">
+            截帧、转写、提示词、性能档位等分析任务的默认配置
+          </div>
+        </div>
+        <div className="settings-header-actions">
+          <button
+            type="button"
+            className="settings-reset-btn"
+            onClick={saveBar.onReset}
+            disabled={!dirty || saving}
+          >
+            重置
+          </button>
+          <button
+            type="button"
+            className="settings-save-btn"
+            onClick={saveBar.onSave}
+            disabled={!dirty || saving}
+          >
+            {saving ? '保存中…' : '保存'}
+          </button>
+        </div>
+      </div>
+
       {/* 内部 Tab 切换 */}
-      <div className="flex items-center gap-1 border-b border-border bg-background px-6">
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 0,
+        borderBottom: '1px solid var(--bdr)',
+        marginBottom: 20,
+      }}>
         <TabBtn
           active={tab === 'performance'}
           onClick={() => setTab('performance')}
@@ -54,7 +97,7 @@ export default function AnalysisDefaultsPage() {
       </div>
 
       {/* 内容区：只渲染激活的子页面 */}
-      <div className="flex-1 overflow-auto">
+      <div>
         {tab === 'performance' && <PerformanceTierPage />}
         {tab === 'screenshot' && <ScreenshotPage />}
         {tab === 'transcriber' && <TranscriberPage />}
@@ -68,10 +111,8 @@ export default function AnalysisDefaultsPage() {
 /** 任务默认勾选偏好（SPEC §2.6）——占位，后续实现 */
 function TaskDefaultsPlaceholder() {
   return (
-    <div className="p-6">
-      <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-        任务默认勾选偏好功能开发中。用户将可自定义「添加素材时默认勾选哪些分析任务」。
-      </div>
+    <div className="settings-empty">
+      <p>任务默认勾选偏好功能开发中。用户将可自定义「添加素材时默认勾选哪些分析任务」。</p>
     </div>
   )
 }
@@ -90,17 +131,18 @@ function TabBtn({
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={[
-        'relative px-4 py-3 text-sm font-medium transition-colors',
-        active
-          ? 'text-foreground'
-          : 'text-muted-foreground hover:text-foreground',
-      ].join(' ')}
+      style={{
+        padding: '10px 16px',
+        fontSize: 'var(--sm)',
+        fontWeight: 500,
+        color: active ? 'var(--fg)' : 'var(--mut)',
+        borderBottom: active ? '2px solid var(--fg)' : '2px solid transparent',
+        transition: 'all 140ms ease',
+        background: 'transparent',
+        cursor: 'pointer',
+      }}
     >
       {children}
-      {active && (
-        <span className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-violet-500" />
-      )}
     </button>
   )
 }

@@ -332,7 +332,7 @@
 }
 .settings-toggle input:checked + .settings-toggle-track .settings-toggle-thumb {
   left: 20px;
-  background: #fff;
+  background: var(--srf);
 }
 
 /* ── 标签 / 开关行 ── */
@@ -419,7 +419,7 @@
   border-radius: 10px;
   display: grid;
   place-items: center;
-  color: #fff;
+  color: var(--srf);
   font-weight: 700;
   font-size: 17px;
   flex-shrink: 0;

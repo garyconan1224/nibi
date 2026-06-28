@@ -70,14 +70,14 @@ function baselineFromDetail(detail: ProviderDetail): EditDraft {
 
 const EMPTY_DRAFT: EditDraft = { api_key: '', base_url: '', enabled: false, name: '' }
 
-/** Provider 颜色映射（用于 pc-logo 背景） */
+/** Provider 颜色映射（用于 pc-logo 背景） — 用 Nibi token 色域 */
 function providerColor(kind: string): string {
   const map: Record<string, string> = {
-    anthropic: '#d3784a',
-    openai_compatible: '#10a37f',
-    ollama: '#4a90d9',
+    anthropic:      'var(--acc)',   // amber accent
+    openai_compatible: 'var(--ok)', // green success
+    ollama:         'var(--acc)',   // 未注册类型回退
   }
-  return map[kind] ?? '#888'
+  return map[kind] ?? 'var(--acc)'
 }
 
 const ProvidersManagementPage = () => {
