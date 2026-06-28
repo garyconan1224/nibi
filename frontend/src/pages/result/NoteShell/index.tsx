@@ -705,7 +705,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
             return (
               <div ref={templateDropRef} style={{ position: 'relative' }}>
                 <button
-                  className="nibi-note-bar-btn"
+                  className="nibi-note-bar-btn nibi-note-bar-btn--label"
                   onClick={() => setTemplateDropOpen((v) => !v)}
                   title="切换总结风格 / 版本"
                 >
@@ -762,7 +762,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
             <button className="nibi-note-bar-btn" onClick={() => setSourceModalOpen(true)} title="源 md"><FileCode size={14} /></button>
           )}
           <div style={{ position: 'relative' }} ref={exportDropRef}>
-            <button className="nibi-note-bar-btn" onClick={() => setExportOpen((v) => !v)} title="导出"><Download size={14} /><ChevronDown size={11} /></button>
+            <button className="nibi-note-bar-btn nibi-note-bar-btn--label" onClick={() => setExportOpen((v) => !v)} title="导出"><Download size={14} /> 导出<ChevronDown size={11} /></button>
             {exportOpen && (
               <div style={{ position: 'absolute', right: 0, top: 34, zIndex: 20, minWidth: 180, padding: '4px', border: '1px solid var(--bdr)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', boxShadow: 'var(--shadow-md)' }}>
                 <button className="btn-ghost" onClick={() => { handleExportMarkdown(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><FileText size={13} /> Markdown</button>
@@ -784,7 +784,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
             )}
           </div>
           <div style={{ position: 'relative' }} ref={aiToolsDropRef}>
-            <button className="nibi-note-bar-btn" onClick={() => setAiToolsOpen((v) => !v)} title="AI 工具"><Brain size={14} /><ChevronDown size={11} /></button>
+            <button className="nibi-note-bar-btn nibi-note-bar-btn--label nibi-note-bar-btn--accent" onClick={() => setAiToolsOpen((v) => !v)} title="AI 工具"><Brain size={14} /> AI 工具<ChevronDown size={11} /></button>
             {aiToolsOpen && (
               <div style={{ position: 'absolute', right: 0, top: 34, zIndex: 20, minWidth: 180, padding: '4px', border: '1px solid var(--bdr)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', boxShadow: 'var(--shadow-md)' }}>
                 <button className="btn-ghost" onClick={() => { setShowNewSummaryModal(true); setAiToolsOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}>新建总结</button>

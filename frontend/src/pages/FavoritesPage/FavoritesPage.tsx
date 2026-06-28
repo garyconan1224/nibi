@@ -7,15 +7,9 @@ import {
   type WorkspaceItem,
   type WorkspaceRecord,
   ITEM_TYPE_TEXT,
-  ITEM_TYPE_COLOR,
 } from '@/types/workspace'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { EmptyState } from '@/components/ui/empty-state'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { resolveItemRoute } from '@/lib/resolveItemRoute'
+import './favorites.css'
 
 type TabKey = 'all' | ItemType
 
@@ -31,6 +25,20 @@ const TAB_DEFS: { key: TabKey; label: string }[] = [
   { key: 'image', label: ITEM_TYPE_TEXT.image },
   { key: 'text', label: ITEM_TYPE_TEXT.text },
 ]
+
+const TYPE_LABEL: Record<string, string> = {
+  video: 'VIDEO',
+  audio: 'AUDIO',
+  image: 'IMAGE',
+  text:  'TEXT',
+}
+
+const COVER_CLASS: Record<string, string> = {
+  video: 'cover-video',
+  audio: 'cover-audio',
+  image: 'cover-image',
+  text:  'cover-text',
+}
 
 function collectFavorites(workspaces: WorkspaceRecord[]): FavoriteEntry[] {
   const out: FavoriteEntry[] = []
@@ -48,8 +56,7 @@ function collectFavorites(workspaces: WorkspaceRecord[]): FavoriteEntry[] {
 }
 
 function resultRouteFor(entry: FavoriteEntry): string {
-  const { workspace, item } = entry
-  return resolveItemRoute(workspace.workspace_id, item)
+  return resolveItemRoute(entry.workspace.workspace_id, entry.item)
 }
 
 export default function FavoritesPage() {
@@ -90,86 +97,98 @@ export default function FavoritesPage() {
   )
 
   return (
-    <div className="h-full w-full overflow-auto bg-[#fbf8f3] p-6">
-      <div className="mx-auto w-full max-w-6xl space-y-4">
-      <header className="flex items-center justify-between rounded-lg border border-black/10 bg-gradient-to-br from-[#fff1f4] to-white/85 px-6 py-5 shadow-[0_18px_50px_rgba(72,50,20,0.07)]">
-        <div className="flex items-center gap-2">
-          <Star className="h-5 w-5 text-amber-500" />
-          <h1 className="font-display text-4xl font-normal leading-none text-foreground">收藏夹</h1>
-          <span className="text-sm text-muted-foreground">
-            {loading ? '加载中…' : `共 ${favorites.length} 项`}
-          </span>
+    <div className="fav-page">
+      {/* Hero */}
+      <div className="lib-page-header">
+        <div>
+          <div className="lib-kicker">FAVORITES · LOCAL</div>
+          <h2>收藏夹</h2>
+          <p>在工作区里点击星标即可把素材收藏到这里。</p>
         </div>
-        <Button variant="ghost" size="sm" onClick={reload} disabled={loading}>
-          <RefreshCw className={`mr-1 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          刷新
-        </Button>
-      </header>
+        <div className="lib-actions">
+          <button className="btn btn-sm" onClick={reload} disabled={loading}>
+            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+            刷新
+          </button>
+        </div>
+      </div>
 
       {error && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+        <div style={{ padding: 12, marginBottom: 12, borderRadius: 'var(--rs)', border: '1px solid var(--err)', background: 'var(--errl)', color: 'var(--err)', fontSize: 13 }}>
           加载失败：{error}
         </div>
       )}
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
-        <TabsList>
-          {TAB_DEFS.map((t) => (
-            <TabsTrigger key={t.key} value={t.key}>
-              {t.label}
-              <span className="ml-1 text-xs text-muted-foreground">
-                {counts[t.key]}
-              </span>
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
+      {/* Filter tabs */}
+      <div className="fav-tabs">
         {TAB_DEFS.map((t) => (
-          <TabsContent key={t.key} value={t.key} className="mt-3">
-            {loading ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {[0, 1, 2].map((i) => (
-                  <Skeleton key={i} className="h-32 w-full rounded-lg" />
-                ))}
-              </div>
-            ) : filtered.length === 0 ? (
-              <EmptyState
-                title={t.key === 'all' ? '还没有收藏内容' : `还没有${t.label}收藏`}
-                description="在工作区里点击星标即可把素材收藏到这里。"
-              />
-            ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {filtered.map((entry) => (
-                  <FavoriteCard key={entry.item.item_id} entry={entry} />
-                ))}
-              </div>
-            )}
-          </TabsContent>
+          <button
+            key={t.key}
+            className={`fav-tab${tab === t.key ? ' fav-tab--active' : ''}`}
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
+            <span>{counts[t.key]}</span>
+          </button>
         ))}
-      </Tabs>
       </div>
+
+      {/* Content */}
+      {loading ? (
+        <div className="note-grid">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="note-card" style={{ minHeight: 200, opacity: 0.5 }}>
+              <div className="note-cover" />
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="empty-state">
+          <div className="empty-state-icon"><Star size={24} strokeWidth={1.5} /></div>
+          <div className="empty-state-title">
+            {tab === 'all' ? '还没有收藏内容' : `还没有${TAB_DEFS.find(t => t.key === tab)?.label ?? ''}收藏`}
+          </div>
+          <div className="empty-state-desc">在工作区里点击星标即可把素材收藏到这里。</div>
+        </div>
+      ) : (
+        <div className="note-grid">
+          {filtered.map((entry) => (
+            <FavoriteCard key={entry.item.item_id} entry={entry} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
 function FavoriteCard({ entry }: { entry: FavoriteEntry }) {
   const { workspace, item } = entry
+  const typeLabel = TYPE_LABEL[item.type] || 'ITEM'
+  const coverClass = COVER_CLASS[item.type] || 'cover-video'
+  const updatedLabel = new Date(item.updated_at).toLocaleString()
+
   return (
-    <Link to={resultRouteFor(entry)}>
-      <Card className="group flex h-full flex-col gap-2 rounded-lg border-black/10 bg-white/80 p-4 transition-colors hover:border-orange-300 hover:shadow-[0_18px_42px_rgba(36,28,18,0.12)]">
-        <div className="flex items-start justify-between gap-2">
-          <span className="line-clamp-2 text-sm font-medium">
-            {item.name || item.source_value}
-          </span>
-          <Badge className={ITEM_TYPE_COLOR[item.type]} variant="outline">
-            {ITEM_TYPE_TEXT[item.type]}
-          </Badge>
+    <Link to={resultRouteFor(entry)} style={{ textDecoration: 'none' }}>
+      <article className="note-card" data-kind={item.type}>
+        <div className={`note-cover ${coverClass}`}>
+          <span className="media-chip">{typeLabel}</span>
+          <span className="status-pill status-done">已收藏</span>
         </div>
-        <p className="text-xs text-muted-foreground">所属：{workspace.name}</p>
-        <p className="text-xs text-muted-foreground">
-          更新于 {new Date(item.updated_at).toLocaleString()}
-        </p>
-      </Card>
+        <div className="note-card-body">
+          <div className="note-title-row">
+            <span className="note-type-dot" />
+            <h3>{item.name || item.source_value}</h3>
+          </div>
+          <p className="note-summary">{workspace.name}</p>
+          <div className="note-meta-row">
+            <span>更新于 {updatedLabel}</span>
+          </div>
+          <div className="note-card-actions">
+            <span>收藏</span>
+            <button className="note-open">打开</button>
+          </div>
+        </div>
+      </article>
     </Link>
   )
 }
