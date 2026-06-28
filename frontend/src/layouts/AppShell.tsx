@@ -268,14 +268,14 @@ export function AppShell({ children }: AppShellProps) {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden print:overflow-visible print:h-auto">
         {/* ── Top bar ── */}
         <div
-          className="flex items-center gap-3 border-b px-5 py-2.5 print:hidden"
+          className="flex items-center gap-2 border-b px-5 py-1 print:hidden"
           style={{ borderColor: 'var(--line)', background: 'var(--bg)' }}
         >
           <div className="flex-1" />
           <ThemeSwitcher />
           {/* 后端状态 chip */}
           <span
-            className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs"
+            className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]"
             style={{
               background: 'var(--bg-sunken)',
               borderColor: 'var(--line)',
@@ -283,7 +283,7 @@ export function AppShell({ children }: AppShellProps) {
             }}
           >
             <span
-              className="inline-block size-1.5 rounded-full"
+              className="inline-block size-1 rounded-full"
               style={{ background: online ? 'var(--accent-green)' : 'var(--accent-pink)' }}
             />
             后端 {BACKEND_ADDR} · {online ? 'online' : 'offline'}
@@ -291,7 +291,7 @@ export function AppShell({ children }: AppShellProps) {
           {/* 系统指标 chip */}
           {stats?.cpu && stats?.memory && (
             <span
-              className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs"
+              className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]"
               style={{
                 background: 'var(--bg-sunken)',
                 borderColor: 'var(--line)',
