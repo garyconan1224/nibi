@@ -903,13 +903,27 @@
   line-height: 1.4;
 }
 
-/* ── 全屏样式（对齐设计稿：整个工作台 .nibi-note-page 全屏） ── */
+/* ── 全屏样式：仅播放器容器全屏 ── */
 
-.nibi-note-page:fullscreen {
+.nibi-note-player-wrap:fullscreen {
   width: 100vw;
   height: 100vh;
   max-height: none;
-  background: var(--bg, #fbf8f3);
+  aspect-ratio: auto;
+  background: #000;
+}
+
+.nibi-note-player-wrap:fullscreen .ln-video-panel,
+.nibi-note-player-wrap:fullscreen .ln-video-wrapper {
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+
+.nibi-note-player-wrap:fullscreen .ln-video-wrapper video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 /* ── 转录区头部（设计稿 .note-transcript-head） ── */

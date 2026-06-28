@@ -93,8 +93,7 @@ const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
 
     const getFullscreenTarget = useCallback((): Element | null => {
       const v = videoRef.current
-      // 对齐设计稿：全屏整个工作台（视频 + 转录 + 右侧笔记），而非仅左栏
-      return v?.closest('.nibi-note-page') ?? v?.closest('.nibi-note-left') ?? panelRef.current
+      return v?.closest('.nibi-note-player-wrap') ?? v?.closest('.ln-video-wrapper') ?? panelRef.current
     }, [])
 
     /* ── video 原生事件驱动 state 同步 ── */
