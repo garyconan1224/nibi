@@ -1,191 +1,126 @@
 import * as React from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
-import { ArrowLeft, Save as SaveIcon, RotateCcw } from 'lucide-react'
+import {
+  Cpu,
+  Download as IcDownload,
+  Sliders,
+  Wifi,
+  Monitor,
+  Trash2,
+  Video,
+  Info,
+  ArrowLeft,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { LangSwitcher } from '@/components/LangSwitcher'
-import { Button } from '@/components/ui/button'
-import { DirtyDot } from '@/components/ui/dirty-dot'
 import { cn } from '@/lib/utils'
-import { useSettingsShellStore } from '@/store/settingsShellStore'
+import { useHealthPulse } from '@/hooks/useHealthPulse'
 
-/**
- * 设置页通用布局（DESIGN_NOTES_SETTINGS.md §4.1）。
- *
- * - 顶部 Header（返回/语言切换）；
- * - 居中 Tab 条导航（替代旧版左侧 250px 菜单）；
- * - 主内容区 `<Outlet />`；
- * - 底部粘性 SaveBar：展示 dirtyCount 徽章 + Save/Reset/Export 插槽。
- *
- * 子页面通过 `<SaveBarPortal />` 向底部栏注入 action 区；
- * 当前版本为最小可用骨架，Portal 逻辑预留给 M1+ 接入 Zustand bus。
- */
-export interface TabItem {
-  /** 路径（完整绝对路径，如 `/settings/providers`） */
-  path: string
-  /** Tab 文案 */
-  label: React.ReactNode
-  /** 图标（可选，lucide） */
-  icon?: React.ReactNode
-}
-
+/** SaveBar 状态类型（保留向后兼容，Step 2+ 逐步移入各 panel 内） */
 export interface SaveBarState {
   dirtyCount: number
   saving?: boolean
   onSave?: () => void
   onReset?: () => void
-  /** 额外右侧插槽，例如 Export 按钮 */
   extra?: React.ReactNode
 }
 
-export interface SettingsShellProps {
-  /** Tab 定义列表；缺省使用内置默认清单 */
-  tabs?: TabItem[]
-  /** SaveBar 当前态；由调用方（路由层或 hook）推送 */
-  saveBar?: SaveBarState
+/**
+ * 设置页左侧导航项定义
+ */
+interface NavItem {
+  path: string
+  icon: React.ReactNode
+  label: string
 }
 
 /**
- * 默认 Tab 清单构造器：基于 `t` 生成 i18n 文案，避免在模块级把运行期
- * 的 i18n 实例冻结为硬编码字符串。
+ * 设置页通用布局 — 对齐设计稿 pg-settings。
+ *
+ * 布局：
+ * - 顶部 settings-head：返回 + eyebrow + 标题 + 描述
+ * - 左栏 settings-sidebar：导航项 + Build 信息卡
+ * - 右栏 settings-content：嵌套路由 <Outlet />
+ *
+ * 导航项按照现有 router 子页组织，不强行凑设计稿数量。
  */
-function buildDefaultTabs(
-  t: (key: string) => string,
-): TabItem[] {
-  return [
-    { path: '/settings/providers-models', label: '模型与渠道' },
-    { path: '/settings/download', label: t('layout.menu.download') },
-    { path: '/settings/analysis-defaults', label: '分析默认偏好' },
-    { path: '/settings/network', label: t('layout.menu.network') },
-    { path: '/settings/monitor', label: t('layout.menu.monitor') },
-    { path: '/settings/trash', label: '垃圾桶' },
-    { path: '/settings/video-templates', label: '视频模板' },
-    { path: '/settings/about', label: t('layout.menu.about') },
-  ]
-}
-
-function TabBar({ tabs }: { tabs: TabItem[] }) {
+export function SettingsShell() {
+  const { t } = useTranslation('settings')
+  const health = useHealthPulse(0)
+  const version = health.data?.version ?? 'v0.4.0'
   const location = useLocation()
+
+  const navItems: NavItem[] = [
+    { path: '/settings/providers-models', icon: <Cpu size={16} />, label: '模型与渠道' },
+    { path: '/settings/analysis-defaults', icon: <Sliders size={16} />, label: '分析默认偏好' },
+    { path: '/settings/download', icon: <IcDownload size={16} />, label: t('layout.menu.download') },
+    { path: '/settings/network', icon: <Wifi size={16} />, label: t('layout.menu.network') },
+    { path: '/settings/monitor', icon: <Monitor size={16} />, label: t('layout.menu.monitor') },
+    { path: '/settings/trash', icon: <Trash2 size={16} />, label: '垃圾桶' },
+    { path: '/settings/video-templates', icon: <Video size={16} />, label: '视频模板' },
+    { path: '/settings/about', icon: <Info size={16} />, label: t('layout.menu.about') },
+  ]
+
   return (
-    <nav
-      role="tablist"
-      aria-label="settings-navigation"
-      className="flex items-center justify-center gap-1 border-b border-border bg-background px-6"
-    >
-      {tabs.map((tab) => {
-        const active = location.pathname === tab.path
-        return (
+    <div className="settings-wrap">
+      {/* ── 顶部头部 ── */}
+      <div className="settings-head">
+        <div className="flex items-center gap-3 mb-2">
           <Link
-            key={tab.path}
-            to={tab.path}
-            role="tab"
-            aria-selected={active}
-            className={cn(
-              'relative flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors',
-              active
-                ? 'text-foreground'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
+            to="/"
+            className="inline-flex items-center gap-1.5 text-sm text-[var(--mut)] hover:text-[var(--fg)] transition-colors"
           >
-            {tab.icon ? <span className="size-4">{tab.icon}</span> : null}
-            <span>{tab.label}</span>
-            {active ? (
-              <span className="pointer-events-none absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-violet-500" />
-            ) : null}
-          </Link>
-        )
-      })}
-    </nav>
-  )
-}
-
-function SaveBar({ state }: { state: SaveBarState | undefined }) {
-  const { t } = useTranslation('settings')
-  const dirty = (state?.dirtyCount ?? 0) > 0
-  return (
-    <div
-      role="toolbar"
-      aria-label="save-bar"
-      className={cn(
-        'sticky bottom-0 flex h-14 items-center justify-between gap-3 border-t border-border bg-background/90 px-6 backdrop-blur',
-      )}
-    >
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        {dirty ? (
-          <>
-            <DirtyDot aria-label="dirty" />
-            <span>
-              {t('shell.saveBar.dirtyCount', '{{count}} 项未保存', {
-                count: state?.dirtyCount ?? 0,
-              })}
+            <ArrowLeft size={14} />
+            <span style={{ fontFamily: 'var(--fd)' }} className="text-base font-semibold text-[var(--fg)]">
+              Nibi
             </span>
-          </>
-        ) : (
-          <span>{t('shell.saveBar.allSaved', '所有变更已保存')}</span>
-        )}
-      </div>
-      <div className="flex items-center gap-2">
-        {state?.extra}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={state?.onReset}
-          disabled={!dirty || state?.saving}
-        >
-          <RotateCcw className="size-4" />
-          {t('shell.saveBar.reset', '重置')}
-        </Button>
-        <Button
-          size="sm"
-          onClick={state?.onSave}
-          disabled={!dirty || state?.saving}
-        >
-          <SaveIcon className="size-4" />
-          {state?.saving
-            ? t('shell.saveBar.saving', '保存中...')
-            : t('shell.saveBar.save', '保存')}
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-export function SettingsShell({
-  tabs,
-  saveBar,
-}: SettingsShellProps) {
-  const { t } = useTranslation('settings')
-  // 订阅 store 里的 SaveBar 状态；显式 prop 优先（便于后续测试注入与特殊路由覆盖）
-  const storeSaveBar = useSettingsShellStore((s) => s.saveBarState)
-  const effectiveSaveBar = saveBar ?? storeSaveBar
-  const effectiveTabs = React.useMemo<TabItem[]>(
-    () => tabs ?? buildDefaultTabs(t),
-    [tabs, t],
-  )
-  return (
-    <div className="flex h-full w-full flex-col overflow-hidden bg-[#fbf8f3]">
-      <header className="flex h-16 items-center justify-between border-b border-black/10 bg-gradient-to-br from-[#fff4e8] to-white/85 px-6">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-          aria-label={t('layout.backHome', '返回首页')}
-        >
-          <ArrowLeft className="size-4" />
-          <span className="text-base font-semibold text-foreground" style={{ fontFamily: 'var(--fd)' }}>
-            Nibi
-          </span>
-        </Link>
-        <LangSwitcher />
-      </header>
-
-      <TabBar tabs={effectiveTabs} />
-
-      <main className="flex-1 overflow-auto p-6">
-        <div className="mx-auto max-w-6xl rounded-lg border border-black/10 bg-white/80 shadow-[0_18px_50px_rgba(72,50,20,0.07)]">
-          <Outlet />
+          </Link>
+          <span className="text-[var(--mut)] text-xs">/</span>
+          <LangSwitcher />
         </div>
-      </main>
+        <div className="eyebrow">SETTINGS · LOCAL · ~/.nibi</div>
+        <h1>设置</h1>
+        <p>
+          模型、API 密钥、下载路径、分析默认偏好。所有设置本地存储，不上传到服务器。
+        </p>
+      </div>
 
-      <SaveBar state={effectiveSaveBar} />
+      {/* ── 左 + 右布局 ── */}
+      <div className="settings-layout">
+        {/* 左侧导航 */}
+        <aside className="settings-sidebar">
+          <div className="settings-nav-title">设置分类</div>
+          <nav className="settings-nav" role="navigation" aria-label="settings-navigation">
+            {navItems.map((item) => {
+              const active = location.pathname === item.path
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={cn('sn-item')}
+                  data-active={active}
+                  aria-current={active ? 'page' : undefined}
+                >
+                  <span className="sn-icon">{item.icon}</span>
+                  <span>{item.label}</span>
+                </Link>
+              )
+            })}
+          </nav>
+
+          {/* Build 信息 */}
+          <div className="settings-nav-footer">
+            <div className="eyebrow">Build</div>
+            <div className="build-version">{version}</div>
+            <div className="build-meta">local · nibi</div>
+          </div>
+        </aside>
+
+        {/* 右侧内容 */}
+        <main className="settings-content">
+          <Outlet />
+        </main>
+      </div>
     </div>
   )
 }
