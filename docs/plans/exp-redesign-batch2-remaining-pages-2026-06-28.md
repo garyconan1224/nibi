@@ -17,7 +17,9 @@ status: ready
 
 **已完成（git，勿重做）**：四类笔记结果页 `pg-note/audio/image/text`（NoteShell）、搜索 `pg-search`、设置 `pg-settings`、主页 `pg-home`。
 
-**本计划范围**：剩余页面，Codex 逐页对齐设计稿。
+**本计划范围**：剩余页面，Codex 逐页对齐设计稿；**外加视频笔记详情页 `pg-note` 的 4 项播放器交互修复（§3.9，功能/交互 bug，非纯视觉）**。
+
+**⚠️ 并发事故（接手前必读）**：本计划起草期间，曾有另一会话与本任务在**同一工作树 `/Users/conan/Desktop/nibi`、同分支 `feat/exp-redesign-p1`** 并发提交，导致 §3.9 的播放器改动被裹进提交 `d71a6c9`「收藏+分镜页 pg-favorites/pg-storyboard」（未单独成 commit）。接手第一步：`git status --short --branch && git log --oneline -8` 对账，确认**只有本任务一个会话**在动这个工作树；§3.9 改动是否已在 HEAD 见 §3.9 自带对账命令，缺则补、全则只验证，**勿重复实现**。若 HEAD 因他人遗留无法 build（如 `FavoritesPage.tsx` 的 `ArrowRight` 未使用 import），先确认非本任务所致再随手修掉使 HEAD 可构建。
 
 ---
 
@@ -59,6 +61,7 @@ status: ready
 | 处理页 | `pg-processing` 3517 | `result/ProcessingPage/index.tsx` (`/processing/:taskId`) | |
 | 知识库 | `pg-knowledge` 3043 | **无对应路由** | ⚠️ 当前无页面，**跳过 + 标注待用户确认，勿擅自新建** |
 | (复查)笔记结果页 | `pg-note/audio/image/text` | `NoteShell` | 首批已完成，**仅复查一致性，非重做** |
+| 视频笔记播放器修复 | `pg-note` 2035 + JS 5463/5500/5555 | `LNVideoPanel` + `NoteShell` | **功能 bug 修复，见 §3.9**（缩放/全屏/字幕/画中画/顶栏收敛） |
 
 ---
 
@@ -101,6 +104,46 @@ status: ready
 
 - `pg-note/audio/image/text` 首批已完成。仅复查：四类与设计稿是否仍一致、有无被本批公共 CSS 改动波及。发现回归才修。
 
+### 3.9 视频笔记播放器 4 项交互修复（功能 bug，非纯视觉）
+
+> 页面用 **NoteShell** 视频态：`.nibi-note-page`（整工作台）/ `.nibi-note-left` / `.nibi-note-player-wrap`；播放器组件 `LNVideoPanel`；控制条经 `renderTransportInline={false}` + `transportNode` getter 渲染在 player-wrap 外。
+> 涉及文件 3 个：`frontend/src/pages/results/LearningNotesPage/LNVideoPanel.tsx`、`frontend/src/pages/result/NoteShell/index.tsx`、`frontend/src/pages/result/NoteShell/note-shell.css`。**零后端/契约改动**。
+
+**对账（先做）**——确认改动是否已在 HEAD（并发事故，见 §0）：
+
+```bash
+git show HEAD:frontend/src/pages/results/LearningNotesPage/LNVideoPanel.tsx | grep -nE "togglePip|toggleSubtitles|subtitlesOn|nibi-note-page"
+git show HEAD:frontend/src/pages/result/NoteShell/note-shell.css        | grep -nE "aspect-ratio: 16 / 9|nibi-note-page:fullscreen|nibi-note-bar-btn--label|nibi-note-bar-btn--accent"
+git show HEAD:frontend/src/pages/result/NoteShell/index.tsx             | grep -nE "nibi-note-bar-btn--label|nibi-note-bar-btn--accent"
+```
+缺项按下文补，全在则只做 §5 真机验证。**勿重复实现**。
+
+**① 视频跟随分栏缩放、消黑边**
+- 根因：`note-shell.css` `.nibi-note-player-wrap` 用 `height: clamp(240px, 56.25cqw, 52vh)`，`52vh` 上限卡死高度，配 `<video> object-fit:contain` → 16:9 视频在矮胖盒子里左右黑边。
+- 设计稿依据：`.note-player{aspect-ratio:16/9}`（行 745）。
+- 改：`.nibi-note-player-wrap` 改 `width:100%; aspect-ratio:16/9;`，删 clamp 高度。盒子宽度随 `.nibi-note-left`（分隔条）变 → 连续缩放、无黑边。
+
+**② 全屏 = 整个工作台**
+- 根因：`LNVideoPanel.tsx` `getFullscreenTarget()` 只全屏 `.nibi-note-left`，且旧 `.nibi-note-left:fullscreen` CSS 把视频 letterbox、转录压 200px。
+- 设计稿依据：`toggleNoteFullscreen()` 全屏 `videoNoteWorkbench`（整 `.note-page`，行 5555-5572）。
+- 改：`getFullscreenTarget()` → `v.closest('.nibi-note-page') ?? v.closest('.nibi-note-left') ?? panelRef.current`；`note-shell.css` 把 `.nibi-note-left:fullscreen` 整块换成 `.nibi-note-page:fullscreen{ width:100vw; height:100vh; max-height:none; background:var(--bg); }`，整页正常 flex 铺满、16:9 播放器自然变大。
+
+**③ 字幕开关 + 原生画中画**
+- 根因：`LNVideoPanel.tsx` 两按钮硬编码 `disabled`、无 onClick。
+- 设计稿依据：`toggleNoteSubtitles()`（行 5463）、`toggleNotePip()`（行 5500，自绘悬浮窗 mock）。
+- 改：
+  - 字幕：新增 `subtitlesOn` state(默认 true)；CC 键 `onClick` 切换 + `is-on` 高亮 + `disabled={!subtitle}`；浮层 `{subtitlesOn && subtitle && ...}`。
+  - 画中画：真实 `<video>` 用**浏览器原生** `requestPictureInPicture()/exitPictureInPicture()`（比 mock 自绘窗更实在）；新增 `isPip` state，监听 video `enterpictureinpicture`/`leavepictureinpicture` 同步高亮；`disabled={!src}`。
+  - `isPip`、`subtitlesOn` 加入 `onTransportChange` 依赖数组（控制条经父 getter 渲染，需通知父刷新）。
+
+**④ 右上角按音频/图文页范式收敛（保留全部功能）**
+- 现状：右上角散落 风格/版本下拉、↗ 原链接、源 md、导出、AI 工具，与设计稿不符。
+- 设计稿依据：`pg-note` 顶栏右侧仅 `VIDEO · 12:34`（行 2044-2046）；导出/AI 工具视觉范式在音频/图文页 `.audio-topbar-btn`（行 2199-2216 / CSS 1036-1040，AI 工具 `--accent`）。
+- 决策（用户拍板）：**保留全部功能，只统一视觉**——导出/AI 工具/风格版本改带文字药丸主按钮，AI 工具 accent；↗/源 md 留小图标次要位。**不删任何功能**（红线）。
+- 改：`note-shell.css` 新增 `.nibi-note-bar-btn--label`（auto 宽 + padding + 600，套 `.audio-topbar-btn` 观感）与 `.nibi-note-bar-btn--accent`（accl/acc token，hover 反色）；`index.tsx` 导出加 `--label`+文字「导出」、AI 工具加 `--label --accent`+文字「AI 工具」、风格/版本下拉加 `--label`（防 32px 固定宽裁字）。
+
+**验收（§5 真机逐项核对）**：拖分隔条播放器连续缩放无黑边；点全屏整页铺满、视频变大无黑边、ESC 同步;CC 键切字幕显隐+高亮;画中画弹原生 PiP+退出+高亮;外链视频两键合理灰显;导出/AI 工具为设计系统药丸(AI accent)且下拉功能与原先一致、窄屏不裁切。
+
 ---
 
 ## 4. 执行协议（Codex）
@@ -115,12 +158,15 @@ status: ready
 6. **复刻详情**（3.3，最复杂）
 7. **知识库**（3.7，跳过 + 标注）
 8. **复查四类结果页**（3.8）
+9. **视频笔记播放器 4 项修复**（3.9，**先对账 HEAD**：已落 `d71a6c9` 则只验证，缺项补；改动单独成 commit `fix(design): 视频笔记播放器交互修复 pg-note`）
 
 **每页流程**：打开真实页 + 读设计稿对照 → 改视觉（复用 Nibi 范式）→ `pnpm -C frontend build` + `test` 通过 → 一页一提交 `feat(design): X 页对齐设计稿 pg-X`。
 
 **自验证（无独立审查，必须自查）**：每页改完自查 → 无写死 hex / 无契约改动 / 现有功能未砍 / API key 遮罩 / 复用 Nibi token；截当前 vs 设计稿对照图存 `frontend/test-results/`。
 
 **遇到即停**：无对应页面 / 需新建功能 / 需改契约 / 与设计稿语义冲突（如设计稿用 AI 绘图示例但实际是 OCR 笔记）→ 停下，在报告标注，不擅自做。
+
+**§3.9 专属遇停**：① 4 项改动既不在 HEAD 也不在工作树 → 疑被并发覆盖，停下报告勿盲目重写；② 用户若后续要「全屏=仅视频元素原生全屏」（不同于当前"整工作台全屏"）→ 产品取舍，等用户拍板。
 
 ---
 
