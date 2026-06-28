@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
-import { Network, ShieldCheck, FolderCog } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Section } from '@/components/ui/section'
 import { FieldRow } from '@/components/ui/field-row'
 import { useConfigStore } from '@/store/configStore'
 import { useSettingsShellStore } from '@/store/settingsShellStore'
@@ -115,153 +113,169 @@ const NetworkSettingsPage = () => {
   const dirty = guard.dirtyMap
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8 p-6">
-      <div>
-        <h1 className="text-[28px] font-semibold tracking-tight">{t('network.title')}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{t('network.subtitle')}</p>
+    <div className="settings-panel">
+      <div className="settings-header">
+        <div>
+          <h2>{t('network.title')}</h2>
+          <div className="settings-header-desc">{t('network.subtitle')}</div>
+        </div>
+        <div className="settings-header-actions">
+          <button
+            type="button"
+            className="settings-reset-btn"
+            onClick={handleReset}
+            disabled={guard.dirtyCount === 0 || isSaving}
+          >
+            重置
+          </button>
+          <button
+            type="button"
+            className="settings-save-btn"
+            onClick={handleSave}
+            disabled={guard.dirtyCount === 0 || isSaving}
+          >
+            {isSaving ? '保存中…' : '保存'}
+          </button>
+        </div>
       </div>
 
       {/* ── Section A · 网络代理 ── */}
-      <Section
-        icon={<Network className="size-4" />}
-        title={t('network.proxyTitle')}
-        description={t('network.proxyDescription')}
-      >
-        <FieldRow
-          htmlFor="proxy"
-          label={t('network.proxyLabel')}
-          hint={t('network.proxySupport')}
-          dirty={dirty.httpProxy}
-        >
-          <Input
-            id="proxy"
-            type="text"
-            value={draft.httpProxy}
-            onChange={(e) => patch({ httpProxy: e.target.value })}
-            placeholder={t('network.proxyPlaceholder')}
-            className="text-sm"
-          />
-        </FieldRow>
-      </Section>
+      <div className="settings-section">
+        <div className="settings-section-title">{t('network.proxyTitle')}</div>
+        <div className="settings-card">
+          <FieldRow
+            htmlFor="proxy"
+            label={t('network.proxyLabel')}
+            hint={t('network.proxySupport')}
+            dirty={dirty.httpProxy}
+          >
+            <Input
+              id="proxy"
+              type="text"
+              value={draft.httpProxy}
+              onChange={(e) => patch({ httpProxy: e.target.value })}
+              placeholder={t('network.proxyPlaceholder')}
+              className="text-sm"
+            />
+          </FieldRow>
+        </div>
+      </div>
 
       {/* ── Section B · PO Token ── */}
-      <Section
-        icon={<ShieldCheck className="size-4" />}
-        title={t('network.poTokenSectionTitle')}
-        description={t('network.poTokenSectionDescription')}
-      >
-        <FieldRow
-          htmlFor="po-token"
-          label={t('network.poTokenLabel')}
-          dirty={dirty.poToken}
-        >
-          <Input
-            id="po-token"
-            type="text"
-            value={draft.poToken}
-            onChange={(e) => patch({ poToken: e.target.value })}
-            placeholder={t('network.poTokenPlaceholder')}
-            className="text-sm font-mono"
-          />
-        </FieldRow>
-        <FieldRow
-          htmlFor="visitor-data"
-          label={t('network.visitorDataLabel')}
-          dirty={dirty.visitorData}
-        >
-          <Input
-            id="visitor-data"
-            type="text"
-            value={draft.visitorData}
-            onChange={(e) => patch({ visitorData: e.target.value })}
-            placeholder={t('network.visitorDataPlaceholder')}
-            className="text-sm font-mono"
-          />
-        </FieldRow>
-      </Section>
+      <div className="settings-section">
+        <div className="settings-section-title">{t('network.poTokenSectionTitle')}</div>
+        <div className="settings-card">
+          <FieldRow
+            htmlFor="po-token"
+            label={t('network.poTokenLabel')}
+            dirty={dirty.poToken}
+          >
+            <Input
+              id="po-token"
+              type="text"
+              value={draft.poToken}
+              onChange={(e) => patch({ poToken: e.target.value })}
+              placeholder={t('network.poTokenPlaceholder')}
+              className="text-sm font-mono"
+            />
+          </FieldRow>
+          <FieldRow
+            htmlFor="visitor-data"
+            label={t('network.visitorDataLabel')}
+            dirty={dirty.visitorData}
+          >
+            <Input
+              id="visitor-data"
+              type="text"
+              value={draft.visitorData}
+              onChange={(e) => patch({ visitorData: e.target.value })}
+              placeholder={t('network.visitorDataPlaceholder')}
+              className="text-sm font-mono"
+            />
+          </FieldRow>
+        </div>
+      </div>
 
       {/* ── Section C · Cookie 目录 ── */}
-      <Section
-        icon={<FolderCog className="size-4" />}
-        title={t('network.cookieSectionTitle')}
-        description={t('network.cookieSectionDescription')}
-      >
-        <FieldRow
-          htmlFor="cookie-dirs"
-          label={t('network.cookieDirsLabel')}
-          hint={t('network.cookieDirsDescription')}
-          dirty={dirty.cookieBaseDirs}
-        >
-          <Textarea
-            id="cookie-dirs"
-            value={draft.cookieBaseDirs}
-            onChange={(e) => patch({ cookieBaseDirs: e.target.value })}
-            placeholder={t('network.cookieDirsPlaceholder')}
-            className="min-h-[88px] text-sm font-mono"
-          />
-        </FieldRow>
-      </Section>
+      <div className="settings-section">
+        <div className="settings-section-title">{t('network.cookieSectionTitle')}</div>
+        <div className="settings-card">
+          <FieldRow
+            htmlFor="cookie-dirs"
+            label={t('network.cookieDirsLabel')}
+            hint={t('network.cookieDirsDescription')}
+            dirty={dirty.cookieBaseDirs}
+          >
+            <Textarea
+              id="cookie-dirs"
+              value={draft.cookieBaseDirs}
+              onChange={(e) => patch({ cookieBaseDirs: e.target.value })}
+              placeholder={t('network.cookieDirsPlaceholder')}
+              className="min-h-[88px] text-sm font-mono"
+            />
+          </FieldRow>
+        </div>
+      </div>
 
       {/* ── Section D · 联网搜索 ── */}
-      <Section
-        icon={<Network className="size-4" />}
-        title="联网搜索"
-        description="总结生成时可选联网搜索补充上下文，需要 Tavily API Key"
-      >
-        <FieldRow
-          htmlFor="tavily-key"
-          label="Tavily API Key"
-          hint="免费注册 tavily.com 即可获得（1000 次/月）"
-          dirty={dirty.tavilyApiKey}
-        >
-          <Input
-            id="tavily-key"
-            type="password"
-            value={draft.tavilyApiKey}
-            onChange={(e) => patch({ tavilyApiKey: e.target.value })}
-            placeholder="tvly-xxxxxxxxxx"
-            className="text-sm font-mono"
-          />
-        </FieldRow>
-        <div className="px-6 pb-4 flex items-center gap-3">
-          <a
-            href="https://app.tavily.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-primary underline"
+      <div className="settings-section">
+        <div className="settings-section-title">联网搜索</div>
+        <div className="settings-card">
+          <FieldRow
+            htmlFor="tavily-key"
+            label="Tavily API Key"
+            hint="免费注册 tavily.com 即可获得（1000 次/月）"
+            dirty={dirty.tavilyApiKey}
           >
-            → 去 tavily.com 免费注册（2 分钟）
-          </a>
-          <button
-            type="button"
-            disabled={tavilyTesting}
-            onClick={async () => {
-              setTavilyTesting(true)
-              setTavilyTestResult(null)
-              try {
-                const { http } = await import('@/services/client')
-                const res = await http.post('/providers/tavily/test', {
-                  api_key: draft.tavilyApiKey.trim(),
-                })
-                setTavilyTestResult(res.data)
-              } catch (err: unknown) {
-                const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '请求失败'
-                setTavilyTestResult({ ok: false, message: msg })
-              } finally {
-                setTavilyTesting(false)
-              }
-            }}
-            className="rounded border px-3 py-1 text-xs font-medium hover:bg-accent disabled:opacity-50"
-          >
-            {tavilyTesting ? '测试中…' : '测试连接'}
-          </button>
-          {tavilyTestResult && (
-            <span className={`text-xs ${tavilyTestResult.ok ? 'text-green-600' : 'text-red-500'}`}>
-              {tavilyTestResult.ok ? '✓' : '✗'} {tavilyTestResult.message}
-            </span>
-          )}
+            <Input
+              id="tavily-key"
+              type="password"
+              value={draft.tavilyApiKey}
+              onChange={(e) => patch({ tavilyApiKey: e.target.value })}
+              placeholder="tvly-xxxxxxxxxx"
+              className="text-sm font-mono"
+            />
+          </FieldRow>
+          <div className="px-6 pb-4 flex items-center gap-3">
+            <a
+              href="https://app.tavily.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-primary underline"
+            >
+              → 去 tavily.com 免费注册（2 分钟）
+            </a>
+            <button
+              type="button"
+              disabled={tavilyTesting}
+              onClick={async () => {
+                setTavilyTesting(true)
+                setTavilyTestResult(null)
+                try {
+                  const { http } = await import('@/services/client')
+                  const res = await http.post('/providers/tavily/test', {
+                    api_key: draft.tavilyApiKey.trim(),
+                  })
+                  setTavilyTestResult(res.data)
+                } catch (err: unknown) {
+                  const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || '请求失败'
+                  setTavilyTestResult({ ok: false, message: msg })
+                } finally {
+                  setTavilyTesting(false)
+                }
+              }}
+              className="rounded border px-3 py-1 text-xs font-medium hover:bg-accent disabled:opacity-50"
+            >
+              {tavilyTesting ? '测试中…' : '测试连接'}
+            </button>
+            {tavilyTestResult && (
+              <span className={`text-xs ${tavilyTestResult.ok ? 'text-green-600' : 'text-red-500'}`}>
+                {tavilyTestResult.ok ? '✓' : '✗'} {tavilyTestResult.message}
+              </span>
+            )}
+          </div>
         </div>
-      </Section>
+      </div>
     </div>
   )
 }

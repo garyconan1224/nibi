@@ -1,6 +1,4 @@
-import { Server, Github, FileText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Section } from '@/components/ui/section'
 import { useHealthPulse } from '@/hooks/useHealthPulse'
 
 /**
@@ -44,172 +42,118 @@ export default function AboutPage() {
   const dynamicVersion = health.data?.version || t('about.versionNumber')
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8 p-6">
-      {/* 页面标题 */}
-      <div>
-        <h1 className="text-[28px] font-semibold tracking-tight">
-          {t('about.title')}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {t('about.subtitle')}
-        </p>
+    <div className="settings-panel">
+      <div className="settings-header">
+        <div>
+          <h2>{t('about.title')}</h2>
+          <div className="settings-header-desc">
+            {t('about.subtitle')}
+          </div>
+        </div>
+        <div className="settings-header-actions">
+          <span className="status-tag online">
+            <span className="status-dot" />
+            {t('about.statusActive')}
+          </span>
+        </div>
       </div>
 
       {/* Section 1: 应用信息 */}
-      <Section
-        title={t('about.appInfoTitle')}
-        description={t('about.appInfoDescription')}
-        icon={<Server className="size-4" />}
-      >
-        <div className="space-y-4">
-          <div className="rounded-lg border border-border bg-card text-card-foreground p-4">
-            <div className="flex items-center gap-4">
-              <div className="flex size-12 items-center justify-center rounded-lg bg-violet-100">
-                <Server className="size-6 text-violet-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold">{t('about.appName')}</h3>
-                <p className="text-sm text-muted-foreground">
-                  {t('about.appDescription')}
-                </p>
-              </div>
+      <div className="settings-section">
+        <div className="settings-section-title">{t('about.appInfoTitle')}</div>
+        <div className="settings-card">
+          <div className="settings-row">
+            <div className="settings-row-label">
+              {t('about.appName')}
+              <div className="settings-row-hint">{t('about.appDescription')}</div>
             </div>
-            <p className="mt-4 text-sm text-muted-foreground">
-              {t('about.appSummary')}
-            </p>
+            <div className="settings-row-control" style={{ justifyContent: 'flex-start' }}>
+              <p className="text-sm" style={{ color: 'var(--fg2)' }}>{t('about.appSummary')}</p>
+            </div>
           </div>
 
           {/* 版本信息行 */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            <div className="rounded-lg border border-border bg-card text-card-foreground p-3">
-              <div className="text-xs font-medium text-muted-foreground">
-                {t('about.versionLabel')}
-              </div>
-              <div className="mt-1 font-mono text-sm font-semibold">
+          <div className="settings-row">
+            <div className="settings-row-label">{t('about.versionLabel')}</div>
+            <div className="settings-row-control" style={{ justifyContent: 'flex-start' }}>
+              <span style={{ fontFamily: 'var(--fm)', fontSize: 'var(--sm)', fontWeight: 600 }}>
                 {dynamicVersion}
-              </div>
+              </span>
             </div>
-            <div className="rounded-lg border border-border bg-card text-card-foreground p-3">
-              <div className="text-xs font-medium text-muted-foreground">
-                {t('about.statusLabel')}
-              </div>
-              <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700">
-                <span className="size-1.5 rounded-full bg-emerald-600" />
+          </div>
+          <div className="settings-row">
+            <div className="settings-row-label">{t('about.statusLabel')}</div>
+            <div className="settings-row-control" style={{ justifyContent: 'flex-start' }}>
+              <span className="status-tag online">
+                <span className="status-dot" />
                 {t('about.statusActive')}
-              </div>
+              </span>
             </div>
           </div>
         </div>
-      </Section>
+      </div>
 
       {/* Section 2: 技术栈与依赖 */}
-      <Section
-        title={t('about.dependenciesTitle')}
-        description={t('about.dependenciesDescription')}
-        icon={<FileText className="size-4" />}
-      >
-        <div className="space-y-6">
+      <div className="settings-section">
+        <div className="settings-section-title">{t('about.dependenciesTitle')}</div>
+        <div className="settings-card">
           {/* 前端依赖 */}
-          <div>
-            <h4 className="mb-3 text-sm font-semibold text-foreground">
-              {t('about.frontendStack')}
-            </h4>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="settings-row">
+            <div className="settings-row-label">{t('about.frontendStack')}</div>
+            <div className="settings-row-control" style={{ justifyContent: 'flex-start', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%' }}>
               {FRONTEND_DEPS.map((dep) => (
-                <div
-                  key={dep.name}
-                  className="rounded-lg border border-border bg-card text-card-foreground p-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-medium">{dep.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {dep.purpose}
-                      </div>
-                    </div>
-                    {dep.version && (
-                      <div className="text-xs font-mono text-muted-foreground">
-                        {dep.version}
-                      </div>
-                    )}
-                  </div>
+                <div key={dep.name} style={{ fontSize: 'var(--xs)', color: 'var(--fg2)' }}>
+                  <span style={{ fontWeight: 500, color: 'var(--fg)' }}>{dep.name}</span>
+                  {dep.version ? ` ${dep.version}` : ''}
+                  <span style={{ color: 'var(--mut)', marginLeft: 6 }}>{dep.purpose}</span>
                 </div>
               ))}
             </div>
           </div>
-
           {/* 后端依赖 */}
-          <div>
-            <h4 className="mb-3 text-sm font-semibold text-foreground">
-              {t('about.backendStack')}
-            </h4>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="settings-row">
+            <div className="settings-row-label">{t('about.backendStack')}</div>
+            <div className="settings-row-control" style={{ justifyContent: 'flex-start', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%' }}>
               {BACKEND_DEPS.map((dep) => (
-                <div
-                  key={dep.name}
-                  className="rounded-lg border border-border bg-card text-card-foreground p-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-medium">{dep.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {dep.purpose}
-                      </div>
-                    </div>
-                    {dep.version && (
-                      <div className="text-xs font-mono text-muted-foreground">
-                        {dep.version}
-                      </div>
-                    )}
-                  </div>
+                <div key={dep.name} style={{ fontSize: 'var(--xs)', color: 'var(--fg2)' }}>
+                  <span style={{ fontWeight: 500, color: 'var(--fg)' }}>{dep.name}</span>
+                  {dep.version ? ` ${dep.version}` : ''}
+                  <span style={{ color: 'var(--mut)', marginLeft: 6 }}>{dep.purpose}</span>
                 </div>
               ))}
             </div>
           </div>
         </div>
-      </Section>
+      </div>
 
       {/* Section 3: 许可证与开源 */}
-      <Section
-        title={t('about.licenseTitle')}
-        description={t('about.licenseDescription')}
-        icon={<Github className="size-4" />}
-      >
-        <div className="space-y-4">
-          <div className="rounded-lg border border-border bg-card text-card-foreground p-4">
-            <div className="flex items-start gap-3">
-              <FileText className="mt-1 size-5 shrink-0 text-violet-600" />
-              <div>
-                <h4 className="font-semibold">{t('about.mitLicense')}</h4>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {t('about.licenseText')}
-                </p>
-              </div>
+      <div className="settings-section">
+        <div className="settings-section-title">{t('about.licenseTitle')}</div>
+        <div className="settings-card">
+          <div className="settings-row">
+            <div className="settings-row-label">
+              {t('about.mitLicense')}
+              <div className="settings-row-hint">{t('about.licenseText')}</div>
             </div>
           </div>
-
-          <div className="rounded-lg border border-border bg-card text-card-foreground p-4">
-            <div className="flex items-start gap-3">
-              <Github className="mt-1 size-5 shrink-0 text-violet-600" />
-              <div>
-                <h4 className="font-semibold">{t('about.githubTitle')}</h4>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {t('about.githubDescription')}
-                </p>
-                <a
-                  href="https://github.com/your-org/nibi"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-violet-600 hover:text-violet-700"
-                >
-                  View on GitHub
-                  <span className="text-xs">→</span>
-                </a>
-              </div>
+          <div className="settings-row">
+            <div className="settings-row-label">
+              {t('about.githubTitle')}
+              <div className="settings-row-hint">{t('about.githubDescription')}</div>
+            </div>
+            <div className="settings-row-control" style={{ justifyContent: 'flex-start' }}>
+              <a
+                href="https://github.com/your-org/nibi"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: 'var(--sm)', fontWeight: 500, color: 'var(--acc)' }}
+              >
+                View on GitHub →
+              </a>
             </div>
           </div>
         </div>
-      </Section>
+      </div>
     </div>
   )
 }
