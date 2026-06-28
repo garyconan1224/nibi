@@ -66,7 +66,7 @@ const TEMPLATE_LABELS: Record<string, string> = {
 const tl = (id: string) => TEMPLATE_LABELS[id] ?? id
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'failed'
-const VIDEO_SPLIT_MIN = 42
+const VIDEO_SPLIT_MIN = 20
 const VIDEO_SPLIT_MAX = 72
 const VIDEO_SPLIT_DEFAULT = 60
 const VIDEO_SPLIT_STORAGE_KEY = 'nibi.note.videoLeftPct'
