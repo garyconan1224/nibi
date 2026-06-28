@@ -2,15 +2,25 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type FilterKey = 'all' | 'video' | 'audio' | 'image' | 'text' | 'workspace'
+export type FilterKey = 'all' | 'video' | 'audio' | 'image' | 'text' | 'collection' | 'running'
+
+const VALID_FILTER_KEYS = new Set<FilterKey>(['all', 'video', 'audio', 'image', 'text', 'collection', 'running'])
+
+function normalizeFilters(filters?: string[]): FilterKey[] {
+  const mapped = (filters ?? [])
+    .map((key) => (key === 'workspace' ? 'collection' : key))
+    .filter((key): key is FilterKey => VALID_FILTER_KEYS.has(key as FilterKey))
+  return mapped.length > 0 ? Array.from(new Set(mapped)) : ['all']
+}
 
 export const FILTER_OPTIONS: { key: FilterKey; label: string }[] = [
   { key: 'all', label: '全部' },
   { key: 'video', label: '视频' },
   { key: 'audio', label: '音频' },
-  { key: 'image', label: '图片' },
-  { key: 'text', label: '文字' },
-  { key: 'workspace', label: '合集' },
+  { key: 'image', label: '图文' },
+  { key: 'text', label: '文本' },
+  { key: 'collection', label: '合集' },
+  { key: 'running', label: '生成中' },
 ]
 
 export type SortBy =
@@ -35,6 +45,7 @@ export type ViewMode = 'grid' | 'list'
 interface LibraryStore {
   selectedFilters: FilterKey[]
   toggleFilter: (key: FilterKey) => void
+  setSelectedFilters: (filters: FilterKey[]) => void
   sortBy: SortBy
   setSortBy: (sort: SortBy) => void
   viewMode: ViewMode
@@ -48,7 +59,7 @@ export const useLibraryStore = create<LibraryStore>()(
 
       toggleFilter: (key) =>
         set((s) => {
-          const prev = s.selectedFilters
+          const prev = normalizeFilters(s.selectedFilters)
           const has = prev.includes(key)
 
           if (key === 'all') {
@@ -64,12 +75,25 @@ export const useLibraryStore = create<LibraryStore>()(
           return { selectedFilters: next }
         }),
 
+      setSelectedFilters: (filters) =>
+        set({ selectedFilters: normalizeFilters(filters) }),
+
       sortBy: 'created_desc',
       setSortBy: (sortBy) => set({ sortBy }),
 
       viewMode: 'grid',
       setViewMode: (viewMode) => set({ viewMode }),
     }),
-    { name: 'nibi-library' },
+    {
+      name: 'nibi-library',
+      version: 2,
+      migrate: (persistedState) => {
+        const state = persistedState as Partial<LibraryStore> | undefined
+        return {
+          ...state,
+          selectedFilters: normalizeFilters((state?.selectedFilters as string[] | undefined) ?? ['all']),
+        }
+      },
+    },
   ),
 )

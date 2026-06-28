@@ -16,6 +16,16 @@ import {
 } from './libraryHelpers'
 import './library.css'
 
+function matchesQuery(query: string, values: Array<string | null | undefined>): boolean {
+  if (!query) return true
+  return values.some((value) => value?.toLowerCase().includes(query))
+}
+
+function isItemGenerating(item: LibraryItem): boolean {
+  const taskState = primaryStatusToState(item.primary_task_status)
+  return taskState === 'queued' || taskState === 'running' || item.status === 'pending' || item.status === 'processing'
+}
+
 function sortItems(items: LibraryItem[], sortBy: SortBy): LibraryItem[] {
   const arr = [...items]
 
@@ -74,8 +84,10 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
   const [selectedSet, setSelectedSet] = useState<Set<string>>(new Set())
   const [deleting, setDeleting] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
+  const [query, setQuery] = useState('')
 
   const selectedFilters = useLibraryStore((s) => s.selectedFilters)
+  const setSelectedFilters = useLibraryStore((s) => s.setSelectedFilters)
   const sortBy = useLibraryStore((s) => s.sortBy)
   const viewMode = useLibraryStore((s) => s.viewMode)
 
@@ -129,46 +141,97 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
     load()
   }, [load])
 
-  const showWorkspace = selectedFilters.includes('workspace')
   const typeFilters = selectedFilters.filter(
-    (k) => k !== 'all' && k !== 'workspace',
-  ) as string[]
+    (k): k is LibraryItem['type'] => k === 'video' || k === 'audio' || k === 'image' || k === 'text',
+  )
+  const showCollections = selectedFilters.includes('collection')
+  const showRunning = selectedFilters.includes('running')
   const showAll = selectedFilters.includes('all')
+  const normalizedQuery = query.trim().toLowerCase()
 
-  const filteredWorkspaces = useMemo(() => {
-    if (!data || !showWorkspace) return null
-    let ws = data.workspaces
-    if (kind) ws = ws.filter((w) => w.kind === kind)
-    return ws
-  }, [data, showWorkspace, kind])
-
-  const filteredItems = useMemo(() => {
+  const scopedItems = useMemo(() => {
     if (!data) return []
-    let items: LibraryItem[]
-    // 先按 kind 过滤（笔记/复刻页）
-    const kindItems = kind ? data.items.filter((it) => it.workspace_kind === kind) : data.items
-    if (showAll) {
-      items = kindItems
-    } else if (typeFilters.length === 0) {
-      return []
-    } else {
-      items = kindItems.filter((it) => typeFilters.includes(it.type))
+    let items = kind ? data.items.filter((it) => it.workspace_kind === kind) : data.items
+    if (intentFilter) items = items.filter((it) => it.preflight?.intent === intentFilter)
+    return items
+  }, [data, kind, intentFilter])
+
+  const scopedWorkspaces = useMemo(() => {
+    if (!data) return []
+    return kind ? data.workspaces.filter((ws) => ws.kind === kind) : data.workspaces
+  }, [data, kind])
+
+  const itemsByWorkspace = useMemo(() => {
+    const map = new Map<string, LibraryItem[]>()
+    scopedItems.forEach((item) => {
+      const current = map.get(item.workspace_id)
+      if (current) current.push(item)
+      else map.set(item.workspace_id, [item])
+    })
+    return map
+  }, [scopedItems])
+
+  const collectionWorkspaces = useMemo(
+    () => scopedWorkspaces.filter((ws) => (itemsByWorkspace.get(ws.workspace_id)?.length ?? ws.items_count) > 1),
+    [scopedWorkspaces, itemsByWorkspace],
+  )
+
+  const collectionWorkspaceIds = useMemo(
+    () => new Set(collectionWorkspaces.map((ws) => ws.workspace_id)),
+    [collectionWorkspaces],
+  )
+
+  const visibleWorkspaces = useMemo(() => {
+    if (!data) return []
+    if (!(showAll || showCollections || showRunning)) return []
+    return collectionWorkspaces.filter((ws) => {
+      const wsItems = itemsByWorkspace.get(ws.workspace_id) ?? []
+      if (wsItems.length === 0) return false
+      if (typeFilters.length > 0 && !wsItems.some((item) => typeFilters.includes(item.type))) return false
+      if (showRunning && !(ws.status === 'running' || wsItems.some(isItemGenerating))) return false
+      if (!matchesQuery(normalizedQuery, [ws.name, ...wsItems.flatMap((item) => [item.name, item.source_value, item.workspace_name])])) return false
+      return true
+    })
+  }, [data, showAll, showCollections, showRunning, collectionWorkspaces, itemsByWorkspace, typeFilters, normalizedQuery])
+
+  const visibleWorkspaceIds = useMemo(
+    () => new Set(visibleWorkspaces.map((ws) => ws.workspace_id)),
+    [visibleWorkspaces],
+  )
+
+  const visibleItems = useMemo(() => {
+    let items = scopedItems
+    if (!showAll) {
+      if (typeFilters.length > 0) {
+        items = items.filter((item) => typeFilters.includes(item.type))
+      }
+      if (showRunning) {
+        items = items.filter(isItemGenerating)
+      }
+      if (showCollections && typeFilters.length === 0 && !showRunning) {
+        return []
+      }
+      if (typeFilters.length === 0 && !showRunning && !showCollections) {
+        return []
+      }
     }
-    // intent 筛选（?intent=replica 等）
-    if (intentFilter) {
-      items = items.filter((it) => it.preflight?.intent === intentFilter)
+    if (visibleWorkspaceIds.size > 0) {
+      items = items.filter((item) => !visibleWorkspaceIds.has(item.workspace_id))
+    }
+    if (normalizedQuery) {
+      items = items.filter((item) => matchesQuery(normalizedQuery, [item.name, item.source_value, item.workspace_name]))
     }
     return sortItems(items, sortBy)
-  }, [data, showAll, typeFilters, sortBy, intentFilter, kind])
+  }, [scopedItems, showAll, showRunning, showCollections, typeFilters, visibleWorkspaceIds, normalizedQuery, sortBy])
+
+  const hasVisibleEntries = visibleWorkspaces.length > 0 || visibleItems.length > 0
 
   const selectAll = useCallback(() => {
     const next = new Set<string>()
-    filteredItems.forEach((it) => next.add(selectionKey(it.workspace_id, it.item_id)))
-    if (filteredWorkspaces) {
-      filteredWorkspaces.forEach((ws) => next.add(`ws:${ws.workspace_id}`))
-    }
+    visibleItems.forEach((it) => next.add(selectionKey(it.workspace_id, it.item_id)))
+    visibleWorkspaces.forEach((ws) => next.add(`ws:${ws.workspace_id}`))
     setSelectedSet(next)
-  }, [filteredItems, filteredWorkspaces])
+  }, [visibleItems, visibleWorkspaces])
 
   const handleDeleteOne = useCallback(async (item: LibraryItem) => {
     const label = item.name || '未命名'
@@ -232,7 +295,7 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
   // I2.1: 批量分析（仅图片）— 对选中 image 素材循环调 start，复用已存 preflight + 浮动队列
   const handleBatchAnalyze = useCallback(async () => {
     if (selectedSet.size === 0) return
-    const imageItems = filteredItems.filter(
+    const imageItems = visibleItems.filter(
       (it) => it.type === 'image' && selectedSet.has(selectionKey(it.workspace_id, it.item_id)),
     )
     if (imageItems.length === 0) {
@@ -256,21 +319,23 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
     } finally {
       setAnalyzing(false)
     }
-  }, [selectedSet, filteredItems, load])
-
-
+  }, [selectedSet, visibleItems, load])
 
   const chipCounts = useMemo(() => {
     if (!data) return undefined
+    const standaloneItems = scopedItems.filter((item) => !collectionWorkspaceIds.has(item.workspace_id))
     return {
-      all: data.items.length,
-      video: data.items.filter((i) => i.type === 'video').length,
-      audio: data.items.filter((i) => i.type === 'audio').length,
-      image: data.items.filter((i) => i.type === 'image').length,
-      text: data.items.filter((i) => i.type === 'text').length,
-      workspace: data.workspaces.length,
+      all: standaloneItems.length + collectionWorkspaces.length,
+      video: scopedItems.filter((i) => i.type === 'video').length,
+      audio: scopedItems.filter((i) => i.type === 'audio').length,
+      image: scopedItems.filter((i) => i.type === 'image').length,
+      text: scopedItems.filter((i) => i.type === 'text').length,
+      collection: collectionWorkspaces.length,
+      running:
+        standaloneItems.filter(isItemGenerating).length +
+        collectionWorkspaces.filter((ws) => ws.status === 'running' || (itemsByWorkspace.get(ws.workspace_id) ?? []).some(isItemGenerating)).length,
     }
-  }, [data])
+  }, [data, scopedItems, collectionWorkspaces, collectionWorkspaceIds, itemsByWorkspace])
 
   const emptyTitle = kind === 'note' ? '暂无笔记' : kind === 'replica' ? '暂无复刻' : '暂无笔记'
   const emptyDesc = kind === 'note'
@@ -311,7 +376,7 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
               <Plus size={15} />
               {kind === 'replica' ? '新建复刻' : kind === 'note' ? '导入内容' : '上传资料'}
             </button>
-            <button className="lib-cta lib-cta-secondary" onClick={() => navigate('/')}>
+            <button className="lib-cta lib-cta-secondary" onClick={() => setSelectedFilters(['collection'])}>
               <Plus size={15} />
               查看合集
             </button>
@@ -325,7 +390,7 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
           </div>
         </div>
         <div className="lib-actions">
-          {(filteredItems.length > 0 || (filteredWorkspaces && filteredWorkspaces.length > 0)) && (
+          {hasVisibleEntries && (
             <>
               {selectMode ? (
                 <>
@@ -366,7 +431,12 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
           </svg>
-          <input type="text" placeholder="搜索标题、来源、摘要..." />
+          <input
+            type="text"
+            placeholder="搜索标题、来源、摘要..."
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
         </div>
         <ViewToggle />
       </div>
@@ -390,86 +460,47 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
 
       {!loading && !error && data && (
         <>
-          {/* Workspace 区 */}
-          {filteredWorkspaces && filteredWorkspaces.length > 0 && (
-            <>
-              {typeFilters.length > 0 && (
-                <div className="sec-h" style={{ marginBottom: 8 }}>
-                  <h3 className="sec-title">合集 · {filteredWorkspaces.length}</h3>
-                </div>
-              )}
-              <div className={`note-grid${viewMode === 'list' ? ' is-list' : ''}`}>
-                {filteredWorkspaces.map((ws) => {
-                  const wsItems = data.items.filter(
-                    (it) => it.workspace_id === ws.workspace_id,
-                  )
-                  return (
-                    <WorkspaceCard
-                      key={ws.workspace_id}
-                      workspace={ws}
-                      items={wsItems}
-                      selectMode={selectMode}
-                      selected={selectedSet.has(`ws:${ws.workspace_id}`)}
-                      onToggleSelect={toggleWorkspaceSelect}
-                      onDelete={handleDeleteWorkspace}
-                    />
-                  )
-                })}
-              </div>
-            </>
-          )}
-
-          {/* Item 区 */}
-          {!(showWorkspace && typeFilters.length === 0) && (
-            <>
-              {showWorkspace && typeFilters.length > 0 && filteredItems.length > 0 && (
-                <div className="sec-h" style={{ marginBottom: 8 }}>
-                  <h3 className="sec-title">笔记 · {filteredItems.length}</h3>
-                </div>
-              )}
-              {filteredItems.length === 0 ? (
-                <div className="empty-state">
-                  <div className="empty-state-icon">
-                    <Inbox size={24} strokeWidth={1.5} />
-                  </div>
-                  <div className="empty-state-title">
-                    {showAll && data.items.length === 0 ? emptyTitle : '没有匹配的笔记'}
-                  </div>
-                  <div className="empty-state-desc">
-                    {showAll && data.items.length === 0 ? emptyDesc : '试试切换筛选条件或清除 chip'}
-                  </div>
-                </div>
-              ) : (
-                <div className={`note-grid${viewMode === 'list' ? ' is-list' : ''}`}>
-                  {filteredItems.map((item) => (
-                    <ItemCard
-                      key={`${item.workspace_id}:${item.item_id}`}
-                      item={item}
-                      selected={selectedSet.has(selectionKey(item.workspace_id, item.item_id))}
-                      selectMode={selectMode}
-                      onToggleSelect={toggleSelect}
-                      onDelete={handleDeleteOne}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-
-          {showWorkspace &&
-            typeFilters.length === 0 &&
-            filteredWorkspaces &&
-            filteredWorkspaces.length === 0 && (
-              <div className="empty-state">
-                <div className="empty-state-icon">
+          {!hasVisibleEntries ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">
+                {(showCollections || showRunning || typeFilters.length > 0 || query.trim()) ? (
                   <Filter size={24} strokeWidth={1.5} />
-                </div>
-                <div className="empty-state-title">没有合集</div>
-                <div className="empty-state-desc">
-                  还没有创建任何合集，去首页导入笔记开始吧
-                </div>
+                ) : (
+                  <Inbox size={24} strokeWidth={1.5} />
+                )}
               </div>
-            )}
+              <div className="empty-state-title">
+                {showAll && chipCounts?.all === 0 ? emptyTitle : '没有匹配的笔记'}
+              </div>
+              <div className="empty-state-desc">
+                {showAll && chipCounts?.all === 0 ? emptyDesc : '试试切换筛选条件或清除 chip'}
+              </div>
+            </div>
+          ) : (
+            <div className={`note-grid${viewMode === 'list' ? ' is-list' : ''}`}>
+              {visibleWorkspaces.map((ws) => (
+                <WorkspaceCard
+                  key={ws.workspace_id}
+                  workspace={ws}
+                  items={itemsByWorkspace.get(ws.workspace_id) ?? []}
+                  selectMode={selectMode}
+                  selected={selectedSet.has(`ws:${ws.workspace_id}`)}
+                  onToggleSelect={toggleWorkspaceSelect}
+                  onDelete={handleDeleteWorkspace}
+                />
+              ))}
+              {visibleItems.map((item) => (
+                <ItemCard
+                  key={`${item.workspace_id}:${item.item_id}`}
+                  item={item}
+                  selected={selectedSet.has(selectionKey(item.workspace_id, item.item_id))}
+                  selectMode={selectMode}
+                  onToggleSelect={toggleSelect}
+                  onDelete={handleDeleteOne}
+                />
+              ))}
+            </div>
+          )}
         </>
       )}
     </div>
