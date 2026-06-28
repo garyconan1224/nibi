@@ -20,6 +20,10 @@
   --display: var(--font-display);
   --radius:   10px;
   --radius-lg: 14px;
+  --proc-dark: oklch(13% 0.012 265);
+  --proc-dark-strong: oklch(8% 0.01 265);
+  --proc-on-dark: oklch(100% 0 0);
+  --proc-live: var(--color-error);
 
   color: var(--color-fg);
   background: var(--color-bg);
@@ -44,6 +48,91 @@
   flex-direction: column;
 }
 
+/* ─── Topbar ─── */
+.vm-processing-scope .proc-topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--bdr);
+  background: var(--srf);
+}
+
+.vm-processing-scope .proc-back {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--fg2);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: background 120ms, color 120ms;
+}
+
+.vm-processing-scope .proc-back:hover {
+  background: var(--bgalt);
+  color: var(--fg);
+}
+
+.vm-processing-scope .proc-top-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vm-processing-scope .proc-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.vm-processing-scope .proc-top-btn {
+  height: 30px;
+  padding: 0 12px;
+  border: 1.5px solid var(--bdrs);
+  border-radius: var(--radius);
+  background: var(--srf);
+  color: var(--fg2);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 120ms, border-color 120ms, color 120ms, opacity 120ms;
+}
+
+.vm-processing-scope .proc-top-btn:hover:not(:disabled) {
+  border-color: var(--fg);
+  color: var(--fg);
+  background: var(--bgalt);
+}
+
+.vm-processing-scope .proc-top-btn.primary {
+  border-color: var(--fg);
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.vm-processing-scope .proc-top-btn.primary:hover:not(:disabled) {
+  border-color: var(--acc);
+  background: var(--acc);
+  color: var(--accfg);
+}
+
+.vm-processing-scope .proc-top-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* ─── Hero ─── */
 .vm-processing-scope .proc-hero {
   padding: 28px 32px 20px;
@@ -57,7 +146,7 @@
   width: 220px;
   aspect-ratio: 16/9;
   border-radius: 16px;
-  background: #000;
+  background: var(--proc-dark-strong);
   overflow: hidden;
   flex-shrink: 0;
   position: relative;
@@ -73,7 +162,18 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 40%, rgba(0, 0, 0, 0.5));
+  background: linear-gradient(180deg, transparent 40%, color-mix(in oklch, var(--proc-dark-strong) 58%, transparent));
+}
+
+.vm-processing-scope .proc-hero .thumb .thumb-placeholder {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.vm-processing-scope .proc-hero .thumb .thumb-placeholder-icon {
+  color: var(--ink-4);
 }
 
 .vm-processing-scope .proc-hero .thumb .live {
@@ -85,8 +185,8 @@
   gap: 6px;
   padding: 4px 8px;
   border-radius: 99px;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
+  background: color-mix(in oklch, var(--proc-dark-strong) 70%, transparent);
+  color: var(--proc-on-dark);
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.1em;
@@ -98,7 +198,7 @@
   width: 6px;
   height: 6px;
   border-radius: 99px;
-  background: #ff3b3b;
+  background: var(--proc-live);
   animation: vm-pulse 1.2s infinite;
 }
 
@@ -112,8 +212,8 @@
   gap: 4px;
   padding: 4px 10px;
   border-radius: 99px;
-  background: rgba(0, 0, 0, 0.65);
-  color: #fff;
+  background: color-mix(in oklch, var(--proc-dark-strong) 72%, transparent);
+  color: var(--proc-on-dark);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.04em;
@@ -125,7 +225,7 @@
 .vm-processing-scope .proc-hero .thumb .thumb-audio-mask {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 50%, rgba(0, 0, 0, 0.45) 100%);
+  background: linear-gradient(180deg, transparent 50%, color-mix(in oklch, var(--proc-dark-strong) 52%, transparent) 100%);
   z-index: 1;
   pointer-events: none;
 }
@@ -153,6 +253,12 @@
   font-size: 32px;
   line-height: 1.1;
   margin: 4px 0 8px;
+}
+
+.vm-processing-scope .proc-hero .info .title-platform {
+  color: var(--mut);
+  font-weight: 400;
+  margin-right: 10px;
 }
 
 .vm-processing-scope .proc-hero .info .src {
@@ -202,6 +308,11 @@
   background: var(--bgalt);
 }
 
+.vm-processing-scope .btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .vm-processing-scope .btn-primary {
   background: var(--fg);
   color: var(--bg);
@@ -228,6 +339,16 @@
   width: 6px;
   height: 6px;
   border-radius: 99px;
+}
+
+.vm-processing-scope .chip-success {
+  background: var(--color-success-light);
+  color: var(--accent-green);
+  border-color: color-mix(in oklch, var(--accent-green) 30%, transparent);
+}
+
+.vm-processing-scope .chip-success .chip-dot {
+  background: var(--accent-green);
 }
 
 /* ─── Step rail (水平 stepper · 对标 BiliNote 图3) ─── */
@@ -278,7 +399,7 @@
 .vm-processing-scope .step-node[data-state='done'] .dot {
   background: var(--acc);
   border-color: var(--acc);
-  color: #fff;
+  color: var(--accfg);
 }
 .vm-processing-scope .step-node[data-state='running'] .dot {
   border-color: var(--acc);
@@ -393,10 +514,94 @@
   text-align: center;
 }
 
+.vm-processing-scope .proc-error-icon {
+  color: var(--err);
+}
+
 .vm-processing-scope .proc-error h3 {
   font-family: var(--display);
   font-size: 24px;
   margin: 12px 0 8px;
+}
+
+.vm-processing-scope .proc-error-message {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 4px;
+  color: var(--fg);
+}
+
+.vm-processing-scope .proc-error-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.vm-processing-scope .proc-confirm {
+  padding: 20px 24px;
+}
+
+.vm-processing-scope .proc-confirm-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.vm-processing-scope .proc-confirm p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-3);
+  line-height: 1.5;
+}
+
+.vm-processing-scope .proc-body {
+  padding: 38px 40px 14px;
+  text-align: center;
+}
+
+.vm-processing-scope .proc-body-title {
+  font-size: 19px;
+  font-weight: 700;
+  margin-bottom: 26px;
+  letter-spacing: normal;
+}
+
+.vm-processing-scope .proc-body-title-meta {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--ink-3);
+  margin-left: 8px;
+}
+
+.vm-processing-scope .proc-body-hint {
+  font-size: 13px;
+  color: var(--ink-4);
+  margin-top: 24px;
+  line-height: 1.5;
+}
+
+.vm-processing-scope .proc-advanced {
+  padding: 8px 24px 20px;
+}
+
+.vm-processing-scope .proc-advanced-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-3);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.vm-processing-scope .proc-advanced-toggle:hover {
+  color: var(--fg);
+}
+
+.vm-processing-scope .proc-advanced-panel {
+  margin-top: 12px;
 }
 
 .vm-processing-scope .proc-error p {
@@ -438,7 +643,7 @@
   border-radius: 6px;
   overflow: hidden;
   flex-shrink: 0;
-  background: #000;
+  background: var(--proc-dark-strong);
 }
 
 .vm-processing-scope .tl-thumb img {
@@ -459,5 +664,14 @@
 
   .vm-processing-scope .proc-hero .thumb {
     width: 100%;
+  }
+
+  .vm-processing-scope .proc-topbar {
+    flex-wrap: wrap;
+  }
+
+  .vm-processing-scope .proc-top-actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { AlertTriangle, ArrowRight, ChevronDown, ChevronUp, Music, RotateCcw, X } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Copy, Music, RotateCcw, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { useTaskStore } from '@/store/taskStore'
@@ -259,6 +259,41 @@ export default function ProcessingPage() {
   // 全局 ETA：所有活跃任务的剩余时间之和，每秒递减
   const etaSec = useGlobalEta()
 
+  const handleViewResult = () => {
+    if (!isSuccess) return
+    if (itemId && workspaceId) {
+      // NI.2: note task 完成后直接进 NoteShell；replica 落复刻页。
+      const effectiveType = state?.taskType ?? ((payload.intent as string) === 'replica' ? 'replica' : 'note')
+      const isNote = effectiveType === 'note'
+      const isReplica = effectiveType === 'replica'
+      let targetPath: string
+      if (isNote) {
+        targetPath = `/workspaces/${workspaceId}/items/${itemId}/note`
+      } else if (isReplica) {
+        const DETAIL: Record<string, string> = { video: 'video_detail', image: 'image_result', audio: 'audio_detail', text: 'text_result' }
+        const itemType = state?.itemType ?? (sourceType === 'image' ? 'image' : 'video')
+        const suffix = DETAIL[itemType] ?? 'overview'
+        targetPath = `/workspaces/${workspaceId}/items/${itemId}/${suffix}`
+      } else {
+        targetPath = `/workspaces/${workspaceId}/items/${itemId}/overview`
+      }
+      navigate(targetPath)
+    } else {
+      // 兜底：跳转到资料库，用户可从那里找到结果。
+      navigate('/library')
+    }
+  }
+
+  const handleCopySource = async () => {
+    const text = url || window.location.href
+    try {
+      await navigator.clipboard?.writeText(text)
+      toast.success(url ? '已复制来源链接' : '已复制当前页面链接')
+    } catch {
+      toast.error('复制失败，请手动复制')
+    }
+  }
+
   // 处理↔结果原地融合：note 任务完成 → 同一任务页内直接渲染结果（不跳页）
   if (isSuccess && (state?.taskType ?? taskType) === 'note' && workspaceId && itemId) {
     return <NoteShell workspaceId={workspaceId} itemId={itemId} />
@@ -268,6 +303,23 @@ export default function ProcessingPage() {
     <div className="vm-processing-scope">
       <div className="proc-wrap">
         <div className="proc-main">
+          <div className="proc-topbar">
+            <button className="proc-back" onClick={() => navigate('/library')} title="返回资料库">
+              <ArrowLeft size={18} />
+            </button>
+            <div className="proc-top-title">{title}</div>
+            <div className="proc-top-actions">
+              <button className="proc-top-btn" onClick={handleCopySource}>
+                <Copy size={12} />
+                复制链接
+              </button>
+              <button className="proc-top-btn primary" onClick={handleViewResult} disabled={!isSuccess}>
+                查看结果
+                <ArrowRight size={12} />
+              </button>
+            </div>
+          </div>
+
           {/* Hero */}
           <div className="proc-hero">
             <div className="thumb">
@@ -283,16 +335,8 @@ export default function ProcessingPage() {
                 />
               ) : (
                 isAudioTask && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Music size={32} style={{ color: 'var(--ink-4)' }} />
+                  <div className="thumb-placeholder">
+                    <Music size={32} className="thumb-placeholder-icon" />
                   </div>
                 )
               )}
@@ -303,7 +347,7 @@ export default function ProcessingPage() {
                 <>
                   <div className="thumb-audio-mask" />
                   <div className="thumb-audio-badge">
-                    <Music size={12} color="#fff" />
+                    <Music size={12} />
                     <span>AUDIO</span>
                   </div>
                 </>
@@ -312,7 +356,7 @@ export default function ProcessingPage() {
             <div className="info">
               <div className="eyebrow">{isAudioTask ? 'AUDIO' : 'PROCESSING'} · {taskId.slice(0, 8)}</div>
               <div className="title">
-                {platform && <span style={{ color: 'var(--ink-3)', fontWeight: 400, marginRight: 10 }}>{platform} ·</span>}
+                {platform && <span className="title-platform">{platform} ·</span>}
                 {title}
               </div>
               <div className="src">{url}</div>
@@ -358,51 +402,14 @@ export default function ProcessingPage() {
                 )}
                 <button
                   className="btn btn-primary"
-                  onClick={() => {
-                    if (!isSuccess) return
-                    if (itemId && workspaceId) {
-                      // NI.2: note task 完成后直接进 NoteShell；replica 落复刻页
-                      // state?.taskType 来自 AddMaterialModal；兜底 payload.intent（FloatingTaskQueue 场景）
-                      const effectiveType = state?.taskType ?? ((payload.intent as string) === 'replica' ? 'replica' : 'note')
-                      const isNote = effectiveType === 'note'
-                      const isReplica = effectiveType === 'replica'
-                      let targetPath: string
-                      if (isNote) {
-                        targetPath = `/workspaces/${workspaceId}/items/${itemId}/note`
-                      } else if (isReplica) {
-                        const DETAIL: Record<string, string> = { video: 'video_detail', image: 'image_result', audio: 'audio_detail', text: 'text_result' }
-                        const itemType = state?.itemType ?? (sourceType === 'image' ? 'image' : 'video')
-                        const suffix = DETAIL[itemType] ?? 'overview'
-                        targetPath = `/workspaces/${workspaceId}/items/${itemId}/${suffix}`
-                      } else {
-                        targetPath = `/workspaces/${workspaceId}/items/${itemId}/overview`
-                      }
-                      navigate(targetPath)
-                    } else {
-                      // 兜底：跳转到资料库，用户可从那里找到结果
-                      navigate('/library')
-                    }
-                  }}
-                  style={{
-                    opacity: isSuccess ? 1 : 0.5,
-                    cursor: isSuccess ? 'pointer' : 'not-allowed',
-                  }}
+                  onClick={handleViewResult}
+                  disabled={!isSuccess}
                 >
                   查看结果 <ArrowRight size={14} />
                 </button>
                 {isSuccess && (
-                  <span
-                    className="chip"
-                    style={{
-                      background: 'rgba(34, 211, 154, 0.12)',
-                      color: 'var(--accent-green)',
-                      borderColor: 'rgba(34, 211, 154, 0.3)',
-                    }}
-                  >
-                    <span
-                      className="chip-dot"
-                      style={{ background: 'var(--accent-green)' }}
-                    />
+                  <span className="chip chip-success">
+                    <span className="chip-dot" />
                     完成 ✓ · 正在打开结果…
                   </span>
                 )}
@@ -413,12 +420,12 @@ export default function ProcessingPage() {
           {/* Failed state — inline indicator */}
           {isFailed && (
             <div className="proc-error">
-              <AlertTriangle size={28} style={{ color: 'var(--accent-pink)' }} />
+              <AlertTriangle size={28} className="proc-error-icon" />
               <h3>任务失败</h3>
-              <p style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>
+              <p className="proc-error-message">
                 {categorized.friendlyMessage}
               </p>
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+              <div className="proc-error-actions">
                 <button className="btn" onClick={() => setShowFailModal(true)}>
                   查看详情
                 </button>
@@ -444,11 +451,11 @@ export default function ProcessingPage() {
 
           {/* AWAITING_CONFIRM: 等待用户确认音乐模式 */}
           {status === 'AWAITING_CONFIRM' && (
-            <div style={{ padding: '20px 24px' }}>
-              <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>
+            <div className="proc-confirm">
+              <div className="proc-confirm-title">
                 等待确认
               </div>
-              <p style={{ fontSize: 13, color: 'var(--ink-3)', lineHeight: 1.5 }}>
+              <p>
                 检测到该内容可能是音乐，需要你确认后继续分析。请在弹窗中操作。
               </p>
             </div>
@@ -458,11 +465,11 @@ export default function ProcessingPage() {
           {!isFailed && !isCancelled && status !== 'AWAITING_CONFIRM' && (
             <>
               {/* VN3: 简洁处理中 — 5 步进度 + 预计剩余 + 友好提示 */}
-              <div style={{ padding: '38px 40px 14px', textAlign: 'center' }}>
-                <div style={{ fontSize: 19, fontWeight: 700, marginBottom: 26, letterSpacing: 'normal' }}>
+              <div className="proc-body">
+                <div className="proc-body-title">
                   {isSuccess ? '生成完成 ✓' : '正在生成笔记'}
                   {etaSec > 0 && !isSuccess && (
-                    <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--ink-3)', marginLeft: 8 }}>
+                    <span className="proc-body-title-meta">
                       · 预计还需 {etaSec}s
                     </span>
                   )}
@@ -473,7 +480,7 @@ export default function ProcessingPage() {
                   sourceType={sourceType as 'local' | 'link'}
                   noteKind={noteKind as 'video' | 'audio' | 'image' | 'image_text' | 'text'}
                 />
-                <div style={{ fontSize: 13, color: 'var(--ink-4)', marginTop: 24, lineHeight: 1.5 }}>
+                <div className="proc-body-hint">
                   {isSuccess
                     ? '笔记已生成完毕，正在打开…'
                     : '正在为你处理内容，完成后会自动进入结果页。'}
@@ -481,20 +488,16 @@ export default function ProcessingPage() {
               </div>
 
               {/* 高级详情折叠块：LiveLog / 下载速度 / 资源指标 */}
-              <div style={{ padding: '8px 24px 20px' }}>
+              <div className="proc-advanced">
                 <button
                   onClick={() => setShowAdvanced(prev => !prev)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    fontSize: 12, color: 'var(--ink-3)', cursor: 'pointer',
-                    background: 'none', border: 'none', padding: 0,
-                  }}
+                  className="proc-advanced-toggle"
                 >
                   {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   {showAdvanced ? '收起详情' : '高级详情'}
                 </button>
                 {showAdvanced && (
-                  <div style={{ marginTop: 12 }}>
+                  <div className="proc-advanced-panel">
                     <LiveLog logs={logs} />
                   </div>
                 )}
