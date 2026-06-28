@@ -282,6 +282,288 @@
   flex-shrink: 0;
 }
 
+/* ═══════════════════════════════════════════════
+   共享 Note Card — 设计稿 note-card 体系
+   所有库页 (Library, 主页, 收藏等) 共用。
+   全部 token 使用 Nibi 短名。
+   ═══════════════════════════════════════════════ */
+.note-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.note-grid.is-list {
+  grid-template-columns: 1fr;
+}
+
+.note-card {
+  border: 1px solid var(--bdr);
+  border-radius: var(--rl);
+  background: var(--srf);
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 0 2px 8px oklch(0% 0 0 / .06);
+  transition: all 0.3s cubic-bezier(.4, 0, .2, 1);
+  position: relative;
+}
+.note-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, oklch(100% 0 0 / .03), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.note-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 12px 28px oklch(0% 0 0 / .12);
+  border-color: var(--bdrs);
+}
+.note-card:hover::after { opacity: 1; }
+
+.note-card--selected {
+  border-color: var(--acc);
+  box-shadow: 0 0 0 2px var(--accl);
+}
+
+/* ── Cover ── */
+.note-cover {
+  position: relative;
+  height: 122px;
+  overflow: hidden;
+  background: var(--bgalt);
+}
+.note-cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 20%, oklch(0% 0 0 / .46));
+  pointer-events: none;
+}
+.cover-video  { background: linear-gradient(135deg, oklch(22% 0.08 255), oklch(35% 0.12 248), oklch(28% 0.10 252)); }
+.cover-audio  { background: linear-gradient(135deg, oklch(24% 0.07 285), oklch(38% 0.14 278), oklch(30% 0.12 282)); }
+.cover-image  { background: linear-gradient(135deg, oklch(88% 0.07 85),  oklch(76% 0.15 48),  oklch(82% 0.12 60));  }
+.cover-text   { background: linear-gradient(135deg, oklch(96% 0.008 80), oklch(93% 0.012 75)); }
+
+.media-chip {
+  position: absolute;
+  left: 9px;
+  top: 9px;
+  z-index: 1;
+  border-radius: var(--rs);
+  background: oklch(0% 0 0 / .58);
+  color: oklch(100% 0 0);
+  font-size: 10px;
+  font-family: var(--fm);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 3px 7px;
+}
+
+.status-pill {
+  position: absolute;
+  right: 9px;
+  top: 9px;
+  z-index: 1;
+  border-radius: var(--rs);
+  font-size: 10px;
+  font-family: var(--fm);
+  font-weight: 800;
+  padding: 3px 7px;
+}
+.status-done  { background: var(--okl); color: var(--ok); }
+.status-run   { background: var(--wrnl); color: var(--wrn); }
+.status-error { background: var(--errl); color: var(--err); }
+
+.cover-icon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  color: oklch(100% 0 0 / .76);
+}
+.cover-icon svg { width: 42px; height: 42px; }
+
+.audio-wave {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 34px;
+  z-index: 1;
+  display: flex;
+  align-items: end;
+  gap: 4px;
+  height: 48px;
+}
+.audio-wave i {
+  display: block;
+  flex: 1;
+  min-width: 3px;
+  border-radius: 999px;
+  background: oklch(100% 0 0 / .68);
+}
+.audio-wave i:nth-child(1) { height: 18px; }
+.audio-wave i:nth-child(2) { height: 32px; }
+.audio-wave i:nth-child(3) { height: 24px; }
+.audio-wave i:nth-child(4) { height: 42px; }
+.audio-wave i:nth-child(5) { height: 28px; }
+.audio-wave i:nth-child(6) { height: 38px; }
+.audio-wave i:nth-child(7) { height: 20px; }
+
+.image-cluster {
+  position: absolute;
+  inset: 22px 24px 26px;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+.image-cluster span {
+  border-radius: var(--rs);
+  background: oklch(100% 0 0 / .34);
+  border: 1px solid oklch(100% 0 0 / .3);
+}
+
+.doc-lines {
+  position: absolute;
+  inset: 28px 22px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.doc-lines i {
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--fg) 18%, transparent);
+}
+.doc-lines i:nth-child(2) { width: 72%; }
+.doc-lines i:nth-child(3) { width: 88%; }
+.doc-lines i:nth-child(4) { width: 54%; }
+
+/* ── Card body ── */
+.note-card-body {
+  padding: 13px 14px 14px;
+}
+
+.note-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+.note-title-row h3 {
+  font-size: var(--sm);
+  font-weight: 800;
+  line-height: 1.35;
+  color: var(--fg);
+  flex: 1;
+  margin: 0;
+}
+.note-type-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--acc);
+  margin-top: 6px;
+  flex: 0 0 auto;
+}
+
+.note-summary {
+  font-size: var(--xs);
+  line-height: 1.65;
+  color: var(--fg2);
+  min-height: 42px;
+  margin-bottom: 11px;
+}
+
+.note-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-family: var(--fm);
+  font-size: 10px;
+  color: var(--mut);
+  margin-bottom: 10px;
+}
+.note-meta-row span { white-space: nowrap; }
+
+.note-progress-mini {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--bdr);
+  overflow: hidden;
+  margin-bottom: 11px;
+}
+.note-progress-mini span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--acc);
+}
+
+.note-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.note-card-actions span {
+  font-size: var(--xs);
+  font-weight: 800;
+  color: var(--fg2);
+}
+
+.note-open {
+  border: none;
+  background: transparent;
+  color: var(--acc);
+  font-size: var(--xs);
+  font-weight: 900;
+  font-family: var(--fb);
+  cursor: pointer;
+}
+
+/* sec-h / sec-title / sec-link */
+.sec-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.sec-title {
+  font-size: var(--lg);
+  font-weight: 700;
+  color: var(--fg);
+  margin: 0;
+}
+.sec-link {
+  font-size: var(--xs);
+  font-weight: 600;
+  color: var(--acc);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-family: var(--fb);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sec-link:hover { text-decoration: underline; }
+
+/* ── Empty state ── */
+.rt-empty {
+  padding: 32px 0;
+  text-align: center;
+  color: var(--ink-4);
+  font-size: 13px;
+  font-family: var(--fm);
+}
+
 /* ── Motion & reduced-motion ── */
 @media (prefers-reduced-motion: reduce) {
   .btn,
