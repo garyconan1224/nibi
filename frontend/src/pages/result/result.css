@@ -41,6 +41,74 @@
   flex-shrink: 0;
 }
 
+.nibi-video-result-scope .vd-nav-btn {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.nibi-video-result-scope .vd-nav-btn--compact {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
+  gap: 4px;
+  border-color: var(--bdr);
+}
+
+.nibi-video-result-scope .vd-nav-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.nibi-video-result-scope .vd-nav-spacer {
+  margin-left: auto;
+}
+
+.nibi-video-result-scope .vd-chip {
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.nibi-video-result-scope .vd-chip--demo {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--wrn);
+  color: var(--color-accent-fg);
+  font-weight: 700;
+}
+
+.nibi-video-result-scope .vd-beta {
+  font-size: 9px;
+  opacity: 0.6;
+}
+
+.nibi-video-result-scope .vd-dropdown-wrap {
+  position: relative;
+}
+
+.nibi-video-result-scope .vd-dropdown-menu {
+  position: absolute;
+  right: 0;
+  top: 36px;
+  z-index: 50;
+  min-width: 140px;
+  padding: 4px 0;
+  border: 1px solid var(--bdr);
+  border-radius: var(--radius-base);
+  background: var(--srf);
+  box-shadow: var(--shadow-md);
+}
+
+.nibi-video-result-scope .vd-dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 6px 14px;
+  border-radius: 0;
+  font-size: 12px;
+  text-align: left;
+}
+
 /* ── 学习/复刻 toggle ──────────────────────────── */
 .nibi-video-result-scope .vd-mode-toggle {
   display: flex;
@@ -219,6 +287,15 @@
   line-height: 1.3;
 }
 
+.nibi-video-result-scope .vd-fi-title--editable {
+  cursor: pointer;
+}
+
+.nibi-video-result-scope .vd-inline-pencil {
+  opacity: 0.4;
+  vertical-align: middle;
+}
+
 .nibi-video-result-scope .vd-frame-info .vd-fi-sub {
   font-size: 12px;
   color: var(--mut);
@@ -232,6 +309,29 @@
   margin-top: 8px;
 }
 
+.nibi-video-result-scope .vd-tag {
+  font-size: 10px;
+}
+
+.nibi-video-result-scope .vd-title-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nibi-video-result-scope .vd-title-edit-input {
+  flex: 1;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--err);
+  border-radius: var(--radius-sm);
+  background: var(--srf);
+  color: var(--fg);
+  font-family: var(--display);
+  font-size: 13px;
+  outline: none;
+}
+
 /* ─── Prompt tabs ─── */
 .nibi-video-result-scope .vd-tabs-bar {
   display: flex;
@@ -241,6 +341,30 @@
   border-bottom: 1px solid var(--bdr);
   flex-shrink: 0;
   background: var(--bgalt);
+}
+
+.nibi-video-result-scope .vd-tabs-title {
+  flex: 1;
+}
+
+.nibi-video-result-scope .vd-tab-config {
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--mut);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.nibi-video-result-scope .vd-tab-config:hover {
+  border-color: var(--bdrs);
+  color: var(--fg);
 }
 
 .nibi-video-result-scope .vd-tabs-row {
@@ -302,6 +426,58 @@
   flex-direction: column;
   gap: 7px;
   flex-shrink: 0;
+}
+
+.nibi-video-result-scope .vd-summary-pane {
+  flex: 1;
+  overflow: hidden;
+}
+
+.nibi-video-result-scope .vd-prompt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.nibi-video-result-scope .vd-editor-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nibi-video-result-scope .vd-prompt-editor {
+  width: 100%;
+  min-height: 100px;
+  resize: vertical;
+  padding: 8px 10px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--radius-sm);
+  background: var(--srf);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  outline: none;
+}
+
+.nibi-video-result-scope .vd-inline-actions,
+.nibi-video-result-scope .vd-frame-nav-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.nibi-video-result-scope .vd-inline-actions {
+  justify-content: flex-end;
+}
+
+.nibi-video-result-scope .vd-version-wrap {
+  margin-top: 14px;
+}
+
+.nibi-video-result-scope .vd-frame-nav-meta {
+  font-size: 10px;
+  color: var(--mut);
 }
 
 .nibi-video-result-scope .vd-btn-main {
@@ -533,6 +709,11 @@
   line-height: 1.5;
 }
 
+.nibi-video-result-scope .vd-frame-fallback-icon {
+  margin-bottom: 8px;
+  color: var(--mut);
+}
+
 .nibi-video-result-scope .vd-main-frame-info {
   position: absolute;
   bottom: 0;
@@ -680,6 +861,16 @@
   flex-shrink: 0;
 }
 
+.nibi-video-result-scope .vd-select-meta {
+  font-size: 11px;
+  color: var(--mut);
+}
+
+.nibi-video-result-scope .vd-select-actions {
+  display: flex;
+  gap: 4px;
+}
+
 .nibi-video-result-scope .vd-btn-tool {
   height: 26px;
   padding: 0 8px;
@@ -698,7 +889,18 @@
 
 .nibi-video-result-scope .vd-btn-tool:hover {
   background: var(--bgalt);
-  color: var(--ink-1);
+  color: var(--fg);
+}
+
+.nibi-video-result-scope .vd-btn-tool--danger {
+  border: none;
+  background: var(--err);
+  color: var(--color-accent-fg);
+}
+
+.nibi-video-result-scope .vd-btn-tool--danger:hover {
+  background: var(--color-error);
+  color: var(--color-accent-fg);
 }
 
 .nibi-video-result-scope .vd-btn-tool:disabled {
@@ -710,6 +912,12 @@
 .nibi-video-result-scope .vd-player-mini-wrap {
   flex-shrink: 0;
   padding: 0 0 6px;
+}
+
+.nibi-video-result-scope .vd-player-mini-wrap--empty {
+  display: grid;
+  place-items: center;
+  padding: 8px 0;
 }
 
 .nibi-video-result-scope .vd-player-mini {
@@ -727,6 +935,27 @@
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.nibi-video-result-scope .vd-player-empty,
+.nibi-video-result-scope .vd-frame-preview-fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: oklch(100% 0 0 / 92%);
+  font-family: var(--display);
+  text-align: center;
+}
+
+.nibi-video-result-scope .vd-player-empty {
+  padding: 12px;
+  font-size: 14px;
+}
+
+.nibi-video-result-scope .vd-frame-preview-fallback {
+  padding: 16px;
+  font-size: 22px;
 }
 
 .nibi-video-result-scope .vd-play-btn-mini {
@@ -763,6 +992,24 @@
   align-items: center;
   justify-content: center;
   margin-top: 4px;
+}
+
+.nibi-video-result-scope .vd-timecode,
+.nibi-video-result-scope .vd-muted {
+  color: var(--mut);
+}
+
+.nibi-video-result-scope .vd-timecode {
+  font-size: 10px;
+}
+
+.nibi-video-result-scope .vd-muted {
+  font-size: 11px;
+}
+
+.nibi-video-result-scope .vd-tags-strip {
+  flex-shrink: 0;
+  padding: 10px 20px 0;
 }
 
 /* Lightbox */

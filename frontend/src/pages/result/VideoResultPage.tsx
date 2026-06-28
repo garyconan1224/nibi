@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, BookOpen, Check, CheckSquare, Copy, Download, FileText, Film, Maximize2, MinusSquare, Pause, Pencil, Play, Settings2, Square, Star, X } from 'lucide-react'
+import { ArrowLeft, BookOpen, Check, CheckSquare, Copy, Download, FileText, Film, ImageIcon, Maximize2, MinusSquare, Pause, Pencil, Play, Settings2, Square, Star, X } from 'lucide-react'
 
 import {
   type PromptVersion,
@@ -855,26 +855,25 @@ export default function VideoResultPage() {
       <div className="vd-left">
         {/* 顶部导航 */}
         <div className="vd-nav">
-          <button className="btn-ghost" onClick={() => navigate(-1)} style={{ height: 28, padding: '0 10px', fontSize: 12 }}>
+          <button className="btn-ghost vd-nav-btn" onClick={() => navigate(-1)}>
             <ArrowLeft size={13} /> 任务中心
           </button>
           <span className="vd-sep" />
           <span className="vd-title">{result.video.title}</span>
-          <span className="kw mono" style={{ fontSize: 10, flexShrink: 0 }}>
+          <span className="kw mono vd-chip">
             VIDEO · {result.video.duration_str || formatSec(totalSec)}
           </span>
           {result.source === 'demo_fixture' && (
-            <span className="mono" style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'var(--wrn)', color: '#fff', fontWeight: 600 }} title="results 尚未填充，正在使用 demo fixture">
+            <span className="mono vd-chip vd-chip--demo" title="results 尚未填充，正在使用 demo fixture">
               DEMO
             </span>
           )}
           <button
-            className="btn-ghost"
-            style={{ height: 24, padding: '0 8px', fontSize: 11, gap: 4, marginLeft: 6, borderRadius: 4, border: '1px solid var(--border)' }}
+            className="btn-ghost vd-nav-btn vd-nav-btn--compact"
             onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/note`)}
             title="打开统一笔记（NoteShell）"
           >
-            <FileText size={12} /> 统一笔记 <span style={{ fontSize: 9, opacity: 0.6 }}>beta</span>
+            <FileText size={12} /> 统一笔记 <span className="vd-beta">beta</span>
           </button>
           {/* 学习/复刻 toggle */}
           <div className="vd-mode-toggle">
@@ -894,26 +893,24 @@ export default function VideoResultPage() {
               <span>复刻</span>
             </button>
           </div>
-          <div style={{ marginLeft: 'auto' }} />
+          <div className="vd-nav-spacer" />
           <button
-            className="btn-ghost"
-            style={{ height: 24, padding: '0 8px', fontSize: 11, gap: 4, borderRadius: 4, border: '1px solid var(--border)' }}
+            className="btn-ghost vd-nav-btn vd-nav-btn--compact"
             onClick={() => navigate('/library?intent=replica')}
             title="查看所有复刻项目"
           >
             <Copy size={12} /> 复刻项目
           </button>
-          <div style={{ position: 'relative' }}>
-            <button className="btn-ghost" style={{ height: 28, padding: '0 10px', fontSize: 12, opacity: isVisualOnly ? 0.5 : 1 }} onClick={() => !isVisualOnly && setExportOpen(!exportOpen)} title={isVisualOnly ? "仅画面分析模式无字幕数据" : "导出字幕"} disabled={isVisualOnly}>
+          <div className="vd-dropdown-wrap">
+            <button className="btn-ghost vd-nav-btn" onClick={() => !isVisualOnly && setExportOpen(!exportOpen)} title={isVisualOnly ? "仅画面分析模式无字幕数据" : "导出字幕"} disabled={isVisualOnly}>
               <Download size={13} /> 字幕
             </button>
             {exportOpen && (
-              <div className="vd-dropdown-menu" style={{ position: 'absolute', right: 0, top: 36, zIndex: 50, background: 'var(--srf)', border: '1px solid var(--bdr)', borderRadius: 8, padding: '4px 0', minWidth: 140, boxShadow: '0 4px 16px rgba(0,0,0,.12)' }}>
+              <div className="vd-dropdown-menu">
                 {(['srt', 'vtt', 'ass'] as const).map((fmt) => (
                   <button
                     key={fmt}
-                    className="btn-ghost"
-                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 14px', fontSize: 12, borderRadius: 0 }}
+                    className="btn-ghost vd-dropdown-item"
                     onClick={() => handleExportSubtitles(fmt)}
                   >
                     .{fmt} 字幕
@@ -925,7 +922,7 @@ export default function VideoResultPage() {
         </div>
 
         {/* 标签展示 */}
-        <div style={{ padding: '10px 20px 0', flexShrink: 0 }}>
+        <div className="vd-tags-strip">
           <ItemTagsPanel workspaceId={workspaceId} itemId={itemId} />
         </div>
 
@@ -937,7 +934,7 @@ export default function VideoResultPage() {
               <img src={frame.image_path} alt={frame.title} />
             ) : (
               <div className="vd-main-frame-fallback">
-                <span style={{ fontSize: 32, marginBottom: 8 }}>🖼️</span>
+                <ImageIcon size={32} className="vd-frame-fallback-icon" />
                 {frame.title}
               </div>
             )}
@@ -955,10 +952,10 @@ export default function VideoResultPage() {
           {/* C-3: 帧多选工具栏 */}
           {selectedFrames.size > 0 && (
             <div className="vd-select-bar">
-              <span className="mono" style={{ fontSize: 11, color: 'var(--mut)' }}>
+              <span className="mono vd-select-meta">
                 已选 {selectedFrames.size} / {frames.length} 帧
               </span>
-              <div style={{ display: 'flex', gap: 4 }}>
+              <div className="vd-select-actions">
                 <button className="vd-btn-tool" onClick={handleBatchCopy} title="复制选中帧提示词">
                   <Copy size={12} /> 复制提示词
                 </button>
@@ -1010,8 +1007,8 @@ export default function VideoResultPage() {
 
           {/* 视频播放器（缩小，次要位置） */}
           {isVisualOnly ? (
-            <div className="vd-player-mini-wrap" style={{ display: 'grid', placeItems: 'center', padding: '8px 0' }}>
-              <span className="mono" style={{ fontSize: 11, color: 'var(--mut)' }}>仅画面分析模式 · 不含视频播放</span>
+            <div className="vd-player-mini-wrap vd-player-mini-wrap--empty">
+              <span className="mono vd-muted">仅画面分析模式 · 不含视频播放</span>
             </div>
           ) : (
             <div className="vd-player-mini-wrap">
@@ -1019,7 +1016,7 @@ export default function VideoResultPage() {
                 {hasVideoSource ? (
                   <video ref={videoRef} src={result.video.url} preload="metadata" />
                 ) : (
-                  <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.92)', fontFamily: 'var(--display)', fontSize: 14, textAlign: 'center', padding: 12 }}>
+                  <div className="vd-player-empty">
                     {frame.title}
                   </div>
                 )}
@@ -1031,7 +1028,7 @@ export default function VideoResultPage() {
                 </div>
               </div>
               <div className="vd-controls-mini">
-                <span className="mono" style={{ fontSize: 10, color: 'var(--mut)' }}>
+                <span className="mono vd-timecode">
                   {formatSec(currentSec)} / {formatSec(totalSec)}
                 </span>
               </div>
@@ -1057,7 +1054,7 @@ export default function VideoResultPage() {
           {frame.image_path ? (
             <img src={frame.image_path} alt={frame.title} />
           ) : (
-            <div style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.92)', fontFamily: 'var(--display)', fontSize: 22, padding: 16, textAlign: 'center' }}>
+            <div className="vd-frame-preview-fallback">
               {frame.title}
             </div>
           )}
@@ -1071,19 +1068,15 @@ export default function VideoResultPage() {
 
         <div className="vd-frame-info">
           {titleEditing ? (
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <div className="vd-title-edit-row">
               <input
                 value={titleEditValue}
                 onChange={(e) => setTitleEditValue(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') saveTitleEdit(); if (e.key === 'Escape') cancelTitleEdit() }}
                 autoFocus
-                style={{
-                  flex: 1, height: 28, fontSize: 13, fontFamily: 'var(--display)',
-                  padding: '0 8px', borderRadius: 6, border: '1px solid var(--err)',
-                  background: 'var(--bg-card, #fff)', color: 'var(--ink-1)', outline: 'none',
-                }}
+                className="vd-title-edit-input"
               />
-              <button className="vd-btn-tool" onClick={saveTitleEdit} style={{ background: 'var(--err)', color: '#fff', border: 'none' }}>
+              <button className="vd-btn-tool vd-btn-tool--danger" onClick={saveTitleEdit}>
                 <Check size={11} />
               </button>
               <button className="vd-btn-tool" onClick={cancelTitleEdit}>
@@ -1091,14 +1084,14 @@ export default function VideoResultPage() {
               </button>
             </div>
           ) : (
-            <div className="vd-fi-title" onClick={startTitleEdit} title="点击改名" style={{ cursor: 'pointer' }}>
-              {displayTitle} <Pencil size={11} style={{ opacity: 0.4, verticalAlign: 'middle' }} />
+            <div className="vd-fi-title vd-fi-title--editable" onClick={startTitleEdit} title="点击改名">
+              {displayTitle} <Pencil size={11} className="vd-inline-pencil" />
             </div>
           )}
           <div className="vd-fi-sub">{frame.subtitle}</div>
           <div className="vd-fi-tags">
             {Object.values(frame.tags ?? {}).flat().slice(0, 6).map((t) => (
-              <span key={t} className="kw" style={{ fontSize: 10 }}>{t}</span>
+              <span key={t} className="kw vd-tag">{t}</span>
             ))}
           </div>
         </div>
@@ -1117,9 +1110,8 @@ export default function VideoResultPage() {
 
         {/* tabs */}
         <div className="vd-tabs-bar">
-          <span className="eyebrow" style={{ flex: 1 }}>提示词格式</span>
-          <button onClick={openPicker} title="选择 3 个图片类格式作为 tabs（JSON 自动附加）"
-            style={{ height: 26, padding: '0 8px', borderRadius: 6, fontSize: 10, fontFamily: 'var(--mono)', border: '1px solid var(--bdr)', background: 'transparent', color: 'var(--mut)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span className="eyebrow vd-tabs-title">提示词格式</span>
+          <button className="vd-tab-config" onClick={openPicker} title="选择 3 个图片类格式作为 tabs（JSON 自动附加）">
             <Settings2 size={11} /> 选择
           </button>
         </div>
@@ -1133,18 +1125,18 @@ export default function VideoResultPage() {
             总结
           </button>
           {!tabs.length && contentTab !== 'summary' && (
-            <span className="mono" style={{ fontSize: 10, color: 'var(--mut)' }}>（提示词格式未加载）</span>
+            <span className="mono vd-muted">（提示词格式未加载）</span>
           )}
         </div>
 
         {contentTab === 'summary' ? (
-          <div style={{ flex: 1, overflow: 'hidden' }}>
+          <div className="vd-summary-pane">
             <SummariesTab workspaceId={workspaceId} itemId={itemId} />
           </div>
         ) : (
         <>
         <div className="vd-prompt-area">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+          <div className="vd-prompt-head">
             <span className="eyebrow">当前提示词</span>
             {!editing && (
               <button className="vd-btn-tool" onClick={startEdit} title="编辑提示词">
@@ -1153,28 +1145,15 @@ export default function VideoResultPage() {
             )}
           </div>
           {editing ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className="vd-editor-wrap">
               <textarea
                 value={editText}
                 onChange={(e) => setEditText(e.target.value)}
-                style={{
-                  width: '100%',
-                  minHeight: 100,
-                  resize: 'vertical',
-                  fontFamily: 'var(--mono)',
-                  fontSize: 11,
-                  lineHeight: 1.5,
-                  padding: '8px 10px',
-                  borderRadius: 6,
-                  border: '1px solid var(--bdr)',
-                  background: 'var(--bg-card, #fff)',
-                  color: 'var(--ink-1)',
-                  outline: 'none',
-                }}
+                className="vd-prompt-editor"
               />
-              <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+              <div className="vd-inline-actions">
                 <button className="vd-btn-tool" onClick={cancelEdit}>取消</button>
-                <button className="vd-btn-tool" onClick={saveEdit} style={{ background: 'var(--err)', color: '#fff', border: 'none' }}>
+                <button className="vd-btn-tool vd-btn-tool--danger" onClick={saveEdit}>
                   <Check size={11} /> 保存为新版本
                 </button>
               </div>
@@ -1182,7 +1161,7 @@ export default function VideoResultPage() {
           ) : (
             <div className="vd-prompt-text">{promptText}</div>
           )}
-          <div style={{ marginTop: 14 }}>
+          <div className="vd-version-wrap">
             <PromptVersionStack
               versions={promptVersions}
               onAddVersion={handleAddPromptVersion}
@@ -1203,10 +1182,10 @@ export default function VideoResultPage() {
           </button>
 
           <div className="vd-frame-nav">
-            <span className="mono" style={{ fontSize: 10, color: 'var(--mut)' }}>
+            <span className="mono vd-frame-nav-meta">
               帧 {activeFrame + 1} / {frames.length} · {frame.shot_type}
             </span>
-            <div style={{ display: 'flex', gap: 4 }}>
+            <div className="vd-frame-nav-actions">
               <button className="vd-frame-nav-btn" onClick={() => jumpFrame(-1)} title="上一帧 (Shift+←)">‹</button>
               <button className="vd-frame-nav-btn" onClick={() => jumpFrame(1)} title="下一帧 (Shift+→)">›</button>
             </div>
