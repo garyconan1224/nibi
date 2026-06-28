@@ -16,9 +16,10 @@
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border-subtle, #eee);
 }
-.tb-head-l {
-  flex: 1;
-  min-width: 0;
+.tb-head-l h1.display {
+  font-size: clamp(2rem, 4vw, 3rem);
+  margin: 0 0 4px;
+  line-height: 1;
 }
 .tb-head-count {
   display: flex;

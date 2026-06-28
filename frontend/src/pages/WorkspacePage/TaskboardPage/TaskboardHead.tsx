@@ -93,7 +93,7 @@ export function TaskboardHead({
     <div className="tb-head">
       {/* 左侧：名称 + 计数 */}
       <div className="tb-head-l">
-        <h1 className="display" style={{ fontSize: 42, margin: '0 0 4px', lineHeight: 1 }}>
+        <h1 className="display">
           {name}
         </h1>
         <div className="tb-head-count">
