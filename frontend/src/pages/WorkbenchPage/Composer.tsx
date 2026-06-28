@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import {
-  Link2, Upload, Search, X, Check, Plus, ArrowRight, Layers,
+  Link2, Upload, Search, X, Check, Plus, Layers,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { WorkspaceRecord } from '@/types/workspace'
@@ -184,183 +184,160 @@ export function Composer({ onTaskCreated }: ComposerProps) {
 
   return (
     <div className="composer">
-      {/* URL row */}
-      <div className="composer-url">
-        {platform ? (
-          <div
-            className="platform"
-            style={{ background: platform.color, color: '#fff', width: 'auto', padding: '0 10px' }}
+      <div className="cp">
+        {/* URL row — 设计稿 cp-row */}
+        <div className="cp-row">
+          {platform ? (
+            <div className="platform" style={{ background: platform.color, color: '#fff', width: 'auto', padding: '0 10px' }}>
+              {platform.name}
+            </div>
+          ) : (
+            <div className="platform">
+              <Link2 size={18} />
+            </div>
+          )}
+
+          <input
+            className="cp-input"
+            value={url}
+            onChange={(e) => handleUrlChange(e.target.value)}
+            placeholder="粘贴 B站/YouTube/小红书/抖音/本地文件路径..."
+          />
+
+          {platform && (
+            <span className="cp-type">{platform.types[0]}</span>
+          )}
+
+          <button
+            className="cp-upload"
+            onClick={handleUploadClick}
+            disabled={uploading}
           >
-            {platform.name}
-          </div>
-        ) : (
-          <div className="platform">
-            <Link2 size={18} />
-          </div>
-        )}
+            <Upload size={13} />
+            {uploading ? '上传中…' : '上传'}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            style={{ display: 'none' }}
+            onChange={handleFileChange}
+          />
+        </div>
 
-        <input
-          value={url}
-          onChange={(e) => handleUrlChange(e.target.value)}
-          placeholder="粘贴 B站 / YouTube / 小红书 / 抖音 / 本地文件路径..."
-        />
+        {/* Row 2 — 合集 */}
+        <div className="composer-projects">
+          <span className="pp-label">归入合集</span>
 
-        {platform && (
-          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-            {platform.types.map((t) => (
-              <span key={t} className="kw" style={{ background: 'var(--bg-sunken)', fontSize: 11 }}>
-                {t}
-              </span>
-            ))}
-          </div>
-        )}
+          {workspaceSel.length === 0 && <span className="pp-none">提交时自动创建</span>}
 
-        <button
-          className="btn btn-ghost"
-          title="上传本地文件"
-          style={{ gap: 6 }}
-          onClick={handleUploadClick}
-          disabled={uploading}
-        >
-          <Upload size={15} />
-          {uploading ? '上传中…' : '上传'}
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          style={{ display: 'none' }}
-          onChange={handleFileChange}
-        />
-      </div>
-
-      {/* Workspace assignment row */}
-      <div className="composer-projects">
-        <span className="pp-label">归入合集</span>
-
-        {workspaceSel.length === 0 && <span className="pp-none">未选合集 · 提交时自动创建</span>}
-
-        {workspaceSel.map((id) => {
-          const ws = wsById[id]
-          if (!ws) return null
-          const color = WS_COLORS[Math.abs(id.charCodeAt(0)) % WS_COLORS.length]
-          return (
-            <span key={id} className="pp-chip">
-              <span className="pp-dot" style={{ background: color }} />
-              {ws.name}
-              <button className="pp-x" onClick={() => removeWs(id)} title="移除">
-                <X size={11} />
-              </button>
-            </span>
-          )
-        })}
-
-        <button className="pp-add" onClick={() => setWsOpen((o) => !o)}>
-          <Layers size={11} />
-          {workspaceSel.length ? '继续添加' : '选择合集'}
-        </button>
-
-        <span
-          style={{
-            marginLeft: 'auto',
-            fontSize: 10,
-            color: 'var(--ink-4)',
-            fontFamily: 'var(--mono)',
-          }}
-          title="一个内容可同时归入多个合集"
-        >
-          可多选 · 一个内容可归入多个合集
-        </span>
-
-        {wsOpen && (
-          <div className="pp-popover" ref={popRef}>
-            <div className="pp-search">
-              <Search size={14} />
-              <input
-                autoFocus
-                placeholder="搜索合集..."
-                value={wsQuery}
-                onChange={(e) => setWsQuery(e.target.value)}
-              />
-              {workspaceSel.length > 0 && (
-                <button
-                  className="btn btn-ghost"
-                  onClick={() => setWorkspaceSel([])}
-                  style={{ height: 24, padding: '0 8px', fontSize: 11 }}
-                >
-                  清空
+          {workspaceSel.map((id) => {
+            const ws = wsById[id]
+            if (!ws) return null
+            const color = WS_COLORS[Math.abs(id.charCodeAt(0)) % WS_COLORS.length]
+            return (
+              <span key={id} className="pp-chip">
+                <span className="pp-dot" style={{ background: color }} />
+                {ws.name}
+                <button className="pp-x" onClick={() => removeWs(id)} title="移除">
+                  <X size={11} />
                 </button>
-              )}
-            </div>
+              </span>
+            )
+          })}
 
-            <div className="pp-list">
-              {filteredWs.length === 0 && (
-                <div
-                  style={{
-                    padding: '18px 12px',
-                    textAlign: 'center',
-                    fontSize: 12,
-                    color: 'var(--ink-4)',
-                    fontFamily: 'var(--mono)',
-                  }}
-                >
-                  无匹配合集
-                </div>
-              )}
-              {filteredWs.map((ws) => {
-                const on = workspaceSel.includes(ws.workspace_id)
-                const color = WS_COLORS[Math.abs(ws.workspace_id.charCodeAt(0)) % WS_COLORS.length]
-                return (
-                  <div
-                    key={ws.workspace_id}
-                    className="pp-row"
-                    data-on={on}
-                    onClick={() => toggleWs(ws.workspace_id)}
+          <button className="pp-add" onClick={() => setWsOpen((o) => !o)}>
+            <Layers size={11} />
+            {workspaceSel.length ? '继续添加' : '选择合集'}
+          </button>
+
+          {wsOpen && (
+            <div className="pp-popover" ref={popRef}>
+              <div className="pp-search">
+                <Search size={14} />
+                <input
+                  autoFocus
+                  placeholder="搜索合集..."
+                  value={wsQuery}
+                  onChange={(e) => setWsQuery(e.target.value)}
+                />
+                {workspaceSel.length > 0 && (
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => setWorkspaceSel([])}
+                    style={{ height: 24, padding: '0 8px', fontSize: 11 }}
                   >
-                    <span className="pp-check">
-                      <Check size={11} strokeWidth={3} />
-                    </span>
-                    <span
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: 99,
-                        background: color,
-                        flexShrink: 0,
-                      }}
-                    />
-                    <div style={{ minWidth: 0 }}>
-                      <div className="pp-name">{ws.name}</div>
-                    </div>
-                    <span className="pp-count">{ws.items.length} 项</span>
+                    清空
+                  </button>
+                )}
+              </div>
+
+              <div className="pp-list">
+                {filteredWs.length === 0 && (
+                  <div
+                    style={{
+                      padding: '18px 12px',
+                      textAlign: 'center',
+                      fontSize: 12,
+                      color: 'var(--ink-4)',
+                      fontFamily: 'var(--fm)',
+                    }}
+                  >
+                    无匹配合集
                   </div>
-                )
-              })}
-            </div>
+                )}
+                {filteredWs.map((ws) => {
+                  const on = workspaceSel.includes(ws.workspace_id)
+                  const color = WS_COLORS[Math.abs(ws.workspace_id.charCodeAt(0)) % WS_COLORS.length]
+                  return (
+                    <div
+                      key={ws.workspace_id}
+                      className="pp-row"
+                      data-on={on}
+                      onClick={() => toggleWs(ws.workspace_id)}
+                    >
+                      <span className="pp-check">
+                        <Check size={11} strokeWidth={3} />
+                      </span>
+                      <span
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 99,
+                          background: color,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <div style={{ minWidth: 0 }}>
+                        <div className="pp-name">{ws.name}</div>
+                      </div>
+                      <span className="pp-count">{ws.items.length} 项</span>
+                    </div>
+                  )
+                })}
+              </div>
 
-            <div className="pp-foot">
-              <button
-                className="pp-new"
-                onClick={handleNewWorkspace}
-              >
-                <Plus size={11} />
-                新建合集{wsQuery ? ` "${wsQuery}"` : ''}
-              </button>
-              <button className="pp-done" onClick={() => setWsOpen(false)}>
-                完成
-              </button>
+              <div className="pp-foot">
+                <button
+                  className="pp-new"
+                  onClick={handleNewWorkspace}
+                >
+                  <Plus size={11} />
+                  新建合集{wsQuery ? ` "${wsQuery}"` : ''}
+                </button>
+                <button className="pp-done" onClick={() => setWsOpen(false)}>
+                  完成
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
 
-      {/* Run row */}
-      <div className="composer-run">
-        <button className="wb-btn-run" onClick={handleAdd} disabled={!url.trim()}>
-          添加素材
-          <span className="iconwrap">
-            <ArrowRight size={14} />
-          </span>
-        </button>
+        {/* Run row — 对齐设计稿 cp-actions */}
+        <div className="composer-run">
+          <button className="cp-submit" onClick={handleAdd} disabled={!url.trim()}>
+            添加素材
+          </button>
+        </div>
       </div>
 
       {/* Link preview modal */}
@@ -377,7 +354,6 @@ export function Composer({ onTaskCreated }: ComposerProps) {
         open={uploadOpen}
         onOpenChange={(open) => {
           setUploadOpen(open)
-          // 关闭时清理：仅未提交时删除残留 item（ref 同步更新，不依赖 state 异步）
           if (!open && !submittedRef.current && localFile && localWsId) {
             removeWorkspaceItem(localWsId, localFile).catch(() => {})
           }

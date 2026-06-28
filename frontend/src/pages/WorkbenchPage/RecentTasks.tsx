@@ -1,24 +1,38 @@
-import { ArrowRight, Film, Mic, Image, FileText } from 'lucide-react'
+import { ArrowRight, Play, Mic, Image, FileText } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTaskStore } from '@/store/taskStore'
 import { usePipelineTasks } from '@/hooks/usePipelineTasks'
 import { isTaskTerminal, getStatusText } from '@/types/task'
 import type { TaskRecord } from '@/types/task'
-import type { TaskCard } from './types'
 
-const STATE_COLOR: Record<TaskCard['state'], string> = {
-  done:      'var(--accent-green)',
-  running:   'var(--accent-blue)',
-  error:     'var(--accent-pink)',
-  cancelled: 'var(--ink-3)',
-  queued:    'var(--ink-4)',
+const STATE_PILL_CLASS: Record<string, string> = {
+  done:      'status-pill status-done',
+  running:   'status-pill status-run',
+  error:     'status-pill status-error',
+  cancelled: 'status-pill',
+  queued:    'status-pill',
 }
 
-const TYPE_ICON = {
-  video: Film,
-  audio: Mic,
-  image: Image,
-  text:  FileText,
+const STATE_STATUS_LABEL: Record<string, string> = {
+  done:      '已完成',
+  running:   '运行中',
+  error:     '失败',
+  cancelled: '已取消',
+  queued:    '排队中',
+}
+
+const TYPE_LABEL: Record<string, string> = {
+  video: 'VIDEO',
+  audio: 'AUDIO',
+  image: 'IMAGE',
+  text:  'TEXT',
+}
+
+const COVER_CLASS: Record<string, string> = {
+  video: 'cover-video',
+  audio: 'cover-audio',
+  image: 'cover-image',
+  text:  'cover-text',
 }
 
 function titleFromFilename(filename: unknown): string {
@@ -28,26 +42,44 @@ function titleFromFilename(filename: unknown): string {
   return name.replace(/\.[^.]+$/, '')
 }
 
-// 音频任务没有 video_thumbnail_url，封面是 PROBE 阶段落在 static 下的同名 jpg（与 TasksCard 一致）
-function audioThumbnailFromResult(result: Record<string, unknown>, audio?: Record<string, unknown>): string {
+function audioThumbFromResult(result: Record<string, unknown>, audio?: Record<string, unknown>): string {
   const projectId = typeof result.project_id === 'string' ? result.project_id.trim() : ''
   const filename = typeof audio?.filename === 'string' ? audio.filename.trim() : ''
   if (!projectId || !filename) return ''
   return `/static/workspaces/${projectId}/audio/${titleFromFilename(filename)}.jpg`
 }
 
-function taskToCard(t: TaskRecord): TaskCard {
+/** 从 result 里取摘要文本，5种来源逐级 fallback */
+function descFromResult(result: Record<string, unknown>): string {
+  return (result.note_summary || result.summary || result.description || result.video_title || '') as string
+}
+
+interface NoteCard {
+  id: string
+  title: string
+  summary: string
+  src: string              // 来源平台/URL 标签
+  type: string             // video | audio | image | text
+  state: string
+  thumb: string
+  progress: number         // 0~1
+  lastAction: string
+  metaLabels: string[]     // 元信息行
+}
+
+function taskToNoteCard(t: TaskRecord): NoteCard {
   const payload = (t.payload ?? {}) as Record<string, unknown>
   const result = (t.result ?? {}) as Record<string, unknown>
 
-  let state: TaskCard['state'] = 'queued'
+  // 状态
+  let state = 'queued'
   if (t.status === 'SUCCESS') state = 'done'
   else if (t.status === 'FAILED') state = 'error'
   else if (t.status === 'CANCELLED') state = 'cancelled'
   else if (isTaskTerminal(t.status)) state = 'done'
   else state = 'running'
 
-  // 真实标题：视频标题 > url 截断 > 状态文案
+  // 标题
   const url = payload.url as string | undefined
   const videoTitle = (result.video_title || payload.video_title) as string | undefined
   const title = videoTitle?.trim()
@@ -56,26 +88,48 @@ function taskToCard(t: TaskRecord): TaskCard {
       ? (url.length > 50 ? url.slice(0, 47) + '...' : url)
       : getStatusText(t.status)
 
-  // 真实封面（PROBE 后已是 static URL，可直接用）；音频走同名 jpg 派生
+  // 摘要
+  const summary = descFromResult(result)
+
+  // 来源标签
+  const src = (result.source_name || result.platform || payload.platform || 'Nibi') as string
+
+  // 封面
   const resultAudio = result.audio as Record<string, unknown> | undefined
   const thumb = (result.video_thumbnail_url
     || result.cover_thumbnail
-    || audioThumbnailFromResult(result, resultAudio)
+    || audioThumbFromResult(result, resultAudio)
     || '') as string
 
-  // 真实类型
+  // 类型
   const noteKind = result.note_kind as string | undefined
   const type =
-    noteKind === 'image_text' ? 'image' : t.task_type === 'audio' ? 'audio' : 'video'
+    noteKind === 'image_text' ? 'image'
+    : t.task_type === 'audio' ? 'audio'
+    : t.task_type === 'image' ? 'image'
+    : t.task_type === 'text'  ? 'text'
+    : 'video'
 
-  return {
-    id: t.task_id,
-    title,
-    src: t.task_type,
-    type,
-    state,
-    thumb,
+  // 进度
+  const progress = typeof t.progress === 'number' ? t.progress : 0
+
+  // 上一次动作
+  const lastAction = (result.last_action
+    || result.last_stage
+    || (state === 'running' ? getStatusText(t.status) : '')
+    || '') as string
+
+  // 元信息
+  const metaLabels: string[] = []
+  if (src) metaLabels.push(src)
+  if (result.duration) metaLabels.push(String(result.duration))
+  if (result.frame_count) metaLabels.push(`${result.frame_count} 帧`)
+  if (result.segment_count) metaLabels.push(`${result.segment_count} 段`)
+  if (!metaLabels.length) {
+    metaLabels.push(t.task_type, type)
   }
+
+  return { id: t.task_id, title, summary, src, type, state, thumb, progress, lastAction, metaLabels }
 }
 
 interface RecentTasksProps {
@@ -87,72 +141,143 @@ export function RecentTasks({ tasks: tasksProp }: RecentTasksProps) {
   usePipelineTasks({ pollInterval: 5000 })
   const storeTasks = useTaskStore((s) => s.tasks)
   const tasks = tasksProp ?? storeTasks
-  const cards = tasks.slice(0, 8).map(taskToCard)
+  const cards = tasks.slice(0, 8).map(taskToNoteCard)
+  const totalCount = tasks.length
+
+  // 封面 icon
+  function coverIcon(type: string) {
+    const cls = 'cover-icon'
+    switch (type) {
+      case 'video': return <div className={cls}><Play fill="currentColor" /></div>
+      case 'audio': return <div className={cls}><Mic /></div>
+      case 'image': return <div className={cls}><Image /></div>
+      case 'text':  return <div className={cls}><FileText /></div>
+      default:      return <div className={cls}><Play fill="currentColor" /></div>
+    }
+  }
+
+  // 模拟波形 (audio)
+  function audioWave() {
+    return (
+      <div className="audio-wave">
+        {Array.from({ length: 7 }, (_, i) => <i key={i} />)}
+      </div>
+    )
+  }
+
+  // 模拟图片堆叠 (image)
+  function imageCluster() {
+    return (
+      <div className="image-cluster">
+        {Array.from({ length: 4 }, (_, i) => <span key={i} />)}
+      </div>
+    )
+  }
+
+  // 模拟文档线条 (text)
+  function docLines() {
+    return (
+      <div className="doc-lines">
+        {Array.from({ length: 4 }, (_, i) => <i key={i} />)}
+      </div>
+    )
+  }
 
   if (cards.length === 0) {
     return (
-      <section className="examples">
-        <div className="examples-head">
-          <h2 className="display rt-title">
-            最近任务
-          </h2>
-        </div>
-        <div className="rt-empty">
-          暂无任务 — 在上方粘贴链接开始解析
-        </div>
+      <section style={{ maxWidth: 1040, margin: '0 auto', padding: '24px 32px 80px' }}>
+        <div className="rt-empty">暂无任务 — 在上方粘贴链接开始解析</div>
       </section>
     )
   }
 
   return (
-    <section className="examples">
-      <div className="examples-head">
-        <h2 className="display rt-title">
-          最近任务
-        </h2>
-        <button className="btn btn-ghost">
-          全部 · {cards.length} <ArrowRight size={14} />
+    <section style={{ maxWidth: 1040, margin: '0 auto', padding: '24px 32px 80px' }}>
+      <div className="sec-h">
+        <h2 className="sec-title">最近任务</h2>
+        <button className="sec-link">
+          全部 · {totalCount} <ArrowRight size={13} />
         </button>
       </div>
 
-      <div className="ex-grid">
-        {cards.map((task) => {
-          const Icon = TYPE_ICON[task.type as keyof typeof TYPE_ICON] ?? Film
+      <div className="note-grid">
+        {cards.map((card) => {
+          const hasThumb = !!card.thumb
+          const coverTypeClass = hasThumb ? '' : COVER_CLASS[card.type] || 'cover-video'
+          const pillClass = STATE_PILL_CLASS[card.state] || 'status-pill'
+          const statusLabel = STATE_STATUS_LABEL[card.state] || card.state
+          const typeLabel = TYPE_LABEL[card.type] || 'VIDEO'
+          const progressPct = Math.round(Math.min(card.progress, 1) * 100)
+
           return (
-            <div
-              key={task.id}
-              className="ex-card"
-              onClick={() => navigate(`/processing/${task.id}`)}
+            <article
+              key={card.id}
+              className="note-card"
+              data-kind={card.type}
+              onClick={() => navigate(`/processing/${card.id}`)}
             >
-              <div className="ex-thumb">
-                {task.thumb ? (
+              <div className={`note-cover ${coverTypeClass}`}>
+                {hasThumb ? (
                   <img
-                    src={task.thumb}
-                    alt={task.title}
+                    src={card.thumb}
+                    alt={card.title}
                     referrerPolicy="no-referrer"
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = 'none'
                     }}
                   />
-                ) : (
-                  <Icon size={28} />
+                ) : null}
+                <span className="media-chip">{typeLabel}</span>
+                <span className={pillClass}>{statusLabel}</span>
+                {!hasThumb && (
+                  <>
+                    {card.type === 'audio' ? audioWave() : null}
+                    {card.type === 'image' ? imageCluster() : null}
+                    {card.type === 'text' ? docLines() : null}
+                    {(card.type === 'video' || !card.type) ? coverIcon(card.type) : null}
+                  </>
                 )}
-                <div className="rt-badge">
-                  <span
-                    className="rt-status-dot"
-                    style={{ background: STATE_COLOR[task.state] }}
-                  />
-                  {task.state}
+              </div>
+
+              <div className="note-card-body">
+                <div className="note-title-row">
+                  <span className="note-type-dot" />
+                  <h3>{card.title}</h3>
+                </div>
+
+                {card.summary && (
+                  <p className="note-summary">{card.summary}</p>
+                )}
+
+                <div className="note-meta-row">
+                  {card.metaLabels.map((label, i) => (
+                    <span key={i}>{label}</span>
+                  ))}
+                </div>
+
+                {card.state === 'running' && progressPct < 100 && (
+                  <div className="note-progress-mini">
+                    <span style={{ width: `${progressPct}%` }} />
+                  </div>
+                )}
+
+                <div className="note-card-actions">
+                  <span>
+                    {card.lastAction || (card.state === 'done' ? '已完成' : '')}
+                  </span>
+                  <button
+                    className="note-open"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      navigate(`/processing/${card.id}`)
+                    }}
+                  >
+                    {card.state === 'running' ? '查看' : '打开'}
+                  </button>
                 </div>
               </div>
-              <div className="ex-meta">
-                <div className="ex-title">{task.title}</div>
-                <div className="ex-sub">
-                  {task.src} · {task.type}
-                </div>
-              </div>
-            </div>
+            </article>
           )
         })}
       </div>
