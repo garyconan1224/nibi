@@ -1,9 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle, Loader2 } from 'lucide-react'
-import OpenAIMono from '@lobehub/icons/es/OpenAI/components/Mono'
-import AnthropicMono from '@lobehub/icons/es/Anthropic/components/Mono'
+import {
+  AlertCircle,
+  Loader2,
+  Plus,
+  Check,
+  Zap,
+  Pencil,
+  Trash2,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -30,21 +36,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { http } from '@/services/client'
 import {
   useProviderStore,
   type ProviderItem,
 } from '@/store/providerStore'
-import { useSettingsShellStore } from '@/store/settingsShellStore'
-import { useDirtyGuard } from '@/hooks/useDirtyGuard'
-import { ProviderList } from '@/components/settings/providers/ProviderList'
-import {
-  ProviderDetailPanel,
-  type EditDraft,
-  type ProviderDetail,
-} from '@/components/settings/providers/ProviderDetailPanel'
+import type { EditDraft, ProviderDetail } from '@/components/settings/providers/ProviderDetailPanel'
 
-/** 新增对话框草稿（与 ProviderCreateRequest 对齐） */
+/** 新增对话框草稿 */
 interface CreateForm {
   name: string
   kind: 'openai_compatible' | 'anthropic'
@@ -59,7 +59,6 @@ const EMPTY_CREATE_FORM: CreateForm = {
   base_url: '',
 }
 
-/** 从 detail 推导 draft 基线（api_key 永远以空串开始） */
 function baselineFromDetail(detail: ProviderDetail): EditDraft {
   return {
     api_key: '',
@@ -70,11 +69,15 @@ function baselineFromDetail(detail: ProviderDetail): EditDraft {
 }
 
 const EMPTY_DRAFT: EditDraft = { api_key: '', base_url: '', enabled: false, name: '' }
-const EMPTY_DIRTY_MAP: Record<keyof EditDraft, boolean> = {
-  api_key: false,
-  base_url: false,
-  enabled: false,
-  name: false,
+
+/** Provider 颜色映射（用于 pc-logo 背景） */
+function providerColor(kind: string): string {
+  const map: Record<string, string> = {
+    anthropic: '#d3784a',
+    openai_compatible: '#10a37f',
+    ollama: '#4a90d9',
+  }
+  return map[kind] ?? '#888'
 }
 
 const ProvidersManagementPage = () => {
@@ -85,12 +88,13 @@ const ProvidersManagementPage = () => {
   const [listLoading, setListLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // ── Master-Detail 选中态 ──
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-
-  // ── 详情 / 草稿缓存（按 id 索引，离开再回来不丢） ──
+  // ── 详情缓存 ──
   const [detailCache, setDetailCache] = useState<Record<string, ProviderDetail>>({})
-  const [drafts, setDrafts] = useState<Record<string, EditDraft>>({})
+
+  // ── 编辑弹窗 ──
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState<EditDraft>(EMPTY_DRAFT)
+  const [editingDetail, setEditingDetail] = useState<ProviderDetail | null>(null)
 
   // ── 过渡态 ──
   const [savingId, setSavingId] = useState<string | null>(null)
@@ -107,10 +111,6 @@ const ProvidersManagementPage = () => {
   const [deleting, setDeleting] = useState(false)
   const removeProviderInStore = useProviderStore((s) => s.removeProvider)
 
-  // ── SaveBar 桥：子页面 → SettingsShell ──
-  const setSaveBar = useSettingsShellStore((s) => s.setSaveBar)
-  const resetSaveBar = useSettingsShellStore((s) => s.resetSaveBar)
-
   /* ── 拉取列表 ── */
   const fetchProviders = async () => {
     try {
@@ -119,14 +119,8 @@ const ProvidersManagementPage = () => {
       const list: ProviderItem[] = res.data.data ?? res.data
       setProviders(list)
       setError(null)
-      setSelectedId((prev) => {
-        if (prev && list.some((p) => p.id === prev)) return prev
-        return list[0]?.id ?? null
-      })
     } catch (e) {
-      const msg = e instanceof Error ? e.message : t('common:status.unknownError')
-      setError(msg)
-      toast.error(msg)
+      setError(e instanceof Error ? e.message : t('common:status.unknownError'))
     } finally {
       setListLoading(false)
     }
@@ -136,176 +130,114 @@ const ProvidersManagementPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  /* ── 懒加载选中项的详情 ── */
-  useEffect(() => {
-    if (!selectedId) return
-    if (detailCache[selectedId]) return
-    let aborted = false
-    ;(async () => {
-      try {
-        const res = await http.get(`/providers/${selectedId}`)
-        const detail: ProviderDetail = res.data.data ?? res.data
-        if (aborted) return
-        setDetailCache((prev) => ({ ...prev, [selectedId]: detail }))
-        setDrafts((prev) =>
-          prev[selectedId] ? prev : { ...prev, [selectedId]: baselineFromDetail(detail) },
-        )
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : t('detail.fetchFailed')
-        setError(msg)
-        toast.error(msg)
-      }
-    })()
-    return () => {
-      aborted = true
-    }
-  }, [selectedId, detailCache, t])
-
-  /* ── 逐 provider 脏判定：驱动左侧 DirtyDot ── */
-  const dirtyIds = useMemo(() => {
-    const s = new Set<string>()
-    for (const [id, draft] of Object.entries(drafts)) {
-      const detail = detailCache[id]
-      if (!detail) continue
-      if (
-        draft.api_key !== '' ||
-        draft.base_url !== detail.base_url ||
-        draft.enabled !== detail.enabled ||
-        draft.name !== detail.name
-      ) {
-        s.add(id)
-      }
-    }
-    return s
-  }, [drafts, detailCache])
-
-  /* ── 当前选中项的草稿 + 基线（供 useDirtyGuard 使用） ── */
-  const currentBaseline = useMemo<EditDraft>(() => {
-    if (!selectedId) return EMPTY_DRAFT
-    const detail = detailCache[selectedId]
-    return detail ? baselineFromDetail(detail) : EMPTY_DRAFT
-  }, [selectedId, detailCache])
-
-  const currentDraft: EditDraft =
-    (selectedId && drafts[selectedId]) || currentBaseline
-
-  /* 路由级脏守卫：beforeunload + useBlocker；页面内切换的拦截走下面的 handleSelect */
-  const guard = useDirtyGuard<EditDraft>({
-    initial: currentBaseline,
-    current: currentDraft,
-    message: t('settings:dirty.leaveConfirm'),
-    enabled: !!selectedId && !!detailCache[selectedId ?? ''],
-  })
-
-  const currentDirtyMap: Record<keyof EditDraft, boolean> = guard.isDirty
-    ? guard.dirtyMap
-    : EMPTY_DIRTY_MAP
-
-  /* ── 草稿 patch / reset ── */
-  const patchDraft = (patch: Partial<EditDraft>) => {
-    if (!selectedId) return
-    setDrafts((prev) => ({
-      ...prev,
-      [selectedId]: { ...(prev[selectedId] ?? currentBaseline), ...patch },
-    }))
+  /* ── 懒加载详情 ── */
+  const loadDetail = async (id: string) => {
+    if (detailCache[id]) return detailCache[id]
+    const res = await http.get(`/providers/${id}`)
+    const detail: ProviderDetail = res.data.data ?? res.data
+    setDetailCache((prev) => ({ ...prev, [id]: detail }))
+    return detail
   }
 
-  const resetDraft = () => {
-    if (!selectedId) return
-    const detail = detailCache[selectedId]
-    if (!detail) return
-    setDrafts((prev) => ({ ...prev, [selectedId]: baselineFromDetail(detail) }))
+  /* ── 打开编辑弹窗 ── */
+  const handleOpenEdit = async (id: string) => {
+    try {
+      const detail = await loadDetail(id)
+      setEditingId(id)
+      setEditingDetail(detail)
+      setEditDraft(baselineFromDetail(detail))
+    } catch {
+      toast.error(t('detail.fetchFailed'))
+    }
   }
 
-  /* ── 保存 ── */
-  const handleSave = async (id = selectedId) => {
-    if (!id) return
-    const draft = drafts[id]
-    const detail = detailCache[id]
-    if (!draft || !detail) return
+  /* ── 保存编辑 ── */
+  const handleSaveEdit = async () => {
+    if (!editingId || !editingDetail) return
+    const id = editingId
     setSavingId(id)
     try {
       const body: Record<string, unknown> = {
-        base_url: draft.base_url,
-        enabled: draft.enabled,
-        name: draft.name,
-        default_models: detail.default_models,
+        base_url: editDraft.base_url,
+        enabled: editDraft.enabled,
+        name: editDraft.name,
+        default_models: editingDetail.default_models,
       }
-      if (draft.api_key.trim() !== '') body.api_key = draft.api_key
+      if (editDraft.api_key.trim() !== '') body.api_key = editDraft.api_key
 
       await http.put(`/providers/${id}`, body)
       toast.success(t('save.success'))
 
       const updated: ProviderDetail = {
-        ...detail,
-        base_url: draft.base_url,
-        enabled: draft.enabled,
-        name: draft.name,
+        ...editingDetail,
+        base_url: editDraft.base_url,
+        enabled: editDraft.enabled,
+        name: editDraft.name,
         has_api_key:
-          draft.api_key.trim() !== '' ? true : detail.has_api_key,
+          editDraft.api_key.trim() !== '' ? true : editingDetail.has_api_key,
       }
       setDetailCache((prev) => ({ ...prev, [id]: updated }))
-      const nextDraft = baselineFromDetail(updated)
-      setDrafts((prev) => ({ ...prev, [id]: nextDraft }))
-      guard.commit(nextDraft)
       setProviders((prev) =>
         prev.map((p) =>
           p.id === id
-            ? { ...p, enabled: draft.enabled, name: draft.name, base_url: draft.base_url }
+            ? { ...p, enabled: editDraft.enabled, name: editDraft.name, base_url: editDraft.base_url }
             : p,
         ),
       )
+      setEditingId(null)
+      setEditingDetail(null)
     } catch (e) {
-      const msg = e instanceof Error ? e.message : t('save.failed')
-      setError(msg)
-      toast.error(msg)
+      toast.error(e instanceof Error ? e.message : t('save.failed'))
     } finally {
       setSavingId(null)
     }
   }
 
   /* ── 连接测试 ── */
-  const handleTest = async () => {
-    if (!selectedId) return
-    const prov = providers.find((p) => p.id === selectedId)
+  const handleTest = async (id: string) => {
+    const prov = providers.find((p) => p.id === id)
     if (!prov) return
-    setTestingId(selectedId)
-    setTestResult((prev) => ({ ...prev, [selectedId]: { ok: false, msg: '' } }))
+    setTestingId(id)
     try {
-      const res = await http.post('/providers/test', { provider_id: selectedId })
+      const res = await http.post('/providers/test', { provider_id: id })
       const data = res.data.data ?? res.data
       setTestResult((prev) => ({
         ...prev,
-        [selectedId]: { ok: true, msg: data.message || t('test.successDefault') },
+        [id]: { ok: true, msg: data.message || t('test.successDefault') },
       }))
       toast.success(t('test.successToast', { name: prov.name }))
     } catch (e) {
       const msg = e instanceof Error ? e.message : t('test.failedDefault')
-      setTestResult((prev) => ({ ...prev, [selectedId]: { ok: false, msg } }))
+      setTestResult((prev) => ({ ...prev, [id]: { ok: false, msg } }))
       toast.error(t('test.failedToast', { name: prov.name, msg }))
     } finally {
       setTestingId(null)
     }
   }
 
-  /* ── 切换选中：脏态下 window.confirm 拦截 ── */
-  const handleSelect = (id: string) => {
-    if (id === selectedId) return
-    if (selectedId && dirtyIds.has(selectedId)) {
-      const ok = window.confirm(t('settings:dirty.leaveConfirm'))
-      if (!ok) return
-      const detail = detailCache[selectedId]
-      if (detail) {
-        setDrafts((prev) => ({
-          ...prev,
-          [selectedId]: baselineFromDetail(detail),
-        }))
+  /* ── 切换启用 ── */
+  const handleToggleEnabled = async (p: ProviderItem) => {
+    try {
+      const detail = await loadDetail(p.id)
+      const newEnabled = !detail.enabled
+      const body = {
+        base_url: detail.base_url,
+        enabled: newEnabled,
+        name: detail.name,
+        default_models: detail.default_models,
       }
+      await http.put(`/providers/${p.id}`, body)
+      const updated: ProviderDetail = { ...detail, enabled: newEnabled }
+      setDetailCache((prev) => ({ ...prev, [p.id]: updated }))
+      setProviders((prev) =>
+        prev.map((x) => (x.id === p.id ? { ...x, enabled: newEnabled } : x)),
+      )
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t('save.failed'))
     }
-    setSelectedId(id)
   }
 
-  /* ── 删除 / 新增 ── */
+  /* ── 删除 ── */
   const handleConfirmDelete = async () => {
     if (!pendingDelete) return
     const target = pendingDelete
@@ -318,31 +250,21 @@ const ProvidersManagementPage = () => {
         delete n[target.id]
         return n
       })
-      setDrafts((prev) => {
-        const n = { ...prev }
-        delete n[target.id]
-        return n
-      })
       setTestResult((prev) => {
         const n = { ...prev }
         delete n[target.id]
         return n
       })
-      if (selectedId === target.id) {
-        setSelectedId((prev) => {
-          const rest = providers.filter((p) => p.id !== target.id)
-          return prev === target.id ? rest[0]?.id ?? null : prev
-        })
-      }
       toast.success(t('delete.successToast', { name: target.name }))
       setPendingDelete(null)
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t('delete.failed'))
+    } catch {
+      toast.error(t('delete.failed'))
     } finally {
       setDeleting(false)
     }
   }
 
+  /* ── 新增 ── */
   const handleCreate = async () => {
     if (!createForm.name.trim()) {
       toast.error(t('create.nameRequired'))
@@ -362,44 +284,26 @@ const ProvidersManagementPage = () => {
     }
   }
 
-  /* ── SaveBar 联动：推送至 SettingsShell 顶层 store ── */
-  useEffect(() => {
-    const isDirty = !!selectedId && dirtyIds.has(selectedId)
-    setSaveBar({
-      dirtyCount: isDirty
-        ? Object.values(currentDirtyMap).filter(Boolean).length
-        : 0,
-      saving: savingId === selectedId,
-      onSave: selectedId ? () => void handleSave(selectedId) : undefined,
-      onReset: selectedId ? () => resetDraft() : undefined,
-    })
-    return () => resetSaveBar()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, dirtyIds, savingId, currentDirtyMap])
-
-  /* ─── 渲染 ─── */
+  /* ── 渲染 ── */
   if (listLoading) {
     return (
-      <div className="flex h-full items-center justify-center gap-2 text-muted-foreground">
+      <div className="flex h-full items-center justify-center gap-2" style={{ color: 'var(--mut)' }}>
         <Loader2 className="size-5 animate-spin" />
         <span>{t('common:status.loading')}</span>
       </div>
     )
   }
 
-  const selectedProvider =
-    (selectedId && providers.find((p) => p.id === selectedId)) || null
-
   return (
-    <div className="flex h-full w-full flex-col">
-      {/* 全局错误横幅 */}
+    <div className="settings-panel">
+      {/* ── 全局错误横幅 ── */}
       {error ? (
-        <div className="mx-6 mt-4 flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 mb-5">
           <AlertCircle className="size-4 shrink-0" />
           <span>{error}</span>
           <button
             type="button"
-            className="ml-auto text-rose-400 hover:text-rose-600"
+            className="ml-auto text-red-400 hover:text-red-600"
             onClick={() => setError(null)}
             aria-label="dismiss-error"
           >
@@ -408,31 +312,267 @@ const ProvidersManagementPage = () => {
         </div>
       ) : null}
 
-      {/* Master-Detail 双栏 */}
-      <div className="flex flex-1 overflow-hidden">
-        <ProviderList
-          providers={providers}
-          selectedId={selectedId}
-          dirtyIds={dirtyIds}
-          onSelect={handleSelect}
-          onAdd={() => setCreateOpen(true)}
-          onDelete={(p) => setPendingDelete(p)}
-        />
-        <ProviderDetailPanel
-          provider={selectedProvider}
-          detail={selectedId ? detailCache[selectedId] ?? null : null}
-          draft={selectedId ? drafts[selectedId] ?? null : null}
-          dirtyMap={currentDirtyMap}
-          savingId={savingId}
-          testingId={testingId}
-          testResult={selectedId ? testResult[selectedId] : undefined}
-          onChange={patchDraft}
-          onSave={() => void handleSave()}
-          onTest={handleTest}
-        />
+      {/* ── 区段头部 ── */}
+      <div className="settings-header">
+        <div>
+          <h2>模型与渠道</h2>
+          <div className="settings-header-desc">
+            API 提供方管理 · 认证配置 · 连接测试
+          </div>
+        </div>
+        <div className="settings-header-actions">
+          <button
+            type="button"
+            className="settings-save-btn"
+            onClick={() => setCreateOpen(true)}
+          >
+            <Plus size={14} />
+            {t('list.addButton')}
+          </button>
+        </div>
       </div>
 
-      {/* 新增提供商 Dialog */}
+      {/* ── 提供商卡片网格 ── */}
+      <div className="settings-section">
+        <div className="settings-section-title">API 提供方 · Providers</div>
+        {providers.length === 0 ? (
+          <div className="settings-empty">
+            <Zap className="settings-empty-icon size-8" />
+            <p>{t('emptyState.description')}</p>
+          </div>
+        ) : (
+          <div className="provider-grid">
+            {providers.map((p) => {
+              const tr = testResult[p.id]
+              const testing = testingId === p.id
+              return (
+                <div key={p.id} className="provider-card" data-on={p.enabled}>
+                  {/* 顶部：logo + 名称 + 开关 */}
+                  <div className="pc-top">
+                    <div className="pc-logo" style={{ background: providerColor(p.kind) }}>
+                      {p.name[0]?.toUpperCase() ?? '?'}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="pc-name">{p.name}</div>
+                      <div className="pc-sub">{p.kind === 'anthropic' ? 'Anthropic · 对话/视觉' : 'OpenAI 兼容 · 通用'}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleEnabled(p)}
+                      className="settings-toggle"
+                      role="switch"
+                      aria-checked={p.enabled}
+                      aria-label={p.enabled ? t('badge.enabled') : t('badge.disabled')}
+                    >
+                      <input type="checkbox" checked={p.enabled} readOnly />
+                      <span className="settings-toggle-track">
+                        <span className="settings-toggle-thumb" />
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* API Key 行 */}
+                  <div className="pc-key">
+                    <span className="key-eyebrow">API KEY</span>
+                    <code>
+                      {p.has_api_key
+                        ? '●●●●●●●●●●●●●●●●'
+                        : t('detail.apiKeyNotSet', '未配置')}
+                    </code>
+                    <button
+                      type="button"
+                      className="key-edit-btn"
+                      onClick={() => handleOpenEdit(p.id)}
+                    >
+                      <Pencil size={11} />
+                      编辑
+                    </button>
+                  </div>
+
+                  {/* 状态栏 */}
+                  <div className="pc-stats">
+                    <div>
+                      <span className="stat-label">STATUS</span>
+                      <span className="stat-value" style={{ color: p.enabled ? 'var(--ok)' : 'var(--mut)' }}>
+                        {p.enabled ? '● 已启用' : '○ 已停用'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="stat-label">类型</span>
+                      <span className="stat-value">{p.kind === 'anthropic' ? 'Anthropic' : 'OpenAI'}</span>
+                    </div>
+                    <div>
+                      <span className="stat-label">测试</span>
+                      <span className="stat-value">
+                        {tr
+                          ? tr.ok
+                            ? <span style={{ color: 'var(--ok)' }}>✓ 通过</span>
+                            : <span style={{ color: 'var(--err)' }}>✗ 失败</span>
+                          : '—'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 操作按钮 */}
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                    <button
+                      type="button"
+                      onClick={() => handleTest(p.id)}
+                      disabled={testing}
+                      className="pc-test-btn"
+                    >
+                      {testing ? (
+                        <>
+                          <Loader2 className="size-3.5 animate-spin" />
+                          测试中…
+                        </>
+                      ) : tr ? (
+                        <>
+                          <Check size={12} style={{ color: tr.ok ? 'var(--ok)' : 'var(--err)' }} />
+                          {tr.ok ? '连接正常' : '重新测试'}
+                        </>
+                      ) : (
+                        <>
+                          <Zap size={12} />
+                          测试连接
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEdit(p.id)}
+                      style={{
+                        height: 32,
+                        padding: '0 12px',
+                        borderRadius: 'var(--r)',
+                        fontSize: 'var(--xs)',
+                        fontWeight: 600,
+                        border: '1px solid var(--bdr)',
+                        cursor: 'pointer',
+                        background: 'transparent',
+                        color: 'var(--fg2)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        transition: 'all 140ms ease',
+                      }}
+                    >
+                      <Pencil size={12} />
+                      编辑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPendingDelete(p)}
+                      style={{
+                        height: 32,
+                        width: 32,
+                        borderRadius: 'var(--r)',
+                        fontSize: 'var(--xs)',
+                        border: '1px solid var(--bdr)',
+                        cursor: 'pointer',
+                        background: 'transparent',
+                        color: 'var(--mut)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 140ms ease',
+                        marginLeft: 'auto',
+                      }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── 编辑弹窗 ── */}
+      <Dialog
+        open={!!editingId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingId(null)
+            setEditingDetail(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>编辑提供商 — {editingDetail?.name}</DialogTitle>
+          </DialogHeader>
+          {editingId && editingDetail ? (
+            <div style={{ display: 'grid', gap: 16, paddingTop: 8 }}>
+              {/* 名称 */}
+              <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', alignItems: 'center', gap: 10 }}>
+                <label style={{ fontSize: 'var(--xs)', fontWeight: 500, color: 'var(--fg2)', textAlign: 'right' }}>
+                  {t('detail.nameLabel')}
+                </label>
+                <Input
+                  value={editDraft.name}
+                  onChange={(e) => setEditDraft((d) => ({ ...d, name: e.target.value }))}
+                  placeholder={t('create.namePlaceholder')}
+                />
+              </div>
+              {/* Base URL */}
+              <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', alignItems: 'center', gap: 10 }}>
+                <label style={{ fontSize: 'var(--xs)', fontWeight: 500, color: 'var(--fg2)', textAlign: 'right' }}>
+                  Base URL
+                </label>
+                <Input
+                  value={editDraft.base_url}
+                  onChange={(e) => setEditDraft((d) => ({ ...d, base_url: e.target.value }))}
+                  placeholder="https://api.example.com/v1"
+                />
+              </div>
+              {/* API Key */}
+              <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', alignItems: 'center', gap: 10 }}>
+                <label style={{ fontSize: 'var(--xs)', fontWeight: 500, color: 'var(--fg2)', textAlign: 'right' }}>
+                  API Key
+                </label>
+                <Input
+                  type="password"
+                  value={editDraft.api_key}
+                  onChange={(e) => setEditDraft((d) => ({ ...d, api_key: e.target.value }))}
+                  placeholder={editingDetail.has_api_key ? '●●●●●●●● (已设置)' : t('detail.apiKeyPlaceholder')}
+                />
+              </div>
+              {/* 启用 */}
+              <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr', alignItems: 'center', gap: 10 }}>
+                <label style={{ fontSize: 'var(--xs)', fontWeight: 500, color: 'var(--fg2)', textAlign: 'right' }}>
+                  {t('detail.enabledLabel')}
+                </label>
+                <Switch
+                  checked={editDraft.enabled}
+                  onCheckedChange={(v) => setEditDraft((d) => ({ ...d, enabled: v }))}
+                />
+              </div>
+              {/* 元信息 */}
+              <div style={{ padding: '10px 12px', background: 'var(--bgalt)', borderRadius: 'var(--r)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 'var(--xs)', color: 'var(--mut)' }}>
+                <span style={{ fontFamily: 'var(--fm)', fontSize: 10 }}>类型: {editingDetail.kind}</span>
+                <span style={{ fontFamily: 'var(--fm)', fontSize: 10 }}>ID: {editingDetail.id}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="size-5 animate-spin" />
+            </div>
+          )}
+          <DialogFooter style={{ gap: 8 }}>
+            <Button variant="ghost" onClick={() => { setEditingId(null); setEditingDetail(null) }}>
+              {t('common:actions.cancel')}
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={savingId === editingId} style={{ gap: 6 }}>
+              {savingId === editingId ? <Loader2 className="size-4 animate-spin" /> : null}
+              {t('common:actions.save')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── 新增提供商 Dialog ── */}
       <Dialog
         open={createOpen}
         onOpenChange={(open) => {
@@ -445,9 +585,9 @@ const ProvidersManagementPage = () => {
           <DialogHeader>
             <DialogTitle>{t('create.title')}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="grid grid-cols-[80px_1fr] items-center gap-3">
-              <label className="text-right text-sm font-medium">
+          <div style={{ display: 'grid', gap: 16, paddingTop: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', alignItems: 'center', gap: 10 }}>
+              <label style={{ fontSize: 'var(--xs)', fontWeight: 500, color: 'var(--fg2)', textAlign: 'right' }}>
                 {t('create.nameLabel')}
               </label>
               <Input
@@ -458,8 +598,8 @@ const ProvidersManagementPage = () => {
                 placeholder={t('create.namePlaceholder')}
               />
             </div>
-            <div className="grid grid-cols-[80px_1fr] items-center gap-3">
-              <label className="text-right text-sm font-medium">
+            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', alignItems: 'center', gap: 10 }}>
+              <label style={{ fontSize: 'var(--xs)', fontWeight: 500, color: 'var(--fg2)', textAlign: 'right' }}>
                 {t('create.kindLabel')}
               </label>
               <Select
@@ -472,28 +612,17 @@ const ProvidersManagementPage = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="openai_compatible">
-                    <span className="inline-flex items-center gap-2">
-                      <OpenAIMono size={16} />
-                      OpenAI Compatible
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="anthropic">
-                    <span className="inline-flex items-center gap-2">
-                      <AnthropicMono size={16} />
-                      Anthropic
-                    </span>
-                  </SelectItem>
+                  <SelectItem value="anthropic">Anthropic</SelectItem>
+                  <SelectItem value="openai_compatible">OpenAI 兼容</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-[80px_1fr] items-center gap-3">
-              <label className="text-right text-sm font-medium">
-                {t('form.apiKey')}
+            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', alignItems: 'center', gap: 10 }}>
+              <label style={{ fontSize: 'var(--xs)', fontWeight: 500, color: 'var(--fg2)', textAlign: 'right' }}>
+                API Key
               </label>
               <Input
                 type="password"
-                autoComplete="new-password"
                 value={createForm.api_key}
                 onChange={(e) =>
                   setCreateForm((f) => ({ ...f, api_key: e.target.value }))
@@ -501,9 +630,9 @@ const ProvidersManagementPage = () => {
                 placeholder={t('create.apiKeyPlaceholder')}
               />
             </div>
-            <div className="grid grid-cols-[80px_1fr] items-center gap-3">
-              <label className="text-right text-sm font-medium">
-                {t('form.baseUrl')}
+            <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', alignItems: 'center', gap: 10 }}>
+              <label style={{ fontSize: 'var(--xs)', fontWeight: 500, color: 'var(--fg2)', textAlign: 'right' }}>
+                Base URL
               </label>
               <Input
                 value={createForm.base_url}
@@ -514,53 +643,44 @@ const ProvidersManagementPage = () => {
               />
             </div>
           </div>
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setCreateOpen(false)
-                setCreateForm(EMPTY_CREATE_FORM)
-              }}
-              disabled={creating}
-            >
+          <DialogFooter style={{ gap: 8 }}>
+            <Button variant="ghost" onClick={() => setCreateOpen(false)} disabled={creating}>
               {t('common:actions.cancel')}
             </Button>
-            <Button onClick={handleCreate} disabled={creating} className="gap-2">
+            <Button onClick={handleCreate} disabled={creating} style={{ gap: 6 }}>
               {creating ? <Loader2 className="size-4 animate-spin" /> : null}
-              {t('create.submit')}
+              {t('create.title')}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* 删除二次确认 */}
+      {/* ── 删除确认对话框 ── */}
       <AlertDialog
-        open={pendingDelete !== null}
+        open={!!pendingDelete}
         onOpenChange={(open) => {
           if (!open && !deleting) setPendingDelete(null)
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('delete.title')}</AlertDialogTitle>
+            <AlertDialogTitle>{t('delete.confirmTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t('delete.description', { name: pendingDelete?.name ?? '' })}
+              {t('delete.confirmDescription', { name: pendingDelete?.name ?? '' })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>
-              {t('delete.cancel')}
+              {t('common:actions.cancel')}
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault()
-                void handleConfirmDelete()
-              }}
+              onClick={handleConfirmDelete}
               disabled={deleting}
-              className="gap-2"
             >
-              {deleting ? <Loader2 className="size-4 animate-spin" /> : null}
-              {t('delete.confirm')}
+              {deleting ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : null}
+              {t('actions.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -570,4 +690,3 @@ const ProvidersManagementPage = () => {
 }
 
 export default ProvidersManagementPage
-

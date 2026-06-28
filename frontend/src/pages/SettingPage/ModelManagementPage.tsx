@@ -2,10 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle, Loader2, RefreshCw, Search } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { EmptyState } from '@/components/ui/empty-state'
-import { cn } from '@/lib/utils'
 import { http } from '@/services/client'
 import { useConfigStore } from '@/store/configStore'
 import {
@@ -212,7 +209,7 @@ const ModelManagementPage = () => {
   /* ─── 渲染 ─── */
   if (listLoading) {
     return (
-      <div className="flex h-full items-center justify-center gap-2 text-muted-foreground">
+      <div className="flex h-full items-center justify-center gap-2" style={{ color: 'var(--mut)' }}>
         <Loader2 className="size-5 animate-spin" />
         <span>{t('model.loading')}</span>
       </div>
@@ -226,42 +223,70 @@ const ModelManagementPage = () => {
   ]
 
   return (
-    <div className="mx-auto w-full max-w-5xl p-6">
+    <div className="settings-panel">
       {/* 顶部标题栏 */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="settings-header">
         <div>
-          <h1 className="text-2xl font-bold">{t('model.title')}</h1>
-          <p className="text-sm text-muted-foreground">{t('model.subtitle')}</p>
+          <h2>{t('model.title')}</h2>
+          <div className="settings-header-desc">{t('model.subtitle')}</div>
         </div>
-        <Button variant="outline" size="sm" className="gap-2" onClick={fetchProviders}>
-          <RefreshCw className="size-4" />
-          {t('model.refresh')}
-        </Button>
+        <div className="settings-header-actions">
+          <button
+            type="button"
+            className="settings-reset-btn"
+            onClick={fetchProviders}
+          >
+            <RefreshCw size={14} />
+            {t('model.refresh')}
+          </button>
+        </div>
       </div>
 
       {/* 搜索 + capability 过滤 */}
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+      <div
+        style={{
+          display: 'flex',
+          gap: 10,
+          alignItems: 'center',
+          marginBottom: 20,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+          <Search
+            size={14}
+            style={{
+              position: 'absolute',
+              left: 12,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'var(--mut)',
+            }}
+          />
           <Input
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
             placeholder={t('model.searchPlaceholder')}
-            className="pl-9"
+            style={{ paddingLeft: 34 }}
           />
         </div>
-        <div className="flex items-center gap-1">
+        <div style={{ display: 'flex', gap: 4 }}>
           {capChips.map((c) => (
             <button
               key={c.key}
               type="button"
               onClick={() => setCapFilter(c.key)}
-              className={cn(
-                'rounded-full border px-3 py-1 text-xs transition-colors',
-                capFilter === c.key
-                  ? 'border-violet-300 bg-violet-50 text-violet-700'
-                  : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300',
-              )}
+              className="chip"
+              style={{
+                background:
+                  capFilter === c.key ? 'var(--fg)' : 'var(--bgalt)',
+                color:
+                  capFilter === c.key ? 'var(--bg)' : 'var(--fg2)',
+                border:
+                  capFilter === c.key
+                    ? '1px solid var(--fg)'
+                    : '1px solid var(--bdr)',
+              }}
             >
               {c.label}
             </button>
@@ -271,22 +296,41 @@ const ModelManagementPage = () => {
 
       {/* 全局错误横幅 */}
       {error && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: 10,
+          marginBottom: 16,
+          borderRadius: 'var(--r)',
+          border: '1px solid #fca5a5',
+          background: '#fef2f2',
+          color: '#b91c1c',
+          fontSize: 'var(--xs)',
+        }}>
           <AlertCircle className="size-4 shrink-0" />
           <span>{error}</span>
-          <button className="ml-auto text-rose-400 hover:text-rose-600" onClick={() => setError(null)}>✕</button>
+          <button
+            style={{ marginLeft: 'auto', color: '#f87171' }}
+            onClick={() => setError(null)}
+          >
+            ✕
+          </button>
         </div>
       )}
 
       {/* 分组列表 */}
-      <div className="space-y-4">
+      <div className="settings-section">
+        <div className="settings-section-title">
+          {t('model.providersSection', '提供商模型列表')}
+        </div>
         {groupedList.length === 0 ? (
-          <EmptyState
-            title={t(keyword || capFilter !== 'all' ? 'model.noMatch' : 'model.noProviders')}
-            description={
-              keyword || capFilter !== 'all' ? t('model.noMatchDesc') : undefined
-            }
-          />
+          <div className="settings-empty">
+            <Search size={24} />
+            <p>
+              {t(keyword || capFilter !== 'all' ? 'model.noMatch' : 'model.noProviders')}
+            </p>
+          </div>
         ) : (
           groupedList.map((g) => (
             <ModelProviderGroup
