@@ -680,6 +680,176 @@
   display: block;
 }
 
+.nibi-note-player-shell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nibi-note-page.is-pip {
+  background: var(--srf, #fff);
+}
+
+.nibi-note-page.is-pip .nibi-note-left {
+  flex: 0 0 0;
+  width: 0;
+  min-width: 0;
+  overflow: visible;
+  background: transparent;
+}
+
+.nibi-note-page.is-pip .nibi-note-right {
+  flex: 1 1 0;
+  width: 100%;
+}
+
+.nibi-note-page.is-pip .note-copy {
+  width: 100%;
+  max-width: none;
+}
+
+.nibi-note-player-shell.is-pip {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 500;
+  width: 320px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 24px 48px rgba(8, 8, 8, 0.34);
+}
+
+.nibi-note-player-shell.is-pip.is-dragging {
+  box-shadow: 0 30px 56px rgba(8, 8, 8, 0.42);
+}
+
+.note-pip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(10, 10, 10, 0.9);
+  color: #fff;
+  cursor: grab;
+  user-select: none;
+}
+
+.nibi-note-player-shell.is-dragging .note-pip-head,
+.note-pip-head:active {
+  cursor: grabbing;
+}
+
+.note-pip-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-family: var(--fm, monospace);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.note-pip-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.note-pip-head-btn {
+  height: 24px;
+  min-width: 24px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+.note-pip-head-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.note-pip-head-btn--danger {
+  color: #ffd1b2;
+}
+
+.note-pip-head-btn--danger:hover {
+  background: rgba(255, 138, 54, 0.2);
+  border-color: rgba(255, 138, 54, 0.45);
+}
+
+.note-pip-transport {
+  background: var(--srf, #fff);
+  border-top: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+}
+
+.note-pip-transport .note-controls {
+  padding: 6px 8px;
+  gap: 4px;
+}
+
+.note-pip-transport .note-transport {
+  gap: 2px;
+}
+
+.note-pip-transport .note-icon-btn {
+  width: 26px;
+  height: 26px;
+}
+
+.note-pip-transport .note-icon-btn svg {
+  width: 13px;
+  height: 13px;
+}
+
+.note-pip-transport .note-speed {
+  padding: 3px 6px;
+  font-size: 10px;
+}
+
+.note-pip-transport .note-audio:hover .note-volume-slider,
+.note-pip-transport .note-volume-slider {
+  width: 42px;
+  opacity: 1;
+}
+
+.note-pip-transport .note-timeline {
+  padding: 8px 8px 10px;
+  gap: 6px;
+  border-bottom: 0;
+}
+
+.note-pip-transport .note-time {
+  font-size: 10px;
+}
+
+.note-pip-transport .note-timeline-actions {
+  gap: 2px;
+}
+
+.note-pip-transport .note-progress {
+  height: 4px;
+}
+
+.note-pip-transport .note-progress::before {
+  inset: -6px 0;
+}
+
 .nibi-note-splitter {
   flex: 0 0 10px;
   align-self: stretch;

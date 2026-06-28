@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Bold, BookOpenCheck, Brain, Check, ChevronDown, ChevronRight, Download, FileCode, FileDown, FileText, FileType, Image, List, Minus, Pencil, Plus, Presentation, Sparkles, Subtitles, Trash2, Type } from 'lucide-react'
+import { ArrowLeft, Bold, BookOpenCheck, Brain, Camera, Check, ChevronDown, ChevronRight, Download, FileCode, FileDown, FileText, FileType, Image, List, Minus, Pencil, Plus, Presentation, Sparkles, Subtitles, Trash2, Type } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { downloadSubtitles, exportItemNoteObsidian, getItemNote, putItemNote } from '@/services/workspaces'
@@ -106,6 +106,8 @@ const FONT_WEIGHT_VALUE: Record<NoteEditorPrefs['fontWeight'], number> = {
   medium: 500,
   bold: 700,
 }
+
+const PIP_WIDTHS = [240, 320, 440]
 
 function readEditorPrefs(): NoteEditorPrefs {
   if (typeof window === 'undefined') return DEFAULT_EDITOR_PREFS
@@ -314,6 +316,10 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const notePageRef = useRef<HTMLDivElement>(null)
   const [currentTime, setCurrentTime] = useState(0)
   const [videoDuration, setVideoDuration] = useState(0)
+  const [isPip, setIsPip] = useState(false)
+  const [pipSizeIndex, setPipSizeIndex] = useState(1)
+  const [pipPosition, setPipPosition] = useState<{ x: number; y: number } | null>(null)
+  const [pipDragging, setPipDragging] = useState(false)
   const [noteLeftPct, setNoteLeftPct] = useState(() => {
     if (typeof window === 'undefined') return VIDEO_SPLIT_DEFAULT
     const storedRaw = window.localStorage.getItem(VIDEO_SPLIT_STORAGE_KEY)
@@ -395,6 +401,29 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     [noteLeftPct, editorPrefs],
   )
 
+  const pipWidth = PIP_WIDTHS[pipSizeIndex]
+
+  useEffect(() => {
+    if (!isPip || typeof window === 'undefined') return
+    const estimatedHeight = Math.round((pipWidth * 9) / 16 + 118)
+    setPipPosition((current) => {
+      const next = current ?? {
+        x: Math.max(12, window.innerWidth - pipWidth - 24),
+        y: Math.max(12, window.innerHeight - estimatedHeight - 24),
+      }
+      return {
+        x: clampNumber(next.x, 12, Math.max(12, window.innerWidth - pipWidth - 12)),
+        y: clampNumber(next.y, 12, Math.max(12, window.innerHeight - estimatedHeight - 12)),
+      }
+    })
+  }, [isPip, pipWidth])
+
+  useEffect(() => {
+    setIsPip(false)
+    setPipDragging(false)
+    setPipPosition(null)
+  }, [workspaceId, itemId])
+
   const updateNoteSplitFromClientX = useCallback((clientX: number) => {
     const el = notePageRef.current
     if (!el) return
@@ -447,6 +476,51 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
       event.preventDefault()
       setNoteLeftPct(VIDEO_SPLIT_MAX)
     }
+  }, [])
+
+  const togglePip = useCallback(() => {
+    setIsPip((current) => !current)
+  }, [])
+
+  const closePip = useCallback(() => {
+    setIsPip(false)
+    setPipDragging(false)
+  }, [])
+
+  const cyclePipSize = useCallback(() => {
+    setPipSizeIndex((current) => (current + 1) % PIP_WIDTHS.length)
+  }, [])
+
+  const handlePipHeaderPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (typeof window === 'undefined') return
+    if ((event.target as HTMLElement).closest('button')) return
+    const rect = event.currentTarget.parentElement?.getBoundingClientRect()
+    if (!rect) return
+    const offsetX = event.clientX - rect.left
+    const offsetY = event.clientY - rect.top
+    setPipDragging(true)
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      setPipPosition({
+        x: clampNumber(moveEvent.clientX - offsetX, 12, Math.max(12, window.innerWidth - rect.width - 12)),
+        y: clampNumber(moveEvent.clientY - offsetY, 12, Math.max(12, window.innerHeight - rect.height - 12)),
+      })
+    }
+
+    const handleUp = () => {
+      setPipDragging(false)
+      window.removeEventListener('pointermove', handleMove)
+      window.removeEventListener('pointerup', handleUp)
+      window.removeEventListener('pointercancel', handleUp)
+    }
+
+    window.addEventListener('pointermove', handleMove)
+    window.addEventListener('pointerup', handleUp)
+    window.addEventListener('pointercancel', handleUp)
+  }, [])
+
+  const handlePipScreenshot = useCallback(() => {
+    videoRef.current?.captureScreenshot()
   }, [])
 
   // 点击外部关闭模板下拉
@@ -1003,28 +1077,52 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
       {isVideoNote ? (
         <>
         {/* ── 视频笔记两栏布局：.note-page（设计稿 pg-note 对齐） ── */}
-        <div className="nibi-note-page" ref={notePageRef} style={notePageStyle}>
+        <div className={`nibi-note-page${isPip ? ' is-pip' : ''}`} ref={notePageRef} style={notePageStyle}>
 
           {/* ── 左栏（60%）：播放器 + 控制 + 转录 ── */}
           <div className="nibi-note-left vm-ln-scope">
-            <div className="nibi-note-player-wrap">
-              <LNVideoPanel
-                ref={videoRef}
-                src={note.media!.video?.url?.startsWith('/static/') ? note.media!.video!.url : ''}
-                externalUrl={!note.media!.video?.url?.startsWith('/static/') ? ((note.frontmatter as Record<string, unknown>)?.source_url as string || note.media!.video?.url) : undefined}
-                title=""
-                workspaceId={workspaceId}
-                onTimeUpdate={handleTimeUpdate}
-                onDurationChange={handleVideoDurationChange}
-                markers={videoFrames}
-                subtitle={videoSubtitle}
-                renderTransportInline={false}
-                onTransportChange={handleTransportChange}
-              />
+            <div
+              className={`nibi-note-player-shell${isPip ? ' is-pip' : ''}${pipDragging ? ' is-dragging' : ''}`}
+              style={isPip && pipPosition ? { width: pipWidth, left: pipPosition.x, top: pipPosition.y, right: 'auto', bottom: 'auto' } : undefined}
+            >
+              {isPip && (
+                <div className="note-pip-head" onPointerDown={handlePipHeaderPointerDown}>
+                  <span className="note-pip-badge">画中画</span>
+                  <div className="note-pip-head-actions">
+                    <button className="note-pip-head-btn" onClick={handlePipScreenshot} title="截取当前帧">
+                      <Camera size={13} />
+                    </button>
+                    <button className="note-pip-head-btn" onClick={cyclePipSize} title="切换尺寸">
+                      {['小', '中', '大'][pipSizeIndex]}
+                    </button>
+                    <button className="note-pip-head-btn note-pip-head-btn--danger" onClick={closePip} title="关闭画中画">
+                      关闭
+                    </button>
+                  </div>
+                </div>
+              )}
+              <div className="nibi-note-player-wrap">
+                <LNVideoPanel
+                  ref={videoRef}
+                  src={note.media!.video?.url?.startsWith('/static/') ? note.media!.video!.url : ''}
+                  externalUrl={!note.media!.video?.url?.startsWith('/static/') ? ((note.frontmatter as Record<string, unknown>)?.source_url as string || note.media!.video?.url) : undefined}
+                  title=""
+                  workspaceId={workspaceId}
+                  onTimeUpdate={handleTimeUpdate}
+                  onDurationChange={handleVideoDurationChange}
+                  markers={videoFrames}
+                  subtitle={videoSubtitle}
+                  renderTransportInline={false}
+                  onTransportChange={handleTransportChange}
+                  isPipActive={isPip}
+                  onTogglePip={togglePip}
+                />
+              </div>
+              {isPip && <div className="note-pip-transport">{transportNode}</div>}
             </div>
             {/* 控制条 + 时间线（在 player-wrap 外，避免 overflow:hidden 截断） */}
-            {transportNode}
-            {videoFrames.length > 0 && (
+            {!isPip && transportNode}
+            {!isPip && videoFrames.length > 0 && (
               <div className="note-chapters" aria-label="关键帧轨">
                 {videoFrames.map((frame, idx) => (
                   <button
@@ -1040,7 +1138,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
               </div>
             )}
             {/* 转录 */}
-            {Array.isArray(note.transcript) && (note.transcript as VideoResultTranscriptLine[]).length > 0 ? (
+            {!isPip && Array.isArray(note.transcript) && (note.transcript as VideoResultTranscriptLine[]).length > 0 ? (
               <div className="nibi-note-transcript-wrap">
                 <div className="nibi-note-transcript-head">
                   <span>转录</span>
@@ -1056,25 +1154,27 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                   sourceMd={note.source_md ?? undefined}
                 />
               </div>
-            ) : (
+            ) : !isPip ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--mut)', fontSize: 12, padding: 24 }}>暂无字幕</div>
-            )}
+            ) : null}
           </div>
 
-          <div
-            className="nibi-note-splitter"
-            role="separator"
-            aria-label="调整左右栏宽度"
-            aria-orientation="vertical"
-            aria-valuemin={VIDEO_SPLIT_MIN}
-            aria-valuemax={VIDEO_SPLIT_MAX}
-            aria-valuenow={Math.round(noteLeftPct)}
-            tabIndex={0}
-            onPointerDown={handleNoteSplitPointerDown}
-            onKeyDown={handleNoteSplitKeyDown}
-          >
-            <span className="nibi-note-splitter-grip" />
-          </div>
+          {!isPip && (
+            <div
+              className="nibi-note-splitter"
+              role="separator"
+              aria-label="调整左右栏宽度"
+              aria-orientation="vertical"
+              aria-valuemin={VIDEO_SPLIT_MIN}
+              aria-valuemax={VIDEO_SPLIT_MAX}
+              aria-valuenow={Math.round(noteLeftPct)}
+              tabIndex={0}
+              onPointerDown={handleNoteSplitPointerDown}
+              onKeyDown={handleNoteSplitKeyDown}
+            >
+              <span className="nibi-note-splitter-grip" />
+            </div>
+          )}
 
           {/* ── 右栏（40%）：标签 + 结构化笔记 ── */}
           <div className="nibi-note-right">

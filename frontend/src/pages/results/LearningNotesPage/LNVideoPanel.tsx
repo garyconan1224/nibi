@@ -36,10 +36,13 @@ interface LNVideoPanelProps {
   renderTransportInline?: boolean
   /** 状态变化时通知父组件重渲染（驱动 transportNode getter 刷新） */
   onTransportChange?: () => void
+  isPipActive?: boolean
+  onTogglePip?: () => void
 }
 
 export interface LNVideoPanelHandle {
   seekTo: (sec: number) => void
+  captureScreenshot: () => void
   /** 控制条和时间线的 JSX（由父组件渲染在 player-wrap 外部，避免 overflow:hidden 截断） */
   transportNode: React.ReactNode
 }
@@ -68,6 +71,8 @@ const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
     subtitle,
     renderTransportInline = true,
     onTransportChange,
+    isPipActive,
+    onTogglePip,
   }, ref) => {
     const videoRef = useRef<HTMLVideoElement>(null)
     const panelRef = useRef<HTMLDivElement>(null)
@@ -86,8 +91,9 @@ const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
     const [hoverTime, setHoverTime] = useState<number | null>(null)
     const [hoverX, setHoverX] = useState(0)
     const [isFullscreen, setIsFullscreen] = useState(false)
-    const [isPip, setIsPip] = useState(false)
+    const [nativePip, setNativePip] = useState(false)
     const [subtitlesOn, setSubtitlesOn] = useState(true)
+    const pipActive = typeof onTogglePip === 'function' ? !!isPipActive : nativePip
 
     const insertAtCursor = useLnEditorStore((s) => s.insertAtCursor)
 
@@ -142,17 +148,18 @@ const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
     /* ── 画中画监听 ── */
 
     useEffect(() => {
+      if (typeof onTogglePip === 'function') return
       const v = videoRef.current
       if (!v) return
-      const onEnter = () => setIsPip(true)
-      const onLeave = () => setIsPip(false)
+      const onEnter = () => setNativePip(true)
+      const onLeave = () => setNativePip(false)
       v.addEventListener('enterpictureinpicture', onEnter)
       v.addEventListener('leavepictureinpicture', onLeave)
       return () => {
         v.removeEventListener('enterpictureinpicture', onEnter)
         v.removeEventListener('leavepictureinpicture', onLeave)
       }
-    }, [src])
+    }, [src, onTogglePip])
 
     /* ── 交互控制 ── */
 
@@ -204,6 +211,10 @@ const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
     }, [getFullscreenTarget])
 
     const togglePip = useCallback(async () => {
+      if (onTogglePip) {
+        onTogglePip()
+        return
+      }
       const v = videoRef.current
       if (!v) return
       try {
@@ -215,7 +226,7 @@ const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
       } catch {
         /* 浏览器不支持或被拒绝时静默忽略 */
       }
-    }, [])
+    }, [onTogglePip])
 
     const toggleSubtitles = useCallback(() => {
       setSubtitlesOn((on) => !on)
@@ -358,7 +369,7 @@ const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
     /* ── 通知父组件状态变化（驱动 transportNode getter 刷新） ── */
     useEffect(() => {
       onTransportChange?.()
-    }, [playing, speed, muted, volume, loop, progress, duration, hoverTime, hoverX, isFullscreen, isPip, subtitlesOn, shooting, onTransportChange])
+    }, [playing, speed, muted, volume, loop, progress, duration, hoverTime, hoverX, isFullscreen, pipActive, subtitlesOn, shooting, onTransportChange])
 
     function renderTransportNode() {
       return (
@@ -404,7 +415,7 @@ const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
                 <button className="note-icon-btn" onClick={handleScreenshot} disabled={shooting} title="截取当前帧">
                   <Camera size={15} />
                 </button>
-                <button className={`note-icon-btn${isPip ? ' is-on' : ''}`} onClick={togglePip} disabled={!src} title={isPip ? '退出画中画' : '画中画'}>
+                <button className={`note-icon-btn${pipActive ? ' is-on' : ''}`} onClick={togglePip} disabled={!src} title={pipActive ? '退出画中画' : '画中画'}>
                   <PictureInPicture2 size={15} />
                 </button>
                 <button className="note-icon-btn" onClick={toggleFullscreen} title={isFullscreen ? '退出全屏' : '全屏'}>
@@ -447,6 +458,9 @@ const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
         if (!v) return
         const clamped = Math.max(0, Math.min(v.duration || 0, sec))
         v.currentTime = clamped
+      },
+      captureScreenshot() {
+        void handleScreenshot()
       },
       get transportNode() {
         return renderTransportNode()
