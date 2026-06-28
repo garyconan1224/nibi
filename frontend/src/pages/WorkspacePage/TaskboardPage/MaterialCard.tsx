@@ -30,6 +30,18 @@ const TYPE_TONE: Record<ItemType, string> = {
   text: 'amber',
 }
 
+function getMaterialThumbnail(item: WorkspaceItem): string | null {
+  const results = item.results as Record<string, unknown>
+  const candidates: Array<string | null | undefined> = [
+    typeof results.thumbnail === 'string' ? results.thumbnail : null,
+    typeof results.cover_url === 'string' ? results.cover_url : null,
+    typeof results.image_path === 'string' ? results.image_path : null,
+    Array.isArray(results.image_paths) ? results.image_paths.find((entry): entry is string => typeof entry === 'string') : null,
+    Array.isArray(results.frame_paths) ? results.frame_paths.find((entry): entry is string => typeof entry === 'string') : null,
+  ]
+  return candidates.find((value): value is string => typeof value === 'string' && value.length > 0) ?? null
+}
+
 /** 后端 status → 设计稿 state dot 颜色 */
 const STATUS_DOT: Record<string, string> = {
   done: 'var(--accent-green)',
@@ -71,6 +83,7 @@ export function MaterialCard({ item, workspaceId, progress, selected, onSelect }
   const dotColor = STATUS_DOT[item.status] ?? 'var(--ink-4)'
   const isRunning = item.status === 'processing'
   const tags = item.tags?.custom_tags ?? []
+  const thumbnail = getMaterialThumbnail(item)
 
   // Extract frame paths from item results (if available)
   const framePaths: string[] = (item.results?.frame_paths as string[]) ?? []
@@ -93,18 +106,13 @@ export function MaterialCard({ item, workspaceId, progress, selected, onSelect }
             {selected && <Check size={12} />}
           </div>
         )}
-        {/* 缩略图占位：无真实图片时显示类型图标 */}
-        <div
-          style={{
-            width: '100%',
-            height: '100%',
-            display: 'grid',
-            placeItems: 'center',
-            color: 'var(--ink-4)',
-          }}
-        >
-          <Icon size={32} />
-        </div>
+        {thumbnail ? (
+          <img src={thumbnail} alt={item.name || '素材封面'} />
+        ) : (
+          <div className={`mat-thumb-fallback mat-thumb-fallback--${item.type}`}>
+            <Icon size={32} />
+          </div>
+        )}
         <span className="mat-type" data-tone={tone}>
           <Icon size={11} />
           {TYPE_LABEL[item.type]}

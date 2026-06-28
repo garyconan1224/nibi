@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import {
+  ArrowLeft,
   Pencil,
   Plus,
   Download,
@@ -32,6 +33,9 @@ interface TaskboardHeadProps {
   name: string
   materialCount: number
   background: WorkspaceBackground
+  description?: string
+  updatedAt?: string
+  onBack?: () => void
   onEditBackground?: () => void
   onAddMaterial?: () => void
   onExport?: () => void
@@ -61,6 +65,9 @@ export function TaskboardHead({
   name,
   materialCount,
   background: _background,
+  description,
+  updatedAt,
+  onBack,
   onEditBackground,
   onAddMaterial,
   onExport,
@@ -91,14 +98,26 @@ export function TaskboardHead({
 
   return (
     <div className="tb-head">
-      {/* 左侧：名称 + 计数 */}
+      {/* 左侧：返回 + 信息 */}
       <div className="tb-head-l">
-        <h1 className="display">
-          {name}
-        </h1>
+        {onBack && (
+          <button className="tb-head-back" onClick={onBack}>
+            <ArrowLeft size={14} />
+            返回笔记库
+          </button>
+        )}
+        <div className="tb-head-title-row">
+          <h1 className="display">
+            {name}
+          </h1>
+        </div>
+        {description && <p className="tb-head-desc">{description}</p>}
         <div className="tb-head-count">
-          <Layers size={13} />
-          <span>{materialCount} 个素材</span>
+          <span className="tb-head-tag">
+            <Layers size={13} />
+            {materialCount} 篇笔记
+          </span>
+          {updatedAt && <span>更新于 {updatedAt}</span>}
         </div>
       </div>
 

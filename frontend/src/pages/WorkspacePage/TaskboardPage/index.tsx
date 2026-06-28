@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -30,6 +30,7 @@ import './taskboard.css'
  */
 export default function TaskboardPage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const [workspace, setWorkspace] = useState<WorkspaceRecord | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -110,6 +111,9 @@ export default function TaskboardPage() {
         name={workspace.name}
         materialCount={workspace.items.length}
         background={workspace.background}
+        description={workspace.background.topic || workspace.background.purpose || '合集内的笔记与素材汇总'}
+        updatedAt={new Date(workspace.updated_at).toLocaleDateString('zh-CN')}
+        onBack={() => navigate(workspace.kind === 'replica' ? '/replicas' : '/notes')}
         onEditBackground={() => setBgOpen(true)}
         onAddMaterial={() => setAddOpen(true)}
         onExport={() => setExportOpen(true)}
