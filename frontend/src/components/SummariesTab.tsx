@@ -22,6 +22,7 @@ import {
   type ItemSummary,
 } from '@/services/summaries'
 import { getItemNote } from '@/services/workspaces'
+import { withStatusToast } from '@/lib/statusToast'
 
 import { flattenText, MarkdownToc, slugify } from './MarkdownToc'
 import { NewSummaryModal } from './NewSummaryModal'
@@ -146,6 +147,9 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
     // 立刻关弹窗，列表里显示生成进度
     setShowModal(false)
     setCreatingTemplate(opts.template)
+    const toastId = `summary-create-${workspaceId}-${itemId}-${opts.template}`
+    const creatingLabel = templateLabel(opts.template)
+    toast.loading(`正在生成${creatingLabel}…`, { id: toastId })
 
     try {
       const s = await createSummary(workspaceId, itemId, opts.template, opts.background, {
@@ -153,7 +157,7 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
         model: opts.model,
         search_web: opts.searchWeb,
       })
-      toast.success(`${templateLabel(s.template)} v${s.version} 生成完成`)
+      toast.success(`${templateLabel(s.template)} v${s.version} 生成完成`, { id: toastId })
       await refresh()
       onRefresh?.()
       setSelected(s)
@@ -161,34 +165,42 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
       const axiosData = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
       if (axiosData && axiosData.includes('chat model')) {
         toast.error('请先在设置中配置 LLM 模型', {
+          id: toastId,
           action: { label: '去设置', onClick: () => navigate('/settings/models') },
         })
       } else {
         const msg = err instanceof Error ? err.message : '生成失败'
-        toast.error(msg)
+        toast.error(msg, { id: toastId })
       }
     } finally {
       setCreatingTemplate(null)
     }
-  }, [workspaceId, itemId, refresh, summaries, navigate])
+  }, [workspaceId, itemId, refresh, onRefresh, navigate])
 
   /* ── 删除 ────────────────────────────────────────────── */
 
   const handleDelete = useCallback(
     async (summaryId: string) => {
       try {
-        await deleteSummary(workspaceId, itemId, summaryId)
-        toast.success('已删除')
+        await withStatusToast(
+          () => deleteSummary(workspaceId, itemId, summaryId),
+          {
+            id: `summary-delete-${summaryId}`,
+            loading: '正在删除总结…',
+            success: '总结已删除',
+            error: '删除总结失败',
+          },
+        )
         if (selected?.summary_id === summaryId) {
           setSelected(null)
         }
         await refresh()
         onRefresh?.()
-      } catch {
-        toast.error('删除失败')
+      } catch (err) {
+        console.error('删除总结失败:', err)
       }
     },
-    [workspaceId, itemId, selected, refresh],
+    [workspaceId, itemId, selected, refresh, onRefresh],
   )
 
   /* ── 改名 ────────────────────────────────────────────── */
@@ -201,20 +213,27 @@ export function SummariesTab({ workspaceId, itemId, onApplyToNote, activeSummary
   const commitRename = useCallback(async () => {
     if (!editingId) return
     try {
-      const updated = await renameSummary(workspaceId, itemId, editingId, editingName.trim())
+      const updated = await withStatusToast(
+        () => renameSummary(workspaceId, itemId, editingId, editingName.trim()),
+        {
+          id: `summary-rename-${editingId}`,
+          loading: '正在保存总结名称…',
+          success: '总结名称已保存',
+          error: '总结改名失败',
+        },
+      )
       setSummaries((prev) => prev.map((s) => (s.summary_id === editingId ? { ...s, name: updated.name } : s)))
       if (selected?.summary_id === editingId) {
         setSelected((prev) => (prev ? { ...prev, name: updated.name } : prev))
       }
-      toast.success('已改名')
       onRefresh?.()
-    } catch {
-      toast.error('改名失败')
+    } catch (err) {
+      console.error('总结改名失败:', err)
     } finally {
       setEditingId(null)
       setEditingName('')
     }
-  }, [editingId, editingName, workspaceId, itemId, selected])
+  }, [editingId, editingName, workspaceId, itemId, selected, onRefresh])
 
   const cancelRename = useCallback(() => {
     setEditingId(null)

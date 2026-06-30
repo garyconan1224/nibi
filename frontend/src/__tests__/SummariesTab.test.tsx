@@ -33,7 +33,7 @@ vi.mock('@/services/workspaces', () => ({
 }))
 
 vi.mock('sonner', () => ({
-  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+  toast: { loading: vi.fn(), success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }))
 
 /* ── fixtures ─────────────────────────────────────────────────── */

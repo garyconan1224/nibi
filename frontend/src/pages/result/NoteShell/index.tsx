@@ -38,10 +38,13 @@ import NoteChatDrawer from '@/components/NoteChatDrawer'
 import { FloatingAskAi } from './FloatingAskAi'
 import { useLnEditorStore } from '@/store/lnEditorStore'
 import { SourceMdModal } from './SourceMdModal'
+import { withStatusToast } from '@/lib/statusToast'
 
 // remarkGfm 类型与 react-markdown 不完全兼容，统一 cast 一次
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const remarkPlugins: any[] = [remarkGfm]
+
+type NoteExportBusy = ItemNoteExportFormat | 'markdown' | 'obsidian' | 'transcript' | 'source_md'
 
 /* ────────────────── helpers ────────────────── */
 
@@ -232,6 +235,19 @@ function extensionForExport(format: ItemNoteExportFormat): string {
   return map[format]
 }
 
+function labelForNoteExport(format: ItemNoteExportFormat): string {
+  const map: Record<ItemNoteExportFormat, string> = {
+    md: '原始 note.md',
+    html: 'HTML',
+    pdf: 'PDF',
+    docx: 'Word',
+    long_image: '长图',
+    pptx: 'PPT',
+    obsidian: 'Obsidian 包',
+  }
+  return map[format]
+}
+
 interface ReadOnlyMarkdownProps {
   markdown: string
   onSeek: (sec: number) => void
@@ -364,7 +380,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const [chatOpen] = useState(false)
   const [askAiOpen, setAskAiOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
-  const [exportBusy, setExportBusy] = useState<ItemNoteExportFormat | null>(null)
+  const [exportBusy, setExportBusy] = useState<NoteExportBusy | null>(null)
   const [immersiveOpen, setImmersiveOpen] = useState(false)
   const [sourceMdOpen, setSourceMdOpen] = useState(false)
   // VN4.3 AI 工具下拉
@@ -797,86 +813,158 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     [currentBody, note?.transcript],
   )
 
-  const handleExportMarkdown = useCallback(() => {
+  const handleExportMarkdown = useCallback(async () => {
     if (!note) return
     const title = String((note.frontmatter as Record<string, unknown>)?.title ?? 'note')
-    downloadMarkdownFile(currentBody, title)
-    setExportOpen(false)
+    setExportBusy('markdown')
+    try {
+      await withStatusToast(
+        async () => {
+          downloadMarkdownFile(currentBody, title)
+        },
+        {
+          id: 'note-export-markdown',
+          loading: '正在导出 Markdown…',
+          success: 'Markdown 已开始下载',
+          error: 'Markdown 导出失败，请重试',
+        },
+      )
+      setExportOpen(false)
+    } catch (err) {
+      console.error('Markdown 导出失败:', err)
+    } finally {
+      setExportBusy(null)
+    }
   }, [currentBody, note])
 
   const handleExportObsidian = useCallback(async () => {
+    setExportBusy('obsidian')
     try {
-      const blob = await exportItemNoteObsidian(workspaceId, itemId)
-      const title = String((note?.frontmatter as Record<string, unknown> | undefined)?.title ?? 'note')
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${safeFilename(title)}-obsidian.zip`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
+      await withStatusToast(
+        async () => {
+          const blob = await exportItemNoteObsidian(workspaceId, itemId)
+          const title = String((note?.frontmatter as Record<string, unknown> | undefined)?.title ?? 'note')
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = `${safeFilename(title)}-obsidian.zip`
+          document.body.appendChild(a)
+          a.click()
+          a.remove()
+          URL.revokeObjectURL(url)
+        },
+        {
+          id: 'note-export-obsidian',
+          loading: '正在导出 Obsidian 包…',
+          success: 'Obsidian 包已开始下载',
+          error: 'Obsidian 包导出失败，请重试',
+        },
+      )
       setExportOpen(false)
     } catch (err) {
       console.error('Obsidian 导出失败:', err)
-      toast.error('Obsidian 包导出失败，请重试')
+    } finally {
+      setExportBusy(null)
     }
   }, [workspaceId, itemId, note])
 
-  const handleExportTranscript = useCallback(() => {
+  const handleExportTranscript = useCallback(async () => {
     const transcriptText = formatTranscriptForPrompt(note?.transcript)
     if (!transcriptText) {
       toast.error('暂无可导出的原文对照')
       return
     }
     const title = String((note?.frontmatter as Record<string, unknown> | undefined)?.title ?? 'transcript')
-    downloadTextFile(transcriptText, `${title}-原文对照`)
-    setExportOpen(false)
+    setExportBusy('transcript')
+    try {
+      await withStatusToast(
+        async () => {
+          downloadTextFile(transcriptText, `${title}-原文对照`)
+        },
+        {
+          id: 'note-export-transcript',
+          loading: '正在导出原文对照…',
+          success: '原文对照已开始下载',
+          error: '原文对照导出失败，请重试',
+        },
+      )
+      setExportOpen(false)
+    } catch (err) {
+      console.error('原文对照导出失败:', err)
+    } finally {
+      setExportBusy(null)
+    }
   }, [note])
 
   const handleDownloadNoteExport = useCallback(async (format: ItemNoteExportFormat) => {
     const title = String((note?.frontmatter as Record<string, unknown> | undefined)?.title ?? 'note')
+    const label = labelForNoteExport(format)
     setExportBusy(format)
     try {
-      await downloadItemNoteExport(
-        workspaceId,
-        itemId,
-        format,
-        `${safeFilename(title)}.${extensionForExport(format)}`,
+      await withStatusToast(
+        () => downloadItemNoteExport(
+          workspaceId,
+          itemId,
+          format,
+          `${safeFilename(title)}.${extensionForExport(format)}`,
+        ),
+        {
+          id: `note-export-${format}`,
+          loading: `正在导出${label}…`,
+          success: `${label}已开始下载`,
+          error: `${label} 导出失败，请稍后重试`,
+        },
       )
       setExportOpen(false)
     } catch (err) {
       console.error('笔记导出失败:', err)
-      toast.error('导出失败，请稍后重试')
     } finally {
       setExportBusy(null)
     }
   }, [workspaceId, itemId, note])
 
-  const handleDownloadSourceMd = useCallback(() => {
+  const handleDownloadSourceMd = useCallback(async () => {
     if (!note?.source_md) {
       toast.error('暂无源 md')
       return
     }
     const title = String((note.frontmatter as Record<string, unknown>)?.title ?? 'source')
-    downloadMarkdownFile(note.source_md, `${title}-source`)
+    setExportBusy('source_md')
+    try {
+      await withStatusToast(
+        async () => {
+          downloadMarkdownFile(note.source_md, `${title}-source`)
+        },
+        {
+          id: 'note-export-source-md',
+          loading: '正在导出源 md…',
+          success: '源 md 已开始下载',
+          error: '源 md 导出失败，请重试',
+        },
+      )
+    } catch (err) {
+      console.error('源 md 导出失败:', err)
+    } finally {
+      setExportBusy(null)
+    }
   }, [note])
 
   // VN4.3 新建总结（从 AI 工具菜单触发，复用 NewSummaryModal）
   const handleCreateSummary = useCallback(async (opts: {
     template: string; background: string; providerId: string; model: string; searchWeb: boolean
   }) => {
-    const toastId = 'note-summary-creating'
+    const templateName = tl(opts.template)
+    const toastId = `note-summary-creating-${opts.template}`
     setCreatingSummary(true)
     setShowNewSummaryModal(false)
-    toast.loading('正在生成总结…', { id: toastId })
+    toast.loading(`正在生成${templateName}…`, { id: toastId })
     try {
       const s = await createSummary(workspaceId, itemId, opts.template, opts.background, {
         provider_id: opts.providerId,
         model: opts.model,
         search_web: opts.searchWeb,
       })
-      toast.success(`v${s.version} 总结生成完成`, { id: toastId })
+      toast.success(`${templateName} v${s.version} 生成完成`, { id: toastId })
       refreshSummaries()
     } catch (err: unknown) {
       const axiosData = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
@@ -897,12 +985,19 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   // 删除总结（从顶栏版本下拉触发）
   const handleDeleteSummary = useCallback(async (summaryId: string) => {
     try {
-      await deleteSummary(workspaceId, itemId, summaryId)
-      toast.success('已删除')
+      await withStatusToast(
+        () => deleteSummary(workspaceId, itemId, summaryId),
+        {
+          id: `note-summary-delete-${summaryId}`,
+          loading: '正在删除总结…',
+          success: '总结已删除',
+          error: '删除总结失败',
+        },
+      )
       if (activeSummaryId === summaryId) setActiveSummaryId(undefined)
       refreshSummaries()
-    } catch {
-      toast.error('删除失败')
+    } catch (err) {
+      console.error('删除总结失败:', err)
     }
   }, [workspaceId, itemId, activeSummaryId, refreshSummaries])
 
@@ -912,11 +1007,18 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     const targetId = renameTargetId
     setRenameTargetId(null)
     try {
-      await renameSummary(workspaceId, itemId, targetId, renameName.trim())
-      toast.success('已改名')
+      await withStatusToast(
+        () => renameSummary(workspaceId, itemId, targetId, renameName.trim()),
+        {
+          id: `note-summary-rename-${targetId}`,
+          loading: '正在保存总结名称…',
+          success: '总结名称已保存',
+          error: '总结改名失败',
+        },
+      )
       refreshSummaries()
-    } catch {
-      toast.error('改名失败')
+    } catch (err) {
+      console.error('总结改名失败:', err)
     } finally {
       setRenameTargetId(null)
       setRenameName('')
@@ -1236,11 +1338,11 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
             <button className="nibi-note-bar-btn nibi-note-bar-btn--label" onClick={() => setExportOpen((v) => !v)} title="导出"><Download size={14} /> 导出<ChevronDown size={11} /></button>
             {exportOpen && (
               <div className="nibi-note-export-menu" style={{ position: 'absolute', right: 0, top: 34, zIndex: 20, minWidth: 200, padding: '4px', border: '1px solid var(--bdr)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', boxShadow: 'var(--shadow-md)' }}>
-                <button className="btn-ghost" onClick={() => { handleExportMarkdown(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><FileText size={13} /> Markdown</button>
-                <button className="btn-ghost" onClick={() => handleDownloadNoteExport('md')} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><FileText size={13} /> 原始 note.md</button>
-                <button className="btn-ghost" onClick={() => { handleExportObsidian(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><BookOpenCheck size={13} /> Obsidian 包</button>
+                <button className="btn-ghost" onClick={handleExportMarkdown} disabled={!!exportBusy} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><FileText size={13} /> {exportBusy === 'markdown' ? '导出中…' : 'Markdown'}</button>
+                <button className="btn-ghost" onClick={() => handleDownloadNoteExport('md')} disabled={!!exportBusy} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><FileText size={13} /> {exportBusy === 'md' ? '导出中…' : '原始 note.md'}</button>
+                <button className="btn-ghost" onClick={handleExportObsidian} disabled={!!exportBusy} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><BookOpenCheck size={13} /> {exportBusy === 'obsidian' ? '导出中…' : 'Obsidian 包'}</button>
                 {(isVideoNote || isAudioNote) && (
-                  <button className="btn-ghost" onClick={() => { handleExportTranscript(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><Subtitles size={13} /> 原文对照（txt）</button>
+                  <button className="btn-ghost" onClick={handleExportTranscript} disabled={!!exportBusy} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><Subtitles size={13} /> {exportBusy === 'transcript' ? '导出中…' : '原文对照（txt）'}</button>
                 )}
                 {[
                   { icon: <FileText size={13} />, label: 'HTML', format: 'html' as const },
@@ -1253,7 +1355,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                     key={item.label}
                     className="btn-ghost"
                     onClick={() => handleDownloadNoteExport(item.format)}
-                    disabled={exportBusy === item.format}
+                    disabled={!!exportBusy}
                     style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
                   >
                     {item.icon} {exportBusy === item.format ? '导出中…' : item.label}
@@ -1310,8 +1412,8 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                   <FileText size={14} /> 源 md
                 </button>
               )}
-              <button className="nibi-note-bar-btn nibi-note-bar-btn--label" onClick={() => handleDownloadNoteExport('pdf')}>
-                <FileDown size={14} /> PDF
+              <button className="nibi-note-bar-btn nibi-note-bar-btn--label" onClick={() => handleDownloadNoteExport('pdf')} disabled={!!exportBusy}>
+                <FileDown size={14} /> {exportBusy === 'pdf' ? '导出中…' : 'PDF'}
               </button>
               <button className="nibi-note-bar-btn" onClick={() => setImmersiveOpen(false)} title="关闭">
                 <X size={14} />
@@ -1913,6 +2015,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
         sourceMd={note.source_md}
         onClose={() => setSourceMdOpen(false)}
         onDownload={handleDownloadSourceMd}
+        downloading={exportBusy === 'source_md'}
       />
     </div>
   )

@@ -6,13 +6,14 @@ interface SourceMdModalProps {
   sourceMd: string
   onClose: () => void
   onDownload?: () => void
+  downloading?: boolean
 }
 
 /**
  * 源 md 悬浮框 — 仿 TranscriptPreviewModal 结构。
  * position:fixed 遮罩 + 居中卡片 + 可滚动源码。
  */
-export function SourceMdModal({ open, sourceMd, onClose, onDownload }: SourceMdModalProps) {
+export function SourceMdModal({ open, sourceMd, onClose, onDownload, downloading = false }: SourceMdModalProps) {
   if (!open) return null
 
   const handleCopy = async () => {
@@ -127,16 +128,18 @@ export function SourceMdModal({ open, sourceMd, onClose, onDownload }: SourceMdM
             {onDownload && (
               <button
                 onClick={onDownload}
+                disabled={downloading}
                 style={{
                   padding: '8px 12px',
                   borderRadius: 8,
                   border: '1px solid var(--bdr)',
                   background: 'var(--bg)',
-                  cursor: 'pointer',
+                  cursor: downloading ? 'wait' : 'pointer',
                   fontSize: 13,
+                  opacity: downloading ? 0.7 : 1,
                 }}
               >
-                下载 .md
+                {downloading ? '下载中…' : '下载 .md'}
               </button>
             )}
           </div>
