@@ -12,6 +12,8 @@ const {
   addWorkspaceItemMock,
   savePreflightMock,
   startItemPipelineMock,
+  updateWorkspaceMock,
+  fetchLinkPreviewMock,
 } = vi.hoisted(() => ({
   navigateMock: vi.fn(),
   sniffUrlMock: vi.fn(),
@@ -22,6 +24,8 @@ const {
   addWorkspaceItemMock: vi.fn(),
   savePreflightMock: vi.fn(),
   startItemPipelineMock: vi.fn(),
+  updateWorkspaceMock: vi.fn(),
+  fetchLinkPreviewMock: vi.fn(),
 }))
 
 vi.mock('react-router-dom', () => ({
@@ -37,6 +41,11 @@ vi.mock('@/services/workspaces', () => ({
   savePreflight: savePreflightMock,
   startItemPipeline: startItemPipelineMock,
   generateNote: generateNoteMock,
+  updateWorkspace: updateWorkspaceMock,
+}))
+
+vi.mock('@/services/linkPreview', () => ({
+  fetchLinkPreview: fetchLinkPreviewMock,
 }))
 
 vi.mock('@/store/providerStore', () => ({
@@ -58,7 +67,10 @@ describe('AddMaterialModal', () => {
     addWorkspaceItemMock.mockReset()
     savePreflightMock.mockReset()
     startItemPipelineMock.mockReset()
+    updateWorkspaceMock.mockReset()
+    fetchLinkPreviewMock.mockReset()
     probeDurationMock.mockResolvedValue({ duration_sec: 0 })
+    fetchLinkPreviewMock.mockImplementation(() => new Promise(() => {}))
     generateNoteMock.mockResolvedValue({
       task_id: 'task-note-1',
       task_type: 'note',
@@ -85,8 +97,9 @@ describe('AddMaterialModal', () => {
       />,
     )
 
-    expect(screen.getByText('② 你要做什么')).toBeTruthy()
-    expect(screen.getByText('③ 笔记设置')).toBeTruthy()
+    expect(screen.getByText('② 合集归属')).toBeTruthy()
+    expect(screen.getByText('③ 你要做什么')).toBeTruthy()
+    expect(screen.getByText('④ 笔记设置')).toBeTruthy()
     expect(screen.getByText('test video')).toBeTruthy()
     expect(screen.getByText('已识别视频')).toBeTruthy()
     expect(screen.getByRole('button', { name: /开始生成/ })).toBeTruthy()
@@ -95,6 +108,88 @@ describe('AddMaterialModal', () => {
     expect(screen.queryByText(/音视频综合/)).toBeNull()
     expect(screen.queryByText(/综合笔记/)).toBeNull()
     expect(screen.queryByText('一键解析')).toBeNull()
+  })
+
+  it('可在弹窗内选择目标合集', () => {
+    const onWorkspaceIdsChange = vi.fn()
+
+    render(
+      <AddMaterialModal
+        open={true}
+        onOpenChange={vi.fn()}
+        workspaceIds={[]}
+        availableWorkspaces={[
+          {
+            workspace_id: 'ws-note-1',
+            name: '课程合集',
+            kind: 'note',
+            status: 'active',
+            trashed: false,
+            background: { content_type: '', participants: [], topic: '', glossary: [], purpose: '' },
+            items: [],
+            favorites: [],
+            created_at: '2026-06-28T00:00:00Z',
+            updated_at: '2026-06-28T00:00:00Z',
+            source: 'manual',
+          },
+        ]}
+        onWorkspaceIdsChange={onWorkspaceIdsChange}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /选择合集/ }))
+    fireEvent.click(screen.getByRole('button', { name: /课程合集/ }))
+
+    expect(onWorkspaceIdsChange).toHaveBeenCalledWith(['ws-note-1'])
+  })
+
+  it('双击当前合集名可重命名', async () => {
+    updateWorkspaceMock.mockResolvedValue({
+      workspace_id: 'ws-note-1',
+      name: '重命名后的合集',
+      kind: 'note',
+      status: 'active',
+      trashed: false,
+      background: { content_type: '', participants: [], topic: '', glossary: [], purpose: '' },
+      items: [],
+      favorites: [],
+      created_at: '2026-06-28T00:00:00Z',
+      updated_at: '2026-06-28T00:00:00Z',
+      source: 'manual',
+    })
+
+    render(
+      <AddMaterialModal
+        open={true}
+        onOpenChange={vi.fn()}
+        workspaceIds={['ws-note-1']}
+        availableWorkspaces={[
+          {
+            workspace_id: 'ws-note-1',
+            name: '课程合集',
+            kind: 'note',
+            status: 'active',
+            trashed: false,
+            background: { content_type: '', participants: [], topic: '', glossary: [], purpose: '' },
+            items: [],
+            favorites: [],
+            created_at: '2026-06-28T00:00:00Z',
+            updated_at: '2026-06-28T00:00:00Z',
+            source: 'manual',
+          },
+        ]}
+      />,
+    )
+
+    fireEvent.doubleClick(screen.getByText('课程合集'))
+    const input = screen.getByDisplayValue('课程合集')
+    fireEvent.change(input, { target: { value: '重命名后的合集' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => {
+      expect(updateWorkspaceMock).toHaveBeenCalledWith('ws-note-1', { name: '重命名后的合集' })
+    })
+    expect(screen.getByText('重命名后的合集')).toBeTruthy()
   })
 
   it('提交时只调用 generateNote 并跳转到 note task processing', async () => {
@@ -181,8 +276,9 @@ describe('AddMaterialModal', () => {
 
     // 点击复刻大卡
     fireEvent.click(screen.getByRole('button', { name: /逐帧复刻/ }))
-    // 此时应该不显示“③ 笔记设置”
-    expect(screen.queryByText('③ 笔记设置')).toBeNull()
+    // 此时应该切到“④ 复刻设置”
+    expect(screen.queryByText('④ 笔记设置')).toBeNull()
+    expect(screen.getByText('④ 复刻设置')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: /开始生成/ }))
 
@@ -253,6 +349,61 @@ describe('AddMaterialModal', () => {
     )
 
     expect(generateNoteMock).not.toHaveBeenCalled()
+  })
+
+  it('音频笔记只显示音频相关高级项', () => {
+    render(
+      <AddMaterialModal
+        open={true}
+        onOpenChange={vi.fn()}
+        workspaceIds={['ws-1']}
+        urlValue="https://example.com/audio"
+        sniffResult={{
+          primary_type: 'audio',
+          possible_types: ['audio'],
+          platform: 'bilibili',
+          title: '播客片段',
+          thumbnail: null,
+          content_type_header: null,
+        }}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /音频笔记/ }))
+    fireEvent.click(screen.getByRole('button', { name: /高级设置/ }))
+
+    expect(screen.queryByText('笔记里配图')).toBeNull()
+    expect(screen.queryByText('视觉模型')).toBeNull()
+    expect(screen.queryByText('取画面')).toBeNull()
+    expect(screen.getByText('区分发言人')).toBeTruthy()
+    expect(screen.getByText('补充说明')).toBeTruthy()
+  })
+
+  it('复刻设置展示取画面，不展示笔记专属项', () => {
+    render(
+      <AddMaterialModal
+        open={true}
+        onOpenChange={vi.fn()}
+        workspaceIds={['ws-1']}
+        urlValue="https://example.com/video"
+        sniffResult={{
+          primary_type: 'video',
+          possible_types: ['video'],
+          platform: 'bilibili',
+          title: '复刻视频',
+          thumbnail: null,
+          content_type_header: null,
+        }}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /逐帧复刻/ }))
+    fireEvent.click(screen.getByRole('button', { name: /高级设置/ }))
+
+    expect(screen.queryByText('笔记风格')).toBeNull()
+    expect(screen.queryByText('区分发言人')).toBeNull()
+    expect(screen.getByText('画面分析')).toBeTruthy()
+    expect(screen.getByText('取画面')).toBeTruthy()
   })
 
   it('内部输入链接后自动嗅探并展示视频卡', async () => {

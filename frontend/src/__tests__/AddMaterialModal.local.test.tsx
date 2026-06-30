@@ -12,6 +12,7 @@ vi.mock('@/services/workspaces', () => ({
   savePreflight: vi.fn().mockResolvedValue({}),
   sniffUrl: vi.fn(),
   startItemPipeline: vi.fn().mockResolvedValue({ task_id: 'task-123', task_type: 'note' }),
+  updateWorkspace: vi.fn().mockResolvedValue({}),
   fetchLinkPreview: vi.fn().mockResolvedValue({}),
 }))
 

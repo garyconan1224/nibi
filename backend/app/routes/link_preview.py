@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import tempfile
 from pathlib import Path
@@ -102,7 +103,10 @@ async def link_preview(
     if _HAS_BILI and extract_bvid_from_url(url):
         try:
             dl = BilibiliNoCookieDownloader()
-            meta = dl.get_meta(url)
+            # get_meta 是同步阻塞调用（内含 tenacity 重试，B 站限流时可耗时数秒）。
+            # 直接在 async 路由里调用会阻塞事件循环 → 添加素材弹框并发的 sniff/probe/重试
+            # 请求被 uvicorn 拒为 503。放到线程池执行，避免阻塞。
+            meta = await asyncio.to_thread(dl.get_meta, url)
             result = {
                 "title": meta.title or None,
                 "description": meta.description or None,

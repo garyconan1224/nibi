@@ -351,6 +351,33 @@
   background: var(--accent-green);
 }
 
+.vm-processing-scope .proc-result-arming {
+  animation: proc-result-pulse 1.1s ease-in-out infinite;
+}
+
+.vm-processing-scope .proc-result-arming .chip-dot {
+  box-shadow: 0 0 0 0 color-mix(in oklch, var(--accent-green) 36%, transparent);
+  animation: proc-dot-ping 1.1s ease-in-out infinite;
+}
+
+@keyframes proc-result-pulse {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1px); }
+}
+
+@keyframes proc-dot-ping {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--accent-green) 36%, transparent); }
+  70% { box-shadow: 0 0 0 7px color-mix(in oklch, var(--accent-green) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--accent-green) 0%, transparent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vm-processing-scope .proc-result-arming,
+  .vm-processing-scope .proc-result-arming .chip-dot {
+    animation: none;
+  }
+}
+
 /* ─── Step rail (水平 stepper · 对标 BiliNote 图3) ─── */
 .vm-processing-scope .step-rail {
   display: flex;

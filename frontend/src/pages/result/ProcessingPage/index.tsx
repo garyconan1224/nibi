@@ -50,6 +50,33 @@ function audioThumbnailFromResult(result: Record<string, unknown>, audio?: Recor
   return `/static/workspaces/${projectId}/audio/${titleFromFilename(filename)}.jpg`
 }
 
+function normalizeResultItemType(...candidates: unknown[]): string {
+  for (const candidate of candidates) {
+    const value = typeof candidate === 'string' ? candidate.trim() : ''
+    if (!value || value === 'auto') continue
+    if (value === 'image_text') return 'image'
+    if (['video', 'image', 'audio', 'text'].includes(value)) return value
+  }
+  return 'video'
+}
+
+function buildResultPath(
+  workspaceId: string | undefined,
+  itemId: string | undefined,
+  intent: string,
+  itemType: string,
+): string {
+  if (!workspaceId || !itemId) return ''
+  if (intent !== 'replica') return `/workspaces/${workspaceId}/items/${itemId}/note`
+  const detail: Record<string, string> = {
+    video: 'video_detail',
+    image: 'image_result',
+    audio: 'audio_detail',
+    text: 'text_result',
+  }
+  return `/workspaces/${workspaceId}/items/${itemId}/${detail[itemType] ?? 'overview'}`
+}
+
 export default function ProcessingPage() {
   const { taskId = '' } = useParams<{ taskId: string }>()
   const navigate = useNavigate()
@@ -258,31 +285,37 @@ export default function ProcessingPage() {
   const asrSegments: number = Number(result.asr_segments as number) || 0
   // 全局 ETA：所有活跃任务的剩余时间之和，每秒递减
   const etaSec = useGlobalEta()
+  const resultIntent = state?.taskType ?? ((payload.intent as string) === 'replica' ? 'replica' : 'note')
+  const resultItemType = normalizeResultItemType(
+    state?.itemType,
+    payload.item_type,
+    result.item_type,
+    noteKind,
+    sourceType,
+  )
+  const resultPath = buildResultPath(workspaceId, itemId, resultIntent, resultItemType)
 
   const handleViewResult = () => {
     if (!isSuccess) return
-    if (itemId && workspaceId) {
-      // NI.2: note task 完成后直接进 NoteShell；replica 落复刻页。
-      const effectiveType = state?.taskType ?? ((payload.intent as string) === 'replica' ? 'replica' : 'note')
-      const isNote = effectiveType === 'note'
-      const isReplica = effectiveType === 'replica'
-      let targetPath: string
-      if (isNote) {
-        targetPath = `/workspaces/${workspaceId}/items/${itemId}/note`
-      } else if (isReplica) {
-        const DETAIL: Record<string, string> = { video: 'video_detail', image: 'image_result', audio: 'audio_detail', text: 'text_result' }
-        const itemType = state?.itemType ?? (sourceType === 'image' ? 'image' : 'video')
-        const suffix = DETAIL[itemType] ?? 'overview'
-        targetPath = `/workspaces/${workspaceId}/items/${itemId}/${suffix}`
-      } else {
-        targetPath = `/workspaces/${workspaceId}/items/${itemId}/overview`
-      }
-      navigate(targetPath)
+    if (resultPath) {
+      navigate(resultPath)
     } else {
       // 兜底：跳转到资料库，用户可从那里找到结果。
       navigate('/library')
     }
   }
+
+  const autoOpenRef = useRef('')
+  useEffect(() => {
+    if (!isSuccess || resultIntent !== 'replica' || !resultPath) return
+    const key = `${taskId}:${resultPath}`
+    if (autoOpenRef.current === key) return
+    const timer = window.setTimeout(() => {
+      autoOpenRef.current = key
+      navigate(resultPath, { replace: true })
+    }, 650)
+    return () => window.clearTimeout(timer)
+  }, [isSuccess, resultIntent, resultPath, navigate, taskId])
 
   const handleCopySource = async () => {
     const text = url || window.location.href
@@ -295,7 +328,7 @@ export default function ProcessingPage() {
   }
 
   // 处理↔结果原地融合：note 任务完成 → 同一任务页内直接渲染结果（不跳页）
-  if (isSuccess && (state?.taskType ?? taskType) === 'note' && workspaceId && itemId) {
+  if (isSuccess && resultIntent === 'note' && workspaceId && itemId) {
     return <NoteShell workspaceId={workspaceId} itemId={itemId} />
   }
 
@@ -408,9 +441,9 @@ export default function ProcessingPage() {
                   查看结果 <ArrowRight size={14} />
                 </button>
                 {isSuccess && (
-                  <span className="chip chip-success">
+                  <span className="chip chip-success proc-result-arming">
                     <span className="chip-dot" />
-                    完成 ✓ · 正在打开结果…
+                    完成 ✓ · {resultIntent === 'replica' ? '正在打开复刻结果…' : '正在打开结果…'}
                   </span>
                 )}
               </div>

@@ -563,6 +563,8 @@ class WorkspaceCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120, description="工作空间名称")
     background: Dict[str, Any] = Field(default_factory=dict)
     kind: str = Field(default="note", description="合集类型：note|replica")
+    source: str = Field(default="manual", description="manual|inbox|...")
+    source_meta: Dict[str, Any] = Field(default_factory=dict)
 
 
 class WorkspaceUpdateRequest(BaseModel):
@@ -1012,6 +1014,8 @@ def create_workspace(req: WorkspaceCreateRequest) -> Dict[str, Any]:
         name=req.name.strip(),
         background=bg,
         kind=kind,
+        source=req.source.strip() or "manual",
+        source_meta=dict(req.source_meta or {}),
     )
     _store.create(rec)
     return rec.to_dict()
@@ -1399,6 +1403,12 @@ def get_library(include_trashed: bool = False) -> Dict[str, Any]:
                 item_status = overlay["status"]
 
             results = (overlay.get("results") if overlay else None) or item.results or {}
+            if item.type == ItemType.VIDEO.value and isinstance(results, dict):
+                preferred_basenames = list(results.get("json_output_basenames") or [])
+                results = _materialize_video_results_from_analyze(
+                    dict(results),
+                    preferred_basenames=preferred_basenames,
+                )
             display_name = _item_display_name(rec, item, results)
             audio_nature = None
             if item.type == "audio":
@@ -1489,7 +1499,7 @@ def update_workspace(workspace_id: str, req: WorkspaceUpdateRequest) -> Dict[str
         rec = _store.update(workspace_id, **payload)
     except KeyError as err:
         raise HTTPException(status_code=404, detail=str(err)) from err
-    return rec.to_dict()
+    return _enrich_workspace(rec)
 
 
 def _cleanup_workspace_chat(workspace_id: str) -> None:

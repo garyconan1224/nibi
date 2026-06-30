@@ -7,14 +7,18 @@ interface FloatingAskAiProps {
   workspaceId: string
   systemPrompt: string
   scopeHint: string
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 /**
  * 问 AI 悬浮泡泡 — 仿 FloatingTaskQueue（fixed right:24 bottom:24）。
  * 收起时显示胶囊按钮，展开时 popover 内嵌 NoteChatDrawer。
  */
-export function FloatingAskAi({ workspaceId, systemPrompt, scopeHint }: FloatingAskAiProps) {
-  const [open, setOpen] = useState(false)
+export function FloatingAskAi({ workspaceId, systemPrompt, scopeHint, open: controlledOpen, onOpenChange }: FloatingAskAiProps) {
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = controlledOpen ?? internalOpen
+  const setOpen = onOpenChange ?? setInternalOpen
 
   return (
     <>

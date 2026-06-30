@@ -288,8 +288,10 @@ export default function TaskboardPage() {
         onOpenChange={setAddOpen}
         workspaceIds={[workspace.workspace_id]}
         workspaceBackgrounds={{ [workspace.workspace_id]: workspace.background }}
+        availableWorkspaces={[workspace]}
         workspaceKind={workspace.kind}
         onAdded={refresh}
+        onWorkspaceUpdated={setWorkspace}
       />
 
       {/* ── BackgroundEditor ── */}

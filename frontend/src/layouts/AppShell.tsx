@@ -1,6 +1,7 @@
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
+  Home,
   Plus,
   Sparkles,
   Film,
@@ -20,7 +21,9 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useSystemStats } from '@/hooks/useSystemStats'
 import { FloatingTaskQueue } from '@/components/FloatingTaskQueue'
+import { GlobalAddMaterialModal } from '@/components/workspace/GlobalAddMaterialModal'
 import ThemeSwitcher from '@/components/ThemeSwitcher'
+import { useAddMaterialStore } from '@/store/addMaterialStore'
 
 interface NavItem {
   id: string
@@ -32,6 +35,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
+  { id: 'home',       path: '/',           icon: Home,         label: '首页' },
   { id: 'notes',      path: '/notes',      icon: FileText,     label: '笔记' },
   { id: 'replicas',   path: '/replicas',   icon: Copy,         label: '复刻' },
   { id: 'library',    path: '/library',    icon: Library,      label: '资料库' },
@@ -115,6 +119,51 @@ function SidebarBtn({ icon: Icon, label, active, badge, placeholder, collapsed, 
   )
 }
 
+function SidebarStatus({
+  collapsed,
+  online,
+  stats,
+}: {
+  collapsed: boolean
+  online: boolean
+  stats: ReturnType<typeof useSystemStats>['stats']
+}) {
+  if (collapsed) {
+    return (
+      <div className="mt-2 flex flex-col items-center gap-2">
+        <ThemeSwitcher />
+        <span
+          className="size-2 rounded-full"
+          style={{ background: online ? 'var(--accent-green)' : 'var(--accent-pink)' }}
+          title={`后端 ${BACKEND_ADDR} · ${online ? 'online' : 'offline'}`}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-2 rounded-[14px] border border-border bg-muted/35 p-2">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-[11px] font-medium text-muted-foreground">状态</span>
+        <ThemeSwitcher />
+      </div>
+      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+        <span
+          className="size-1.5 rounded-full"
+          style={{ background: online ? 'var(--accent-green)' : 'var(--accent-pink)' }}
+        />
+        <span className="truncate">{BACKEND_ADDR}</span>
+        <span className="ml-auto">{online ? 'online' : 'offline'}</span>
+      </div>
+      {stats?.cpu && stats?.memory && (
+        <div className="mt-1 text-[11px] text-muted-foreground">
+          CPU {stats.cpu.percent.toFixed(0)}% · MEM {formatBytes(stats.memory.used)}/{formatBytes(stats.memory.total)}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export interface AppShellProps {
   children: ReactNode
 }
@@ -133,6 +182,7 @@ export function AppShell({ children }: AppShellProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const { stats, online } = useSystemStats()
+  const openAddMaterial = useAddMaterialStore((state) => state.openAddMaterial)
   const [collapsed, setCollapsed] = useState<boolean>(
     () => localStorage.getItem('nibi-sidebar-collapsed') === '1',
   )
@@ -144,8 +194,16 @@ export function AppShell({ children }: AppShellProps) {
     })
   }
 
+  useEffect(() => {
+    document.body.classList.toggle('nibi-sidebar-compact', collapsed)
+    return () => {
+      document.body.classList.remove('nibi-sidebar-compact')
+    }
+  }, [collapsed])
+
   const isActive = (item: NavItem) => {
-    if (item.id === 'notes') return location.pathname === '/' || location.pathname.startsWith('/notes')
+    if (item.id === 'home') return location.pathname === '/'
+    if (item.id === 'notes') return location.pathname.startsWith('/notes')
     if (item.id === 'replicas') return location.pathname.startsWith('/replicas')
     return location.pathname.startsWith(item.path)
   }
@@ -220,9 +278,9 @@ export function AppShell({ children }: AppShellProps) {
             background: 'var(--accl)',
             color: 'var(--acc)',
           }}
-          onClick={() => navigate('/')}
-          title="新建笔记"
-          aria-label="新建笔记"
+          onClick={() => openAddMaterial()}
+          title="新建内容"
+          aria-label="新建内容"
         >
           <Plus size={16} />
           {!collapsed && <span>新建</span>}
@@ -248,6 +306,9 @@ export function AppShell({ children }: AppShellProps) {
         {/* Separator */}
         <div className={cn('my-2 h-px bg-border', collapsed ? 'mx-3 w-6' : 'mx-2')} />
 
+        {/* Spacer */}
+        <div className="flex-1" />
+
         {/* Bottom nav (search, settings) */}
         {BOTTOM_ITEMS.map((item) => (
           <SidebarBtn
@@ -260,54 +321,17 @@ export function AppShell({ children }: AppShellProps) {
           />
         ))}
 
-        {/* Spacer */}
-        <div className="flex-1" />
+        <SidebarStatus collapsed={collapsed} online={online} stats={stats} />
       </nav>
 
       {/* ── Main content ── */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden print:overflow-visible print:h-auto">
-        {/* ── Top bar ── */}
-        <div
-          className="flex items-center gap-2 border-b px-5 py-1 print:hidden"
-          style={{ borderColor: 'var(--line)', background: 'var(--bg)' }}
-        >
-          <div className="flex-1" />
-          <ThemeSwitcher />
-          {/* 后端状态 chip */}
-          <span
-            className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]"
-            style={{
-              background: 'var(--bg-sunken)',
-              borderColor: 'var(--line)',
-              color: 'var(--ink-2)',
-            }}
-          >
-            <span
-              className="inline-block size-1 rounded-full"
-              style={{ background: online ? 'var(--accent-green)' : 'var(--accent-pink)' }}
-            />
-            后端 {BACKEND_ADDR} · {online ? 'online' : 'offline'}
-          </span>
-          {/* 系统指标 chip */}
-          {stats?.cpu && stats?.memory && (
-            <span
-              className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]"
-              style={{
-                background: 'var(--bg-sunken)',
-                borderColor: 'var(--line)',
-                color: 'var(--ink-2)',
-              }}
-            >
-              CPU {stats.cpu.percent.toFixed(0)}% · MEM{' '}
-              {formatBytes(stats.memory.used)}/{formatBytes(stats.memory.total)}
-            </span>
-          )}
-        </div>
         {children}
       </div>
 
       {/* Global floating task queue — fixed position, outside layout flow */}
       <FloatingTaskQueue />
+      <GlobalAddMaterialModal />
     </div>
   )
 }

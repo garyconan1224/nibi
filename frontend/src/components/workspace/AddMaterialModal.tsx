@@ -32,6 +32,7 @@ import {
   savePreflight,
   sniffUrl,
   startItemPipeline,
+  updateWorkspace as updateWorkspaceSvc,
 } from '@/services/workspaces'
 import { fetchLinkPreview } from '@/services/linkPreview'
 import type {
@@ -62,6 +63,7 @@ interface AddMaterialModalProps {
   availableWorkspaces?: WorkspaceRecord[]
   onWorkspaceIdsChange?: (workspaceIds: string[]) => void
   onCreateWorkspace?: (name: string, kind?: 'note' | 'replica') => Promise<WorkspaceRecord>
+  onWorkspaceUpdated?: (workspace: WorkspaceRecord) => void
   sniffResult?: SniffResult | null
   urlValue?: string
   onAdded?: () => void
@@ -158,6 +160,7 @@ export function AddMaterialModal({
   availableWorkspaces,
   onWorkspaceIdsChange,
   onCreateWorkspace,
+  onWorkspaceUpdated,
   sniffResult,
   urlValue,
   onAdded,
@@ -182,6 +185,7 @@ export function AddMaterialModal({
   const [videoDuration, setVideoDuration] = useState(0) // 探测到的视频时长（秒），0=未知
   const [coverUrl, setCoverUrl] = useState('') // sniff 没给封面时，用 link-preview 补的封面
   const [linkTitle, setLinkTitle] = useState('') // sniff 没给标题时，用 link-preview 补的标题
+  const [linkDesc, setLinkDesc] = useState('') // link-preview 的简介（B站含 UP主/播放量等）
   const [localCover, setLocalCover] = useState('') // 本地文件：后端 cv2 探测的首帧封面 static URL
   const [error, setError] = useState<string | null>(null)
   const [sniffFailed, setSniffFailed] = useState(false)
@@ -191,6 +195,9 @@ export function AddMaterialModal({
   const [workspacePickerOpen, setWorkspacePickerOpen] = useState(false)
   const [workspaceQuery, setWorkspaceQuery] = useState('')
   const [creatingWorkspace, setCreatingWorkspace] = useState(false)
+  const [renamingWorkspaceId, setRenamingWorkspaceId] = useState<string | null>(null)
+  const [workspaceNameDraft, setWorkspaceNameDraft] = useState('')
+  const [workspaceNameOverrides, setWorkspaceNameOverrides] = useState<Record<string, string>>({})
   const [advancedOpen, setAdvancedOpen] = useState(false) // 「高级设置」折叠
   const sniffTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
@@ -211,6 +218,9 @@ export function AddMaterialModal({
     () => workspaceIds.map((id) => workspaceLookup.get(id)).filter((ws): ws is WorkspaceRecord => Boolean(ws)),
     [workspaceIds, workspaceLookup],
   )
+  const getWorkspaceLabel = useCallback((workspaceId: string, fallback = '当前合集') => {
+    return workspaceNameOverrides[workspaceId] ?? workspaceLookup.get(workspaceId)?.name ?? fallback
+  }, [workspaceLookup, workspaceNameOverrides])
   const lockedWorkspaceKind = workspaceKind ?? selectedWorkspaces[0]?.kind
   const targetWorkspaceKind: 'note' | 'replica' = lockedWorkspaceKind ?? (selectedAction === 'replica' ? 'replica' : 'note')
   const selectableWorkspaces = useMemo(
@@ -223,12 +233,13 @@ export function AddMaterialModal({
     return selectableWorkspaces.filter((ws) => ws.name.toLowerCase().includes(q))
   }, [selectableWorkspaces, workspaceQuery])
 
-  // 硬锁：从合集详情页进入时，动作锁成合集 kind
+  // 硬锁：仅「从合集详情页进入」(workspaceKind prop) 才把动作锁成合集 kind。
+  // 普通添加流程（未选合集）不锁，笔记/复刻自由选。
   useEffect(() => {
-    if (lockedWorkspaceKind && open) {
-      setSelectedAction(lockedWorkspaceKind)
+    if (workspaceKind && open) {
+      setSelectedAction(workspaceKind)
     }
-  }, [lockedWorkspaceKind, open])
+  }, [workspaceKind, open])
 
   // 首次打开弹窗时：拉最新 providers；有视觉模型则默认开配图
   useEffect(() => {
@@ -249,9 +260,10 @@ export function AddMaterialModal({
   // 也避免链接探测 useEffect 把 probeItemMedia 探到的本地时长清零覆盖。
   const effectiveUrl = isLocalFile ? '' : (urlValue ?? internalUrl).trim()
   const effectiveSniff = isLocalFile ? null : (sniffResult ?? internalSniff)
-  const workspaceSummary =
-    selectedWorkspaces[0]?.name ??
-    (workspaceIds.length === 1 ? '当前合集' : '默认收纳箱')
+  // 稳定原始值供 link-preview effect 依赖（避免 effectiveSniff 对象身份抖动）
+  const sniffThumbnail = effectiveSniff?.thumbnail ?? null
+  const sniffTitle = effectiveSniff?.title ?? null
+  const workspaceSummary = workspaceIds[0] ? getWorkspaceLabel(workspaceIds[0], '当前合集') : ''
   const sourceSummary = isLocalFile
     ? (localFileName || '本地文件')
     : (effectiveSniff?.title || linkTitle)
@@ -259,6 +271,27 @@ export function AddMaterialModal({
       : effectiveUrl
         ? '网络链接'
         : '输入素材链接'
+  const autoResolvedNoteType: NoteMediaKind =
+    isLocalFile
+      ? 'video'
+      : effectiveSniff?.primary_type === 'video'
+        ? 'video'
+        : effectiveSniff?.primary_type === 'audio'
+          ? 'audio'
+          : effectiveSniff?.primary_type === 'image' || effectiveSniff?.primary_type === 'text'
+            ? 'image_text'
+            : 'auto'
+  const showVideoNoteSettings =
+    selectedAction === 'note' && (selectedNoteType === 'video' || (selectedNoteType === 'auto' && autoResolvedNoteType === 'video'))
+  const showAudioNoteSettings =
+    selectedAction === 'note' && (selectedNoteType === 'audio' || (selectedNoteType === 'auto' && autoResolvedNoteType === 'audio'))
+  const showFrameAnalysisSettings = selectedAction === 'replica' || showVideoNoteSettings
+  const showSpeakerSettings = selectedAction === 'note' && (showVideoNoteSettings || showAudioNoteSettings)
+  const advancedSummaryParts = [
+    ...(showSpeakerSettings ? ['发言人'] : []),
+    '补充说明',
+  ]
+  const advancedSummary = advancedSummaryParts.join(' · ')
 
   const doSniff = useCallback(async (url: string) => {
     try {
@@ -279,13 +312,24 @@ export function AddMaterialModal({
     setUserNotes('')
     setNoteStyle('standard')
     setSelectedAction('note')
+    setSelectedNoteType('auto')
+    setReplicaKind('prompt')
+    setCaptureMode('auto')
+    setFrameInterval(5)
+    setSelectedVisionModel('')
+    setAdvancedOpen(false)
     setWorkspaceQuery('')
     setWorkspacePickerOpen(false)
     setError(null)
     setSubmitting(false)
+    setRenamingWorkspaceId(null)
+    setWorkspaceNameDraft('')
+    setLinkDesc('')
     setCoverUrl('')
     setLinkTitle('')
-    // embedFrames 由 auto-detect effect 根据 hasVisionModel 设置，不在这里强制
+    userToggledRef.current = false
+    // 每次重开恢复到当前 provider 能力下的默认值，避免上次展开/切换残留到这次弹框。
+    setEmbedFrames(hasVisionModel)
   }, [open, urlValue])
 
   useEffect(() => {
@@ -332,28 +376,34 @@ export function AddMaterialModal({
     return () => { cancelled = true }
   }, [open, isLocalFile, localFile, localWsId])
 
-  // sniff 对已知平台（B站等）只做 O(1) 类型判断、不返回封面/标题 → 用 link-preview 补
+  // URL 变化时才清空补抓的封面/标题/简介（避免 effectiveSniff 对象身份抖动反复重置）
   useEffect(() => {
     setCoverUrl('')
     setLinkTitle('')
-    if (!open || !effectiveUrl || !effectiveSniff) return
+    setLinkDesc('')
+  }, [effectiveUrl])
+
+  // sniff 对已知平台（B站等）只做 O(1) 类型判断、不返回封面/标题 → 用 link-preview 补
+  // 依赖用稳定原始值（effectiveUrl + 缺失标志），不放入 effectiveSniff 对象，否则父组件每次 sniff
+  // 重渲染会重置 state、cancel 掉异步结果 → 封面/标题永远填不上。
+  useEffect(() => {
+    if (!open || !effectiveUrl) return
     // sniff 已返回封面+标题（非已知平台场景）→ 不需要 link-preview 补
-    if (effectiveSniff.thumbnail && effectiveSniff.title) return
+    if (sniffThumbnail && sniffTitle) return
     let cancelled = false
     fetchLinkPreview(effectiveUrl)
       .then((p) => {
         if (cancelled) return
-        if (p.image_url && !effectiveSniff.thumbnail) {
+        if (p.image_url && !sniffThumbnail) {
           // B站封面是协议相对 URL（//i1.hdslb.com/...），补 https 否则 localhost(http) 下加载失败
           setCoverUrl(p.image_url.startsWith('//') ? `https:${p.image_url}` : p.image_url)
         }
-        if (p.title && !effectiveSniff.title) {
-          setLinkTitle(p.title)
-        }
+        if (p.title && !sniffTitle) setLinkTitle(p.title)
+        if (p.description) setLinkDesc(p.description)
       })
       .catch(() => { /* link-preview 已内部兜底，忽略 */ })
     return () => { cancelled = true }
-  }, [open, effectiveUrl, effectiveSniff, effectiveSniff?.thumbnail, effectiveSniff?.title])
+  }, [open, effectiveUrl, sniffThumbnail, sniffTitle])
 
   const selectWorkspace = useCallback((workspaceId: string) => {
     if (!onWorkspaceIdsChange) return
@@ -396,6 +446,29 @@ export function AddMaterialModal({
       setCreatingWorkspace(false)
     }
   }, [creatingWorkspace, onCreateWorkspace, onWorkspaceIdsChange, targetWorkspaceKind, workspaceKind, workspaceQuery])
+
+  const handleSaveWorkspaceRename = useCallback(async () => {
+    const workspaceId = renamingWorkspaceId
+    const nextName = workspaceNameDraft.trim()
+    if (!workspaceId) return
+    if (!nextName) {
+      setRenamingWorkspaceId(null)
+      setWorkspaceNameDraft('')
+      return
+    }
+    try {
+      const updated = await updateWorkspaceSvc(workspaceId, { name: nextName })
+      setWorkspaceNameOverrides((prev) => ({ ...prev, [workspaceId]: updated.name }))
+      onWorkspaceUpdated?.(updated)
+      setRenamingWorkspaceId(null)
+      setWorkspaceNameDraft('')
+      toast.success(`合集已重命名为「${updated.name}」`)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '重命名合集失败'
+      setError(msg)
+      toast.error(msg)
+    }
+  }, [onWorkspaceUpdated, renamingWorkspaceId, workspaceNameDraft])
 
   const handleGenerateNote = async () => {
     if (isLocalFile) {
@@ -505,7 +578,7 @@ export function AddMaterialModal({
             <h3 className="display" style={{ fontSize: 28, margin: '4px 0 0' }}>
               添加素材
             </h3>
-            <p className="modal-subtitle">{workspaceSummary} · {sourceSummary}</p>
+            <p className="modal-subtitle">{[workspaceSummary, sourceSummary].filter(Boolean).join(' · ')}</p>
           </div>
           <DialogClose className="btn btn-ghost modal-close">
             <X size={16} />
@@ -598,6 +671,7 @@ export function AddMaterialModal({
                   <div className="sniff-title">
                     {effectiveSniff.title || linkTitle || `已识别${{ video: '视频', audio: '音频', image: '图片', text: '网页' }[effectiveSniff.primary_type] ?? '内容'}`}
                   </div>
+                  {linkDesc && <div className="sniff-desc">{linkDesc}</div>}
                   <div className="sniff-tags">
                     {effectiveSniff.platform && (
                       <span className="kw" style={{ fontSize: 11 }}>{effectiveSniff.platform}</span>
@@ -625,11 +699,43 @@ export function AddMaterialModal({
             <div className="eyebrow" style={{ marginBottom: 10 }}>② 合集归属</div>
             <div className="modal-workspace-picker">
               <div className="modal-workspace-row">
-                <div className="modal-workspace-current">
-                  <Layers size={15} />
-                  <span>{selectedWorkspaces[0]?.name ?? (workspaceIds.length ? '当前合集' : '默认收纳箱')}</span>
-                  <span className="kw">{targetWorkspaceKind === 'replica' ? '复刻' : '笔记'}</span>
-                </div>
+                {workspaceIds[0] ? (
+                  <div className="modal-workspace-current">
+                    <Layers size={15} />
+                    {renamingWorkspaceId === workspaceIds[0] ? (
+                      <input
+                        autoFocus
+                        className="modal-inline-name-input"
+                        value={workspaceNameDraft}
+                        onChange={(event) => setWorkspaceNameDraft(event.target.value)}
+                        onClick={(event) => event.stopPropagation()}
+                        onBlur={() => void handleSaveWorkspaceRename()}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            void handleSaveWorkspaceRename()
+                          }
+                          if (event.key === 'Escape') {
+                            setRenamingWorkspaceId(null)
+                            setWorkspaceNameDraft('')
+                          }
+                        }}
+                      />
+                    ) : (
+                      <span
+                        onDoubleClick={() => {
+                          setRenamingWorkspaceId(workspaceIds[0])
+                          setWorkspaceNameDraft(getWorkspaceLabel(workspaceIds[0], '当前合集'))
+                        }}
+                      >
+                        {getWorkspaceLabel(workspaceIds[0], '当前合集')}
+                      </span>
+                    )}
+                    <span className="kw">{targetWorkspaceKind === 'replica' ? '复刻' : '笔记'}</span>
+                  </div>
+                ) : (
+                  <div className="modal-workspace-current modal-workspace-current--empty" aria-hidden="true" />
+                )}
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                   {onWorkspaceIdsChange && (availableWorkspaces?.length ?? 0) > 0 && (
                     <button
@@ -694,7 +800,7 @@ export function AddMaterialModal({
                             <Check size={11} strokeWidth={3} />
                           </span>
                           <div style={{ minWidth: 0 }}>
-                            <div className="pp-name">{ws.name}</div>
+                            <div className="pp-name">{getWorkspaceLabel(ws.workspace_id, ws.name)}</div>
                           </div>
                           <span className="pp-count">{ws.items.length} 项</span>
                         </button>
@@ -723,9 +829,9 @@ export function AddMaterialModal({
           {/* ③ 你要做什么 */}
           <div className="m-section">
             <div className="eyebrow" style={{ marginBottom: 10 }}>③ 你要做什么</div>
-            {lockedWorkspaceKind && (
+            {workspaceKind && (
               <div style={{ fontSize: 12, color: 'var(--mut)', marginBottom: 8 }}>
-                动作已锁定为「{lockedWorkspaceKind === 'replica' ? '复刻' : '笔记'}」合集类型
+                动作已锁定为「{workspaceKind === 'replica' ? '复刻' : '笔记'}」合集类型
               </div>
             )}
             <div className="note-type-grid" style={{ marginBottom: 14 }}>
@@ -733,9 +839,14 @@ export function AddMaterialModal({
                 type="button"
                 className="note-type-card"
                 data-active={selectedAction === 'note'}
-                disabled={!!lockedWorkspaceKind && lockedWorkspaceKind !== 'note'}
-                style={lockedWorkspaceKind && lockedWorkspaceKind !== 'note' ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
-                onClick={() => !lockedWorkspaceKind && setSelectedAction('note')}
+                disabled={workspaceKind === 'replica'}
+                style={workspaceKind === 'replica' ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
+                onClick={() => {
+                  if (workspaceKind === 'replica') return
+                  setSelectedAction('note')
+                  // 选了复刻合集却切回笔记 → 清掉冲突的合集选择（变为新建/单独）
+                  if (selectedWorkspaces[0]?.kind === 'replica') onWorkspaceIdsChange?.([])
+                }}
               >
                 <div className="ntc-l"><FileText size={16} style={{ display: 'inline', verticalAlign: '-3px', marginRight: 4 }} /> 学习笔记</div>
                 <div className="ntc-d">沉浸式阅读与总结提取</div>
@@ -744,9 +855,14 @@ export function AddMaterialModal({
                 type="button"
                 className="note-type-card"
                 data-active={selectedAction === 'replica'}
-                disabled={!!lockedWorkspaceKind && lockedWorkspaceKind !== 'replica'}
-                style={lockedWorkspaceKind && lockedWorkspaceKind !== 'replica' ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
-                onClick={() => !lockedWorkspaceKind && setSelectedAction('replica')}
+                disabled={workspaceKind === 'note'}
+                style={workspaceKind === 'note' ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
+                onClick={() => {
+                  if (workspaceKind === 'note') return
+                  setSelectedAction('replica')
+                  // 选了笔记合集却切到复刻 → 清掉冲突的合集选择（变为新建/单独）
+                  if (selectedWorkspaces[0]?.kind === 'note') onWorkspaceIdsChange?.([])
+                }}
               >
                 <div className="ntc-l"><Copy size={16} style={{ display: 'inline', verticalAlign: '-3px', marginRight: 4 }} /> 逐帧复刻</div>
                 <div className="ntc-d">提取画面提示词与详细信息</div>
@@ -788,87 +904,174 @@ export function AddMaterialModal({
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: 8, marginBottom: selectedAction === 'note' ? 24 : 0 }}>
-              {[{ id: 'ai_video', label: 'AI视频', icon: <Video size={12} /> },
-                { id: 'storyboard', label: '分镜脚本', icon: <LayoutTemplate size={12} /> },
-                { id: 'rewrite', label: '二创改写', icon: <PenTool size={12} /> }].map(item => (
-                <button
-                  key={item.id}
-                  type="button"
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 4,
-                    padding: '6px 10px', fontSize: 12, color: 'var(--mut)',
-                    border: '1px dashed var(--bdr)', borderRadius: 6,
-                    background: 'var(--bgalt)'
-                  }}
-                  onClick={() => toast('该功能即将上线')}
-                >
-                  {item.icon} {item.label} <Lock size={10} style={{ marginLeft: 2 }} />
-                </button>
-              ))}
-            </div>
-
-            {selectedAction === 'note' && (
+            {(selectedAction === 'note' || selectedAction === 'replica') && (
               <>
-                <div className="eyebrow" style={{ marginBottom: 10 }}>④ 笔记设置</div>
-                <div className="note-type-grid">
-                  {NOTE_TYPE_CARDS.map(card => {
-                    const active = selectedNoteType === card.value
-                    return (
-                      <button
-                        key={card.value}
-                        type="button"
-                        className="note-type-card"
-                        data-active={active}
-                        onClick={() => setSelectedNoteType(card.value)}
-                      >
-                        <div className="ntc-l">{card.label}</div>
-                        <div className="ntc-d">{card.desc}</div>
-                      </button>
-                    )
-                  })}
+                <div className="eyebrow" style={{ marginBottom: 10 }}>
+                  {selectedAction === 'replica' ? '④ 复刻设置' : '④ 笔记设置'}
                 </div>
-                <div style={{ marginTop: 14 }}>
-                  <div className="gen-field">
-                    <span className="gen-field-label">笔记风格</span>
-                    <Select value={noteStyle} onValueChange={setNoteStyle}>
-                      <SelectTrigger style={{ fontSize: 13 }}>
-                        <SelectValue placeholder="选择风格" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectLabel style={{ fontSize: 11, color: 'var(--mut)' }}>常用风格</SelectLabel>
-                          {PRIMARY_STYLES.map(opt => (
-                            <SelectItem key={opt.id} value={opt.id}>
-                              {opt.label}
-                              <span style={{ fontSize: 11, color: 'var(--mut)', marginLeft: 6 }}>{STYLE_DESCRIPTIONS[opt.id]}</span>
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                        <SelectSeparator />
-                        <SelectGroup>
-                          <SelectLabel style={{ fontSize: 11, color: 'var(--mut)' }}>更多风格</SelectLabel>
-                          {MORE_STYLES.map(opt => (
-                            <SelectItem key={opt.id} value={opt.id}>
-                              {opt.label}
-                              <span style={{ fontSize: 11, color: 'var(--mut)', marginLeft: 6 }}>{STYLE_DESCRIPTIONS[opt.id]}</span>
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                {selectedAction === 'note' && (
+                  <>
+                    <div className="note-type-grid">
+                      {NOTE_TYPE_CARDS.map(card => {
+                        const active = selectedNoteType === card.value
+                        return (
+                          <button
+                            key={card.value}
+                            type="button"
+                            className="note-type-card"
+                            data-active={active}
+                            onClick={() => setSelectedNoteType(card.value)}
+                          >
+                            <div className="ntc-l">{card.label}</div>
+                            <div className="ntc-d">{card.desc}</div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <div style={{ marginTop: 14 }}>
+                      <div className="gen-field">
+                        <span className="gen-field-label">笔记风格</span>
+                        <Select value={noteStyle} onValueChange={setNoteStyle}>
+                          <SelectTrigger style={{ fontSize: 13 }}>
+                            <SelectValue placeholder="选择风格" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectLabel style={{ fontSize: 11, color: 'var(--mut)' }}>常用风格</SelectLabel>
+                              {PRIMARY_STYLES.map(opt => (
+                                <SelectItem key={opt.id} value={opt.id}>
+                                  {opt.label}
+                                  <span style={{ fontSize: 11, color: 'var(--mut)', marginLeft: 6 }}>{STYLE_DESCRIPTIONS[opt.id]}</span>
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                            <SelectSeparator />
+                            <SelectGroup>
+                              <SelectLabel style={{ fontSize: 11, color: 'var(--mut)' }}>更多风格</SelectLabel>
+                              {MORE_STYLES.map(opt => (
+                                <SelectItem key={opt.id} value={opt.id}>
+                                  {opt.label}
+                                  <span style={{ fontSize: 11, color: 'var(--mut)', marginLeft: 6 }}>{STYLE_DESCRIPTIONS[opt.id]}</span>
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </>
+                )}
+                {showFrameAnalysisSettings && (
+                  <div className="capture-panel" data-enabled={embedFrames}>
+                    <div className="capture-head">
+                      <label htmlFor="add-material-embed" className="capture-main-toggle">
+                        <Switch
+                          id="add-material-embed"
+                          checked={embedFrames}
+                          onCheckedChange={(v) => {
+                            userToggledRef.current = true
+                            setEmbedFrames(v)
+                          }}
+                        />
+                        <span className="gen-toggle-text">
+                          <span className="gen-field-label">{selectedAction === 'replica' ? '画面分析' : '笔记里配图'}</span>
+                          <span className="kw">
+                            {selectedAction === 'replica' ? '关键画面参与复刻' : '带图笔记'}
+                          </span>
+                        </span>
+                      </label>
+                      {!embedFrames && (
+                        <span className="kw">纯文字模式</span>
+                      )}
+                    </div>
 
-                  {/* ── 高级设置（折叠）── */}
+                    {embedFrames ? (
+                      <div className="capture-tools">
+                        {visionModels.length > 0 ? (
+                          <div className="capture-model-row">
+                            <span className="gen-field-label">视觉模型</span>
+                            <Select value={selectedVisionModel} onValueChange={setSelectedVisionModel}>
+                              <SelectTrigger className="capture-model-trigger">
+                                <SelectValue placeholder="系统默认" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__default__">系统默认</SelectItem>
+                                {visionModels.map(vm => (
+                                  <SelectItem key={vm.modelId} value={vm.modelId}>
+                                    {vm.providerName} · {vm.modelName}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ) : (
+                          <span className="kw capture-warning">
+                            未检测到视觉模型，将使用纯文字总结。可在「设置 → 模型」中添加。
+                          </span>
+                        )}
+
+                        {hasVisionModel && (() => {
+                          const autoInterval = computeAutoInterval(videoDuration)
+                          const activeInterval = captureMode === 'auto' ? autoInterval : frameInterval
+                          const frameEstimate = estimateFrames(videoDuration, activeInterval)
+                          return (
+                            <div className="capture-strip">
+                              <span className="gen-field-label">取画面</span>
+                              <div className="capture-segment" role="group" aria-label="取画面模式">
+                                <button
+                                  type="button"
+                                  data-active={captureMode === 'auto'}
+                                  onClick={() => setCaptureMode('auto')}
+                                >
+                                  <Wand2 size={12} />
+                                  智能
+                                </button>
+                                <button
+                                  type="button"
+                                  data-active={captureMode === 'manual'}
+                                  onClick={() => setCaptureMode('manual')}
+                                >
+                                  <Settings2 size={12} />
+                                  手动
+                                </button>
+                              </div>
+                              <label className="capture-interval">
+                                <span>每</span>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={60}
+                                  value={activeInterval}
+                                  disabled={captureMode === 'auto'}
+                                  onChange={(e) => {
+                                    const next = Number(e.target.value)
+                                    setFrameInterval(Number.isFinite(next) ? Math.min(60, Math.max(1, next)) : 5)
+                                  }}
+                                />
+                                <span>秒</span>
+                              </label>
+                              <span className="capture-estimate">
+                                {videoDuration > 0 ? `约 ${frameEstimate} 张` : '识别后估算'}
+                              </span>
+                              {videoDuration > 0 && (
+                                <span className="kw">时长 {formatDuration(videoDuration)}</span>
+                              )}
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+                <div style={{ marginTop: showFrameAnalysisSettings ? 12 : selectedAction === 'note' ? 14 : 0 }}>
                   <button
                     type="button"
                     className="accordion-trigger"
-                    style={{ marginTop: 14 }}
                     onClick={() => setAdvancedOpen(v => !v)}
                   >
                     <Settings2 size={14} />
                     <span>高级设置</span>
-                    <span className="kw" style={{ fontSize: 11 }}>配图 · 取画面 · 视觉模型 · 发言人 · 补充说明</span>
+                    <span className="kw" style={{ fontSize: 11 }}>{advancedSummary}</span>
                     <ChevronDown
                       size={14}
                       style={{
@@ -881,89 +1084,15 @@ export function AddMaterialModal({
                   </button>
                   {advancedOpen && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 14 }}>
-                      <label htmlFor="add-material-embed" className="gen-toggle">
-                        <Switch id="add-material-embed" checked={embedFrames} onCheckedChange={(v) => { userToggledRef.current = true; setEmbedFrames(v) }} />
-                        <span className="gen-toggle-text">
-                          <span className="gen-field-label">笔记里配图</span>
-                          <span className="kw" style={{ fontSize: 11 }}>打开＝带图笔记（自动挑有信息的画面）；关闭＝纯文字笔记</span>
-                        </span>
-                      </label>
-                      {embedFrames && visionModels.length > 0 && (
-                        <div className="gen-field">
-                          <span className="gen-field-label">视觉模型</span>
-                          <Select value={selectedVisionModel} onValueChange={setSelectedVisionModel}>
-                            <SelectTrigger style={{ fontSize: 13 }}>
-                              <SelectValue placeholder="系统默认" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="__default__">系统默认</SelectItem>
-                              {visionModels.map(vm => (
-                                <SelectItem key={vm.modelId} value={vm.modelId}>
-                                  {vm.providerName} · {vm.modelName}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                      {showSpeakerSettings && (
+                        <label className="gen-toggle">
+                          <Switch checked={diarizeOn} onCheckedChange={setDiarizeOn} />
+                          <span className="gen-toggle-text">
+                            <span className="gen-field-label">区分发言人</span>
+                            <span className="kw" style={{ fontSize: 11 }}>开启后在转写中标注不同说话人（实验功能）</span>
+                          </span>
+                        </label>
                       )}
-                      {embedFrames && !hasVisionModel && (
-                        <span className="kw" style={{ fontSize: 11, color: 'var(--mut)' }}>
-                          未检测到视觉模型，将使用纯文字总结。可在「设置 → 模型」中添加。
-                        </span>
-                      )}
-                      {(selectedNoteType === 'auto' || selectedNoteType === 'video') && embedFrames && hasVisionModel && (() => {
-                        const autoInterval = computeAutoInterval(videoDuration)
-                        const autoFrames = estimateFrames(videoDuration, autoInterval)
-                        const manualFrames = estimateFrames(videoDuration, frameInterval)
-                        return (
-                          <div className="gen-field">
-                            <span className="gen-field-label">取画面</span>
-                            <div className="gen-card-grid">
-                              <div className="gen-card" data-on={captureMode === 'auto'} onClick={() => setCaptureMode('auto')}>
-                                <div className="gen-card-head">
-                                  <Wand2 size={15} style={{ color: 'var(--wrn)' }} />
-                                  <span className="gen-card-title">智能</span>
-                                </div>
-                                <div className="kw" style={{ fontSize: 11 }}>按时长自动</div>
-                                <div className="kw" style={{ fontSize: 11, marginTop: 4 }}>
-                                  {videoDuration > 0 ? `每 ${autoInterval} 秒 · 约 ${autoFrames} 张` : '识别后显示'}
-                                </div>
-                              </div>
-                              <div className="gen-card" data-on={captureMode === 'manual'} onClick={() => setCaptureMode('manual')}>
-                                <div className="gen-card-head">
-                                  <Settings2 size={15} style={{ color: captureMode === 'manual' ? 'var(--wrn)' : 'var(--mut)' }} />
-                                  <span className="gen-card-title">手动</span>
-                                </div>
-                                <div className="kw" style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
-                                  每隔
-                                  <input
-                                    className="gen-num-input"
-                                    type="number" min={1} max={60} value={frameInterval}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onChange={(e) => setFrameInterval(Number(e.target.value) || 5)}
-                                  />
-                                  秒
-                                </div>
-                                <div className="kw" style={{ fontSize: 11, marginTop: 4 }}>
-                                  {videoDuration > 0 ? `约 ${manualFrames} 张` : '识别后显示'}
-                                </div>
-                              </div>
-                            </div>
-                            {videoDuration > 0 && (
-                              <div className="kw" style={{ fontSize: 11, color: 'var(--mut)' }}>
-                                视频时长 {formatDuration(videoDuration)} · 识别时获取
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })()}
-                      <label className="gen-toggle">
-                        <Switch checked={diarizeOn} onCheckedChange={setDiarizeOn} />
-                        <span className="gen-toggle-text">
-                          <span className="gen-field-label">区分发言人</span>
-                          <span className="kw" style={{ fontSize: 11 }}>开启后在转写中标注不同说话人（实验功能）</span>
-                        </span>
-                      </label>
                       <div className="gen-field">
                         <span className="gen-field-label">补充说明</span>
                         <Textarea
@@ -978,6 +1107,20 @@ export function AddMaterialModal({
                 </div>
               </>
             )}
+
+            <div className="modal-future-actions">
+              {[{ id: 'ai_video', label: 'AI视频', icon: <Video size={12} /> },
+                { id: 'storyboard', label: '分镜脚本', icon: <LayoutTemplate size={12} /> },
+                { id: 'rewrite', label: '二创改写', icon: <PenTool size={12} /> }].map(item => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => toast('该功能即将上线')}
+                >
+                  {item.icon} {item.label} <Lock size={10} />
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

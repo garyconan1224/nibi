@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Trash2, Plus, Inbox, Filter, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { fetchLibrary, deleteItem, batchDeleteItems, type LibraryItem, type LibraryResponse } from '@/services/library'
-import { deleteWorkspace, startItemPipeline } from '@/services/workspaces'
+import { createWorkspace, deleteWorkspace, startItemPipeline, updateWorkspace } from '@/services/workspaces'
 import { useLibraryStore, type SortBy } from '@/store/libraryStore'
 import { FilterChips } from './FilterChips'
 import { SortMenu } from './SortMenu'
@@ -84,6 +84,7 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
   const [selectedSet, setSelectedSet] = useState<Set<string>>(new Set())
   const [deleting, setDeleting] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
+  const [creatingWorkspace, setCreatingWorkspace] = useState(false)
   const [query, setQuery] = useState('')
 
   const selectedFilters = useLibraryStore((s) => s.selectedFilters)
@@ -172,7 +173,10 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
   }, [scopedItems])
 
   const collectionWorkspaces = useMemo(
-    () => scopedWorkspaces.filter((ws) => (itemsByWorkspace.get(ws.workspace_id)?.length ?? ws.items_count) > 1),
+    () => scopedWorkspaces.filter((ws) => {
+      const count = itemsByWorkspace.get(ws.workspace_id)?.length ?? ws.items_count
+      return count === 0 || count > 1
+    }),
     [scopedWorkspaces, itemsByWorkspace],
   )
 
@@ -186,7 +190,6 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
     if (!(showAll || showCollections || showRunning)) return []
     return collectionWorkspaces.filter((ws) => {
       const wsItems = itemsByWorkspace.get(ws.workspace_id) ?? []
-      if (wsItems.length === 0) return false
       if (typeFilters.length > 0 && !wsItems.some((item) => typeFilters.includes(item.type))) return false
       if (showRunning && !(ws.status === 'running' || wsItems.some(isItemGenerating))) return false
       if (!matchesQuery(normalizedQuery, [ws.name, ...wsItems.flatMap((item) => [item.name, item.source_value, item.workspace_name])])) return false
@@ -321,6 +324,32 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
     }
   }, [selectedSet, visibleItems, load])
 
+  const handleCreateCollection = useCallback(async () => {
+    if (!kind) return
+    setCreatingWorkspace(true)
+    try {
+      const name = kind === 'replica' ? '新复刻合集' : '新笔记合集'
+      await createWorkspace({ name, kind })
+      setSelectedFilters(['collection'])
+      toast.success(`已创建${kind === 'replica' ? '复刻' : '笔记'}合集`)
+      await load()
+    } catch {
+      toast.error('创建合集失败，请重试')
+    } finally {
+      setCreatingWorkspace(false)
+    }
+  }, [kind, load, setSelectedFilters])
+
+  const handleRenameWorkspace = useCallback(async (workspaceId: string, name: string) => {
+    try {
+      await updateWorkspace(workspaceId, { name })
+      toast.success(`已重命名为「${name}」`)
+      await load()
+    } catch {
+      toast.error('重命名合集失败，请重试')
+    }
+  }, [load])
+
   const chipCounts = useMemo(() => {
     if (!data) return undefined
     const standaloneItems = scopedItems.filter((item) => !collectionWorkspaceIds.has(item.workspace_id))
@@ -337,7 +366,11 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
     }
   }, [data, scopedItems, collectionWorkspaces, collectionWorkspaceIds, itemsByWorkspace])
 
-  const emptyTitle = kind === 'note' ? '暂无笔记' : kind === 'replica' ? '暂无复刻' : '暂无笔记'
+  const emptyTitle = kind === 'note'
+    ? '暂无笔记'
+    : kind === 'replica'
+      ? '暂无复刻'
+      : '暂无笔记'
   const emptyDesc = kind === 'note'
     ? '去工作台添加学习素材，或粘贴一个链接开始吧'
     : kind === 'replica'
@@ -374,19 +407,22 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
           <div className="lib-hero-actions">
             <button className="lib-cta lib-cta-primary" onClick={() => navigate('/')}>
               <Plus size={15} />
-              {kind === 'replica' ? '新建复刻' : kind === 'note' ? '导入内容' : '上传资料'}
+              {kind === 'note' || kind === 'replica' ? '导入内容' : '上传资料'}
             </button>
+            {kind && (
+              <button
+                className="lib-cta lib-cta-secondary"
+                onClick={handleCreateCollection}
+                disabled={creatingWorkspace}
+              >
+                <Plus size={15} />
+                {creatingWorkspace ? '创建中…' : '新建合集'}
+              </button>
+            )}
             <button className="lib-cta lib-cta-secondary" onClick={() => setSelectedFilters(['collection'])}>
               <Plus size={15} />
               查看合集
             </button>
-          </div>
-          <div className="lib-mini-stats" aria-label="library-stats">
-            <span>全部 {chipCounts?.all ?? 0}</span>
-            <span>视频 {chipCounts?.video ?? 0}</span>
-            <span>音频 {chipCounts?.audio ?? 0}</span>
-            <span>图片 {chipCounts?.image ?? 0}</span>
-            <span>文字 {chipCounts?.text ?? 0}</span>
           </div>
         </div>
         <div className="lib-actions">
@@ -487,6 +523,7 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
                   selected={selectedSet.has(`ws:${ws.workspace_id}`)}
                   onToggleSelect={toggleWorkspaceSelect}
                   onDelete={handleDeleteWorkspace}
+                  onRename={handleRenameWorkspace}
                 />
               ))}
               {visibleItems.map((item) => (

@@ -850,31 +850,33 @@ export default function VideoResultPage() {
   const progress = totalSec > 0 ? Math.min(1, currentSec / totalSec) : 0
 
   return (
-    <div className="nibi-video-result-scope vd-layout">
+    <div className={`nibi-video-result-scope vd-layout${!isLearning ? ' vd-layout--replica' : ''}`}>
       {/* ════════ 左：播放器 + 三轨 ════════ */}
       <div className="vd-left">
         {/* 顶部导航 */}
         <div className="vd-nav">
           <button className="btn-ghost vd-nav-btn" onClick={() => navigate(-1)}>
-            <ArrowLeft size={13} /> 任务中心
+            <ArrowLeft size={13} /> {isLearning ? '任务中心' : '复刻库'}
           </button>
           <span className="vd-sep" />
           <span className="vd-title">{result.video.title}</span>
           <span className="kw mono vd-chip">
-            VIDEO · {result.video.duration_str || formatSec(totalSec)}
+            VIDEO · {result.video.duration_str || formatSec(totalSec)} · {frames.length} 帧
           </span>
           {result.source === 'demo_fixture' && (
             <span className="mono vd-chip vd-chip--demo" title="results 尚未填充，正在使用 demo fixture">
               DEMO
             </span>
           )}
-          <button
-            className="btn-ghost vd-nav-btn vd-nav-btn--compact"
-            onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/note`)}
-            title="打开统一笔记（NoteShell）"
-          >
-            <FileText size={12} /> 统一笔记 <span className="vd-beta">beta</span>
-          </button>
+          {isLearning && (
+            <button
+              className="btn-ghost vd-nav-btn vd-nav-btn--compact"
+              onClick={() => navigate(`/workspaces/${workspaceId}/items/${itemId}/note`)}
+              title="打开统一笔记（NoteShell）"
+            >
+              <FileText size={12} /> 统一笔记 <span className="vd-beta">beta</span>
+            </button>
+          )}
           {/* 学习/复刻 toggle */}
           <div className="vd-mode-toggle">
             <button
@@ -896,7 +898,7 @@ export default function VideoResultPage() {
           <div className="vd-nav-spacer" />
           <button
             className="btn-ghost vd-nav-btn vd-nav-btn--compact"
-            onClick={() => navigate('/library?intent=replica')}
+            onClick={() => navigate('/replicas')}
             title="查看所有复刻项目"
           >
             <Copy size={12} /> 复刻项目
@@ -1005,46 +1007,49 @@ export default function VideoResultPage() {
             ))}
           </div>
 
-          {/* 视频播放器（缩小，次要位置） */}
-          {isVisualOnly ? (
-            <div className="vd-player-mini-wrap vd-player-mini-wrap--empty">
-              <span className="mono vd-muted">仅画面分析模式 · 不含视频播放</span>
-            </div>
-          ) : (
-            <div className="vd-player-mini-wrap">
-              <div className="vd-player-mini" onClick={togglePlay}>
-                {hasVideoSource ? (
-                  <video ref={videoRef} src={result.video.url} preload="metadata" />
-                ) : (
-                  <div className="vd-player-empty">
-                    {frame.title}
+          {/* 视频播放器（学习模式保留；复刻模式以帧浏览为主） */}
+          {isLearning && (
+            isVisualOnly ? (
+              <div className="vd-player-mini-wrap vd-player-mini-wrap--empty">
+                <span className="mono vd-muted">仅画面分析模式 · 不含视频播放</span>
+              </div>
+            ) : (
+              <div className="vd-player-mini-wrap">
+                <div className="vd-player-mini" onClick={togglePlay}>
+                  {hasVideoSource ? (
+                    <video ref={videoRef} src={result.video.url} preload="metadata" />
+                  ) : (
+                    <div className="vd-player-empty">
+                      {frame.title}
+                    </div>
+                  )}
+                  <div className="vd-play-btn-mini">
+                    {playing ? <Pause size={14} /> : <Play size={14} />}
                   </div>
-                )}
-                <div className="vd-play-btn-mini">
-                  {playing ? <Pause size={14} /> : <Play size={14} />}
+                  <div className="vd-progress-mini">
+                    <div className="vd-progress-mini-fill" style={{ width: `${progress * 100}%` }} />
+                  </div>
                 </div>
-                <div className="vd-progress-mini">
-                  <div className="vd-progress-mini-fill" style={{ width: `${progress * 100}%` }} />
+                <div className="vd-controls-mini">
+                  <span className="mono vd-timecode">
+                    {formatSec(currentSec)} / {formatSec(totalSec)}
+                  </span>
                 </div>
               </div>
-              <div className="vd-controls-mini">
-                <span className="mono vd-timecode">
-                  {formatSec(currentSec)} / {formatSec(totalSec)}
-                </span>
-              </div>
-            </div>
+            )
           )}
         </div>
 
-        {/* 三轨 */}
-        <TripleTrack
-          frames={frames}
-          transcript={transcript}
-          activeFrame={activeFrame}
-          currentSec={currentSec}
-          onFrameClick={(idx) => seekTo(frames[idx].sec ?? parseTsStr(frames[idx].ts ?? ''))}
-          onTranscriptClick={(l) => seekTo(l.t_sec)}
-        />
+        {isLearning && (
+          <TripleTrack
+            frames={frames}
+            transcript={transcript}
+            activeFrame={activeFrame}
+            currentSec={currentSec}
+            onFrameClick={(idx) => seekTo(frames[idx].sec ?? parseTsStr(frames[idx].ts ?? ''))}
+            onTranscriptClick={(l) => seekTo(l.t_sec)}
+          />
+        )}
       </div>
 
       {/* ════════ 右：当前帧浮动面板 ════════ */}

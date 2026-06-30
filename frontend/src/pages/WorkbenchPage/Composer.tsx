@@ -1,27 +1,17 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import {
-  Link2, Upload, Search, X, Check, Plus, Layers,
+  Link2, Upload,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import type { WorkspaceRecord } from '@/types/workspace'
 import { detectPlatform } from './platforms'
 import { normalizeMediaUrl } from '@/lib/url'
 import {
-  listWorkspaces,
-  createWorkspace,
   sniffUrl,
   ensureInbox,
   uploadWorkspaceItem,
-  removeWorkspaceItem,
 } from '@/services/workspaces'
 import type { SniffResult } from '@/services/workspaces'
-import { AddMaterialModal } from '@/components/workspace/AddMaterialModal'
-import { LinkPreviewModal } from '@/components/workspace/LinkPreviewModal'
-
-const WS_COLORS = [
-  '#22c55e', '#f59e0b', '#a855f7', '#0ea5e9',
-  '#ef4444', '#ec4899', '#14b8a6', '#eab308',
-]
+import { useAddMaterialStore } from '@/store/addMaterialStore'
 
 interface ComposerProps {
   onTaskCreated?: () => void
@@ -29,73 +19,12 @@ interface ComposerProps {
 
 export function Composer({ onTaskCreated }: ComposerProps) {
   const [url, setUrl] = useState('')
-  const [uploadOpen, setUploadOpen] = useState(false)
-
-  const [workspaces, setWorkspaces] = useState<WorkspaceRecord[]>([])
-  const [workspaceSel, setWorkspaceSel] = useState<string[]>([])
-  const [wsOpen, setWsOpen] = useState(false)
-  const [wsQuery, setWsQuery] = useState('')
   const [sniffResult, setSniffResult] = useState<SniffResult | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [previewOpen, setPreviewOpen] = useState(false)
-  const [localFile, setLocalFile] = useState<string | undefined>(undefined)
-  const [localFileName, setLocalFileName] = useState<string | undefined>(undefined)
-  const [localWsId, setLocalWsId] = useState<string | undefined>(undefined)
 
-  const popRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const sniffTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  /** 已提交标记：同步更新，避免 onOpenChange 闭包拿到旧 state 误删 item */
-  const submittedRef = useRef(false)
-
-  // Fetch workspaces on mount
-  useEffect(() => {
-    listWorkspaces().then(setWorkspaces).catch(() => {
-      toast.error('加载合集列表失败，请检查后端是否已启动')
-    })
-  }, [])
-
-  useEffect(() => {
-    if (!wsOpen) return
-    const handler = (e: MouseEvent) => {
-      if (popRef.current && !popRef.current.contains(e.target as Node)) setWsOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [wsOpen])
-
-  const wsById = useMemo(
-    () => Object.fromEntries(workspaces.map((w) => [w.workspace_id, w])),
-    [workspaces],
-  )
-
-  const wsBackgrounds = useMemo(
-    () => Object.fromEntries(workspaces.map((w) => [w.workspace_id, w.background])),
-    [workspaces],
-  )
-
-  const filteredWs = wsQuery
-    ? workspaces.filter((w) => w.name.toLowerCase().includes(wsQuery.toLowerCase()))
-    : workspaces
-
-  const toggleWs = useCallback((id: string) =>
-    setWorkspaceSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id])), [])
-
-  const removeWs = useCallback((id: string) =>
-    setWorkspaceSel((s) => s.filter((x) => x !== id)), [])
-
-  const handleNewWorkspace = useCallback(async () => {
-    const name = wsQuery.trim() || '新合集'
-    try {
-      const created = await createWorkspace({ name })
-      setWorkspaces((prev) => [...prev, created])
-      setWorkspaceSel((s) => [...s, created.workspace_id])
-      setWsQuery('')
-      toast.success(`合集「${name}」已创建`)
-    } catch {
-      toast.error('创建合集失败')
-    }
-  }, [wsQuery])
+  const openAddMaterial = useAddMaterialStore((state) => state.openAddMaterial)
 
   const normalizedUrl = useMemo(() => normalizeMediaUrl(url), [url])
   const platform = detectPlatform(normalizedUrl || url)
@@ -121,19 +50,17 @@ export function Composer({ onTaskCreated }: ComposerProps) {
   }, [normalizedUrl])
 
   const handleAdd = () => {
-    if (!url.trim()) return
-    // text 类型直接进添加素材弹窗（跳过预览，减少步骤）
-    setUploadOpen(true)
-  }
-
-  const handlePreviewConfirm = () => {
-    setPreviewOpen(false)
-    setUploadOpen(true)
-  }
-
-  const handlePreviewFallback = () => {
-    setPreviewOpen(false)
-    setUploadOpen(true)
+    const nextUrl = normalizedUrl || url.trim()
+    if (!nextUrl) return
+    openAddMaterial({
+      urlValue: nextUrl,
+      sniffResult,
+      onAdded: () => {
+        setUrl('')
+        setSniffResult(null)
+        onTaskCreated?.()
+      },
+    })
   }
 
   const handleUploadClick = () => {
@@ -152,12 +79,12 @@ export function Composer({ onTaskCreated }: ComposerProps) {
       })
       const item = updated.items[updated.items.length - 1]
       const itemId = item.item_id
-      // 暂存上传结果，打开 AddMaterialModal 让用户配置
-      submittedRef.current = false
-      setLocalFile(itemId)
-      setLocalFileName(file.name)
-      setLocalWsId(ws.workspace_id)
-      setUploadOpen(true)
+      openAddMaterial({
+        localFile: itemId,
+        localFileName: file.name,
+        localWsId: ws.workspace_id,
+        onAdded: onTaskCreated,
+      })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '上传失败'
       toast.error(`文件上传失败: ${msg}`)
@@ -166,20 +93,6 @@ export function Composer({ onTaskCreated }: ComposerProps) {
       // 重置 file input，允许再次选同一个文件
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
-  }
-
-  const handleAdded = () => {
-    submittedRef.current = true
-    setUploadOpen(false)
-    setUrl('')
-    // 清理本地文件标记，避免 onOpenChange 的 cleanup 误删已启动的 item
-    setLocalFile(undefined)
-    setLocalFileName(undefined)
-    setLocalWsId(undefined)
-    listWorkspaces().then(setWorkspaces).catch(() => {
-      toast.error('刷新合集列表失败')
-    })
-    onTaskCreated?.()
   }
 
   return (
@@ -224,114 +137,6 @@ export function Composer({ onTaskCreated }: ComposerProps) {
           />
         </div>
 
-        {/* Row 2 — 合集 */}
-        <div className="composer-projects">
-          <span className="pp-label">归入合集</span>
-
-          {workspaceSel.length === 0 && <span className="pp-none">提交时自动创建</span>}
-
-          {workspaceSel.map((id) => {
-            const ws = wsById[id]
-            if (!ws) return null
-            const color = WS_COLORS[Math.abs(id.charCodeAt(0)) % WS_COLORS.length]
-            return (
-              <span key={id} className="pp-chip">
-                <span className="pp-dot" style={{ background: color }} />
-                {ws.name}
-                <button className="pp-x" onClick={() => removeWs(id)} title="移除">
-                  <X size={11} />
-                </button>
-              </span>
-            )
-          })}
-
-          <button className="pp-add" onClick={() => setWsOpen((o) => !o)}>
-            <Layers size={11} />
-            {workspaceSel.length ? '继续添加' : '选择合集'}
-          </button>
-
-          {wsOpen && (
-            <div className="pp-popover" ref={popRef}>
-              <div className="pp-search">
-                <Search size={14} />
-                <input
-                  autoFocus
-                  placeholder="搜索合集..."
-                  value={wsQuery}
-                  onChange={(e) => setWsQuery(e.target.value)}
-                />
-                {workspaceSel.length > 0 && (
-                  <button
-                    className="btn btn-ghost"
-                    onClick={() => setWorkspaceSel([])}
-                    style={{ height: 24, padding: '0 8px', fontSize: 11 }}
-                  >
-                    清空
-                  </button>
-                )}
-              </div>
-
-              <div className="pp-list">
-                {filteredWs.length === 0 && (
-                  <div
-                    style={{
-                      padding: '18px 12px',
-                      textAlign: 'center',
-                      fontSize: 12,
-                      color: 'var(--ink-4)',
-                      fontFamily: 'var(--fm)',
-                    }}
-                  >
-                    无匹配合集
-                  </div>
-                )}
-                {filteredWs.map((ws) => {
-                  const on = workspaceSel.includes(ws.workspace_id)
-                  const color = WS_COLORS[Math.abs(ws.workspace_id.charCodeAt(0)) % WS_COLORS.length]
-                  return (
-                    <div
-                      key={ws.workspace_id}
-                      className="pp-row"
-                      data-on={on}
-                      onClick={() => toggleWs(ws.workspace_id)}
-                    >
-                      <span className="pp-check">
-                        <Check size={11} strokeWidth={3} />
-                      </span>
-                      <span
-                        style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: 99,
-                          background: color,
-                          flexShrink: 0,
-                        }}
-                      />
-                      <div style={{ minWidth: 0 }}>
-                        <div className="pp-name">{ws.name}</div>
-                      </div>
-                      <span className="pp-count">{ws.items.length} 项</span>
-                    </div>
-                  )
-                })}
-              </div>
-
-              <div className="pp-foot">
-                <button
-                  className="pp-new"
-                  onClick={handleNewWorkspace}
-                >
-                  <Plus size={11} />
-                  新建合集{wsQuery ? ` "${wsQuery}"` : ''}
-                </button>
-                <button className="pp-done" onClick={() => setWsOpen(false)}>
-                  完成
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* Run row — 对齐设计稿 cp-actions */}
         <div className="composer-run">
           <button className="cp-submit" onClick={handleAdd} disabled={!url.trim()}>
@@ -340,39 +145,6 @@ export function Composer({ onTaskCreated }: ComposerProps) {
         </div>
       </div>
 
-      {/* Link preview modal */}
-      <LinkPreviewModal
-        open={previewOpen}
-        url={normalizedUrl || url}
-        onConfirm={handlePreviewConfirm}
-        onFallback={handlePreviewFallback}
-        onCancel={() => setPreviewOpen(false)}
-      />
-
-      {/* Upload modal — 链接和本地文件统一走此弹窗 */}
-      <AddMaterialModal
-        open={uploadOpen}
-        onOpenChange={(open) => {
-          setUploadOpen(open)
-          if (!open && !submittedRef.current && localFile && localWsId) {
-            removeWorkspaceItem(localWsId, localFile).catch(() => {})
-          }
-          if (!open) {
-            setLocalFile(undefined)
-            setLocalFileName(undefined)
-            setLocalWsId(undefined)
-          }
-        }}
-        workspaceIds={workspaceSel}
-        workspaceBackgrounds={wsBackgrounds}
-        workspaceKind={workspaceSel[0] ? wsById[workspaceSel[0]]?.kind : undefined}
-        sniffResult={sniffResult}
-        urlValue={normalizedUrl || undefined}
-        onAdded={handleAdded}
-        localFile={localFile}
-        localFileName={localFileName}
-        localWsId={localWsId}
-      />
     </div>
   )
 }

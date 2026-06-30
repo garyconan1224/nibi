@@ -11,9 +11,9 @@
  *   - NoteEditor：轻量 CodeMirror 编辑器（注册到 lnEditorStore，复用截图插入能力）
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Bold, BookOpenCheck, Brain, Camera, Check, ChevronDown, ChevronRight, Download, FileCode, FileDown, FileText, FileType, Image, List, Minus, Pencil, Plus, Presentation, Sparkles, Subtitles, Trash2, Type } from 'lucide-react'
+import { ArrowLeft, Bold, BookOpenCheck, Brain, Camera, Check, ChevronDown, ChevronRight, Download, FileDown, FileText, FileType, Image, List, MessageCircle, Minus, Pause, Pencil, Play, Plus, Presentation, Sparkles, Subtitles, Trash2, Type, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { downloadSubtitles, exportItemNoteObsidian, getItemNote, putItemNote } from '@/services/workspaces'
@@ -32,7 +32,6 @@ import '@/pages/results/LearningNotesPage/learning-notes.css'
 import './note-shell.css'
 import { NewSummaryModal } from '@/components/NewSummaryModal'
 import NoteChatDrawer from '@/components/NoteChatDrawer'
-import { SourceMdModal } from './SourceMdModal'
 import { FloatingAskAi } from './FloatingAskAi'
 import { useLnEditorStore } from '@/store/lnEditorStore'
 
@@ -260,7 +259,7 @@ function SourcePanel({ sourceMd, open: controlledOpen, onToggle }: SourcePanelPr
         }}
       >
         {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        Source（原始依据）
+        原文
       </button>
       {open && (
         <div style={{ padding: '0 20px 16px', fontSize: 13, lineHeight: 1.7, color: 'var(--mut)' }}>
@@ -285,6 +284,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [chatOpen] = useState(false)
+  const [askAiOpen, setAskAiOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   // VN4.3 AI 工具下拉
   const [aiToolsOpen, setAiToolsOpen] = useState(false)
@@ -320,6 +320,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const [pipSizeIndex, setPipSizeIndex] = useState(1)
   const [pipPosition, setPipPosition] = useState<{ x: number; y: number } | null>(null)
   const [pipDragging, setPipDragging] = useState(false)
+  const [pipPlaying, setPipPlaying] = useState(false)
   const [noteLeftPct, setNoteLeftPct] = useState(() => {
     if (typeof window === 'undefined') return VIDEO_SPLIT_DEFAULT
     const storedRaw = window.localStorage.getItem(VIDEO_SPLIT_STORAGE_KEY)
@@ -330,6 +331,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const [transportNode, setTransportNode] = useState<ReactNode>(null)
   const handleTransportChange = useCallback(() => {
     setTransportNode(videoRef.current?.transportNode ?? null)
+    setPipPlaying(videoRef.current?.isPlaying ?? false)
   }, [])
   const handleVideoDurationChange = useCallback((duration: number) => setVideoDuration(duration), [])
 
@@ -342,7 +344,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   }, [])
   const handleAudioDurationChange = useCallback((d: number) => setAudioDuration(d), [])
 
-  const [sourceModalOpen, setSourceModalOpen] = useState(false)
   const [activeSummaryId, setActiveSummaryId] = useState<string | undefined>(undefined)
   // VN4.1 版本下拉 + 风格/版本两层
   const [summaries, setSummaries] = useState<ItemSummary[]>([])
@@ -405,7 +406,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
 
   useEffect(() => {
     if (!isPip || typeof window === 'undefined') return
-    const estimatedHeight = Math.round((pipWidth * 9) / 16 + 118)
+    const estimatedHeight = Math.round((pipWidth * 9) / 16 + 86)
     setPipPosition((current) => {
       const next = current ?? {
         x: Math.max(12, window.innerWidth - pipWidth - 24),
@@ -522,6 +523,18 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const handlePipScreenshot = useCallback(() => {
     videoRef.current?.captureScreenshot()
   }, [])
+
+  const handlePipTogglePlay = useCallback(() => {
+    videoRef.current?.togglePlay()
+    setPipPlaying(videoRef.current?.isPlaying ?? false)
+  }, [])
+
+  const handlePipProgressClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    if (!videoDuration) return
+    const rect = event.currentTarget.getBoundingClientRect()
+    const pct = clampNumber((event.clientX - rect.left) / rect.width, 0, 1)
+    videoRef.current?.seekTo(pct * videoDuration)
+  }, [videoDuration])
 
   // 点击外部关闭模板下拉
   useEffect(() => {
@@ -928,13 +941,20 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                         </div>
                       )
                     })}
-                    <div style={{ height: 1, background: 'var(--bdr)', margin: '4px 0' }} />
-                    <button className="btn-ghost" onClick={() => { if (!creatingSummary) { setShowNewSummaryModal(true); setTemplateDropOpen(false) } }} disabled={creatingSummary} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12, ...(creatingSummary ? { color: 'var(--accent)', opacity: 0.7 } : undefined) }}>{creatingSummary ? '生成中…' : '+ 新建总结…'}</button>
                   </div>
                 )}
               </div>
             )
           })()}
+          <button
+            className="nibi-note-bar-btn nibi-note-bar-btn--label nibi-note-bar-btn--accent"
+            onClick={() => setShowNewSummaryModal(true)}
+            disabled={creatingSummary}
+            title="新建总结"
+          >
+            <Plus size={14} />
+            {creatingSummary ? '生成中…' : '新建总结'}
+          </button>
           <div style={{ position: 'relative' }} ref={editorPrefsRef}>
             <button className="nibi-note-bar-btn nibi-note-bar-btn--label" onClick={() => setEditorPrefsOpen((value) => !value)} title="正文设置">
               <Type size={14} /> Aa 设置<ChevronDown size={11} />
@@ -1036,9 +1056,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
           {sourceUrl && (
             <a className="nibi-note-bar-btn" href={sourceUrl} target="_blank" rel="noreferrer" title="原链接">↗</a>
           )}
-          {note.source_md && (
-            <button className="nibi-note-bar-btn" onClick={() => setSourceModalOpen(true)} title="源 md"><FileCode size={14} /></button>
-          )}
           <div style={{ position: 'relative' }} ref={exportDropRef}>
             <button className="nibi-note-bar-btn nibi-note-bar-btn--label" onClick={() => setExportOpen((v) => !v)} title="导出"><Download size={14} /> 导出<ChevronDown size={11} /></button>
             {exportOpen && (
@@ -1065,7 +1082,18 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
             <button className="nibi-note-bar-btn nibi-note-bar-btn--label nibi-note-bar-btn--accent" onClick={() => setAiToolsOpen((v) => !v)} title="AI 工具"><Brain size={14} /> AI 工具<ChevronDown size={11} /></button>
             {aiToolsOpen && (
               <div style={{ position: 'absolute', right: 0, top: 34, zIndex: 20, minWidth: 180, padding: '4px', border: '1px solid var(--bdr)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', boxShadow: 'var(--shadow-md)' }}>
-                <button className="btn-ghost" disabled title="即将上线" style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12, color: 'var(--mut)', cursor: 'not-allowed' }}>敬请期待</button>
+                <button
+                  className="btn-ghost"
+                  onClick={() => {
+                    setAskAiOpen(true)
+                    setAiToolsOpen(false)
+                  }}
+                  style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
+                >
+                  <MessageCircle size={13} />
+                  问 AI
+                </button>
+                <button className="btn-ghost" disabled title="即将上线" style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12, color: 'var(--mut)', cursor: 'not-allowed' }}>更多 AI 工具</button>
               </div>
             )}
           </div>
@@ -1089,14 +1117,11 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 <div className="note-pip-head" onPointerDown={handlePipHeaderPointerDown}>
                   <span className="note-pip-badge">画中画</span>
                   <div className="note-pip-head-actions">
-                    <button className="note-pip-head-btn" onClick={handlePipScreenshot} title="截取当前帧">
-                      <Camera size={13} />
-                    </button>
                     <button className="note-pip-head-btn" onClick={cyclePipSize} title="切换尺寸">
                       {['小', '中', '大'][pipSizeIndex]}
                     </button>
                     <button className="note-pip-head-btn note-pip-head-btn--danger" onClick={closePip} title="关闭画中画">
-                      关闭
+                      <X size={13} />
                     </button>
                   </div>
                 </div>
@@ -1111,14 +1136,26 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                   onTimeUpdate={handleTimeUpdate}
                   onDurationChange={handleVideoDurationChange}
                   markers={videoFrames}
-                  subtitle={videoSubtitle}
                   renderTransportInline={false}
                   onTransportChange={handleTransportChange}
                   isPipActive={isPip}
                   onTogglePip={togglePip}
+                  subtitle={isPip ? undefined : videoSubtitle}
                 />
               </div>
-              {isPip && <div className="note-pip-transport">{transportNode}</div>}
+              {isPip && (
+                <div className="note-pip-simple-controls">
+                  <button className="note-pip-control-btn note-pip-control-btn--play" onClick={handlePipTogglePlay} title={pipPlaying ? '暂停' : '播放'}>
+                    {pipPlaying ? <Pause size={14} /> : <Play size={14} fill="currentColor" />}
+                  </button>
+                  <div className="note-pip-simple-progress" onClick={handlePipProgressClick} title={`${formatTimecode(currentTime)} / ${formatTimecode(videoDuration)}`}>
+                    <span style={{ width: `${videoDuration ? Math.min(100, Math.max(0, (currentTime / videoDuration) * 100)) : 0}%` }} />
+                  </div>
+                  <button className="note-pip-control-btn" onClick={handlePipScreenshot} title="截取当前帧">
+                    <Camera size={14} />
+                  </button>
+                </div>
+              )}
             </div>
             {/* 控制条 + 时间线（在 player-wrap 外，避免 overflow:hidden 截断） */}
             {!isPip && transportNode}
@@ -1609,15 +1646,10 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
           workspaceId={workspaceId}
           systemPrompt={chatSystemPrompt}
           scopeHint="仅基于当前 note.md 与转录上下文回答"
+          open={askAiOpen}
+          onOpenChange={setAskAiOpen}
         />
       )}
-
-      {/* 源 md 悬浮框（点4：仿 TranscriptPreviewModal） */}
-      <SourceMdModal
-        open={sourceModalOpen}
-        sourceMd={note.source_md ?? ''}
-        onClose={() => setSourceModalOpen(false)}
-      />
 
       {/* VN4.3 新建/重新生成总结弹窗（从 AI 工具菜单触发） */}
       {showNewSummaryModal && (

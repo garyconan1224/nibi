@@ -42,7 +42,9 @@ interface LNVideoPanelProps {
 
 export interface LNVideoPanelHandle {
   seekTo: (sec: number) => void
+  togglePlay: () => void
   captureScreenshot: () => void
+  readonly isPlaying: boolean
   /** 控制条和时间线的 JSX（由父组件渲染在 player-wrap 外部，避免 overflow:hidden 截断） */
   transportNode: React.ReactNode
 }
@@ -461,6 +463,10 @@ const LNVideoPanel = forwardRef<LNVideoPanelHandle, LNVideoPanelProps>(
       },
       captureScreenshot() {
         void handleScreenshot()
+      },
+      togglePlay,
+      get isPlaying() {
+        return playing
       },
       get transportNode() {
         return renderTransportNode()

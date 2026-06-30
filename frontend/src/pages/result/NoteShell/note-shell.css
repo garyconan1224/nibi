@@ -793,61 +793,61 @@
   border-color: rgba(255, 138, 54, 0.45);
 }
 
-.note-pip-transport {
-  background: var(--srf, #fff);
-  border-top: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+.note-pip-simple-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px 8px;
+  background: rgba(10, 10, 10, 0.92);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.note-pip-transport .note-controls {
-  padding: 6px 8px;
-  gap: 4px;
-}
-
-.note-pip-transport .note-transport {
-  gap: 2px;
-}
-
-.note-pip-transport .note-icon-btn {
+.note-pip-control-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 26px;
   height: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
 }
 
-.note-pip-transport .note-icon-btn svg {
-  width: 13px;
-  height: 13px;
+.note-pip-control-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
-.note-pip-transport .note-speed {
-  padding: 3px 6px;
-  font-size: 10px;
+.note-pip-control-btn--play {
+  background: var(--acc, #ff8a36);
+  border-color: var(--acc, #ff8a36);
+  color: var(--accfg, #fff);
 }
 
-.note-pip-transport .note-audio:hover .note-volume-slider,
-.note-pip-transport .note-volume-slider {
-  width: 42px;
-  opacity: 1;
+.note-pip-simple-progress {
+  position: relative;
+  flex: 1;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.24);
+  cursor: pointer;
+  overflow: hidden;
 }
 
-.note-pip-transport .note-timeline {
-  padding: 8px 8px 10px;
-  gap: 6px;
-  border-bottom: 0;
+.note-pip-simple-progress::before {
+  content: "";
+  position: absolute;
+  inset: -7px 0;
 }
 
-.note-pip-transport .note-time {
-  font-size: 10px;
-}
-
-.note-pip-transport .note-timeline-actions {
-  gap: 2px;
-}
-
-.note-pip-transport .note-progress {
-  height: 4px;
-}
-
-.note-pip-transport .note-progress::before {
-  inset: -6px 0;
+.note-pip-simple-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--acc, #ff8a36);
 }
 
 .nibi-note-splitter {
