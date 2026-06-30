@@ -64,6 +64,7 @@ from backend.app.services.note_assembler import (
     normalize_transcript,
     note_dir,
 )
+from backend.app.services.note_exporter import build_note_export_response
 from backend.app.services.summary_generator import generate_summary
 from backend.app.services.summary_templates import list_template_ids
 from backend.app.services.video_result_demo import build_demo_video_result
@@ -3953,9 +3954,7 @@ def update_item_note(workspace_id: str, item_id: str, req: NoteUpdateRequest) ->
 
 @router.get("/{workspace_id}/items/{item_id}/note/export")
 def export_item_note(workspace_id: str, item_id: str, format: str = "obsidian") -> StreamingResponse:
-    """R4.3: 导出单素材 NoteShell 笔记为 Obsidian zip。"""
-    if format != "obsidian":
-        raise HTTPException(status_code=400, detail=f"unsupported format: {format!r}; use obsidian")
+    """导出单素材 NoteShell 笔记。"""
 
     rec = _store.get(workspace_id)
     if rec is None:
@@ -3979,37 +3978,15 @@ def export_item_note(workspace_id: str, item_id: str, format: str = "obsidian") 
         raise HTTPException(status_code=404, detail="note not generated")
 
     note_md = note_path.read_text(encoding="utf-8")
-    body = note_md
-    if note_md.startswith("---\n"):
-        parts = note_md.split("---\n", 2)
-        if len(parts) >= 3:
-            body = parts[2].lstrip()
-
-    title = item.name or item_id
-    h1 = re.search(r"^#\s+(.+)$", body, re.MULTILINE)
-    if h1:
-        title = h1.group(1).strip()
-    safe_title = re.sub(r'[/\\:*?"<>|]+', "_", title).strip("._ ") or "note"
-
-    exported_md = f"""---
-title: {title}
-source: {item.source_value or workspace_id}
-workspace_id: {workspace_id}
-item_id: {item_id}
-tags: [nibi, noteshell]
----
-
-{body}"""
-
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr(f"{safe_title}.md", exported_md)
-    buf.seek(0)
-    filename = f"{safe_title}-obsidian.zip"
-    return StreamingResponse(
-        buf,
-        media_type="application/zip",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
+    source_path = nd / "source.md"
+    source_md = source_path.read_text(encoding="utf-8") if source_path.exists() else ""
+    return build_note_export_response(
+        workspace_id=workspace_id,
+        item_id=item_id,
+        item=item,
+        note_md=note_md,
+        source_md=source_md,
+        format=format,
     )
 
 

@@ -918,3 +918,39 @@ export async function exportItemNoteObsidian(
   })
   return res.data as Blob
 }
+
+export type ItemNoteExportFormat =
+  | 'md'
+  | 'html'
+  | 'pdf'
+  | 'docx'
+  | 'long_image'
+  | 'pptx'
+  | 'obsidian'
+
+/** GET /workspaces/{id}/items/{itemId}/note/export?format=... */
+export async function downloadItemNoteExport(
+  workspaceId: string,
+  itemId: string,
+  format: ItemNoteExportFormat,
+  fallbackFilename: string,
+): Promise<void> {
+  const res = await http.get(`${BASE}/${workspaceId}/items/${itemId}/note/export`, {
+    params: { format },
+    responseType: 'blob',
+  })
+  const disposition = res.headers['content-disposition'] as string | undefined
+  let filename = fallbackFilename
+  if (disposition) {
+    const match = disposition.match(/filename\*=(?:UTF-8''|")?([^";]+)/i)
+    if (match) filename = decodeURIComponent(match[1])
+  }
+  const url = URL.createObjectURL(res.data as Blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}

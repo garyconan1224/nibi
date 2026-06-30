@@ -3,6 +3,7 @@
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  position: relative;
   background:
     radial-gradient(circle at 92% 8%, rgba(255, 138, 54, 0.10), transparent 28%),
     linear-gradient(180deg, #fbf8f3 0%, #f7f3ec 100%);
@@ -607,6 +608,336 @@
   gap: 6px;
 }
 
+.nibi-note-version-menu {
+  position: absolute;
+  right: 0;
+  top: 34px;
+  z-index: 28;
+  width: 320px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  border-radius: 12px;
+  background: var(--bg, #fff);
+  box-shadow: var(--shadow-md);
+}
+
+.nibi-note-version-main,
+.nibi-note-version-choice {
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg2, #3d3929);
+  cursor: pointer;
+  text-align: left;
+}
+
+.nibi-note-version-main:hover,
+.nibi-note-version-choice:hover,
+.nibi-note-version-main.is-active,
+.nibi-note-version-choice.is-active {
+  background: var(--accl, rgba(255, 138, 54, 0.12));
+  color: var(--acc, #ff8a36);
+}
+
+.nibi-note-version-main span,
+.nibi-note-version-choice span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nibi-note-version-main strong,
+.nibi-note-version-choice strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.nibi-note-version-main small,
+.nibi-note-version-choice small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mut, #7c7464);
+  font-size: 10px;
+}
+
+.nibi-note-version-divider {
+  height: 1px;
+  margin: 5px 0;
+  background: var(--bdr, rgba(25, 20, 16, 0.08));
+}
+
+.nibi-note-version-empty {
+  padding: 10px;
+  color: var(--mut, #7c7464);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.nibi-note-version-group {
+  padding: 6px 8px 3px;
+  color: var(--mut, #7c7464);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.nibi-note-version-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.nibi-note-version-row input {
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--acc, #ff8a36);
+  border-radius: 8px;
+  background: var(--bg, #fff);
+  color: var(--fg, #191410);
+  outline: none;
+}
+
+.nibi-note-version-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.nibi-note-version-actions button {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--mut, #7c7464);
+  cursor: pointer;
+}
+
+.nibi-note-version-actions button:hover {
+  background: var(--bgalt, #f7f3ec);
+  color: var(--fg, #191410);
+}
+
+.nibi-note-immersive {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg, #fbf8f3);
+}
+
+.nibi-note-immersive-bar {
+  height: 48px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  background: var(--srf, #fff);
+}
+
+.nibi-note-immersive-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg, #191410);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.nibi-note-immersive-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  overflow: hidden;
+}
+
+.nibi-note-immersive-scroll {
+  min-width: 0;
+  overflow-y: auto;
+  padding: 28px clamp(24px, 7vw, 92px) 72px;
+}
+
+.nibi-note-source-banner {
+  min-height: 86px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 0 auto 34px;
+  max-width: 960px;
+  padding: 18px 22px;
+  border-radius: 12px;
+  color: #fff;
+  background:
+    linear-gradient(90deg, rgba(17, 24, 39, 0.98), rgba(80, 84, 92, 0.9)),
+    var(--fg, #191410);
+  box-shadow: 0 18px 42px rgba(25, 20, 16, 0.14);
+}
+
+.nibi-note-source-banner-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.nibi-note-source-banner-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+}
+
+.nibi-note-source-banner-copy span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+}
+
+.nibi-note-source-banner a {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.nibi-note-immersive-article {
+  max-width: 860px;
+  margin: 0 auto;
+  color: var(--fg2, #3d3929);
+  font-size: 16px;
+  line-height: 1.85;
+}
+
+.nibi-note-immersive-article > h1 {
+  margin: 0 0 30px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  color: var(--fg, #191410);
+  font-family: var(--fd, var(--font-display, inherit));
+  font-size: 30px;
+  line-height: 1.18;
+}
+
+.nibi-note-immersive-article h2 {
+  scroll-margin-top: 24px;
+  margin: 34px 0 14px;
+  color: var(--fg, #191410);
+  font-family: var(--fd, var(--font-display, inherit));
+  font-size: 24px;
+  line-height: 1.25;
+}
+
+.nibi-note-immersive-article h3 {
+  scroll-margin-top: 24px;
+  margin: 26px 0 10px;
+  color: var(--fg, #191410);
+  font-size: 18px;
+}
+
+.nibi-note-immersive-article img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 18px auto;
+  border-radius: 10px;
+  box-shadow: 0 14px 34px rgba(25, 20, 16, 0.14);
+}
+
+.nibi-note-immersive-article blockquote {
+  margin: 22px 0;
+  padding: 14px 18px;
+  border-left: 4px solid var(--acc, #ff8a36);
+  border-radius: 0 8px 8px 0;
+  background: var(--accl, rgba(255, 138, 54, 0.12));
+}
+
+.nibi-note-immersive-article table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 14px;
+}
+
+.nibi-note-immersive-article th,
+.nibi-note-immersive-article td {
+  border: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  padding: 8px 10px;
+  vertical-align: top;
+}
+
+.nibi-note-immersive-toc {
+  min-width: 0;
+  overflow-y: auto;
+  padding: 42px 18px;
+  border-left: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  background: rgba(255, 255, 255, 0.54);
+}
+
+.nibi-note-immersive-toc .sm-toc {
+  position: sticky;
+  top: 18px;
+}
+
+.nibi-note-immersive-toc .sm-toc-title {
+  margin-bottom: 12px;
+  color: var(--fg, #191410);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.nibi-note-immersive-toc .sm-toc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nibi-note-immersive-toc .sm-toc-item a {
+  display: block;
+  color: var(--mut, #7c7464);
+  font-size: 12px;
+  line-height: 1.45;
+  text-decoration: none;
+}
+
+.nibi-note-immersive-toc .sm-toc-h3 {
+  padding-left: 12px;
+}
+
+.nibi-note-immersive-toc .sm-toc-item[data-active] a,
+.nibi-note-immersive-toc .sm-toc-item a:hover {
+  color: var(--acc, #ff8a36);
+  font-weight: 800;
+}
+
 /* ── 两栏布局：.note-page（设计稿 .note-page） ── */
 .nibi-note-page {
   --note-left-width: 60%;
@@ -907,6 +1238,8 @@
   flex-direction: column;
   overflow: hidden;
   background: var(--bg, #fbf8f3);
+  container-type: inline-size;
+  container-name: note-right;
 }
 
 .nibi-note-right-scroll {
@@ -920,6 +1253,68 @@
   scrollbar-width: thin;
   scrollbar-color: color-mix(in oklch, var(--bdr, rgba(25, 20, 16, 0.08)) 72%, var(--bg, #fbf8f3)) transparent;
   padding: 20px;
+}
+
+.nibi-note-right-scroll.has-toc {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(132px, 0.34fr);
+  align-items: start;
+  gap: 18px;
+}
+
+.nibi-note-inline-toc {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  max-height: calc(100vh - 104px);
+  overflow: auto;
+  padding: 2px 0 2px 14px;
+  border-left: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  color: var(--mut, #8f877b);
+}
+
+.nibi-note-inline-toc .sm-toc-title {
+  margin: 0 0 10px;
+  color: var(--fg, #191410);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.nibi-note-inline-toc .sm-toc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nibi-note-inline-toc .sm-toc-item a {
+  display: block;
+  color: inherit;
+  font-size: 11px;
+  line-height: 1.45;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.nibi-note-inline-toc .sm-toc-h3 {
+  padding-left: 10px;
+}
+
+.nibi-note-inline-toc .sm-toc-item[data-active] a,
+.nibi-note-inline-toc .sm-toc-item a:hover {
+  color: var(--acc, #ff8a36);
+}
+
+@container note-right (max-width: 440px) {
+  .nibi-note-right-scroll.has-toc {
+    display: block;
+  }
+
+  .nibi-note-inline-toc {
+    display: none;
+  }
 }
 
 .nibi-note-right-scroll::-webkit-scrollbar {
@@ -1825,6 +2220,26 @@
   .nibi-note-right {
     flex: 1 1 auto;
     width: 100%;
+  }
+
+  .nibi-note-right-scroll.has-toc {
+    display: block;
+  }
+
+  .nibi-note-inline-toc {
+    display: none;
+  }
+
+  .nibi-note-immersive-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .nibi-note-immersive-toc {
+    display: none;
+  }
+
+  .nibi-note-immersive-scroll {
+    padding: 20px 18px 56px;
   }
 
   .nibi-note-bar {

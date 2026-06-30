@@ -1,22 +1,32 @@
 import { X, FileCode } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import { toast } from 'sonner'
 
 interface SourceMdModalProps {
   open: boolean
   sourceMd: string
   onClose: () => void
+  onDownload?: () => void
 }
 
 /**
  * 源 md 悬浮框 — 仿 TranscriptPreviewModal 结构。
  * position:fixed 遮罩 + 居中卡片 + 可滚动源码。
  */
-export function SourceMdModal({ open, sourceMd, onClose }: SourceMdModalProps) {
+export function SourceMdModal({ open, sourceMd, onClose, onDownload }: SourceMdModalProps) {
   if (!open) return null
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard?.writeText(sourceMd)
+      toast.success('已复制源 md')
+    } catch {
+      toast.error('复制失败，请手动复制')
+    }
+  }
 
   return (
     <div
+      className="nibi-source-md-modal"
       style={{
         position: 'fixed',
         inset: 0,
@@ -74,31 +84,62 @@ export function SourceMdModal({ open, sourceMd, onClose }: SourceMdModalProps) {
           </button>
         </div>
 
-        {/* Body：渲染 markdown，让 ![]() 显示成图（不再是 raw 源码）*/}
         <div
           className="source-md-body"
           style={{
             flex: 1,
             overflow: 'auto',
             padding: '14px 18px',
-            fontSize: 13,
-            lineHeight: 1.7,
+            fontSize: 12,
+            lineHeight: 1.65,
             color: 'var(--fg2)',
           }}
         >
-          <style>{`.source-md-body img { max-width: 100%; height: auto; border-radius: 8px; display: block; margin: 8px 0; }`}</style>
-          <ReactMarkdown remarkPlugins={[remarkGfm as any]}>{sourceMd}</ReactMarkdown>
+          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--fm, monospace)' }}>
+            {sourceMd}
+          </pre>
         </div>
 
         {/* Footer */}
         <div
           style={{
             display: 'flex',
-            justifyContent: 'flex-end',
+            justifyContent: 'space-between',
+            gap: 8,
             padding: '12px 18px',
             borderTop: '1px solid var(--bdr)',
           }}
         >
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={handleCopy}
+              style={{
+                padding: '8px 12px',
+                borderRadius: 8,
+                border: '1px solid var(--bdr)',
+                background: 'var(--bg)',
+                cursor: 'pointer',
+                fontSize: 13,
+              }}
+            >
+              复制
+            </button>
+            {onDownload && (
+              <button
+                onClick={onDownload}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  border: '1px solid var(--bdr)',
+                  background: 'var(--bg)',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                }}
+              >
+                下载 .md
+              </button>
+            )}
+          </div>
           <button
             onClick={onClose}
             style={{

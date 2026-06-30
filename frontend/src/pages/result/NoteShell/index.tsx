@@ -13,14 +13,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Bold, BookOpenCheck, Brain, Camera, Check, ChevronDown, ChevronRight, Download, FileDown, FileText, FileType, Image, List, MessageCircle, Minus, Pause, Pencil, Play, Plus, Presentation, Sparkles, Subtitles, Trash2, Type, X } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { ArrowLeft, Bold, BookOpenCheck, Brain, Camera, Check, ChevronDown, ChevronRight, Download, ExternalLink, FileDown, FileText, FileType, Image, List, MessageCircle, Minus, Pause, Pencil, Play, Plus, Presentation, Sparkles, Subtitles, Trash2, Type, X } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { downloadSubtitles, exportItemNoteObsidian, getItemNote, putItemNote } from '@/services/workspaces'
+import { downloadItemNoteExport, exportItemNoteObsidian, getItemNote, putItemNote, type ItemNoteExportFormat } from '@/services/workspaces'
 import type { VideoResultTranscriptLine } from '@/services/workspaces'
 import type { ItemNote } from '@/types/workspace'
 import { createSummary, deleteSummary, listSummaries, renameSummary, type ItemSummary } from '@/services/summaries'
-import { platformLabelFromUrl } from './note-shell-utils'
+import { MarkdownToc, extractToc, flattenText, slugify } from '@/components/MarkdownToc'
+import { platformLabelFromUrl, renderNoteTimestampChildren } from './note-shell-utils'
 import { Badge } from '@/components/ui/badge'
 import { SYSTEM_TAG_DIMENSIONS } from '@/constants/tagDimensions'
 import NoteMediaCompanion, { type NoteMediaCompanionHandle } from './NoteMediaCompanion'
@@ -34,6 +37,11 @@ import { NewSummaryModal } from '@/components/NewSummaryModal'
 import NoteChatDrawer from '@/components/NoteChatDrawer'
 import { FloatingAskAi } from './FloatingAskAi'
 import { useLnEditorStore } from '@/store/lnEditorStore'
+import { SourceMdModal } from './SourceMdModal'
+
+// remarkGfm 类型与 react-markdown 不完全兼容，统一 cast 一次
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const remarkPlugins: any[] = [remarkGfm]
 
 /* ────────────────── helpers ────────────────── */
 
@@ -135,6 +143,13 @@ function formatTime(d: Date): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
+function formatDateTime(value: string): string {
+  if (!value) return ''
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return value
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
 /** 秒数 → mm:ss 或 hh:mm:ss */
 function formatTimecode(sec: number): string {
   const s = Math.round(sec)
@@ -190,6 +205,69 @@ function downloadMarkdownFile(markdown: string, title: string): void {
   a.click()
   a.remove()
   URL.revokeObjectURL(url)
+}
+
+function downloadTextFile(text: string, title: string, extension = 'txt'): void {
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${safeFilename(title)}.${extension}`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+function extensionForExport(format: ItemNoteExportFormat): string {
+  const map: Record<ItemNoteExportFormat, string> = {
+    md: 'md',
+    html: 'html',
+    pdf: 'pdf',
+    docx: 'docx',
+    long_image: 'png',
+    pptx: 'pptx',
+    obsidian: 'zip',
+  }
+  return map[format]
+}
+
+interface ReadOnlyMarkdownProps {
+  markdown: string
+  onSeek: (sec: number) => void
+}
+
+function ReadOnlyMarkdown({ markdown, onSeek }: ReadOnlyMarkdownProps) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={remarkPlugins}
+      components={{
+        h2({ children }) {
+          const text = flattenText(children)
+          return <h2 id={slugify(text)}>{renderNoteTimestampChildren(children, onSeek)}</h2>
+        },
+        h3({ children }) {
+          const text = flattenText(children)
+          return <h3 id={slugify(text)}>{renderNoteTimestampChildren(children, onSeek)}</h3>
+        },
+        p({ children }) {
+          return <p>{renderNoteTimestampChildren(children, onSeek)}</p>
+        },
+        li({ children }) {
+          return <li>{renderNoteTimestampChildren(children, onSeek)}</li>
+        },
+        a({ children, href }) {
+          return (
+            <a href={href} target={href?.startsWith('http') ? '_blank' : undefined} rel="noreferrer">
+              {renderNoteTimestampChildren(children, onSeek)}
+            </a>
+          )
+        },
+      }}
+    >
+      {markdown}
+    </ReactMarkdown>
+  )
 }
 
 /** 视频笔记视图标签：中列只展示「标准总结」，两种格式（蓝图 §3.5）。
@@ -286,6 +364,9 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const [chatOpen] = useState(false)
   const [askAiOpen, setAskAiOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
+  const [exportBusy, setExportBusy] = useState<ItemNoteExportFormat | null>(null)
+  const [immersiveOpen, setImmersiveOpen] = useState(false)
+  const [sourceMdOpen, setSourceMdOpen] = useState(false)
   // VN4.3 AI 工具下拉
   const [aiToolsOpen, setAiToolsOpen] = useState(false)
   const aiToolsDropRef = useRef<HTMLDivElement>(null)
@@ -314,6 +395,8 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   // 7.3: 视频笔记三列布局 — 播放器 + 转录轴联动
   const videoRef = useRef<LNVideoPanelHandle>(null)
   const notePageRef = useRef<HTMLDivElement>(null)
+  const noteScrollRef = useRef<HTMLDivElement>(null)
+  const immersiveScrollRef = useRef<HTMLDivElement>(null)
   const [currentTime, setCurrentTime] = useState(0)
   const [videoDuration, setVideoDuration] = useState(0)
   const [isPip, setIsPip] = useState(false)
@@ -686,6 +769,29 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   // 切换视图模式（记忆 localStorage）
 
   const currentBody = editingBody
+  const showInlineToc = useMemo(() => extractToc(currentBody).length > 0, [currentBody])
+  const inlineTocNode = showInlineToc ? (
+    <aside className="nibi-note-inline-toc" aria-label="正文目录">
+      <MarkdownToc markdown={currentBody} scrollRef={noteScrollRef} />
+    </aside>
+  ) : null
+
+  useEffect(() => {
+    const container = noteScrollRef.current
+    if (!container) return
+
+    const frame = window.requestAnimationFrame(() => {
+      const headings = container.querySelectorAll<HTMLElement>('.note-copy h2, .note-copy h3')
+      headings.forEach((heading) => {
+        const text = heading.textContent?.trim()
+        if (!text) return
+        heading.id = slugify(text)
+      })
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [currentBody, seedVersion])
+
   const chatSystemPrompt = useMemo(
     () => buildChatSystemPrompt(currentBody, note?.transcript),
     [currentBody, note?.transcript],
@@ -717,15 +823,44 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     }
   }, [workspaceId, itemId, note])
 
-  const handleExportTranscript = useCallback(async () => {
+  const handleExportTranscript = useCallback(() => {
+    const transcriptText = formatTranscriptForPrompt(note?.transcript)
+    if (!transcriptText) {
+      toast.error('暂无可导出的原文对照')
+      return
+    }
+    const title = String((note?.frontmatter as Record<string, unknown> | undefined)?.title ?? 'transcript')
+    downloadTextFile(transcriptText, `${title}-原文对照`)
+    setExportOpen(false)
+  }, [note])
+
+  const handleDownloadNoteExport = useCallback(async (format: ItemNoteExportFormat) => {
+    const title = String((note?.frontmatter as Record<string, unknown> | undefined)?.title ?? 'note')
+    setExportBusy(format)
     try {
-      await downloadSubtitles(workspaceId, itemId, 'srt', true)
+      await downloadItemNoteExport(
+        workspaceId,
+        itemId,
+        format,
+        `${safeFilename(title)}.${extensionForExport(format)}`,
+      )
       setExportOpen(false)
     } catch (err) {
-      console.error('原文对照导出失败:', err)
-      toast.error('原文对照导出失败，请重试')
+      console.error('笔记导出失败:', err)
+      toast.error('导出失败，请稍后重试')
+    } finally {
+      setExportBusy(null)
     }
-  }, [workspaceId, itemId])
+  }, [workspaceId, itemId, note])
+
+  const handleDownloadSourceMd = useCallback(() => {
+    if (!note?.source_md) {
+      toast.error('暂无源 md')
+      return
+    }
+    const title = String((note.frontmatter as Record<string, unknown>)?.title ?? 'source')
+    downloadMarkdownFile(note.source_md, `${title}-source`)
+  }, [note])
 
   // VN4.3 新建总结（从 AI 工具菜单触发，复用 NewSummaryModal）
   const handleCreateSummary = useCallback(async (opts: {
@@ -838,8 +973,14 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const title = String(fm.title ?? '')
   const sourceUrl = String(fm.source_url ?? '') || undefined
   const itemType = String(fm.type ?? 'text')
+  const noteVersion = Number(fm.version ?? 1) || 1
+  const noteCreatedAt = formatDateTime(String(fm.created_at ?? ''))
   const tags = (fm.tags ?? {}) as Record<string, unknown>
   const hasTags = tags && Object.keys(tags).length > 0
+  const activeSummary = summaries.find((x) => x.summary_id === activeSummaryId)
+  const versionButtonLabel = activeSummary
+    ? `${tl(activeSummary.template)} · ${activeSummary.name || `v${activeSummary.version}`}`
+    : `主笔记 v${noteVersion}`
 
   // 7.3: 视频笔记三列布局标志
   const isVideoNote = itemType === 'video' && !!note.media?.video?.url
@@ -891,61 +1032,89 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
           <span className="nibi-note-bar-meta">{(TYPE_LABEL[itemType] ?? itemType).toUpperCase()}</span>
         )}
         <div className="nibi-note-bar-tools">
-          {/* 总结风格 + 版本 合并下拉 */}
-          {summaries.length > 0 && (() => {
-            const activeS = summaries.find(x => x.summary_id === activeSummaryId)
-            const activeVersionLabel = activeS ? (activeS.name || `v${activeS.version}`) : ''
-            return (
-              <div ref={templateDropRef} style={{ position: 'relative' }}>
+          <div ref={templateDropRef} style={{ position: 'relative' }}>
+            <button
+              className="nibi-note-bar-btn nibi-note-bar-btn--label"
+              onClick={() => setTemplateDropOpen((v) => !v)}
+              title="切换主笔记 / AI 总结版本"
+            >
+              <List size={13} /> {versionButtonLabel}
+              <ChevronDown size={11} style={{ marginLeft: 2 }} />
+            </button>
+            {templateDropOpen && (
+              <div className="nibi-note-version-menu">
                 <button
-                  className="nibi-note-bar-btn nibi-note-bar-btn--label"
-                  onClick={() => setTemplateDropOpen((v) => !v)}
-                  title="切换总结风格 / 版本"
+                  className={`nibi-note-version-main${!activeSummaryId ? ' is-active' : ''}`}
+                  onClick={() => {
+                    setActiveSummaryId(undefined)
+                    setTemplateDropOpen(false)
+                  }}
                 >
-                  <List size={13} /> {tl(activeTemplate)}{activeVersionLabel ? ` · ${activeVersionLabel}` : ''}
-                  <ChevronDown size={11} style={{ marginLeft: 2 }} />
+                  <span>
+                    <strong>主笔记 v{noteVersion}</strong>
+                    {noteCreatedAt && <small>{noteCreatedAt}</small>}
+                  </span>
+                  {!activeSummaryId && <Check size={13} />}
                 </button>
-                {templateDropOpen && (
-                  <div style={{ position: 'absolute', right: 0, top: 34, zIndex: 20, minWidth: 240, maxHeight: 360, overflowY: 'auto', padding: '4px', border: '1px solid var(--bdr)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', boxShadow: 'var(--shadow-md)' }}>
-                    {[...templateGroups.entries()].map(([tmpl, versions], gi) => {
-                      const isCurrentTmpl = tmpl === activeTemplate
-                      return (
-                        <div key={tmpl}>
-                          {gi > 0 && <div style={{ height: 1, background: 'var(--bdr)', margin: '2px 0' }} />}
-                          <button className="btn-ghost" onClick={() => { const first = versions[0]; if (first) handleApplyToNote(first); setTemplateDropOpen(false) }} style={{ width: '100%', justifyContent: 'space-between', height: 30, padding: '0 10px', fontSize: 12, color: isCurrentTmpl ? 'var(--acc)' : undefined, fontWeight: isCurrentTmpl ? 600 : undefined }}>
-                            <span>{tl(tmpl)}</span>
-                            <span style={{ color: 'var(--mut)', fontSize: 10 }}>({versions.length})</span>
-                          </button>
-                          {versions.map((s) => {
-                            const isActive = s.summary_id === activeSummaryId
-                            const isRenaming = renameTargetId === s.summary_id
-                            return (
-                              <div key={s.summary_id} style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 16 }}>
-                                {isRenaming ? (
-                                  <input autoFocus value={renameName} onChange={(e) => setRenameName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') { setRenameTargetId(null); setRenameName('') } }} onBlur={commitRename} style={{ flex: 1, height: 28, padding: '0 8px', fontSize: 12, border: '1px solid var(--acc)', borderRadius: 4, background: 'var(--bg)', outline: 'none' }} />
-                                ) : (
-                                  <button className="btn-ghost" onClick={() => { handleApplyToNote(s); setTemplateDropOpen(false) }} style={{ flex: 1, justifyContent: 'flex-start', height: 28, padding: '0 8px', fontSize: 12, color: isActive ? 'var(--acc)' : undefined, fontWeight: isActive ? 600 : undefined }}>
-                                    {isActive && <Check size={12} style={{ marginRight: 4, flexShrink: 0 }} />}
-                                    {s.name || `v${s.version}`}
-                                  </button>
-                                )}
-                                {!isRenaming && (
-                                  <>
-                                    <button className="btn-ghost" title="改名" onClick={(e) => { e.stopPropagation(); setRenameTargetId(s.summary_id); setRenameName(s.name || '') }} style={{ padding: 4, height: 22, width: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Pencil size={11} /></button>
-                                    <button className="btn-ghost" title="删除" onClick={(e) => { e.stopPropagation(); handleDeleteSummary(s.summary_id) }} style={{ padding: 4, height: 22, width: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'var(--mut)' }}><Trash2 size={11} /></button>
-                                  </>
-                                )}
+                <div className="nibi-note-version-divider" />
+                {summaries.length === 0 ? (
+                  <div className="nibi-note-version-empty">暂无 AI 总结版本，可点击“新建总结”生成。</div>
+                ) : (
+                  [...templateGroups.entries()].map(([tmpl, versions], gi) => (
+                    <div key={tmpl}>
+                      {gi > 0 && <div className="nibi-note-version-divider" />}
+                      <div className="nibi-note-version-group">{tl(tmpl)}</div>
+                      {versions.map((s) => {
+                        const isActive = s.summary_id === activeSummaryId
+                        const isRenaming = renameTargetId === s.summary_id
+                        return (
+                          <div key={s.summary_id} className="nibi-note-version-row">
+                            {isRenaming ? (
+                              <input
+                                autoFocus
+                                value={renameName}
+                                onChange={(e) => setRenameName(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') commitRename()
+                                  if (e.key === 'Escape') {
+                                    setRenameTargetId(null)
+                                    setRenameName('')
+                                  }
+                                }}
+                                onBlur={commitRename}
+                              />
+                            ) : (
+                              <button
+                                className={`nibi-note-version-choice${isActive ? ' is-active' : ''}`}
+                                onClick={() => {
+                                  handleApplyToNote(s)
+                                  setTemplateDropOpen(false)
+                                }}
+                              >
+                                <span>
+                                  <strong>{s.name || `v${s.version}`}</strong>
+                                  <small>
+                                    {[s.model_used || '默认模型', formatDateTime(s.created_at)].filter(Boolean).join(' · ')}
+                                  </small>
+                                </span>
+                                {isActive && <Check size={13} />}
+                              </button>
+                            )}
+                            {!isRenaming && (
+                              <div className="nibi-note-version-actions">
+                                <button title="改名" onClick={(e) => { e.stopPropagation(); setRenameTargetId(s.summary_id); setRenameName(s.name || '') }}><Pencil size={11} /></button>
+                                <button title="删除" onClick={(e) => { e.stopPropagation(); handleDeleteSummary(s.summary_id) }}><Trash2 size={11} /></button>
                               </div>
-                            )
-                          })}
-                        </div>
-                      )
-                    })}
-                  </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ))
                 )}
               </div>
-            )
-          })()}
+            )}
+          </div>
           <button
             className="nibi-note-bar-btn nibi-note-bar-btn--label nibi-note-bar-btn--accent"
             onClick={() => setShowNewSummaryModal(true)}
@@ -1054,30 +1223,52 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
             )}
           </div>
           {sourceUrl && (
-            <a className="nibi-note-bar-btn" href={sourceUrl} target="_blank" rel="noreferrer" title="原链接">↗</a>
+            <a className="nibi-note-bar-btn nibi-note-bar-btn--label" href={sourceUrl} target="_blank" rel="noreferrer" title="打开原视频">
+              <ExternalLink size={14} /> 原视频
+            </a>
+          )}
+          {note.source_md && (
+            <button className="nibi-note-bar-btn nibi-note-bar-btn--label" onClick={() => setSourceMdOpen(true)} title="查看源 md">
+              <FileText size={14} /> 源 md
+            </button>
           )}
           <div style={{ position: 'relative' }} ref={exportDropRef}>
             <button className="nibi-note-bar-btn nibi-note-bar-btn--label" onClick={() => setExportOpen((v) => !v)} title="导出"><Download size={14} /> 导出<ChevronDown size={11} /></button>
             {exportOpen && (
-              <div style={{ position: 'absolute', right: 0, top: 34, zIndex: 20, minWidth: 180, padding: '4px', border: '1px solid var(--bdr)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', boxShadow: 'var(--shadow-md)' }}>
+              <div className="nibi-note-export-menu" style={{ position: 'absolute', right: 0, top: 34, zIndex: 20, minWidth: 200, padding: '4px', border: '1px solid var(--bdr)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', boxShadow: 'var(--shadow-md)' }}>
                 <button className="btn-ghost" onClick={() => { handleExportMarkdown(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><FileText size={13} /> Markdown</button>
+                <button className="btn-ghost" onClick={() => handleDownloadNoteExport('md')} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><FileText size={13} /> 原始 note.md</button>
                 <button className="btn-ghost" onClick={() => { handleExportObsidian(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><BookOpenCheck size={13} /> Obsidian 包</button>
                 {(isVideoNote || isAudioNote) && (
                   <button className="btn-ghost" onClick={() => { handleExportTranscript(); setExportOpen(false) }} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><Subtitles size={13} /> 原文对照（txt）</button>
                 )}
-                {/* 占位导出项（灰显 disabled） */}
                 {[
-                  { icon: <FileDown size={13} />, label: 'PDF' },
-                  { icon: <FileType size={13} />, label: 'Word' },
-                  { icon: <Image size={13} />, label: '长图' },
-                  { icon: <Presentation size={13} />, label: 'PPT' },
-                  { icon: <Sparkles size={13} />, label: '沉浸式笔记' },
+                  { icon: <FileText size={13} />, label: 'HTML', format: 'html' as const },
+                  { icon: <FileDown size={13} />, label: 'PDF', format: 'pdf' as const },
+                  { icon: <FileType size={13} />, label: 'Word', format: 'docx' as const },
+                  { icon: <Image size={13} />, label: '长图', format: 'long_image' as const },
+                  { icon: <Presentation size={13} />, label: 'PPT', format: 'pptx' as const },
                 ].map((item) => (
-                  <button key={item.label} disabled title="敬请期待" style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'not-allowed', color: 'var(--mut)', opacity: 0.45 }}>{item.icon} {item.label}</button>
+                  <button
+                    key={item.label}
+                    className="btn-ghost"
+                    onClick={() => handleDownloadNoteExport(item.format)}
+                    disabled={exportBusy === item.format}
+                    style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
+                  >
+                    {item.icon} {exportBusy === item.format ? '导出中…' : item.label}
+                  </button>
                 ))}
               </div>
             )}
           </div>
+          <button
+            className="nibi-note-bar-btn nibi-note-bar-btn--label nibi-note-bar-btn--accent"
+            onClick={() => setImmersiveOpen(true)}
+            title="打开沉浸式笔记"
+          >
+            <Sparkles size={14} /> 沉浸式
+          </button>
           <div style={{ position: 'relative' }} ref={aiToolsDropRef}>
             <button className="nibi-note-bar-btn nibi-note-bar-btn--label nibi-note-bar-btn--accent" onClick={() => setAiToolsOpen((v) => !v)} title="AI 工具"><Brain size={14} /> AI 工具<ChevronDown size={11} /></button>
             {aiToolsOpen && (
@@ -1099,6 +1290,60 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
           </div>
         </div>
       </div>
+
+      {immersiveOpen && (
+        <div className="nibi-note-immersive">
+          <div className="nibi-note-immersive-bar">
+            <button className="nibi-note-bar-back" onClick={() => setImmersiveOpen(false)} title="返回工作台">
+              <ArrowLeft size={15} />
+              <span>工作台</span>
+            </button>
+            <div className="nibi-note-immersive-title">{title || '未命名笔记'}</div>
+            <div className="nibi-note-bar-tools">
+              {sourceUrl && (
+                <a className="nibi-note-bar-btn nibi-note-bar-btn--label" href={sourceUrl} target="_blank" rel="noreferrer">
+                  <ExternalLink size={14} /> 原视频
+                </a>
+              )}
+              {note.source_md && (
+                <button className="nibi-note-bar-btn nibi-note-bar-btn--label" onClick={() => setSourceMdOpen(true)}>
+                  <FileText size={14} /> 源 md
+                </button>
+              )}
+              <button className="nibi-note-bar-btn nibi-note-bar-btn--label" onClick={() => handleDownloadNoteExport('pdf')}>
+                <FileDown size={14} /> PDF
+              </button>
+              <button className="nibi-note-bar-btn" onClick={() => setImmersiveOpen(false)} title="关闭">
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+          <div className="nibi-note-immersive-body">
+            <div className="nibi-note-immersive-scroll" ref={immersiveScrollRef}>
+              <section className="nibi-note-source-banner">
+                <div className="nibi-note-source-banner-copy">
+                  <strong>{title || '未命名笔记'}</strong>
+                  <span>
+                    {sourceLabel}
+                    {isVideoNote && effectiveVideoDuration ? ` · ${formatTimecode(effectiveVideoDuration)}` : ''}
+                    {itemType ? ` · ${TYPE_LABEL[itemType] ?? itemType}` : ''}
+                  </span>
+                </div>
+                {sourceUrl && (
+                  <a href={sourceUrl} target="_blank" rel="noreferrer">原视频</a>
+                )}
+              </section>
+              <article className="nibi-note-immersive-article">
+                <h1>{title || '未命名笔记'}</h1>
+                <ReadOnlyMarkdown markdown={currentBody} onSeek={handleSeek} />
+              </article>
+            </div>
+            <aside className="nibi-note-immersive-toc">
+              <MarkdownToc markdown={currentBody} scrollRef={immersiveScrollRef} />
+            </aside>
+          </div>
+        </div>
+      )}
 
 
       {/* ════════ 主内容区（视频笔记 = 三列 / 图文笔记 = 三列 / 其余 = 通用布局）════════ */}
@@ -1215,7 +1460,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
 
           {/* ── 右栏（40%）：标签 + 结构化笔记 ── */}
           <div className="nibi-note-right">
-            <div className="nibi-note-right-scroll">
+            <div className={`nibi-note-right-scroll${showInlineToc ? ' has-toc' : ''}`} ref={noteScrollRef}>
               <div className="note-copy">
                 <div className="note-copy-head">
                   <h1>{title || '未命名笔记'}</h1>
@@ -1257,6 +1502,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 {/* 保存状态 */}
                 <div style={{ padding: '12px 0', textAlign: 'right' }}>{saveStatusNode}</div>
               </div>
+              {inlineTocNode}
             </div>
           </div>
         </div>
@@ -1318,7 +1564,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
 
           {/* ── 右栏：标题 + 标签 + 总结 + 正文 ── */}
           <div className="nibi-note-right">
-            <div className="nibi-note-right-scroll">
+            <div className={`nibi-note-right-scroll${showInlineToc ? ' has-toc' : ''}`} ref={noteScrollRef}>
               <div className="note-copy">
                 <div className="note-copy-head">
                   <h1>{title || '未命名笔记'}</h1>
@@ -1360,6 +1606,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 {/* 保存状态 */}
                 <div style={{ padding: '12px 0', textAlign: 'right' }}>{saveStatusNode}</div>
               </div>
+              {inlineTocNode}
             </div>
           </div>
         </div>
@@ -1442,7 +1689,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
 
           {/* ── 右栏：标题 + 标签 + 总结 + 正文 ── */}
           <div className="nibi-note-right">
-            <div className="nibi-note-right-scroll">
+            <div className={`nibi-note-right-scroll${showInlineToc ? ' has-toc' : ''}`} ref={noteScrollRef}>
               <div className="note-copy">
                 <div className="note-copy-head">
                   <h1>{title || '未命名笔记'}</h1>
@@ -1484,6 +1731,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 {/* 保存状态 */}
                 <div style={{ padding: '12px 0', textAlign: 'right' }}>{saveStatusNode}</div>
               </div>
+              {inlineTocNode}
             </div>
           </div>
         </div>
@@ -1526,7 +1774,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
 
           {/* ── 右栏：标题 + 标签 + 总结 + 正文 ── */}
           <div className="nibi-note-right nibi-text-right">
-            <div className="nibi-note-right-scroll">
+            <div className={`nibi-note-right-scroll${showInlineToc ? ' has-toc' : ''}`} ref={noteScrollRef}>
               <div className="note-copy">
                 <div className="note-copy-head">
                   <h1>{title || '未命名笔记'}</h1>
@@ -1568,6 +1816,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 {/* 保存状态 */}
                 <div style={{ padding: '12px 0', textAlign: 'right' }}>{saveStatusNode}</div>
               </div>
+              {inlineTocNode}
             </div>
           </div>
         </div>
@@ -1659,6 +1908,12 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
           onClose={() => setShowNewSummaryModal(false)}
         />
       )}
+      <SourceMdModal
+        open={sourceMdOpen}
+        sourceMd={note.source_md}
+        onClose={() => setSourceMdOpen(false)}
+        onDownload={handleDownloadSourceMd}
+      />
     </div>
   )
 }
