@@ -9,6 +9,13 @@ const TYPE_TONE: Record<string, { badge: string; label: string }> = {
   text: { badge: 'collection-mini--text', label: 'TEXT' },
 }
 
+const TYPE_NAME: Record<string, string> = {
+  video: '视频',
+  audio: '音频',
+  image: '图文',
+  text: '文本',
+}
+
 function formatRelative(iso: string): string {
   if (!iso) return ''
   try {
@@ -27,6 +34,14 @@ function buildSourceSummary(items: LibraryItem[]): string {
   if (labels.length === 0) return '空合集'
   if (labels.length === 1) return `来自${labels[0]}`
   return `来自${labels.slice(0, 2).join(' / ')}`
+}
+
+function getPreviewSlots(items: LibraryItem[]): Array<LibraryItem | null> {
+  const visible: Array<LibraryItem | null> = [...items]
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+    .slice(0, 4)
+  while (visible.length < 4) visible.push(null)
+  return visible
 }
 
 interface WorkspaceCardProps {
@@ -58,14 +73,21 @@ export function WorkspaceCard({
   }, [workspace.name])
 
   const previewItems = useMemo(
-    () => [...items].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 2),
+    () => [...items].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 4),
     [items],
   )
+  const previewSlots = useMemo(() => getPreviewSlots(items), [items])
 
   const progressPct = workspace.items_count === 0 ? 12 : Math.min(100, 28 + workspace.items_count * 24)
-  const summaryText = workspace.kind === 'replica'
-    ? '把拆帧、提示词和镜头观察放进同一个夹层，复盘时能顺着继续。'
-    : '把同一个主题下的视频、音频、图片和文本放在一起，随时回到这条路径。'
+  const typeMix = Object.entries(workspace.items_count_by_type ?? {})
+    .filter(([, count]) => count > 0)
+    .map(([type, count]) => `${TYPE_NAME[type] ?? type} ${count}`)
+    .join(' · ')
+  const summaryText = workspace.items_count > 0
+    ? `${typeMix || `${workspace.items_count} 项内容`}，可继续生成融合笔记或补充新素材。`
+    : workspace.kind === 'replica'
+      ? '空复刻合集：适合先收纳参考图、视频与分镜素材。'
+      : '空笔记合集：适合按主题收纳视频、音频、图片和文本。'
 
   const handleSave = async () => {
     const nextName = draftName.trim()
@@ -128,20 +150,25 @@ export function WorkspaceCard({
 
         <div className="collection-folder">
           <div className="collection-tab" />
-          <div className="collection-stack">
-            {previewItems.length > 0 ? (
-              previewItems.map((item) => (
-                <div key={item.item_id} className={`collection-mini ${TYPE_TONE[item.type]?.badge ?? 'collection-mini--video'}`}>
-                  <span>{TYPE_TONE[item.type]?.label ?? item.type.toUpperCase()}</span>
-                  <strong>{item.name || '未命名内容'}</strong>
+          <div className="collection-preview-grid">
+            {previewSlots.map((item, index) => {
+              const tone = item ? TYPE_TONE[item.type]?.badge.replace('collection-mini', 'collection-preview-tile') : 'collection-preview-tile--empty'
+              return (
+                <div
+                  key={item?.item_id ?? `empty-${index}`}
+                  className={`collection-preview-tile ${tone ?? 'collection-preview-tile--video'}`}
+                >
+                  {item?.thumbnail ? (
+                    <img src={item.thumbnail} alt="" loading="lazy" />
+                  ) : (
+                    <div className="collection-preview-fallback">
+                      <span>{item ? (TYPE_TONE[item.type]?.label ?? item.type.toUpperCase()) : (workspace.kind === 'replica' ? 'REPLICA' : 'NOTE')}</span>
+                      <strong>{item?.name || (index === 0 ? '先往这个合集里放一条内容' : '等待内容')}</strong>
+                    </div>
+                  )}
                 </div>
-              ))
-            ) : (
-              <div className="collection-mini collection-mini--empty">
-                <span>{workspace.kind === 'replica' ? 'REPLICA' : 'NOTE'}</span>
-                <strong>先往这个合集里放一条内容</strong>
-              </div>
-            )}
+              )
+            })}
           </div>
         </div>
       </div>

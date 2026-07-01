@@ -16,6 +16,13 @@
   flex-wrap: wrap;
   margin-bottom: 14px;
 }
+
+.fav-kind-tabs {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
 .fav-tab {
   display: inline-flex;
   align-items: center;

@@ -265,6 +265,26 @@ def _build_body(item: WorkspaceItem) -> str:
     return ""
 
 
+def _looks_like_markdown_heading(text: str) -> bool:
+    stripped = text.lstrip()
+    return stripped.startswith("# ") or stripped.startswith("## ") or stripped.startswith("### ")
+
+
+def _build_audio_note_body(item: WorkspaceItem) -> str:
+    """音频主笔记优先展示 AI 总结；逐字稿留在 source.md / 字幕区。"""
+    results = item.results or {}
+    summary = results.get("note_body") or results.get("summary") or results.get("llm_summary") or ""
+    if isinstance(summary, str) and summary.strip():
+        body = summary.strip()
+        if _looks_like_markdown_heading(body):
+            return body
+        return f"## AI 总结\n\n{body}"
+    transcript_body = _build_body(item).strip()
+    if transcript_body:
+        return f"## 转写正文\n\n{transcript_body}"
+    return ""
+
+
 def build_source_md(item: WorkspaceItem) -> str:
     """生成 source.md 内容（原始依据）。"""
     body = _build_body(item)
@@ -409,6 +429,10 @@ def build_note_md(item: WorkspaceItem, frontmatter: Dict[str, Any]) -> str:
     note_body = (item.results or {}).get("note_body", "")
     if note_body and isinstance(note_body, str) and note_body.strip():
         return f"---\n{fm_yaml}---\n\n{note_body.strip()}"
+
+    if item.type == "audio":
+        body = _build_audio_note_body(item)
+        return f"---\n{fm_yaml}---\n\n{body}"
 
     # 兜底：旧逻辑（摘要 + 转写正文）
     body = _build_body(item)

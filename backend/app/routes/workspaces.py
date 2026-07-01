@@ -115,6 +115,64 @@ def to_static_url(path: str | Path) -> str:
     return ""
 
 
+def _note_audio_url(
+    workspace_id: str,
+    item: WorkspaceItem,
+    results: Dict[str, Any],
+    frontmatter: Optional[Dict[str, Any]] = None,
+) -> str:
+    """Resolve the browser-playable audio URL for audio notes."""
+
+    audio_info = results.get("audio") if isinstance(results.get("audio"), dict) else {}
+
+    def _from_value(value: Any) -> str:
+        raw = str(value or "").strip()
+        if not raw:
+            return ""
+        if raw.startswith(("http://", "https://", "/static/")):
+            return raw
+        return to_static_url(raw)
+
+    media_fm = (frontmatter or {}).get("media") or {}
+    fm_audio = media_fm.get("audio") if isinstance(media_fm, dict) else None
+    if isinstance(fm_audio, dict):
+        fm_url = _from_value(fm_audio.get("url") or fm_audio.get("src"))
+        if fm_url:
+            return fm_url
+    elif isinstance(fm_audio, str):
+        fm_url = _from_value(fm_audio)
+        if fm_url:
+            return fm_url
+
+    for key in ("path", "file", "audio_path"):
+        candidate = _from_value(audio_info.get(key) or results.get(key))
+        if candidate:
+            return candidate
+
+    filename = str(audio_info.get("filename") or "").strip()
+    if filename:
+        for candidate_path in (
+            DATA_DIR / "workspaces" / workspace_id / "audio" / filename,
+            DATA_DIR / "workspaces" / "default_project" / "audio" / filename,
+            DATA_DIR / "workspaces" / workspace_id / filename,
+            DATA_DIR / "workspaces" / "default_project" / filename,
+        ):
+            candidate = to_static_url(candidate_path)
+            if candidate:
+                return candidate
+
+    if item.source == "local":
+        source_url = to_static_url(item.source_value)
+        if source_url:
+            return source_url
+
+    existing_url = _from_value(audio_info.get("url"))
+    if existing_url:
+        return existing_url
+
+    return item.source_value if item.source == "url" else ""
+
+
 def _task_config_value(tasks: Dict[str, Any], *keys: str) -> Any:
     """Return the first present task config, preserving False boolean values."""
     for key in keys:
@@ -468,6 +526,12 @@ def _auto_note_is_stale(item: WorkspaceItem, note_md: str) -> bool:
         markers.extend([
             str(results.get("note_body") or "").strip(),
             str(results.get("markdown") or "").strip(),
+        ])
+    elif item.type == ItemType.AUDIO.value:
+        markers.extend([
+            str(results.get("note_body") or "").strip(),
+            str(results.get("summary") or "").strip(),
+            str(results.get("llm_summary") or "").strip(),
         ])
     else:
         markers.append(str(results.get("note_body") or "").strip())
@@ -1341,6 +1405,69 @@ def _item_display_name(
     return raw_name
 
 
+def _plain_card_text(raw: Any, *, limit: int = 150) -> str:
+    """把结果里的 markdown/转写内容压成卡片摘要。"""
+    if raw is None:
+        return ""
+    if isinstance(raw, list):
+        parts: List[str] = []
+        for entry in raw:
+            if isinstance(entry, dict):
+                text = entry.get("text") or entry.get("content") or entry.get("sentence")
+                if text:
+                    parts.append(str(text))
+            elif isinstance(entry, str):
+                parts.append(entry)
+            if len(" ".join(parts)) >= limit:
+                break
+        raw = " ".join(parts)
+    if not isinstance(raw, str):
+        return ""
+    text = raw.strip()
+    if not text:
+        return ""
+    text = re.sub(r"```[\s\S]*?```", " ", text)
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+    text = re.sub(r"!\[[^\]]*\]\([^)]+\)", " ", text)
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    text = re.sub(r"^\s{0,3}#{1,6}\s*", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*[-*+]\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) > limit:
+        return text[: limit - 1].rstrip() + "…"
+    return text
+
+
+def _item_card_description(item: WorkspaceItem, results: dict) -> str:
+    """为资料库卡片提取一行用户可扫读的简介。"""
+    summary_candidates: List[Any] = []
+    if item.summaries:
+        latest_summary = sorted(item.summaries, key=lambda s: s.created_at, reverse=True)[0]
+        summary_candidates.append(latest_summary.content_md)
+    summary_candidates.extend([
+        results.get("note_summary"),
+        results.get("summary"),
+        results.get("description"),
+        results.get("video_description"),
+        results.get("transcript"),
+        results.get("segments"),
+    ])
+    for candidate in summary_candidates:
+        text = _plain_card_text(candidate)
+        if text:
+            return text
+
+    if item.type == ItemType.AUDIO.value:
+        return "音频笔记：保留转写、时间线与后续总结入口。"
+    if item.type == ItemType.VIDEO.value:
+        return "视频笔记：保留封面、字幕、关键帧与结构化总结。"
+    if item.type == ItemType.IMAGE.value:
+        return "图文笔记：保留图片素材与视觉分析结果。"
+    if item.type == ItemType.TEXT.value:
+        return "文本笔记：保留原文与结构化摘要。"
+    return "素材已收纳，可继续整理、收藏或加入合集。"
+
+
 def _item_primary_task_status(item: WorkspaceItem) -> Optional[str]:
     """返回 item.related_task_ids 里最新 task 的 status。"""
     if not item.related_task_ids:
@@ -1370,6 +1497,24 @@ def _compute_primary_view(item: "WorkspaceItem", results: dict) -> str:
         return "note"
         
     return "note"
+
+
+def _default_summary_template_for_item(item: "WorkspaceItem", results: dict) -> str:
+    """返回素材当前最合适的新建总结默认模板。"""
+    template = str(results.get("default_summary_template") or "").strip()
+    if template:
+        return template
+    preflight = getattr(item, "preflight", None)
+    tasks = getattr(preflight, "tasks", {}) if preflight else {}
+    if isinstance(tasks, dict):
+        for key in ("summary", "transcribe_summary", "note"):
+            cfg = tasks.get(key)
+            if isinstance(cfg, dict):
+                template = str(cfg.get("summary_template") or "").strip()
+                if template:
+                    return template
+    return ""
+
 
 @router.get("/library")
 def get_library(include_trashed: bool = False) -> Dict[str, Any]:
@@ -1434,6 +1579,8 @@ def get_library(include_trashed: bool = False) -> Dict[str, Any]:
                 "updated_at": item.updated_at,
                 "duration_seconds": _item_duration_seconds(item, results),
                 "thumbnail": _item_thumbnail(item, results),
+                "description": _item_card_description(item, results),
+                "favorite": item.item_id in rec.favorites,
                 "results_summary": {
                     "has_summary": bool(results.get("summary")),
                     "has_transcript": bool(results.get("transcript")),
@@ -1455,6 +1602,11 @@ class BatchDeleteRequest(BaseModel):
     items: list[dict]  # [{"workspace_id": "...", "item_id": "..."}, ...]
 
 
+class BatchAddToWorkspaceRequest(BaseModel):
+    target_workspace_id: str
+    items: list[dict]  # [{"workspace_id": "...", "item_id": "..."}, ...]
+
+
 @router.post("/items/batch-delete")
 def batch_delete_items(req: BatchDeleteRequest) -> Dict[str, Any]:
     """批量删除素材。"""
@@ -1472,6 +1624,64 @@ def batch_delete_items(req: BatchDeleteRequest) -> Dict[str, Any]:
         except KeyError as err:
             failed.append({"workspace_id": ws_id, "item_id": item_id, "reason": str(err)})
     return {"removed": len(removed), "failed": len(failed), "removed_ids": removed, "failures": failed}
+
+
+@router.post("/items/batch-add-to-workspace")
+def batch_add_items_to_workspace(req: BatchAddToWorkspaceRequest) -> Dict[str, Any]:
+    """把已有素材加入目标合集。
+
+    当前素材模型允许同一个 item 数据被多个 workspace 引用。这里复制 item 记录本身，
+    保留原结果与任务关联，不重复触发下载/分析。
+    """
+    target_id = req.target_workspace_id.strip()
+    target = _store.get(target_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {target_id}")
+
+    existing_ids = {item.item_id for item in target.items}
+    added: List[str] = []
+    skipped: List[str] = []
+    failed: List[Dict[str, Any]] = []
+
+    for entry in req.items:
+        ws_id = str(entry.get("workspace_id") or "").strip()
+        item_id = str(entry.get("item_id") or "").strip()
+        if not ws_id or not item_id:
+            failed.append({**entry, "reason": "missing workspace_id or item_id"})
+            continue
+        if item_id in existing_ids:
+            skipped.append(item_id)
+            continue
+
+        source = _store.get(ws_id)
+        if source is None:
+            failed.append({"workspace_id": ws_id, "item_id": item_id, "reason": "source workspace not found"})
+            continue
+        if source.kind != target.kind:
+            failed.append({"workspace_id": ws_id, "item_id": item_id, "reason": "workspace kind mismatch"})
+            continue
+
+        item = next((it for it in source.items if it.item_id == item_id), None)
+        if item is None:
+            failed.append({"workspace_id": ws_id, "item_id": item_id, "reason": "item not found"})
+            continue
+
+        try:
+            cloned = WorkspaceItem.from_dict(item.to_dict())
+            _store.add_item(target_id, cloned)
+            existing_ids.add(item_id)
+            added.append(item_id)
+        except Exception as err:
+            failed.append({"workspace_id": ws_id, "item_id": item_id, "reason": str(err)})
+
+    return {
+        "added": len(added),
+        "skipped": len(skipped),
+        "failed": len(failed),
+        "added_ids": added,
+        "skipped_ids": skipped,
+        "failures": failed,
+    }
 
 
 @router.get("/{workspace_id}")
@@ -2902,6 +3112,8 @@ def get_audio_result(workspace_id: str, item_id: str) -> Dict[str, Any]:
             _candidates = [
                 _ROOT_DIR / "data" / "workspaces" / workspace_id / "audio" / _filename,
                 _ROOT_DIR / "data" / "workspaces" / "default_project" / "audio" / _filename,
+                _ROOT_DIR / "data" / "workspaces" / workspace_id / _filename,
+                _ROOT_DIR / "data" / "workspaces" / "default_project" / _filename,
             ]
             for _p in _candidates:
                 if _p.exists():
@@ -3741,15 +3953,7 @@ def get_item_note(workspace_id: str, item_id: str) -> Dict[str, Any]:
         transcript = _note_transcript(results, nd)
 
     elif item_type == "audio":
-        # 音频文件：results.audio.filename 存在 workspace/<id>/audio/ 下
-        audio_info = results.get("audio") if isinstance(results.get("audio"), dict) else {}
-        audio_url = ""
-        if audio_info.get("filename"):
-            audio_path = DATA_DIR / "workspaces" / workspace_id / "audio" / audio_info["filename"]
-            audio_url = to_static_url(audio_path)
-        if not audio_url and audio_info.get("url"):
-            audio_url = audio_info["url"]  # URL 来源
-        media["audio"] = audio_url
+        media["audio"] = _note_audio_url(workspace_id, item, results, frontmatter)
         # transcript：统一规范成 [{t_sec, t_str, text}]
         transcript = _note_transcript(results, nd)
 
@@ -3759,6 +3963,8 @@ def get_item_note(workspace_id: str, item_id: str) -> Dict[str, Any]:
     if _cc:
         summary_hint["content_category"] = _cc
     _dst = results.get("default_summary_template")
+    if not _dst:
+        _dst = _default_summary_template_for_item(item, results)
     if _dst:
         summary_hint["default_template"] = _dst
 
@@ -3921,14 +4127,7 @@ def update_item_note(workspace_id: str, item_id: str, req: NoteUpdateRequest) ->
         transcript = _note_transcript(results, nd)
 
     elif item_type == "audio":
-        audio_info = results.get("audio") if isinstance(results.get("audio"), dict) else {}
-        audio_url = ""
-        if audio_info.get("filename"):
-            audio_path = DATA_DIR / "workspaces" / workspace_id / "audio" / audio_info["filename"]
-            audio_url = to_static_url(audio_path)
-        if not audio_url and audio_info.get("url"):
-            audio_url = audio_info["url"]
-        media["audio"] = audio_url
+        media["audio"] = _note_audio_url(workspace_id, item, results, frontmatter)
         transcript = _note_transcript(results, nd)
 
     # summary_hint：图文内容分类结果（与 GET 同逻辑）
@@ -3937,6 +4136,8 @@ def update_item_note(workspace_id: str, item_id: str, req: NoteUpdateRequest) ->
     if _cc:
         summary_hint["content_category"] = _cc
     _dst = results.get("default_summary_template")
+    if not _dst:
+        _dst = _default_summary_template_for_item(item, results)
     if _dst:
         summary_hint["default_template"] = _dst
 

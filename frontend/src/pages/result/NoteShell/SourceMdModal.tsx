@@ -10,7 +10,7 @@ interface SourceMdModalProps {
 }
 
 /**
- * 源 md 悬浮框 — 仿 TranscriptPreviewModal 结构。
+ * 原始素材 Markdown 悬浮框 — 仿 TranscriptPreviewModal 结构。
  * position:fixed 遮罩 + 居中卡片 + 可滚动源码。
  */
 export function SourceMdModal({ open, sourceMd, onClose, onDownload, downloading = false }: SourceMdModalProps) {
@@ -19,7 +19,7 @@ export function SourceMdModal({ open, sourceMd, onClose, onDownload, downloading
   const handleCopy = async () => {
     try {
       await navigator.clipboard?.writeText(sourceMd)
-      toast.success('已复制源 md')
+      toast.success('已复制原始素材 Markdown')
     } catch {
       toast.error('复制失败，请手动复制')
     }
@@ -64,7 +64,7 @@ export function SourceMdModal({ open, sourceMd, onClose, onDownload, downloading
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <FileCode size={16} style={{ color: 'var(--acc)' }} />
-            <span style={{ fontWeight: 600, fontSize: 14 }}>源 Markdown</span>
+            <span style={{ fontWeight: 600, fontSize: 14 }}>原始素材 Markdown</span>
           </div>
           <button
             onClick={onClose}
@@ -139,7 +139,7 @@ export function SourceMdModal({ open, sourceMd, onClose, onDownload, downloading
                   opacity: downloading ? 0.7 : 1,
                 }}
               >
-                {downloading ? '下载中…' : '下载 .md'}
+                {downloading ? '下载中…' : '下载原始素材 .md'}
               </button>
             )}
           </div>

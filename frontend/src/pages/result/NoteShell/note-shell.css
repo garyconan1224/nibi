@@ -477,6 +477,82 @@
   border-color: var(--acc, #ff8a36);
 }
 
+.nibi-note-operation-notice {
+  position: fixed;
+  top: 58px;
+  right: 24px;
+  z-index: 72;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  max-width: min(360px, calc(100vw - 48px));
+  min-height: 38px;
+  padding: 9px 13px;
+  border: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  border-radius: 8px;
+  background: var(--srf, #fff);
+  color: var(--fg, #191410);
+  box-shadow: var(--shadow-lg);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.nibi-note-operation-notice[data-tone='success'] {
+  border-color: rgba(47, 129, 91, 0.28);
+  color: #206244;
+}
+
+.nibi-note-operation-notice[data-tone='error'] {
+  border-color: rgba(179, 55, 55, 0.28);
+  color: #8f2e2e;
+}
+
+.nibi-note-operation-notice[data-tone='info'] {
+  border-color: rgba(79, 112, 166, 0.28);
+  color: #31527f;
+}
+
+.nibi-note-operation-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.nibi-note-operation-action {
+  height: 26px;
+  margin-left: 4px;
+  padding: 0 10px;
+  border: 1px solid currentColor;
+  border-radius: 7px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.nibi-note-operation-action:hover {
+  background: color-mix(in oklch, currentColor 10%, transparent);
+}
+
+.nibi-note-operation-notice[data-tone='loading'] .nibi-note-operation-dot {
+  color: var(--acc, #ff8a36);
+  animation: nibi-operation-pulse 1s ease-in-out infinite;
+}
+
+@keyframes nibi-operation-pulse {
+  0%, 100% {
+    opacity: 0.45;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .nibi-note-pref-panel {
   position: absolute;
   right: 0;
@@ -889,6 +965,24 @@
   border: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
   padding: 8px 10px;
   vertical-align: top;
+}
+
+.nibi-note-immersive-article--editor .nibi-note-editor-panel {
+  min-height: 0;
+  padding: 0;
+}
+
+.nibi-note-immersive-article--editor .ProseMirror {
+  max-width: none;
+  min-height: 48vh;
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.85;
+}
+
+.nibi-note-immersive-save {
+  padding: 18px 0 4px;
+  text-align: right;
 }
 
 .nibi-note-immersive-toc {
@@ -1733,6 +1827,54 @@
   white-space: nowrap;
 }
 
+.nibi-note-meta-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 8px 0 26px;
+  padding: 12px;
+  border: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.nibi-note-meta-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.nibi-note-meta-chip {
+  min-height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 9px;
+  border: 1px solid rgba(25, 20, 16, 0.07);
+  border-radius: 999px;
+  background: var(--srf, #fff);
+  color: var(--fg2, #3d3929);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.nibi-note-meta-chip strong {
+  color: var(--mut, #7c7464);
+  font-weight: 800;
+}
+
+.nibi-note-meta-chip span {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--fm, monospace);
+}
+
+.nibi-note-meta-tags {
+  padding-top: 2px;
+}
+
 /* ── Stage 2: 音频笔记形态 ───────────────────── */
 
 .nibi-note-page--audio {
@@ -1755,6 +1897,125 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+.nibi-audio-player-shell {
+  flex: 0 0 auto;
+  min-width: 0;
+  background: var(--srf, #fff);
+}
+
+.nibi-audio-player-shell.is-pip {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 500;
+  width: 320px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: #11100f;
+  color: #fff;
+  box-shadow: 0 24px 48px rgba(8, 8, 8, 0.34);
+}
+
+.nibi-audio-player-shell.is-dragging {
+  box-shadow: 0 30px 56px rgba(8, 8, 8, 0.42);
+}
+
+.nibi-audio-player-shell.is-pip .nibi-audio-player-wrap {
+  padding: 12px 14px 0;
+}
+
+.nibi-audio-player-shell.is-pip .note-audio-waveform {
+  padding: 0 14px;
+}
+
+.nibi-audio-player-shell.is-pip .note-audio-bars--bg span {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.nibi-audio-player-shell.is-pip .note-audio-time {
+  padding: 7px 14px 0;
+  color: rgba(255, 255, 255, 0.64);
+}
+
+.nibi-audio-player-shell.is-pip .note-audio-controls {
+  gap: 4px;
+  padding: 8px 14px 10px;
+}
+
+.nibi-audio-player-shell.is-pip .note-audio-ctrl {
+  width: 28px;
+  height: 28px;
+}
+
+.nibi-audio-player-shell.is-pip .note-audio-ctrl {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.nibi-audio-player-shell.is-pip .note-audio-ctrl:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.nibi-audio-player-shell.is-pip .note-audio-play {
+  width: 36px;
+  height: 36px;
+  background: var(--acc, #ff8a36);
+}
+
+.nibi-audio-player-shell.is-pip .note-audio-big-play {
+  display: none;
+}
+
+.nibi-audio-player-shell.is-pip .note-audio-speed {
+  margin-left: auto;
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.82);
+  padding: 3px 7px;
+}
+
+.nibi-audio-player-shell.is-pip .note-audio-volume {
+  display: none;
+}
+
+.note-audio-pip-caption {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 0 14px 14px;
+}
+
+.note-audio-pip-subtitle {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  min-height: 48px;
+  padding: 10px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.note-audio-pip-subtitle span {
+  color: rgba(255, 255, 255, 0.62);
+  font-family: var(--fm, monospace);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.note-audio-pip-subtitle p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 /* ── NoteAudioPanel 内壳 ── */
@@ -1960,11 +2221,106 @@
   pointer-events: none;
 }
 
+/* ── 音频章节轨 ── */
+
+.note-audio-chapters {
+  flex: 0 0 auto;
+  padding: 10px 14px 12px;
+  border-top: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  background: linear-gradient(180deg, var(--bgalt, #f7f4ee), var(--srf, #fff));
+}
+
+.note-audio-chapters-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: var(--ink, #1a1612);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.note-audio-chapters-head small {
+  color: var(--mut, #7c7464);
+  font-family: var(--fm, monospace);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.note-audio-chapter-track {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(156px, 0.74fr);
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+
+.note-audio-chapter {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  row-gap: 3px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--bdr, rgba(25, 20, 16, 0.08));
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--fg2, #3d3929);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.14s, background 0.14s, transform 0.14s;
+}
+
+.note-audio-chapter:hover {
+  border-color: color-mix(in oklch, var(--acc, #ff8a36) 38%, var(--bdr, #e8e3db));
+  transform: translateY(-1px);
+}
+
+.note-audio-chapter.is-active {
+  border-color: var(--acc, #ff8a36);
+  background: color-mix(in oklch, var(--acc, #ff8a36) 10%, #fff);
+}
+
+.note-audio-chapter-time {
+  grid-row: 1 / span 2;
+  align-self: start;
+  min-width: 38px;
+  color: var(--acc, #ff8a36);
+  font-family: var(--fm, monospace);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.note-audio-chapter strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink, #1a1612);
+  font-size: 12px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-audio-chapter small {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--mut, #7c7464);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 /* ── 音频左栏转录区 ── */
 
 .nibi-audio-left .nibi-note-transcript-wrap {
   flex: 1 1 0;
-  min-height: 0;
+  min-height: 220px;
   overflow: hidden;
   display: flex;
   flex-direction: column;

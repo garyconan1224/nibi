@@ -8,7 +8,7 @@
  */
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
-import { Pause, Play, Repeat, Volume2, VolumeX } from 'lucide-react'
+import { Pause, PictureInPicture2, Play, Repeat, Volume2, VolumeX } from 'lucide-react'
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3] as const
 const WAVEFORM_BARS = 72
@@ -25,10 +25,37 @@ function formatSpeed(s: number): string {
 }
 
 /* ── 常量 ── */
-const WAVEFORM_HEIGHTS = Array.from({ length: WAVEFORM_BARS }, (_, i) => {
+const FALLBACK_WAVEFORM_HEIGHTS = Array.from({ length: WAVEFORM_BARS }, (_, i) => {
   const t = i / (WAVEFORM_BARS - 1)
   return 0.3 + 0.7 * Math.abs(Math.sin(t * Math.PI * 2.4 + 0.5) * Math.cos(t * Math.PI * 1.1 + 0.3))
 })
+
+function extractWaveformPeaks(audioBuffer: AudioBuffer, bars: number): number[] {
+  const channelCount = Math.min(audioBuffer.numberOfChannels, 2)
+  const samplesPerBar = Math.max(1, Math.floor(audioBuffer.length / bars))
+  const peaks: number[] = []
+
+  for (let bar = 0; bar < bars; bar += 1) {
+    const start = bar * samplesPerBar
+    const end = Math.min(audioBuffer.length, start + samplesPerBar)
+    const sampleStep = Math.max(1, Math.floor((end - start) / 160))
+    let sum = 0
+    let count = 0
+
+    for (let channel = 0; channel < channelCount; channel += 1) {
+      const data = audioBuffer.getChannelData(channel)
+      for (let idx = start; idx < end; idx += sampleStep) {
+        const value = data[idx] ?? 0
+        sum += value * value
+        count += 1
+      }
+    }
+    peaks.push(count > 0 ? Math.sqrt(sum / count) : 0)
+  }
+
+  const max = Math.max(...peaks, 0.001)
+  return peaks.map((peak) => Math.max(0.16, Math.min(1, Math.pow(peak / max, 0.72))))
+}
 
 /* ── types ── */
 interface NoteAudioPanelProps {
@@ -36,16 +63,22 @@ interface NoteAudioPanelProps {
   onTimeUpdate?: (currentTime: number) => void
   onDurationChange?: (duration: number) => void
   onTransportChange?: () => void
+  isPipActive?: boolean
+  onTogglePip?: () => void
 }
 
 export interface NoteAudioPanelHandle {
   seekTo: (sec: number) => void
+  togglePlay: () => void
+  readonly isPlaying: boolean
+  readonly currentTime: number
+  readonly duration: number
   /** 控制条 + 波形 JSX，父组件在 player-wrap 外渲染 */
   readonly transportNode: import('react').ReactNode
 }
 
 const NoteAudioPanel = forwardRef<NoteAudioPanelHandle, NoteAudioPanelProps>(
-  ({ src, onTimeUpdate, onDurationChange, onTransportChange }, ref) => {
+  ({ src, onTimeUpdate, onDurationChange, onTransportChange, isPipActive, onTogglePip }, ref) => {
     const audioRef = useRef<HTMLAudioElement>(null)
     const progressRef = useRef<HTMLDivElement>(null)
     const volumeSliderRef = useRef<HTMLDivElement>(null)
@@ -57,18 +90,7 @@ const NoteAudioPanel = forwardRef<NoteAudioPanelHandle, NoteAudioPanelProps>(
     const [volume, setVolume] = useState(1)
     const [speed, setSpeed] = useState(1)
     const [loop, setLoop] = useState(false)
-
-    /* ── expose handle ── */
-    useImperativeHandle(ref, () => ({
-      seekTo(sec: number) {
-        const a = audioRef.current
-        if (!a) return
-        a.currentTime = Math.max(0, Math.min(a.duration || 0, sec))
-      },
-      get transportNode() {
-        return transportJsx
-      },
-    }))
+    const [waveformHeights, setWaveformHeights] = useState(FALLBACK_WAVEFORM_HEIGHTS)
 
     /* ── audio 原生事件驱动 state ── */
     const handlePlay = useCallback(() => setPlaying(true), [])
@@ -101,7 +123,52 @@ const NoteAudioPanel = forwardRef<NoteAudioPanelHandle, NoteAudioPanelProps>(
       if (a) setSpeed(a.playbackRate)
     }, [])
 
-    useEffect(() => { onTransportChange?.() }, [playing, progress, duration, muted, volume, speed, loop, onTransportChange])
+    useEffect(() => {
+      let cancelled = false
+
+      async function loadWaveform() {
+        setWaveformHeights(FALLBACK_WAVEFORM_HEIGHTS)
+        if (!src || typeof window === 'undefined') return
+
+        const cacheKey = `nibi:audio-waveform:${WAVEFORM_BARS}:${src}`
+        try {
+          const cached = window.sessionStorage.getItem(cacheKey)
+          if (cached) {
+            const parsed = JSON.parse(cached) as number[]
+            if (Array.isArray(parsed) && parsed.length === WAVEFORM_BARS && !cancelled) {
+              setWaveformHeights(parsed)
+              return
+            }
+          }
+
+          const AudioContextCtor = window.AudioContext || (window as Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+          if (!AudioContextCtor) return
+
+          const response = await fetch(src, { cache: 'force-cache' })
+          if (!response.ok) throw new Error('audio fetch failed')
+
+          const arrayBuffer = await response.arrayBuffer()
+          const context = new AudioContextCtor()
+          try {
+            const audioBuffer = await context.decodeAudioData(arrayBuffer.slice(0))
+            const peaks = extractWaveformPeaks(audioBuffer, WAVEFORM_BARS)
+            if (!cancelled) {
+              setWaveformHeights(peaks)
+              window.sessionStorage.setItem(cacheKey, JSON.stringify(peaks))
+            }
+          } finally {
+            void context.close()
+          }
+        } catch {
+          if (!cancelled) setWaveformHeights(FALLBACK_WAVEFORM_HEIGHTS)
+        }
+      }
+
+      void loadWaveform()
+      return () => { cancelled = true }
+    }, [src])
+
+    useEffect(() => { onTransportChange?.() }, [playing, progress, duration, muted, volume, speed, loop, waveformHeights, isPipActive, onTransportChange])
 
     /* ── 交互控制 ── */
     const togglePlay = useCallback(() => {
@@ -218,14 +285,6 @@ const NoteAudioPanel = forwardRef<NoteAudioPanelHandle, NoteAudioPanelProps>(
       return () => window.removeEventListener('keydown', handleKey)
     }, [])
 
-    if (!src) {
-      return (
-        <div style={{ padding: 24, textAlign: 'center', color: 'var(--mut)', fontSize: 13 }}>
-          暂无可用音频源
-        </div>
-      )
-    }
-
     const transportJsx = (
       <>
         {/* 波形 + 进度 */}
@@ -237,12 +296,12 @@ const NoteAudioPanel = forwardRef<NoteAudioPanelHandle, NoteAudioPanelProps>(
             onPointerDown={onProgressPointerDown}
           >
             <div className="note-audio-bars note-audio-bars--bg">
-              {WAVEFORM_HEIGHTS.map((h, i) => (
+              {waveformHeights.map((h, i) => (
                 <span key={i} style={{ '--bar-h': `${h * 100}%` } as React.CSSProperties} />
               ))}
             </div>
             <div className="note-audio-bars note-audio-bars--fill">
-              {WAVEFORM_HEIGHTS.map((h, i) => (
+              {waveformHeights.map((h, i) => (
                 <span key={i} style={{ '--bar-h': `${h * 100}%` } as React.CSSProperties} />
               ))}
             </div>
@@ -274,6 +333,15 @@ const NoteAudioPanel = forwardRef<NoteAudioPanelHandle, NoteAudioPanelProps>(
           <button className={`note-audio-ctrl${loop ? ' is-on' : ''}`} onClick={toggleLoop} title="循环播放">
             <Repeat size={14} />
           </button>
+          {onTogglePip && (
+            <button
+              className={`note-audio-ctrl${isPipActive ? ' is-on' : ''}`}
+              onClick={onTogglePip}
+              title={isPipActive ? '退出后台播放' : '后台播放'}
+            >
+              <PictureInPicture2 size={14} />
+            </button>
+          )}
           <button className="note-audio-speed" onClick={cycleSpeed} title="切换倍速">
             {formatSpeed(speed)}x
           </button>
@@ -292,6 +360,36 @@ const NoteAudioPanel = forwardRef<NoteAudioPanelHandle, NoteAudioPanelProps>(
         </div>
       </>
     )
+
+    /* ── expose handle ── */
+    useImperativeHandle(ref, () => ({
+      seekTo(sec: number) {
+        const a = audioRef.current
+        if (!a) return
+        a.currentTime = Math.max(0, Math.min(a.duration || 0, sec))
+      },
+      togglePlay,
+      get isPlaying() {
+        return playing
+      },
+      get currentTime() {
+        return audioRef.current?.currentTime ?? progress * duration
+      },
+      get duration() {
+        return duration
+      },
+      get transportNode() {
+        return transportJsx
+      },
+    }), [duration, playing, progress, togglePlay, transportJsx])
+
+    if (!src) {
+      return (
+        <div style={{ padding: 24, textAlign: 'center', color: 'var(--mut)', fontSize: 13 }}>
+          暂无可用音频源
+        </div>
+      )
+    }
 
     return (
       <div className="note-audio-panel">

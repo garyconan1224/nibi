@@ -21,7 +21,7 @@ const QUICK_CARDS: { value: string; label: string; desc: string }[] = [
   { value: 'concise', label: '精简摘要', desc: '100-200 字，适合快速浏览' },
   { value: 'detailed', label: '详细要点', desc: '多级要点 + 关键词，适合深度学习' },
   { value: 'outline', label: '大纲', desc: '多级层次提纲，一眼看清结构' },
-  { value: 'lecture', label: '教学笔记', desc: '知识点/例子/重点/延伸阅读，适合课程录音' },
+  { value: 'lecture', label: '教学笔记', desc: '学完掌握→前置工具→步骤教程→常见坑→总结建议，适合教学音频' },
   { value: 'steps', label: '步骤教程', desc: '前置条件→步骤→常见坑→验收标准，适合操作类内容' },
   { value: 'quotes', label: '金句提取', desc: '5-10 条独立金句卡片，适合短视频/社媒' },
 ]

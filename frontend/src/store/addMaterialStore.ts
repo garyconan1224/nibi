@@ -1,11 +1,13 @@
 import { create } from 'zustand'
 import type { SniffResult } from '@/services/workspaces'
+import type { ItemType } from '@/types/workspace'
 
 export interface AddMaterialLaunchOptions {
   urlValue?: string
   sniffResult?: SniffResult | null
   localFile?: string
   localFileName?: string
+  localFileType?: ItemType
   localWsId?: string
   onAdded?: () => void
 }
@@ -21,6 +23,7 @@ const EMPTY_CONTEXT: AddMaterialLaunchOptions = {
   sniffResult: undefined,
   localFile: undefined,
   localFileName: undefined,
+  localFileType: undefined,
   localWsId: undefined,
   onAdded: undefined,
 }

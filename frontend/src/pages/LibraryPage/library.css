@@ -150,6 +150,32 @@
   align-self: start;
 }
 
+.batch-collection-control select {
+  height: 30px;
+  max-width: 150px;
+  border: 1px solid var(--bdr);
+  border-radius: var(--rs);
+  background: var(--srf);
+  color: var(--fg2);
+  padding: 0 26px 0 10px;
+  font-family: var(--fb);
+  font-size: var(--xs);
+  font-weight: 600;
+  outline: none;
+}
+
+.batch-collection-control select:focus {
+  border-color: var(--acc);
+  box-shadow: var(--shf);
+}
+
+.batch-collection-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 /* ── Button helpers ── */
 .btn-sm {
   display: inline-flex;
@@ -294,8 +320,9 @@
 
 .lib-page .note-grid.is-list .note-card {
   display: grid;
-  grid-template-columns: minmax(190px, 240px) minmax(0, 1fr);
-  align-items: stretch;
+  grid-template-columns: 220px minmax(0, 1fr);
+  align-items: start;
+  min-height: 164px;
 }
 
 .lib-page .note-grid.is-list .note-card:hover {
@@ -303,15 +330,21 @@
 }
 
 .lib-page .note-grid.is-list .note-cover {
-  height: 100%;
-  min-height: 156px;
+  width: calc(100% - 24px);
+  height: auto;
+  min-height: 0;
+  margin: 12px;
+  border-radius: var(--r);
+  align-self: start;
 }
 
 .lib-page .note-grid.is-list .note-card-body {
   min-width: 0;
+  min-height: 164px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  padding: 14px 16px 14px 0;
 }
 
 .lib-page .note-grid.is-list .note-summary {
@@ -323,12 +356,38 @@
    ═══════════════════════════════════════════════ */
 .collection-card {
   position: relative;
+  border-color: color-mix(in oklch, var(--acc) 32%, var(--bdr));
+  background:
+    linear-gradient(180deg, color-mix(in oklch, var(--accl) 35%, transparent), transparent 46%),
+    var(--srf);
+  box-shadow: 0 4px 16px oklch(0% 0 0 / .08);
+}
+
+.collection-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--acc), color-mix(in oklch, var(--acc) 35%, transparent));
+  z-index: 2;
+  pointer-events: none;
+}
+
+.collection-card .note-card-body {
+  background: color-mix(in oklch, var(--accl) 18%, var(--srf));
+}
+
+.collection-card .note-type-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: color-mix(in oklch, var(--acc) 82%, var(--fg));
 }
 
 .collection-cover {
   background:
-    linear-gradient(180deg, color-mix(in oklch, var(--accl) 34%, transparent), transparent 70%),
-    linear-gradient(180deg, oklch(95% 0.02 80) 0%, oklch(83% 0.01 80) 100%);
+    radial-gradient(circle at 18% 14%, color-mix(in oklch, var(--acc) 16%, transparent), transparent 26%),
+    linear-gradient(135deg, oklch(95% 0.015 88), oklch(84% 0.018 92) 45%, oklch(72% 0.012 92));
 }
 
 .collection-folder {
@@ -337,7 +396,7 @@
   right: 26px;
   bottom: 24px;
   z-index: 1;
-  padding: 18px 14px 14px;
+  padding: 14px;
   border-radius: 18px;
   background: var(--srf);
   box-shadow: 0 10px 24px oklch(0% 0 0 / .12);
@@ -358,6 +417,84 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.collection-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.collection-preview-tile {
+  position: relative;
+  min-height: 82px;
+  border: 1px solid color-mix(in oklch, var(--bdr) 76%, transparent);
+  border-radius: 14px;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--bgalt), var(--srf));
+  box-shadow: 0 4px 12px oklch(0% 0 0 / .07);
+}
+
+.collection-preview-tile img {
+  width: 100%;
+  height: 100%;
+  min-height: 82px;
+  object-fit: cover;
+  display: block;
+}
+
+.collection-preview-fallback {
+  height: 100%;
+  min-height: 82px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.collection-preview-fallback span {
+  align-self: flex-start;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: oklch(0% 0 0 / .58);
+  color: oklch(100% 0 0);
+  font-family: var(--fm);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.collection-preview-fallback strong {
+  color: var(--fg);
+  font-size: 12px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.collection-preview-tile--video {
+  background: linear-gradient(135deg, oklch(24% 0.09 255), oklch(36% 0.08 248));
+}
+
+.collection-preview-tile--audio {
+  background: linear-gradient(135deg, oklch(28% 0.09 280), oklch(40% 0.11 272));
+}
+
+.collection-preview-tile--image {
+  background: linear-gradient(135deg, oklch(88% 0.06 80), oklch(77% 0.15 48));
+}
+
+.collection-preview-tile--text,
+.collection-preview-tile--empty {
+  background: linear-gradient(135deg, oklch(98% 0.004 80), oklch(92% 0.014 80));
+}
+
+.collection-preview-tile--video .collection-preview-fallback strong,
+.collection-preview-tile--audio .collection-preview-fallback strong {
+  color: oklch(100% 0 0);
 }
 
 .collection-mini {
@@ -555,6 +692,32 @@
 }
 .sort-option:hover { color: var(--fg); background: var(--bgalt); }
 .sort-option--active { color: var(--fg); background: var(--bgalt); }
+
+@media (max-width: 760px) {
+  .lib-page .note-grid.is-list .note-card {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .lib-page .note-grid.is-list .note-cover {
+    width: 100%;
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .lib-page .note-grid.is-list .note-card-body {
+    min-height: 0;
+    padding: 13px 14px 14px;
+  }
+
+  .batch-collection-control {
+    width: 100%;
+  }
+
+  .batch-collection-control select {
+    flex: 1;
+  }
+}
 
 /* ── List view ── */
 .lv-wrapper {

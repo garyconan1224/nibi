@@ -215,18 +215,22 @@ export function MaterialCard({ item, workspaceId, progress, selected, onSelect }
         )}
       </div>
     </div>
-      <StoryboardLaunchModal
-        open={sbOpen}
-        itemName={item.name || '未命名素材'}
-        workspaceId={workspaceId}
-        framePaths={framePaths}
-        onClose={() => setSbOpen(false)}
-      />
-      <TranscriptPreviewModal
-        open={transcriptOpen}
-        sourceUrl={item.source_value}
-        onClose={() => setTranscriptOpen(false)}
-      />
+      {sbOpen && (
+        <StoryboardLaunchModal
+          open={sbOpen}
+          itemName={item.name || '未命名素材'}
+          workspaceId={workspaceId}
+          framePaths={framePaths}
+          onClose={() => setSbOpen(false)}
+        />
+      )}
+      {transcriptOpen && (
+        <TranscriptPreviewModal
+          open={transcriptOpen}
+          sourceUrl={item.source_value}
+          onClose={() => setTranscriptOpen(false)}
+        />
+      )}
     </>
   )
 }

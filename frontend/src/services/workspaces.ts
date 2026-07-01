@@ -911,10 +911,12 @@ export async function putItemNote(
 export async function exportItemNoteObsidian(
   workspaceId: string,
   itemId: string,
+  signal?: AbortSignal,
 ): Promise<Blob> {
   const res = await http.get(`${BASE}/${workspaceId}/items/${itemId}/note/export`, {
     params: { format: 'obsidian' },
     responseType: 'blob',
+    signal,
   })
   return res.data as Blob
 }
@@ -934,10 +936,12 @@ export async function downloadItemNoteExport(
   itemId: string,
   format: ItemNoteExportFormat,
   fallbackFilename: string,
+  signal?: AbortSignal,
 ): Promise<void> {
   const res = await http.get(`${BASE}/${workspaceId}/items/${itemId}/note/export`, {
     params: { format },
     responseType: 'blob',
+    signal,
   })
   const disposition = res.headers['content-disposition'] as string | undefined
   let filename = fallbackFilename

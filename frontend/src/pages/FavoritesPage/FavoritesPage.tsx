@@ -12,6 +12,7 @@ import { resolveItemRoute } from '@/lib/resolveItemRoute'
 import './favorites.css'
 
 type TabKey = 'all' | ItemType
+type KindTabKey = 'all' | 'note' | 'replica'
 
 interface FavoriteEntry {
   workspace: WorkspaceRecord
@@ -24,6 +25,12 @@ const TAB_DEFS: { key: TabKey; label: string }[] = [
   { key: 'audio', label: ITEM_TYPE_TEXT.audio },
   { key: 'image', label: ITEM_TYPE_TEXT.image },
   { key: 'text', label: ITEM_TYPE_TEXT.text },
+]
+
+const KIND_TAB_DEFS: { key: KindTabKey; label: string }[] = [
+  { key: 'all', label: '全部收藏' },
+  { key: 'note', label: '笔记收藏' },
+  { key: 'replica', label: '复刻收藏' },
 ]
 
 const TYPE_LABEL: Record<string, string> = {
@@ -64,6 +71,7 @@ export default function FavoritesPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<TabKey>('all')
+  const [kindTab, setKindTab] = useState<KindTabKey>('all')
 
   const reload = () => {
     setLoading(true)
@@ -79,21 +87,30 @@ export default function FavoritesPage() {
   }, [])
 
   const favorites = useMemo(() => collectFavorites(workspaces), [workspaces])
+  const kindCounts = useMemo(() => {
+    const acc: Record<KindTabKey, number> = { all: favorites.length, note: 0, replica: 0 }
+    for (const f of favorites) acc[f.workspace.kind] += 1
+    return acc
+  }, [favorites])
+  const scopedFavorites = useMemo(
+    () => (kindTab === 'all' ? favorites : favorites.filter((f) => f.workspace.kind === kindTab)),
+    [favorites, kindTab],
+  )
   const counts = useMemo(() => {
     const acc: Record<TabKey, number> = {
-      all: favorites.length,
+      all: scopedFavorites.length,
       video: 0,
       audio: 0,
       image: 0,
       text: 0,
     }
-    for (const f of favorites) acc[f.item.type] += 1
+    for (const f of scopedFavorites) acc[f.item.type] += 1
     return acc
-  }, [favorites])
+  }, [scopedFavorites])
 
   const filtered = useMemo(
-    () => (tab === 'all' ? favorites : favorites.filter((f) => f.item.type === tab)),
-    [favorites, tab],
+    () => (tab === 'all' ? scopedFavorites : scopedFavorites.filter((f) => f.item.type === tab)),
+    [scopedFavorites, tab],
   )
 
   return (
@@ -120,6 +137,18 @@ export default function FavoritesPage() {
       )}
 
       {/* Filter tabs */}
+      <div className="fav-kind-tabs">
+        {KIND_TAB_DEFS.map((t) => (
+          <button
+            key={t.key}
+            className={`fav-tab${kindTab === t.key ? ' fav-tab--active' : ''}`}
+            onClick={() => setKindTab(t.key)}
+          >
+            {t.label}
+            <span>{kindCounts[t.key]}</span>
+          </button>
+        ))}
+      </div>
       <div className="fav-tabs">
         {TAB_DEFS.map((t) => (
           <button
@@ -166,21 +195,23 @@ function FavoriteCard({ entry }: { entry: FavoriteEntry }) {
   const typeLabel = TYPE_LABEL[item.type] || 'ITEM'
   const coverClass = COVER_CLASS[item.type] || 'cover-video'
   const updatedLabel = new Date(item.updated_at).toLocaleString()
+  const kindLabel = workspace.kind === 'replica' ? '复刻收藏' : '笔记收藏'
 
   return (
     <Link to={resultRouteFor(entry)} style={{ textDecoration: 'none' }}>
       <article className="note-card" data-kind={item.type}>
         <div className={`note-cover ${coverClass}`}>
           <span className="media-chip">{typeLabel}</span>
-          <span className="status-pill status-done">已收藏</span>
+          <span className="status-pill status-done">{kindLabel}</span>
         </div>
         <div className="note-card-body">
           <div className="note-title-row">
             <span className="note-type-dot" />
             <h3>{item.name || item.source_value}</h3>
           </div>
-          <p className="note-summary">{workspace.name}</p>
+          <p className="note-summary">{workspace.name} · {kindLabel}</p>
           <div className="note-meta-row">
+            <span>{workspace.kind === 'replica' ? '复刻' : '笔记'}</span>
             <span>更新于 {updatedLabel}</span>
           </div>
           <div className="note-card-actions">

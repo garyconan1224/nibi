@@ -82,6 +82,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
       openAddMaterial({
         localFile: itemId,
         localFileName: file.name,
+        localFileType: item.type,
         localWsId: ws.workspace_id,
         onAdded: onTaskCreated,
       })

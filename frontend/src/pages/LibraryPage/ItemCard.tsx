@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import type { LibraryItem } from '@/services/library'
-import { Mic, Music, Play } from 'lucide-react'
+import { Mic, Music, Play, Star } from 'lucide-react'
 import { resolveItemRoute } from '@/lib/resolveItemRoute'
 import {
   STATE_LABEL,
@@ -23,9 +23,10 @@ interface ItemCardProps {
   selectMode?: boolean
   onToggleSelect?: (itemId: string, workspaceId: string) => void
   onDelete?: (item: LibraryItem) => void
+  onToggleFavorite?: (item: LibraryItem) => void
 }
 
-export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete }: ItemCardProps) {
+export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete, onToggleFavorite }: ItemCardProps) {
   const navigate = useNavigate()
   const state = primaryStatusToState(item.primary_task_status)
   const stateLabel = STATE_LABEL[state] || 'queued'
@@ -50,13 +51,14 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
   if (item.has_chapters) summaryBits.push('章节')
   if (item.type === 'video' && (item.frames_count ?? 0) > 0) summaryBits.push(`${item.frames_count} 帧`)
   if (item.has_subtitle) summaryBits.push('字幕')
-  const summaryLine = summaryBits.length > 0
+  const fallbackSummaryLine = summaryBits.length > 0
     ? summaryBits.join(' · ')
     : state === 'error'
       ? '处理失败，请检查链接或重新提交。'
       : isRunning
         ? '正在生成结构化笔记与素材索引。'
         : '等待开始分析。'
+  const summaryLine = item.description?.trim() || fallbackSummaryLine
 
   const actionLabel = isDone ? '打开' : '进度'
   const progressPct = isDone ? 100 : isRunning ? 46 : isError ? 100 : 18
@@ -156,6 +158,13 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete 
             </span>
           ) : (
             <>
+              <button
+                onClick={(e) => { e.stopPropagation(); onToggleFavorite?.(item) }}
+                title={item.favorite ? '取消收藏' : '收藏'}
+                className={`card-fav-btn${item.favorite ? ' card-fav-btn--active' : ''}`}
+              >
+                <Star size={13} fill={item.favorite ? 'currentColor' : 'none'} />
+              </button>
               <button
                 onClick={(e) => { e.stopPropagation(); onDelete?.(item) }}
                 title="删除"

@@ -7,23 +7,20 @@
  *
  * 子组件拆分：
  *   - TagChips：frontmatter.tags → 标签 chips 展示
- *   - SourcePanel：source.md 只读区（可折叠）
  *   - NoteEditor：轻量 CodeMirror 编辑器（注册到 lnEditorStore，复用截图插入能力）
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import { ArrowLeft, Bold, BookOpenCheck, Brain, Camera, Check, ChevronDown, ChevronRight, Download, ExternalLink, FileDown, FileText, FileType, Image, List, MessageCircle, Minus, Pause, Pencil, Play, Plus, Presentation, Sparkles, Subtitles, Trash2, Type, X } from 'lucide-react'
+import { ArrowLeft, Bold, BookOpenCheck, Brain, Camera, Check, ChevronDown, Download, ExternalLink, FileDown, FileText, FileType, Image, List, MessageCircle, Minus, Pause, Pencil, Play, Plus, Presentation, Sparkles, Subtitles, Trash2, Type, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { downloadItemNoteExport, exportItemNoteObsidian, getItemNote, putItemNote, type ItemNoteExportFormat } from '@/services/workspaces'
 import type { VideoResultTranscriptLine } from '@/services/workspaces'
 import type { ItemNote } from '@/types/workspace'
 import { createSummary, deleteSummary, listSummaries, renameSummary, type ItemSummary } from '@/services/summaries'
-import { MarkdownToc, extractToc, flattenText, slugify } from '@/components/MarkdownToc'
-import { platformLabelFromUrl, renderNoteTimestampChildren } from './note-shell-utils'
+import { MarkdownToc, extractToc, slugify } from '@/components/MarkdownToc'
+import { platformLabelFromUrl } from './note-shell-utils'
 import { Badge } from '@/components/ui/badge'
 import { SYSTEM_TAG_DIMENSIONS } from '@/constants/tagDimensions'
 import NoteMediaCompanion, { type NoteMediaCompanionHandle } from './NoteMediaCompanion'
@@ -40,11 +37,15 @@ import { useLnEditorStore } from '@/store/lnEditorStore'
 import { SourceMdModal } from './SourceMdModal'
 import { withStatusToast } from '@/lib/statusToast'
 
-// remarkGfm 类型与 react-markdown 不完全兼容，统一 cast 一次
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const remarkPlugins: any[] = [remarkGfm]
-
 type NoteExportBusy = ItemNoteExportFormat | 'markdown' | 'obsidian' | 'transcript' | 'source_md'
+type OperationNoticeTone = 'loading' | 'success' | 'error' | 'info'
+type OperationNotice = {
+  id: number
+  message: string
+  tone: OperationNoticeTone
+  actionLabel?: string
+  onAction?: () => void
+}
 
 /* ────────────────── helpers ────────────────── */
 
@@ -119,6 +120,20 @@ const FONT_WEIGHT_VALUE: Record<NoteEditorPrefs['fontWeight'], number> = {
 
 const PIP_WIDTHS = [240, 320, 440]
 
+type AudioChapter = {
+  start: number
+  end: number
+  title: string
+  summary: string
+  keywords: string[]
+}
+
+const AUDIO_KEYWORD_STOPWORDS = new Set([
+  '这个', '那个', '然后', '就是', '我们', '你们', '他们', '大家', '可以', '一个', '一些', '进行',
+  '如果', '因为', '所以', '但是', '或者', '以及', '其实', '比较', '时候', '现在', '需要', '没有',
+  'the', 'and', 'for', 'with', 'that', 'this', 'you', 'your', 'are', 'was', 'can',
+])
+
 function readEditorPrefs(): NoteEditorPrefs {
   if (typeof window === 'undefined') return DEFAULT_EDITOR_PREFS
   try {
@@ -161,6 +176,74 @@ function formatTimecode(sec: number): string {
   const ss = s % 60
   const mm = h > 0 ? String(m).padStart(2, '0') : String(m)
   return h > 0 ? `${h}:${mm}:${String(ss).padStart(2, '0')}` : `${mm}:${String(ss).padStart(2, '0')}`
+}
+
+function compactText(text: string, max = 42): string {
+  const normalized = text.replace(/\s+/g, ' ').trim()
+  if (normalized.length <= max) return normalized
+  return `${normalized.slice(0, max)}...`
+}
+
+function extractAudioKeywords(text: string, max = 4): string[] {
+  const scores = new Map<string, number>()
+  const normalized = text
+    .replace(/[，。！？、；：,.!?;:()[\]{}"'“”‘’]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  for (const token of normalized.match(/[A-Za-z][A-Za-z0-9.+#-]{2,}/g) ?? []) {
+    const key = token.toLowerCase()
+    if (AUDIO_KEYWORD_STOPWORDS.has(key)) continue
+    scores.set(token, (scores.get(token) ?? 0) + Math.min(4, token.length / 3))
+  }
+
+  const cjk = normalized.replace(/[^\u4e00-\u9fff]/g, '')
+  for (let size = 4; size >= 2; size -= 1) {
+    for (let idx = 0; idx <= cjk.length - size; idx += size === 2 ? 2 : 1) {
+      const key = cjk.slice(idx, idx + size)
+      if (AUDIO_KEYWORD_STOPWORDS.has(key)) continue
+      scores.set(key, (scores.get(key) ?? 0) + size)
+    }
+  }
+
+  return [...scores.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].length - b[0].length)
+    .map(([keyword]) => keyword)
+    .filter((keyword, idx, arr) => arr.findIndex((other) => other.includes(keyword) || keyword.includes(other)) === idx)
+    .slice(0, max)
+}
+
+function buildAudioChapters(transcript: VideoResultTranscriptLine[]): AudioChapter[] {
+  if (transcript.length === 0) return []
+  const chapters: AudioChapter[] = []
+  let group: VideoResultTranscriptLine[] = []
+  let groupStart = transcript[0]?.t_sec ?? 0
+
+  const flush = (nextStart?: number) => {
+    if (group.length === 0) return
+    const text = group.map((line) => line.text).join(' ')
+    const keywords = extractAudioKeywords(text, 4)
+    chapters.push({
+      start: groupStart,
+      end: nextStart ?? group[group.length - 1]?.t_sec ?? groupStart,
+      title: keywords.length > 0 ? keywords.slice(0, 3).join(' / ') : compactText(text, 18),
+      summary: compactText(text, 54),
+      keywords,
+    })
+    group = []
+  }
+
+  for (const line of transcript) {
+    if (group.length === 0) groupStart = line.t_sec
+    const elapsed = line.t_sec - groupStart
+    if (group.length > 0 && (elapsed >= 42 || group.length >= 7)) {
+      flush(line.t_sec)
+      groupStart = line.t_sec
+    }
+    group.push(line)
+  }
+  flush()
+  return chapters.slice(0, 12)
 }
 
 function safeFilename(name: string): string {
@@ -237,7 +320,7 @@ function extensionForExport(format: ItemNoteExportFormat): string {
 
 function labelForNoteExport(format: ItemNoteExportFormat): string {
   const map: Record<ItemNoteExportFormat, string> = {
-    md: '原始 note.md',
+    md: '完整 note.md',
     html: 'HTML',
     pdf: 'PDF',
     docx: 'Word',
@@ -248,47 +331,40 @@ function labelForNoteExport(format: ItemNoteExportFormat): string {
   return map[format]
 }
 
-interface ReadOnlyMarkdownProps {
-  markdown: string
-  onSeek: (sec: number) => void
+function sourceMarkerFromUrl(url?: string): string | null {
+  if (!url) return null
+  try {
+    const parsed = new URL(url)
+    const bilibiliId = parsed.pathname.match(/\/video\/(BV[\w]+)/i)?.[1]
+    if (bilibiliId) return bilibiliId
+    const youtubeId = parsed.searchParams.get('v')
+    if (youtubeId) return youtubeId
+    if (parsed.hostname.includes('youtu.be')) {
+      const shortId = parsed.pathname.replace(/^\//, '').split('/')[0]
+      return shortId || null
+    }
+    return null
+  } catch {
+    return null
+  }
 }
 
-function ReadOnlyMarkdown({ markdown, onSeek }: ReadOnlyMarkdownProps) {
-  return (
-    <ReactMarkdown
-      remarkPlugins={remarkPlugins}
-      components={{
-        h2({ children }) {
-          const text = flattenText(children)
-          return <h2 id={slugify(text)}>{renderNoteTimestampChildren(children, onSeek)}</h2>
-        },
-        h3({ children }) {
-          const text = flattenText(children)
-          return <h3 id={slugify(text)}>{renderNoteTimestampChildren(children, onSeek)}</h3>
-        },
-        p({ children }) {
-          return <p>{renderNoteTimestampChildren(children, onSeek)}</p>
-        },
-        li({ children }) {
-          return <li>{renderNoteTimestampChildren(children, onSeek)}</li>
-        },
-        a({ children, href }) {
-          return (
-            <a href={href} target={href?.startsWith('http') ? '_blank' : undefined} rel="noreferrer">
-              {renderNoteTimestampChildren(children, onSeek)}
-            </a>
-          )
-        },
-      }}
-    >
-      {markdown}
-    </ReactMarkdown>
-  )
+function isCanceledExportError(error: unknown): boolean {
+  const err = error as { code?: string; name?: string; message?: string }
+  return err?.code === 'ERR_CANCELED'
+    || err?.name === 'AbortError'
+    || err?.name === 'CanceledError'
+    || err?.message === 'canceled'
 }
 
-/** 视频笔记视图标签：中列只展示「标准总结」，两种格式（蓝图 §3.5）。
- *  富文本 = 渲染态（ReactMarkdown）；md格式 = 源码态（CodeMirror，可编辑）。
- *  源 md（转写+截帧原始内容）在右侧操作区，不是中列标签。 */
+function showCanceledExportToast(toastId: string, message: string): void {
+  toast.dismiss(toastId)
+  window.setTimeout(() => {
+    toast.info(message, { id: `${toastId}-cancelled` })
+  }, 0)
+}
+
+/** frontmatter.tags → 标签 chips 展示。 */
 /* ────────────────── TagChips ────────────────── */
 
 interface TagChipsProps {
@@ -324,48 +400,6 @@ function TagChips({ tags }: TagChipsProps) {
   )
 }
 
-/* ────────────────── SourcePanel ────────────────── */
-
-interface SourcePanelProps {
-  sourceMd: string
-  /** 外部受控开关（可选）；不传则内部自管 */
-  open?: boolean
-  onToggle?: () => void
-}
-
-/** source.md 只读区（可折叠）。 */
-function SourcePanel({ sourceMd, open: controlledOpen, onToggle }: SourcePanelProps) {
-  const [internalOpen, setInternalOpen] = useState(false)
-  const open = controlledOpen ?? internalOpen
-  const toggle = onToggle ?? (() => setInternalOpen((v) => !v))
-
-  if (!sourceMd) return null
-
-  return (
-    <div style={{ borderTop: '1px solid var(--bdr)' }}>
-      <button
-        onClick={toggle}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          width: '100%', padding: '10px 20px',
-          background: 'none', border: 'none', cursor: 'pointer',
-          fontSize: 13, fontWeight: 600, color: 'var(--fg2)',
-        }}
-      >
-        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        原文
-      </button>
-      {open && (
-        <div style={{ padding: '0 20px 16px', fontSize: 13, lineHeight: 1.7, color: 'var(--mut)' }}>
-          <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', margin: 0 }}>
-            {sourceMd}
-          </pre>
-        </div>
-      )}
-    </div>
-  )
-}
-
 /* ────────────────── NoteShell ────────────────── */
 
 export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { workspaceId?: string; itemId?: string } = {}) {
@@ -387,6 +421,10 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const [aiToolsOpen, setAiToolsOpen] = useState(false)
   const aiToolsDropRef = useRef<HTMLDivElement>(null)
   const exportDropRef = useRef<HTMLDivElement>(null)
+  const exportAbortRef = useRef<AbortController | null>(null)
+  const operationNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const operationNoticeSeqRef = useRef(0)
+  const [operationNotice, setOperationNotice] = useState<OperationNotice | null>(null)
   // 新建总结（复用 NewSummaryModal）
   const [showNewSummaryModal, setShowNewSummaryModal] = useState(false)
   const [creatingSummary, setCreatingSummary] = useState(false)
@@ -440,6 +478,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const [audioTransportNode, setAudioTransportNode] = useState<ReactNode>(null)
   const handleAudioTransportChange = useCallback(() => {
     setAudioTransportNode(audioRef.current?.transportNode ?? null)
+    setPipPlaying(audioRef.current?.isPlaying ?? false)
   }, [])
   const handleAudioDurationChange = useCallback((d: number) => setAudioDuration(d), [])
 
@@ -489,6 +528,37 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     window.localStorage.setItem(EDITOR_PREFS_STORAGE_KEY, JSON.stringify(editorPrefs))
   }, [editorPrefs])
 
+  useEffect(() => {
+    return () => {
+      exportAbortRef.current?.abort()
+      exportAbortRef.current = null
+      if (operationNoticeTimerRef.current) {
+        clearTimeout(operationNoticeTimerRef.current)
+        operationNoticeTimerRef.current = null
+      }
+    }
+  }, [])
+
+  const showOperationNotice = useCallback((
+    message: string,
+    tone: OperationNoticeTone,
+    action?: Pick<OperationNotice, 'actionLabel' | 'onAction'>,
+  ) => {
+    if (operationNoticeTimerRef.current) {
+      clearTimeout(operationNoticeTimerRef.current)
+      operationNoticeTimerRef.current = null
+    }
+    const id = operationNoticeSeqRef.current + 1
+    operationNoticeSeqRef.current = id
+    setOperationNotice({ id, message, tone, ...action })
+    if (tone !== 'loading') {
+      operationNoticeTimerRef.current = setTimeout(() => {
+        setOperationNotice((current) => (current?.id === id ? null : current))
+        operationNoticeTimerRef.current = null
+      }, 4200)
+    }
+  }, [])
+
   const notePageStyle = useMemo<CSSProperties>(
     () => ({
       '--note-left-width': `${noteLeftPct}%`,
@@ -501,11 +571,13 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     [noteLeftPct, editorPrefs],
   )
 
+  const currentNoteType = String(((note?.frontmatter ?? {}) as Record<string, unknown>).type ?? '')
+  const isCurrentAudioNote = currentNoteType === 'audio' && !!note?.media?.audio
   const pipWidth = PIP_WIDTHS[pipSizeIndex]
 
   useEffect(() => {
     if (!isPip || typeof window === 'undefined') return
-    const estimatedHeight = Math.round((pipWidth * 9) / 16 + 86)
+    const estimatedHeight = isCurrentAudioNote ? 236 : Math.round((pipWidth * 9) / 16 + 86)
     setPipPosition((current) => {
       const next = current ?? {
         x: Math.max(12, window.innerWidth - pipWidth - 24),
@@ -516,7 +588,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
         y: clampNumber(next.y, 12, Math.max(12, window.innerHeight - estimatedHeight - 12)),
       }
     })
-  }, [isPip, pipWidth])
+  }, [isPip, isCurrentAudioNote, pipWidth])
 
   useEffect(() => {
     setIsPip(false)
@@ -635,6 +707,19 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     videoRef.current?.seekTo(pct * videoDuration)
   }, [videoDuration])
 
+  const handleAudioPipTogglePlay = useCallback(() => {
+    audioRef.current?.togglePlay()
+    setPipPlaying(audioRef.current?.isPlaying ?? false)
+  }, [])
+
+  const handleAudioPipProgressClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
+    const duration = audioRef.current?.duration || audioDuration
+    if (!duration) return
+    const rect = event.currentTarget.getBoundingClientRect()
+    const pct = clampNumber((event.clientX - rect.left) / rect.width, 0, 1)
+    audioRef.current?.seekTo(pct * duration)
+  }, [audioDuration])
+
   // 点击外部关闭模板下拉
   useEffect(() => {
     if (!templateDropOpen) return
@@ -680,6 +765,9 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     mediaCompanionRef.current?.seekTo(sec)
   }, [])
 
+  const transcriptLines = useMemo<VideoResultTranscriptLine[]>(() => (
+    Array.isArray(note?.transcript) ? note.transcript as VideoResultTranscriptLine[] : []
+  ), [note?.transcript])
   const videoFrames = useMemo(() => note?.media?.frames ?? [], [note?.media?.frames])
   const activeFrameIdx = useMemo(() => {
     let activeIdx = -1
@@ -689,16 +777,31 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     return activeIdx
   }, [currentTime, videoFrames])
 
-  const videoSubtitle = useMemo(() => {
-    if (!Array.isArray(note?.transcript)) return ''
-    const lines = note.transcript as VideoResultTranscriptLine[]
+  const activeTranscriptLine = useMemo(() => {
     let active: VideoResultTranscriptLine | null = null
-    for (const line of lines) {
+    for (const line of transcriptLines) {
       if (line.t_sec <= currentTime + 0.35) active = line
       else break
     }
-    return active?.text ?? ''
-  }, [currentTime, note?.transcript])
+    return active
+  }, [currentTime, transcriptLines])
+  const audioChapters = useMemo(() => buildAudioChapters(transcriptLines), [transcriptLines])
+  const activeAudioChapterIdx = useMemo(() => {
+    let activeIdx = -1
+    for (let idx = 0; idx < audioChapters.length; idx += 1) {
+      if (audioChapters[idx].start <= currentTime + 0.35) activeIdx = idx
+      else break
+    }
+    return activeIdx
+  }, [audioChapters, currentTime])
+  const videoSubtitle = activeTranscriptLine?.text ?? ''
+  const audioSubtitle = activeTranscriptLine?.text ?? ''
+
+  const handleOpenImmersive = useCallback(() => {
+    setImmersiveOpen(true)
+    const noteType = String(((note?.frontmatter ?? {}) as Record<string, unknown>).type ?? '')
+    if (noteType === 'audio' && note?.media?.audio) setIsPip(true)
+  }, [note])
 
   const fetchNote = useCallback(async () => {
     setLoading(true)
@@ -820,58 +923,74 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     try {
       await withStatusToast(
         async () => {
-          downloadMarkdownFile(currentBody, title)
+          downloadMarkdownFile(currentBody, `${title}-正文`)
         },
         {
           id: 'note-export-markdown',
-          loading: '正在导出 Markdown…',
-          success: 'Markdown 已开始下载',
-          error: 'Markdown 导出失败，请重试',
+          loading: '正在导出当前正文…',
+          success: '当前正文已开始下载',
+          error: '当前正文导出失败，请重试',
         },
       )
       setExportOpen(false)
     } catch (err) {
-      console.error('Markdown 导出失败:', err)
+      console.error('当前正文导出失败:', err)
     } finally {
       setExportBusy(null)
     }
   }, [currentBody, note])
 
   const handleExportObsidian = useCallback(async () => {
+    const controller = new AbortController()
+    exportAbortRef.current?.abort()
+    exportAbortRef.current = controller
+    const toastId = 'note-export-obsidian'
+    const cancelExport = () => {
+      controller.abort()
+      showOperationNotice('已取消导出 Obsidian 包', 'info')
+      showCanceledExportToast(toastId, '已取消导出 Obsidian 包')
+    }
     setExportBusy('obsidian')
+    showOperationNotice('正在导出 Obsidian 包…', 'loading', {
+      actionLabel: '取消',
+      onAction: cancelExport,
+    })
+    toast.loading('正在导出 Obsidian 包…', {
+      id: toastId,
+    })
     try {
-      await withStatusToast(
-        async () => {
-          const blob = await exportItemNoteObsidian(workspaceId, itemId)
-          const title = String((note?.frontmatter as Record<string, unknown> | undefined)?.title ?? 'note')
-          const url = URL.createObjectURL(blob)
-          const a = document.createElement('a')
-          a.href = url
-          a.download = `${safeFilename(title)}-obsidian.zip`
-          document.body.appendChild(a)
-          a.click()
-          a.remove()
-          URL.revokeObjectURL(url)
-        },
-        {
-          id: 'note-export-obsidian',
-          loading: '正在导出 Obsidian 包…',
-          success: 'Obsidian 包已开始下载',
-          error: 'Obsidian 包导出失败，请重试',
-        },
-      )
+      const blob = await exportItemNoteObsidian(workspaceId, itemId, controller.signal)
+      const title = String((note?.frontmatter as Record<string, unknown> | undefined)?.title ?? 'note')
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${safeFilename(title)}-obsidian.zip`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      showOperationNotice('Obsidian 包已开始下载', 'success')
+      toast.success('Obsidian 包已开始下载', { id: toastId })
       setExportOpen(false)
     } catch (err) {
+      if (isCanceledExportError(err)) {
+        showOperationNotice('已取消导出 Obsidian 包', 'info')
+        showCanceledExportToast(toastId, '已取消导出 Obsidian 包')
+        return
+      }
+      showOperationNotice('Obsidian 包导出失败，请重试', 'error')
+      toast.error('Obsidian 包导出失败，请重试', { id: toastId })
       console.error('Obsidian 导出失败:', err)
     } finally {
+      if (exportAbortRef.current === controller) exportAbortRef.current = null
       setExportBusy(null)
     }
-  }, [workspaceId, itemId, note])
+  }, [workspaceId, itemId, note, showOperationNotice])
 
   const handleExportTranscript = useCallback(async () => {
     const transcriptText = formatTranscriptForPrompt(note?.transcript)
     if (!transcriptText) {
-      toast.error('暂无可导出的原文对照')
+      toast.error('暂无可导出的转写文本')
       return
     }
     const title = String((note?.frontmatter as Record<string, unknown> | undefined)?.title ?? 'transcript')
@@ -879,18 +998,18 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     try {
       await withStatusToast(
         async () => {
-          downloadTextFile(transcriptText, `${title}-原文对照`)
+          downloadTextFile(transcriptText, `${title}-转写文本`)
         },
         {
           id: 'note-export-transcript',
-          loading: '正在导出原文对照…',
-          success: '原文对照已开始下载',
-          error: '原文对照导出失败，请重试',
+          loading: '正在导出转写文本…',
+          success: '转写文本已开始下载',
+          error: '转写文本导出失败，请重试',
         },
       )
       setExportOpen(false)
     } catch (err) {
-      console.error('原文对照导出失败:', err)
+      console.error('转写文本导出失败:', err)
     } finally {
       setExportBusy(null)
     }
@@ -899,33 +1018,52 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const handleDownloadNoteExport = useCallback(async (format: ItemNoteExportFormat) => {
     const title = String((note?.frontmatter as Record<string, unknown> | undefined)?.title ?? 'note')
     const label = labelForNoteExport(format)
+    const controller = new AbortController()
+    exportAbortRef.current?.abort()
+    exportAbortRef.current = controller
+    const toastId = `note-export-${format}`
+    const cancelExport = () => {
+      controller.abort()
+      showOperationNotice(`已取消导出${label}`, 'info')
+      showCanceledExportToast(toastId, `已取消导出${label}`)
+    }
     setExportBusy(format)
+    showOperationNotice(`正在导出${label}…`, 'loading', {
+      actionLabel: '取消',
+      onAction: cancelExport,
+    })
+    toast.loading(`正在导出${label}…`, {
+      id: toastId,
+    })
     try {
-      await withStatusToast(
-        () => downloadItemNoteExport(
-          workspaceId,
-          itemId,
-          format,
-          `${safeFilename(title)}.${extensionForExport(format)}`,
-        ),
-        {
-          id: `note-export-${format}`,
-          loading: `正在导出${label}…`,
-          success: `${label}已开始下载`,
-          error: `${label} 导出失败，请稍后重试`,
-        },
+      await downloadItemNoteExport(
+        workspaceId,
+        itemId,
+        format,
+        `${safeFilename(title)}.${extensionForExport(format)}`,
+        controller.signal,
       )
+      showOperationNotice(`${label}已开始下载`, 'success')
+      toast.success(`${label}已开始下载`, { id: toastId })
       setExportOpen(false)
     } catch (err) {
+      if (isCanceledExportError(err)) {
+        showOperationNotice(`已取消导出${label}`, 'info')
+        showCanceledExportToast(toastId, `已取消导出${label}`)
+        return
+      }
+      showOperationNotice(`${label} 导出失败，请稍后重试`, 'error')
+      toast.error(`${label} 导出失败，请稍后重试`, { id: toastId })
       console.error('笔记导出失败:', err)
     } finally {
+      if (exportAbortRef.current === controller) exportAbortRef.current = null
       setExportBusy(null)
     }
-  }, [workspaceId, itemId, note])
+  }, [workspaceId, itemId, note, showOperationNotice])
 
   const handleDownloadSourceMd = useCallback(async () => {
     if (!note?.source_md) {
-      toast.error('暂无源 md')
+      toast.error('暂无原始素材 Markdown')
       return
     }
     const title = String((note.frontmatter as Record<string, unknown>)?.title ?? 'source')
@@ -933,17 +1071,17 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     try {
       await withStatusToast(
         async () => {
-          downloadMarkdownFile(note.source_md, `${title}-source`)
+          downloadMarkdownFile(note.source_md, `${title}-原始素材`)
         },
         {
           id: 'note-export-source-md',
-          loading: '正在导出源 md…',
-          success: '源 md 已开始下载',
-          error: '源 md 导出失败，请重试',
+          loading: '正在导出原始素材 Markdown…',
+          success: '原始素材 Markdown 已开始下载',
+          error: '原始素材 Markdown 导出失败，请重试',
         },
       )
     } catch (err) {
-      console.error('源 md 导出失败:', err)
+      console.error('原始素材 Markdown 导出失败:', err)
     } finally {
       setExportBusy(null)
     }
@@ -957,6 +1095,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     const toastId = `note-summary-creating-${opts.template}`
     setCreatingSummary(true)
     setShowNewSummaryModal(false)
+    showOperationNotice(`正在生成${templateName}…`, 'loading')
     toast.loading(`正在生成${templateName}…`, { id: toastId })
     try {
       const s = await createSummary(workspaceId, itemId, opts.template, opts.background, {
@@ -964,23 +1103,26 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
         model: opts.model,
         search_web: opts.searchWeb,
       })
+      showOperationNotice(`${templateName} v${s.version} 生成完成`, 'success')
       toast.success(`${templateName} v${s.version} 生成完成`, { id: toastId })
       refreshSummaries()
     } catch (err: unknown) {
       const axiosData = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
       if (axiosData && axiosData.includes('chat model')) {
+        showOperationNotice('请先在设置中配置 LLM 模型', 'error')
         toast.error('请先在设置中配置 LLM 模型', {
           id: toastId,
           action: { label: '去设置', onClick: () => navigate('/settings/models') },
         })
       } else {
         const msg = err instanceof Error ? err.message : '生成失败'
+        showOperationNotice(msg, 'error')
         toast.error(msg, { id: toastId })
       }
     } finally {
       setCreatingSummary(false)
     }
-  }, [workspaceId, itemId, refreshSummaries, navigate])
+  }, [workspaceId, itemId, refreshSummaries, navigate, showOperationNotice])
 
   // 删除总结（从顶栏版本下拉触发）
   const handleDeleteSummary = useCallback(async (summaryId: string) => {
@@ -1095,10 +1237,12 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const images = note.media?.images ?? []
   const imageInfos = note.media?.image_infos ?? []
   const currentInfo = imageInfos[selectedImageIdx]
-  const transcriptCount = Array.isArray(note.transcript) ? note.transcript.length : 0
+  const transcriptCount = transcriptLines.length
   const sourceLabel = sourceUrl ? platformLabelFromUrl(sourceUrl) : '本地素材'
   const effectiveVideoDuration = note.media?.video?.duration || videoDuration
   const effectiveAudioDuration = audioDuration
+  const sourceMarker = sourceMarkerFromUrl(sourceUrl)
+  const mediaDuration = isVideoNote ? effectiveVideoDuration : isAudioNote ? effectiveAudioDuration : 0
   const saveStatusNode = (
     <span className={`nibi-note-save nibi-note-save--${saveStatus}`}>
       {saveStatus === 'saving' && '保存中…'}
@@ -1107,6 +1251,34 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
       {saveStatus === 'idle' && '自动保存'}
     </span>
   )
+  const noteMetaRows = [
+    { label: '来源', value: sourceLabel },
+    itemType ? { label: '类型', value: TYPE_LABEL[itemType] ?? itemType } : null,
+    mediaDuration ? { label: '时长', value: formatTimecode(mediaDuration) } : null,
+    sourceMarker ? { label: '素材 ID', value: sourceMarker } : null,
+    transcriptCount > 0 ? { label: '转写', value: `${transcriptCount} 条` } : null,
+    isVideoNote && videoFrames.length > 0 ? { label: '关键帧', value: `${videoFrames.length} 张` } : null,
+    isImageNote && images.length > 0 ? { label: '图片', value: `${images.length} 张` } : null,
+    summaries.length > 0 ? { label: '总结', value: `${summaries.length} 个版本` } : null,
+    noteCreatedAt ? { label: '创建', value: noteCreatedAt } : null,
+  ].filter((row): row is { label: string; value: string } => Boolean(row?.value))
+  const noteMetaPanel = (noteMetaRows.length > 0 || hasTags) ? (
+    <div className="nibi-note-meta-strip">
+      <div className="nibi-note-meta-grid">
+        {noteMetaRows.map((row) => (
+          <span key={row.label} className="nibi-note-meta-chip">
+            <strong>{row.label}</strong>
+            <span>{row.value}</span>
+          </span>
+        ))}
+      </div>
+      {hasTags && (
+        <div className="nibi-note-meta-tags">
+          <TagChips tags={tags} />
+        </div>
+      )}
+    </div>
+  ) : null
 
   // ── 提取正文 JSX（视频 / 非视频布局复用）──
   const noteContent = (
@@ -1330,19 +1502,34 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
             </a>
           )}
           {note.source_md && (
-            <button className="nibi-note-bar-btn nibi-note-bar-btn--label" onClick={() => setSourceMdOpen(true)} title="查看源 md">
-              <FileText size={14} /> 源 md
+            <button
+              className="nibi-note-bar-btn nibi-note-bar-btn--label"
+              onClick={() => {
+                setExportOpen(false)
+                setSourceMdOpen(true)
+              }}
+              title="查看原始素材 Markdown"
+            >
+              <FileText size={14} /> 原始素材
             </button>
           )}
           <div style={{ position: 'relative' }} ref={exportDropRef}>
-            <button className="nibi-note-bar-btn nibi-note-bar-btn--label" onClick={() => setExportOpen((v) => !v)} title="导出"><Download size={14} /> 导出<ChevronDown size={11} /></button>
+            <button
+              className="nibi-note-bar-btn nibi-note-bar-btn--label"
+              onClick={() => {
+                setAiToolsOpen(false)
+                setExportOpen((v) => !v)
+              }}
+              title="导出"
+            >
+              <Download size={14} /> 导出<ChevronDown size={11} />
+            </button>
             {exportOpen && (
               <div className="nibi-note-export-menu" style={{ position: 'absolute', right: 0, top: 34, zIndex: 20, minWidth: 200, padding: '4px', border: '1px solid var(--bdr)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', boxShadow: 'var(--shadow-md)' }}>
-                <button className="btn-ghost" onClick={handleExportMarkdown} disabled={!!exportBusy} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><FileText size={13} /> {exportBusy === 'markdown' ? '导出中…' : 'Markdown'}</button>
-                <button className="btn-ghost" onClick={() => handleDownloadNoteExport('md')} disabled={!!exportBusy} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><FileText size={13} /> {exportBusy === 'md' ? '导出中…' : '原始 note.md'}</button>
+                <button className="btn-ghost" onClick={handleExportMarkdown} disabled={!!exportBusy} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><FileText size={13} /> {exportBusy === 'markdown' ? '导出中…' : '当前正文.md'}</button>
                 <button className="btn-ghost" onClick={handleExportObsidian} disabled={!!exportBusy} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><BookOpenCheck size={13} /> {exportBusy === 'obsidian' ? '导出中…' : 'Obsidian 包'}</button>
                 {(isVideoNote || isAudioNote) && (
-                  <button className="btn-ghost" onClick={handleExportTranscript} disabled={!!exportBusy} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><Subtitles size={13} /> {exportBusy === 'transcript' ? '导出中…' : '原文对照（txt）'}</button>
+                  <button className="btn-ghost" onClick={handleExportTranscript} disabled={!!exportBusy} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><Subtitles size={13} /> {exportBusy === 'transcript' ? '导出中…' : '转写文本.txt'}</button>
                 )}
                 {[
                   { icon: <FileText size={13} />, label: 'HTML', format: 'html' as const },
@@ -1366,13 +1553,22 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
           </div>
           <button
             className="nibi-note-bar-btn nibi-note-bar-btn--label nibi-note-bar-btn--accent"
-            onClick={() => setImmersiveOpen(true)}
+            onClick={handleOpenImmersive}
             title="打开沉浸式笔记"
           >
             <Sparkles size={14} /> 沉浸式
           </button>
           <div style={{ position: 'relative' }} ref={aiToolsDropRef}>
-            <button className="nibi-note-bar-btn nibi-note-bar-btn--label nibi-note-bar-btn--accent" onClick={() => setAiToolsOpen((v) => !v)} title="AI 工具"><Brain size={14} /> AI 工具<ChevronDown size={11} /></button>
+            <button
+              className="nibi-note-bar-btn nibi-note-bar-btn--label nibi-note-bar-btn--accent"
+              onClick={() => {
+                setExportOpen(false)
+                setAiToolsOpen((v) => !v)
+              }}
+              title="AI 工具"
+            >
+              <Brain size={14} /> AI 工具<ChevronDown size={11} />
+            </button>
             {aiToolsOpen && (
               <div style={{ position: 'absolute', right: 0, top: 34, zIndex: 20, minWidth: 180, padding: '4px', border: '1px solid var(--bdr)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', boxShadow: 'var(--shadow-md)' }}>
                 <button
@@ -1384,7 +1580,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                   style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
                 >
                   <MessageCircle size={13} />
-                  问 AI
+                  基于当前笔记问 AI
                 </button>
                 <button className="btn-ghost" disabled title="即将上线" style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12, color: 'var(--mut)', cursor: 'not-allowed' }}>更多 AI 工具</button>
               </div>
@@ -1408,8 +1604,14 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 </a>
               )}
               {note.source_md && (
-                <button className="nibi-note-bar-btn nibi-note-bar-btn--label" onClick={() => setSourceMdOpen(true)}>
-                  <FileText size={14} /> 源 md
+                <button
+                  className="nibi-note-bar-btn nibi-note-bar-btn--label"
+                  onClick={() => {
+                    setExportOpen(false)
+                    setSourceMdOpen(true)
+                  }}
+                >
+                  <FileText size={14} /> 原始素材
                 </button>
               )}
               <button className="nibi-note-bar-btn nibi-note-bar-btn--label" onClick={() => handleDownloadNoteExport('pdf')} disabled={!!exportBusy}>
@@ -1435,9 +1637,15 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                   <a href={sourceUrl} target="_blank" rel="noreferrer">原视频</a>
                 )}
               </section>
-              <article className="nibi-note-immersive-article">
+              <article className="nibi-note-immersive-article nibi-note-immersive-article--editor">
                 <h1>{title || '未命名笔记'}</h1>
-                <ReadOnlyMarkdown markdown={currentBody} onSeek={handleSeek} />
+                <MilkdownEditor
+                  key={`immersive-${milkdownKey}`}
+                  markdown={editingBody}
+                  onMarkdownChange={handleEditorChange}
+                  onSeek={handleSeek}
+                />
+                <div className="nibi-note-immersive-save">{saveStatusNode}</div>
               </article>
             </div>
             <aside className="nibi-note-immersive-toc">
@@ -1535,7 +1743,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                   workspaceId={workspaceId}
                   itemId={itemId}
                   onSaved={refreshAfterTranscriptEdit}
-                  sourceMd={note.source_md ?? undefined}
                 />
               </div>
             ) : !isPip ? (
@@ -1567,13 +1774,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 <div className="note-copy-head">
                   <h1>{title || '未命名笔记'}</h1>
                 </div>
-                {/* 标签 + meta */}
-                {(hasTags || sourceUrl) && (
-                  <div className="note-tags-inline">
-                    {hasTags && <TagChips tags={tags} />}
-                    {sourceUrl && <span className="note-meta-inline">{platformLabelFromUrl(sourceUrl)} · {note.media?.video?.duration ? formatTimecode(note.media.video.duration) : ''}</span>}
-                  </div>
-                )}
+                {noteMetaPanel}
                 {/* 总结版本切换 */}
                 {summaries.length > 0 && (() => {
 
@@ -1612,57 +1813,114 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
       ) : isAudioNote ? (
         <>
         {/* ── 音频笔记两栏布局：.note-page（设计稿 pg-audio 对齐） ── */}
-        <div className="nibi-note-page nibi-note-page--audio" ref={notePageRef} style={notePageStyle}>
+        <div className={`nibi-note-page nibi-note-page--audio${isPip ? ' is-pip' : ''}`} ref={notePageRef} style={notePageStyle}>
 
           {/* ── 左栏：播放器 + 波形 + 控制 + 转录 ── */}
-          <div className="nibi-note-left nibi-audio-left">
-            <div className="nibi-audio-player-wrap">
-              <NoteAudioPanel
-                ref={audioRef}
-                src={note.media!.audio!}
-                onTimeUpdate={handleTimeUpdate}
-                onDurationChange={handleAudioDurationChange}
-                onTransportChange={handleAudioTransportChange}
-              />
-            </div>
-            {/* 波形 + 时间 + 控制条（player 外，overflow 安全） */}
-            {audioTransportNode}
-            {/* 转录 */}
-            {Array.isArray(note.transcript) && (note.transcript as VideoResultTranscriptLine[]).length > 0 ? (
-              <div className="nibi-note-transcript-wrap">
-                <div className="nibi-note-transcript-head">
-                  <span>转录文本</span>
-                  <span className="nibi-note-transcript-count">{transcriptCount} 条</span>
+	          <div className="nibi-note-left nibi-audio-left vm-ln-scope">
+            <div
+              className={`nibi-audio-player-shell${isPip ? ' is-pip' : ''}${pipDragging ? ' is-dragging' : ''}`}
+              style={isPip && pipPosition ? { width: pipWidth, left: pipPosition.x, top: pipPosition.y, right: 'auto', bottom: 'auto' } : undefined}
+            >
+              {isPip && (
+                <div className="note-pip-head note-audio-pip-head" onPointerDown={handlePipHeaderPointerDown}>
+                  <span className="note-pip-badge">音频小窗</span>
+                  <div className="note-pip-head-actions">
+                    <button className="note-pip-head-btn" onClick={handleAudioPipTogglePlay} title={pipPlaying ? '暂停' : '播放'}>
+                      {pipPlaying ? <Pause size={13} /> : <Play size={13} fill="currentColor" />}
+                    </button>
+                    <button className="note-pip-head-btn" onClick={cyclePipSize} title="切换尺寸">
+                      {['小', '中', '大'][pipSizeIndex]}
+                    </button>
+                    <button className="note-pip-head-btn note-pip-head-btn--danger" onClick={closePip} title="关闭音频小窗">
+                      <X size={13} />
+                    </button>
+                  </div>
                 </div>
-                <LNTranscriptPanel
-                  transcript={note.transcript as VideoResultTranscriptLine[]}
+              )}
+              <div className="nibi-audio-player-wrap">
+                <NoteAudioPanel
+                  ref={audioRef}
+                  src={note.media!.audio!}
+	                  onTimeUpdate={handleTimeUpdate}
+	                  onDurationChange={handleAudioDurationChange}
+	                  onTransportChange={handleAudioTransportChange}
+	                  isPipActive={isPip}
+	                  onTogglePip={togglePip}
+	                />
+	              </div>
+	              {/* 波形 + 时间 + 控制条（player 外，overflow 安全） */}
+	              {audioTransportNode}
+              {isPip && (
+                <div className="note-audio-pip-caption">
+                  <div className="note-pip-simple-progress" onClick={handleAudioPipProgressClick} title={`${formatTimecode(currentTime)} / ${formatTimecode(effectiveAudioDuration)}`}>
+                    <span style={{ width: `${effectiveAudioDuration ? Math.min(100, Math.max(0, (currentTime / effectiveAudioDuration) * 100)) : 0}%` }} />
+                  </div>
+                  <div className="note-audio-pip-subtitle">
+                    <span>{formatTimecode(currentTime)}</span>
+                    <p>{audioSubtitle || '暂无当前字幕'}</p>
+                  </div>
+	                </div>
+	              )}
+	            </div>
+	            {!isPip && audioChapters.length > 0 && (
+	              <div className="note-audio-chapters" aria-label="音频章节">
+	                <div className="note-audio-chapters-head">
+	                  <span>关键时间点</span>
+	                  <small>{audioChapters.length} 段</small>
+	                </div>
+	                <div className="note-audio-chapter-track">
+	                  {audioChapters.map((chapter, idx) => (
+	                    <button
+	                      key={`${chapter.start}-${chapter.title}`}
+	                      className={`note-audio-chapter${idx === activeAudioChapterIdx ? ' is-active' : ''}`}
+	                      onClick={() => handleSeek(chapter.start)}
+	                      title={`跳转到 ${formatTimecode(chapter.start)}`}
+	                    >
+	                      <span className="note-audio-chapter-time">{formatTimecode(chapter.start)}</span>
+	                      <strong>{chapter.title}</strong>
+	                      <small>{chapter.summary}</small>
+	                    </button>
+	                  ))}
+	                </div>
+	              </div>
+	            )}
+	            {/* 转录 */}
+	            {!isPip && transcriptLines.length > 0 ? (
+	              <div className="nibi-note-transcript-wrap">
+	                <div className="nibi-note-transcript-head">
+	                  <span>转录文本</span>
+	                  <span className="nibi-note-transcript-count">{transcriptCount} 条</span>
+	                </div>
+	                <LNTranscriptPanel
+	                  transcript={transcriptLines}
                   currentTime={currentTime}
                   onSeek={handleSeek}
                   workspaceId={workspaceId}
                   itemId={itemId}
                   onSaved={refreshAfterTranscriptEdit}
-                  sourceMd={note.source_md ?? undefined}
                 />
               </div>
-            ) : (
+            ) : !isPip ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--mut)', fontSize: 12, padding: 24 }}>暂无转录</div>
-            )}
+            ) : null}
           </div>
 
-          <div
-            className="nibi-note-splitter"
-            role="separator"
-            aria-label="调整左右栏宽度"
-            aria-orientation="vertical"
-            aria-valuemin={VIDEO_SPLIT_MIN}
-            aria-valuemax={VIDEO_SPLIT_MAX}
-            aria-valuenow={Math.round(noteLeftPct)}
-            tabIndex={0}
-            onPointerDown={handleNoteSplitPointerDown}
-            onKeyDown={handleNoteSplitKeyDown}
-          >
-            <span className="nibi-note-splitter-grip" />
-          </div>
+          {!isPip && (
+            <div
+              className="nibi-note-splitter"
+              role="separator"
+              aria-label="调整左右栏宽度"
+              aria-orientation="vertical"
+              aria-valuemin={VIDEO_SPLIT_MIN}
+              aria-valuemax={VIDEO_SPLIT_MAX}
+              aria-valuenow={Math.round(noteLeftPct)}
+              tabIndex={0}
+              onPointerDown={handleNoteSplitPointerDown}
+              onKeyDown={handleNoteSplitKeyDown}
+            >
+              <span className="nibi-note-splitter-grip" />
+            </div>
+          )}
 
           {/* ── 右栏：标题 + 标签 + 总结 + 正文 ── */}
           <div className="nibi-note-right">
@@ -1671,13 +1929,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 <div className="note-copy-head">
                   <h1>{title || '未命名笔记'}</h1>
                 </div>
-                {/* 标签 + meta */}
-                {(hasTags || sourceUrl) && (
-                  <div className="note-tags-inline">
-                    {hasTags && <TagChips tags={tags} />}
-                    {sourceUrl && <span className="note-meta-inline">{platformLabelFromUrl(sourceUrl)}{effectiveAudioDuration ? ` · ${formatTimecode(effectiveAudioDuration)}` : ''}</span>}
-                  </div>
-                )}
+                {noteMetaPanel}
                 {/* 总结版本切换 */}
                 {summaries.length > 0 && (() => {
 
@@ -1796,13 +2048,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 <div className="note-copy-head">
                   <h1>{title || '未命名笔记'}</h1>
                 </div>
-                {/* 标签 + meta */}
-                {(hasTags || sourceUrl) && (
-                  <div className="note-tags-inline">
-                    {hasTags && <TagChips tags={tags} />}
-                    {sourceUrl && <span className="note-meta-inline">{platformLabelFromUrl(sourceUrl)}</span>}
-                  </div>
-                )}
+                {noteMetaPanel}
                 {/* 总结版本切换 */}
                 {summaries.length > 0 && (() => {
 
@@ -1881,13 +2127,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 <div className="note-copy-head">
                   <h1>{title || '未命名笔记'}</h1>
                 </div>
-                {/* 标签 + meta */}
-                {(hasTags || sourceUrl) && (
-                  <div className="note-tags-inline">
-                    {hasTags && <TagChips tags={tags} />}
-                    {sourceUrl && <span className="note-meta-inline">{platformLabelFromUrl(sourceUrl)}</span>}
-                  </div>
-                )}
+                {noteMetaPanel}
                 {/* 总结版本切换 */}
                 {summaries.length > 0 && (() => {
 
@@ -1982,11 +2222,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 />
               </section>
             )}
-            {note.source_md && (
-              <section className="nibi-note-side-card nibi-note-source-card">
-                <SourcePanel sourceMd={note.source_md} open />
-              </section>
-            )}
           </aside>
         </div>
       )}
@@ -1999,13 +2234,35 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
           scopeHint="仅基于当前 note.md 与转录上下文回答"
           open={askAiOpen}
           onOpenChange={setAskAiOpen}
+          hideTrigger
         />
+      )}
+
+      {operationNotice && (
+        <div
+          className="nibi-note-operation-notice"
+          data-tone={operationNotice.tone}
+          role="status"
+          aria-live="polite"
+        >
+          <span className="nibi-note-operation-dot" />
+          <span>{operationNotice.message}</span>
+          {operationNotice.onAction && (
+            <button
+              className="nibi-note-operation-action"
+              onClick={operationNotice.onAction}
+            >
+              {operationNotice.actionLabel ?? '取消'}
+            </button>
+          )}
+        </div>
       )}
 
       {/* VN4.3 新建/重新生成总结弹窗（从 AI 工具菜单触发） */}
       {showNewSummaryModal && (
         <NewSummaryModal
           creating={creatingSummary}
+          defaultTemplate={note.summary_hint?.default_template}
           onSubmit={handleCreateSummary}
           onClose={() => setShowNewSummaryModal(false)}
         />

@@ -812,10 +812,12 @@ def _run_subtitle_summary(
             runner.set_progress(task_id, 0.98, "LLM 生成摘要...")
             # R18: 优先使用 summary_template（新模板系统）
             summary_template_id = str(payload.get("summary_template") or "").strip()
+            summary_max_tokens = 1200
             if summary_template_id:
                 from backend.app.services.summary_templates import get_template
                 tpl = get_template(summary_template_id)
                 prompt = tpl.user_prompt.replace("{transcript}", transcript_text[:12000])
+                summary_max_tokens = 3000
                 log(f"📝 LLM 总结 | template={tpl.label} ({summary_template_id})")
             else:
                 prompt = _build_video_summary_prompt(
@@ -836,7 +838,7 @@ def _run_subtitle_summary(
                         model=chat_model,
                         messages=[{"role": "user", "content": prompt}],
                         temperature=0.3,
-                        max_tokens=1200,
+                        max_tokens=summary_max_tokens,
                     )
                 )
                 log(f"✅ 摘要生成完成 | {len(summary)} 字符")
@@ -4348,10 +4350,12 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
             try:
                 # R18: 优先使用 summary_template（新模板系统）
                 summary_template_id = str(payload.get("summary_template") or "").strip()
+                summary_max_tokens = 1200
                 if summary_template_id:
                     from backend.app.services.summary_templates import get_template
                     tpl = get_template(summary_template_id)
-                    prompt = tpl.user_prompt.replace("{transcript}", transcript_text[:3000])
+                    prompt = tpl.user_prompt.replace("{transcript}", transcript_text[:12000])
+                    summary_max_tokens = 3000
                     log(f"📝 LLM 总结 | template={tpl.label} ({summary_template_id})")
                 else:
                     prompt = f"请将以下音频转写内容总结为 100-200 字的中文摘要：\n\n{transcript_text[:3000]}"
@@ -4361,7 +4365,7 @@ def handle_audio_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                         model=chat_model,
                         messages=[{"role": "user", "content": prompt}],
                         temperature=0.3,
-                        max_tokens=1200,
+                        max_tokens=summary_max_tokens,
                     )
                 )
                 log(f"📋 摘要生成完成，{len(summary)} 字符")

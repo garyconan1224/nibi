@@ -1,15 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { Camera, Grid3X3, Image as ImageIcon } from 'lucide-react'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
 import { Section } from '@/components/ui/section'
 import { FieldRow } from '@/components/ui/field-row'
 import { useConfigStore } from '@/store/configStore'
@@ -78,25 +70,33 @@ const ScreenshotPage = () => {
   const [isSaving, setIsSaving] = useState(false)
   const [gridError, setGridError] = useState<string | null>(null)
 
-  // 基线刷新：仅在 store 侧值变化时同步（避免本地草稿被外部回填覆盖）
-  // 仅当基线实际变化时才更新 draft（通过对象值比对，不仅是引用）
+  // 基线刷新：仅在 store 侧值变化时同步。
+  // 不依赖 draft，避免打开截图页时形成草稿同步循环。
   useEffect(() => {
-    const baselineChanged =
-      draft.defaultInterval !== baseline.defaultInterval ||
-      draft.gridSize !== baseline.gridSize ||
-      draft.jpegQuality !== baseline.jpegQuality ||
-      draft.embedInNote !== baseline.embedInNote
-    if (baselineChanged) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setDraft(baseline)
-    }
-  }, [baseline, draft])
+    setDraft(baseline)
+    setGridError(null)
+  }, [baseline])
 
   const guard = useDirtyGuard<ScreenshotDraft>({
     initial: baseline,
     current: draft,
     message: t('dirty.leaveConfirm'),
   })
+  const draftRef = useRef(draft)
+  const baselineRef = useRef(baseline)
+  const commitRef = useRef(guard.commit)
+
+  useEffect(() => {
+    draftRef.current = draft
+  }, [draft])
+
+  useEffect(() => {
+    baselineRef.current = baseline
+  }, [baseline])
+
+  useEffect(() => {
+    commitRef.current = guard.commit
+  }, [guard.commit])
 
   const patch = useCallback((p: Partial<ScreenshotDraft>) => {
     setDraft((prev) => ({ ...prev, ...p }))
@@ -104,12 +104,13 @@ const ScreenshotPage = () => {
   }, [])
 
   const handleReset = useCallback(() => {
-    setDraft(baseline)
+    setDraft(baselineRef.current)
     setGridError(null)
-  }, [baseline])
+  }, [])
 
   const handleSave = useCallback(async () => {
-    const grid = parseGridKey(draft.gridSize)
+    const currentDraft = draftRef.current
+    const grid = parseGridKey(currentDraft.gridSize)
     if (!grid) {
       setGridError(t('screenshot.grid.invalid', '网格大小必须为 1-10 的整数'))
       return
@@ -117,10 +118,10 @@ const ScreenshotPage = () => {
     setIsSaving(true)
     try {
       const nextConfig: ScreenshotConfig = {
-        defaultInterval: draft.defaultInterval,
+        defaultInterval: currentDraft.defaultInterval,
         gridSize: grid,
-        jpegQuality: draft.jpegQuality,
-        embedInNote: draft.embedInNote,
+        jpegQuality: currentDraft.jpegQuality,
+        embedInNote: currentDraft.embedInNote,
       }
       // 先尝试落后端；失败时保留草稿不触达 store
       await updateScreenshotConfig(nextConfig)
@@ -132,7 +133,7 @@ const ScreenshotPage = () => {
         embedInNote: nextConfig.embedInNote,
       }
       setDraft(next)
-      guard.commit(next)
+      commitRef.current(next)
       toast.success(t('screenshot.saved', '截图配置已保存'))
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -140,9 +141,9 @@ const ScreenshotPage = () => {
     } finally {
       setIsSaving(false)
     }
-  }, [draft, setConfig, guard, t])
+  }, [setConfig, t])
 
-  // SaveBar 桥：推送脏计数 + 保存/重置回调；卸载归零
+  // SaveBar 桥：推送脏计数 + 保存/重置回调
   useEffect(() => {
     setSaveBar({
       dirtyCount: guard.dirtyCount,
@@ -150,8 +151,12 @@ const ScreenshotPage = () => {
       onSave: handleSave,
       onReset: handleReset,
     })
+  }, [guard.dirtyCount, isSaving, handleSave, handleReset, setSaveBar])
+
+  // 只在卸载时归零，避免依赖更新时 reset/setSaveBar 循环。
+  useEffect(() => {
     return () => resetSaveBar()
-  }, [guard.dirtyCount, isSaving, handleSave, handleReset, setSaveBar, resetSaveBar])
+  }, [resetSaveBar])
 
   const dirty = guard.dirtyMap
   const gridTuple = parseGridKey(draft.gridSize)
@@ -213,24 +218,21 @@ const ScreenshotPage = () => {
           error={gridError ?? undefined}
           dirty={dirty.gridSize}
         >
-          <Select
+          <select
+            id="screenshot-grid"
+            className="settings-native-select"
             value={draft.gridSize}
-            onValueChange={(v) => patch({ gridSize: v })}
+            onChange={(event) => patch({ gridSize: event.target.value })}
           >
-            <SelectTrigger id="screenshot-grid">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {getGridPresets().map((preset) => (
-                <SelectItem
-                  key={preset.label}
-                  value={`${preset.value[0]}x${preset.value[1]}`}
-                >
-                  {preset.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            {getGridPresets().map((preset) => (
+              <option
+                key={preset.label}
+                value={`${preset.value[0]}x${preset.value[1]}`}
+              >
+                {preset.label}
+              </option>
+            ))}
+          </select>
         </FieldRow>
       </Section>
 
@@ -246,21 +248,18 @@ const ScreenshotPage = () => {
           hint={t('screenshot.quality.description')}
           dirty={dirty.jpegQuality}
         >
-          <Select
+          <select
+            id="screenshot-quality"
+            className="settings-native-select"
             value={String(draft.jpegQuality)}
-            onValueChange={(v) => patch({ jpegQuality: Number(v) })}
+            onChange={(event) => patch({ jpegQuality: Number(event.target.value) })}
           >
-            <SelectTrigger id="screenshot-quality">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {getQualityLevels().map((opt) => (
-                <SelectItem key={opt.value} value={String(opt.value)}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            {getQualityLevels().map((opt) => (
+              <option key={opt.value} value={String(opt.value)}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </FieldRow>
 
         <FieldRow
@@ -270,11 +269,17 @@ const ScreenshotPage = () => {
           dirty={dirty.embedInNote}
           inline
         >
-          <Switch
-            id="screenshot-embed"
-            checked={draft.embedInNote}
-            onCheckedChange={(v) => patch({ embedInNote: v })}
-          />
+          <label className="settings-toggle" htmlFor="screenshot-embed">
+            <input
+              id="screenshot-embed"
+              type="checkbox"
+              checked={draft.embedInNote}
+              onChange={(event) => patch({ embedInNote: event.target.checked })}
+            />
+            <span className="settings-toggle-track">
+              <span className="settings-toggle-thumb" />
+            </span>
+          </label>
         </FieldRow>
       </Section>
     </div>
@@ -282,4 +287,3 @@ const ScreenshotPage = () => {
 }
 
 export default ScreenshotPage
-

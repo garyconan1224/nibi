@@ -15,7 +15,7 @@ interface LNTranscriptPanelProps {
   itemId: string
   /** 字幕保存成功后回调（父组件可借此刷新 source.md 展示） */
   onSaved?: () => void
-  /** 源 md 内容（有值时显示「字幕/源md」切换 tab） */
+  /** 原始素材 Markdown（有值时显示「字幕/原始素材」切换 tab） */
   sourceMd?: string
 }
 
@@ -114,7 +114,7 @@ export default function LNTranscriptPanel({
 
   return (
     <div className="ln-transcript-panel">
-      {/* 顶层切换：字幕 | 源 md（仅当 sourceMd 有值时显示） */}
+      {/* 顶层切换：字幕 | 原始素材（仅当 sourceMd 有值时显示） */}
       {sourceMd && (
         <div className="ln-tr-mode-tabs">
           <button
@@ -129,7 +129,7 @@ export default function LNTranscriptPanel({
             data-active={showSourceMd ? 'true' : undefined}
             onClick={() => setShowSourceMd(true)}
           >
-            <FileCode size={11} style={{ marginRight: 3 }} /> 源 md
+            <FileCode size={11} style={{ marginRight: 3 }} /> 原始素材
           </button>
         </div>
       )}

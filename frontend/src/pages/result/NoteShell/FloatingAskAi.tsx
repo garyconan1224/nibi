@@ -9,16 +9,26 @@ interface FloatingAskAiProps {
   scopeHint: string
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  hideTrigger?: boolean
 }
 
 /**
  * 问 AI 悬浮泡泡 — 仿 FloatingTaskQueue（fixed right:24 bottom:24）。
  * 收起时显示胶囊按钮，展开时 popover 内嵌 NoteChatDrawer。
  */
-export function FloatingAskAi({ workspaceId, systemPrompt, scopeHint, open: controlledOpen, onOpenChange }: FloatingAskAiProps) {
+export function FloatingAskAi({
+  workspaceId,
+  systemPrompt,
+  scopeHint,
+  open: controlledOpen,
+  onOpenChange,
+  hideTrigger = false,
+}: FloatingAskAiProps) {
   const [internalOpen, setInternalOpen] = useState(false)
   const open = controlledOpen ?? internalOpen
   const setOpen = onOpenChange ?? setInternalOpen
+
+  if (!open && hideTrigger) return null
 
   return (
     <>
@@ -48,10 +58,10 @@ export function FloatingAskAi({ workspaceId, systemPrompt, scopeHint, open: cont
       {open && (
         <div
           style={{
-            position: 'fixed', right: 24, bottom: 80, zIndex: 38,
-            width: 400, height: '60vh',
+            position: 'fixed', right: 24, bottom: 24, zIndex: 38,
+            width: 'min(440px, calc(100vw - 32px))', height: 'min(680px, calc(100vh - 88px))',
             background: 'var(--srf)', border: '1px solid var(--bdr)',
-            borderRadius: 16, boxShadow: 'var(--shadow-lg)',
+            borderRadius: 12, boxShadow: 'var(--shadow-lg)',
             display: 'flex', flexDirection: 'column', overflow: 'hidden',
           }}
         >
@@ -64,9 +74,22 @@ export function FloatingAskAi({ workspaceId, systemPrompt, scopeHint, open: cont
               flexShrink: 0,
             }}
           >
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--acc)' }}>
-              <MessageCircle size={14} /> 问 AI
-            </span>
+            <div style={{ minWidth: 0 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: 'var(--acc)' }}>
+                <MessageCircle size={14} /> 问 AI
+              </span>
+              <div style={{
+                maxWidth: 340,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                marginTop: 3,
+                color: 'var(--mut)',
+                fontSize: 11,
+              }}>
+                {scopeHint}
+              </div>
+            </div>
             <button
               onClick={() => setOpen(false)}
               style={{

@@ -307,7 +307,8 @@ export default function ProcessingPage() {
 
   const autoOpenRef = useRef('')
   useEffect(() => {
-    if (!isSuccess || resultIntent !== 'replica' || !resultPath) return
+    const shouldAutoOpen = resultIntent === 'replica' || resultItemType === 'audio'
+    if (!isSuccess || !shouldAutoOpen || !resultPath) return
     const key = `${taskId}:${resultPath}`
     if (autoOpenRef.current === key) return
     const timer = window.setTimeout(() => {
@@ -315,7 +316,7 @@ export default function ProcessingPage() {
       navigate(resultPath, { replace: true })
     }, 650)
     return () => window.clearTimeout(timer)
-  }, [isSuccess, resultIntent, resultPath, navigate, taskId])
+  }, [isSuccess, resultIntent, resultItemType, resultPath, navigate, taskId])
 
   const handleCopySource = async () => {
     const text = url || window.location.href
@@ -328,7 +329,7 @@ export default function ProcessingPage() {
   }
 
   // 处理↔结果原地融合：note 任务完成 → 同一任务页内直接渲染结果（不跳页）
-  if (isSuccess && resultIntent === 'note' && workspaceId && itemId) {
+  if (isSuccess && resultIntent === 'note' && resultItemType !== 'audio' && workspaceId && itemId) {
     return <NoteShell workspaceId={workspaceId} itemId={itemId} />
   }
 

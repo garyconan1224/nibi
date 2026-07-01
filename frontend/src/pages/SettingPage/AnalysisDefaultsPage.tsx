@@ -5,8 +5,9 @@ import TranscriberPage from './TranscriberPage'
 import PromptFormatPage from './PromptFormatPage'
 import PerformanceTierPage from './PerformanceTierPage'
 import { useSettingsShellStore } from '@/store/settingsShellStore'
+import { CARD_COLUMN_OPTIONS, useLibraryStore, type CardColumns } from '@/store/libraryStore'
 
-type TabKey = 'performance' | 'screenshot' | 'transcriber' | 'prompt' | 'defaults'
+type TabKey = 'performance' | 'display' | 'screenshot' | 'transcriber' | 'prompt' | 'defaults'
 
 /**
  * 分析默认偏好（SPEC §3.5 第 4 页）。
@@ -71,6 +72,12 @@ export default function AnalysisDefaultsPage() {
           性能档位
         </TabBtn>
         <TabBtn
+          active={tab === 'display'}
+          onClick={() => setTab('display')}
+        >
+          显示偏好
+        </TabBtn>
+        <TabBtn
           active={tab === 'screenshot'}
           onClick={() => setTab('screenshot')}
         >
@@ -99,11 +106,45 @@ export default function AnalysisDefaultsPage() {
       {/* 内容区：只渲染激活的子页面 */}
       <div>
         {tab === 'performance' && <PerformanceTierPage />}
+        {tab === 'display' && <DisplayDefaultsPanel />}
         {tab === 'screenshot' && <ScreenshotPage />}
         {tab === 'transcriber' && <TranscriberPage />}
         {tab === 'prompt' && <PromptFormatPage />}
         {tab === 'defaults' && <TaskDefaultsPlaceholder />}
       </div>
+    </div>
+  )
+}
+
+function DisplayDefaultsPanel() {
+  const cardColumns = useLibraryStore((s) => s.cardColumns)
+  const setCardColumns = useLibraryStore((s) => s.setCardColumns)
+
+  return (
+    <div className="settings-subpanel">
+      <section className="settings-card">
+        <div className="settings-row">
+          <div>
+            <div className="settings-row-label">资料库卡片密度</div>
+            <div className="settings-row-hint">控制笔记页和复刻页网格视图默认每行显示几个卡片。</div>
+          </div>
+        </div>
+        <label className="settings-inline-field">
+          <span>
+            <strong>默认每行</strong>
+            <p>侧栏收起时会自动多显示一列，方便宽屏快速浏览。</p>
+          </span>
+          <select
+            className="settings-native-select"
+            value={cardColumns}
+            onChange={(event) => setCardColumns(Number(event.target.value) as CardColumns)}
+          >
+            {CARD_COLUMN_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </label>
+      </section>
     </div>
   )
 }

@@ -41,6 +41,18 @@ export const SORT_OPTIONS: { value: SortBy; label: string }[] = [
 ]
 
 export type ViewMode = 'grid' | 'list'
+export type CardColumns = 2 | 3 | 4 | 5
+
+export const CARD_COLUMN_OPTIONS: { value: CardColumns; label: string }[] = [
+  { value: 2, label: '每行 2 个' },
+  { value: 3, label: '每行 3 个' },
+  { value: 4, label: '每行 4 个' },
+  { value: 5, label: '每行 5 个' },
+]
+
+function normalizeCardColumns(value: unknown): CardColumns {
+  return value === 2 || value === 4 || value === 5 ? value : 3
+}
 
 interface LibraryStore {
   selectedFilters: FilterKey[]
@@ -50,6 +62,8 @@ interface LibraryStore {
   setSortBy: (sort: SortBy) => void
   viewMode: ViewMode
   setViewMode: (mode: ViewMode) => void
+  cardColumns: CardColumns
+  setCardColumns: (columns: CardColumns) => void
 }
 
 export const useLibraryStore = create<LibraryStore>()(
@@ -83,15 +97,19 @@ export const useLibraryStore = create<LibraryStore>()(
 
       viewMode: 'grid',
       setViewMode: (viewMode) => set({ viewMode }),
+
+      cardColumns: 3,
+      setCardColumns: (cardColumns) => set({ cardColumns: normalizeCardColumns(cardColumns) }),
     }),
     {
       name: 'nibi-library',
-      version: 2,
+      version: 3,
       migrate: (persistedState) => {
         const state = persistedState as Partial<LibraryStore> | undefined
         return {
           ...state,
           selectedFilters: normalizeFilters((state?.selectedFilters as string[] | undefined) ?? ['all']),
+          cardColumns: normalizeCardColumns(state?.cardColumns),
         }
       },
     },

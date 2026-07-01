@@ -7,6 +7,7 @@ import { getWorkspace, getItemNote, downloadCollectionHtml, mergeNotes } from '@
 import type { MergedNote } from '@/services/workspaces'
 import { AddMaterialModal } from '@/components/workspace/AddMaterialModal'
 import { usePipelineTasks } from '@/hooks/usePipelineTasks'
+import { withStatusToast } from '@/lib/statusToast'
 
 import type { WorkspaceRecord } from '@/types/workspace'
 
@@ -111,13 +112,20 @@ export default function TaskboardPage() {
         name={workspace.name}
         materialCount={workspace.items.length}
         background={workspace.background}
+        items={workspace.items}
         description={workspace.background.topic || workspace.background.purpose || '合集内的笔记与素材汇总'}
         updatedAt={new Date(workspace.updated_at).toLocaleDateString('zh-CN')}
         onBack={() => navigate(workspace.kind === 'replica' ? '/replicas' : '/notes')}
         onEditBackground={() => setBgOpen(true)}
         onAddMaterial={() => setAddOpen(true)}
         onExport={() => setExportOpen(true)}
-        onCompare={() => setCompareOpen(true)}
+        onCompare={() => {
+          if (compareSelectedIds.size < 2) {
+            toast.info('请先在素材网格中多选至少 2 个素材，再点击对比')
+            return
+          }
+          setCompareOpen(true)
+        }}
         onMerge={async () => {
           const ids = [...compareSelectedIds]
           if (ids.length < 2) {
@@ -126,11 +134,18 @@ export default function TaskboardPage() {
           }
           setMergeLoading(true)
           try {
-            const result = await mergeNotes(workspace.workspace_id, ids)
+            const result = await withStatusToast(
+              () => mergeNotes(workspace.workspace_id, ids),
+              {
+                id: `workspace-merge-${workspace.workspace_id}`,
+                loading: '正在融合笔记…',
+                success: '融合完成',
+                error: '融合失败，请重试',
+              },
+            )
             setMergeResult(result)
-            toast.success('融合完成')
           } catch {
-            toast.error('融合失败，请重试')
+            /* withStatusToast 已提示 */
           } finally {
             setMergeLoading(false)
           }
@@ -140,6 +155,8 @@ export default function TaskboardPage() {
             toast.info('合集为空，暂无可复制的笔记')
             return
           }
+          const toastId = `workspace-copy-md-${workspace.workspace_id}`
+          toast.loading('正在复制合集 Markdown…', { id: toastId })
           try {
             const notes = await Promise.all(
               workspace.items.map((item) =>
@@ -150,21 +167,28 @@ export default function TaskboardPage() {
               .filter((n): n is NonNullable<typeof n> => n != null && n.note_md.trim().length > 0)
               .map((n) => n.note_md.trim())
             if (mdParts.length === 0) {
-              toast.info('暂无笔记内容可复制')
+              toast.info('暂无笔记内容可复制', { id: toastId })
               return
             }
             await navigator.clipboard.writeText(mdParts.join('\n\n---\n\n'))
-            toast.success(`已复制 ${mdParts.length} 篇笔记到剪贴板`)
+            toast.success(`已复制 ${mdParts.length} 篇笔记到剪贴板`, { id: toastId })
           } catch {
-            toast.error('复制失败，请重试')
+            toast.error('复制失败，请重试', { id: toastId })
           }
         }}
         onShareHtml={async () => {
           try {
-            await downloadCollectionHtml(workspace.workspace_id)
-            toast.success('HTML 导出成功')
+            await withStatusToast(
+              () => downloadCollectionHtml(workspace.workspace_id),
+              {
+                id: `workspace-export-html-${workspace.workspace_id}`,
+                loading: '正在导出合集 HTML…',
+                success: '合集 HTML 已开始下载',
+                error: '合集 HTML 导出失败，请重试',
+              },
+            )
           } catch {
-            toast.error('导出失败，请重试')
+            /* withStatusToast 已提示 */
           }
         }}
         onMenuAction={handleMenuAction}
@@ -298,7 +322,9 @@ export default function TaskboardPage() {
       <BackgroundEditor
         open={bgOpen}
         workspaceId={workspace.workspace_id}
+        initialName={workspace.name}
         initial={workspace.background}
+        items={workspace.items}
         onClose={() => setBgOpen(false)}
         onSaved={(updated) => setWorkspace(updated)}
       />

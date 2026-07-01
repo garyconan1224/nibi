@@ -15,6 +15,8 @@ export interface LibraryItem {
   updated_at: string
   duration_seconds: number | null
   thumbnail: string | null
+  description?: string
+  favorite?: boolean
   results_summary: { has_summary: boolean; has_transcript: boolean }
   primary_task_status: string | null
   preflight?: { intent?: string; [key: string]: unknown }
@@ -62,5 +64,22 @@ export async function batchDeleteItems(
   items: { workspace_id: string; item_id: string }[],
 ): Promise<{ removed: number; failed: number; removed_ids: string[] }> {
   const res = await http.post('/workspaces/items/batch-delete', { items })
+  return res.data
+}
+
+export async function batchAddItemsToWorkspace(
+  targetWorkspaceId: string,
+  items: { workspace_id: string; item_id: string }[],
+): Promise<{
+  added: number
+  skipped: number
+  failed: number
+  added_ids: string[]
+  skipped_ids: string[]
+}> {
+  const res = await http.post('/workspaces/items/batch-add-to-workspace', {
+    target_workspace_id: targetWorkspaceId,
+    items,
+  })
   return res.data
 }

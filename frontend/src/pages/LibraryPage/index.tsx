@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Trash2, Plus, Inbox, Filter, Sparkles } from 'lucide-react'
+import { Trash2, Plus, Inbox, Filter, Sparkles, FolderInput } from 'lucide-react'
 import { toast } from 'sonner'
-import { fetchLibrary, deleteItem, batchDeleteItems, type LibraryItem, type LibraryResponse } from '@/services/library'
-import { createWorkspace, deleteWorkspace, startItemPipeline, updateWorkspace } from '@/services/workspaces'
+import { fetchLibrary, deleteItem, batchDeleteItems, batchAddItemsToWorkspace, type LibraryItem, type LibraryResponse, type LibraryWorkspace } from '@/services/library'
+import { createWorkspace, deleteWorkspace, startItemPipeline, updateWorkspace, favoriteItem, unfavoriteItem } from '@/services/workspaces'
 import { useLibraryStore, type SortBy } from '@/store/libraryStore'
 import { FilterChips } from './FilterChips'
 import { SortMenu } from './SortMenu'
@@ -73,6 +73,86 @@ function sortItems(items: LibraryItem[], sortBy: SortBy): LibraryItem[] {
   }
 }
 
+type LibraryEntry =
+  | { kind: 'workspace'; workspace: LibraryWorkspace; items: LibraryItem[] }
+  | { kind: 'item'; item: LibraryItem }
+
+function entryCreatedAt(entry: LibraryEntry): number {
+  const iso = entry.kind === 'item' ? entry.item.created_at : entry.workspace.updated_at
+  return new Date(iso).getTime()
+}
+
+function entryUpdatedAt(entry: LibraryEntry): number {
+  const iso = entry.kind === 'item' ? entry.item.updated_at : entry.workspace.updated_at
+  return new Date(iso).getTime()
+}
+
+function entryDoneAt(entry: LibraryEntry): number {
+  if (entry.kind === 'item') {
+    return entry.item.status === 'done' ? new Date(entry.item.updated_at).getTime() : 0
+  }
+  const isRunning = entry.workspace.status === 'running' || entry.items.some(isItemGenerating)
+  return isRunning ? 0 : new Date(entry.workspace.updated_at).getTime()
+}
+
+function entryDuration(entry: LibraryEntry): number {
+  return entry.kind === 'item' ? entry.item.duration_seconds ?? -1 : -1
+}
+
+function entryStateOrder(entry: LibraryEntry): number {
+  if (entry.kind === 'item') {
+    return STATE_ORDER[primaryStatusToState(entry.item.primary_task_status)] ?? 9
+  }
+  const state = entry.workspace.status === 'running' || entry.items.some(isItemGenerating) ? 'running' : 'done'
+  return STATE_ORDER[state] ?? 9
+}
+
+function sortLibraryEntries(entries: LibraryEntry[], sortBy: SortBy): LibraryEntry[] {
+  const arr = [...entries]
+  switch (sortBy) {
+    case 'created_desc':
+      return arr.sort((a, b) => entryCreatedAt(b) - entryCreatedAt(a))
+    case 'created_asc':
+      return arr.sort((a, b) => entryCreatedAt(a) - entryCreatedAt(b))
+    case 'completed_desc':
+      return arr.sort((a, b) => {
+        const aDone = entryDoneAt(a)
+        const bDone = entryDoneAt(b)
+        if (aDone && bDone) return bDone - aDone
+        if (aDone) return -1
+        if (bDone) return 1
+        return entryCreatedAt(b) - entryCreatedAt(a)
+      })
+    case 'duration_desc':
+      return arr.sort((a, b) => {
+        const da = entryDuration(a)
+        const db = entryDuration(b)
+        if (da >= 0 && db >= 0) return db - da
+        if (da >= 0) return -1
+        if (db >= 0) return 1
+        return entryCreatedAt(b) - entryCreatedAt(a)
+      })
+    case 'duration_asc':
+      return arr.sort((a, b) => {
+        const da = entryDuration(a)
+        const db = entryDuration(b)
+        if (da >= 0 && db >= 0) return da - db
+        if (da >= 0) return -1
+        if (db >= 0) return 1
+        return entryCreatedAt(b) - entryCreatedAt(a)
+      })
+    case 'status':
+      return arr.sort((a, b) => {
+        const sa = entryStateOrder(a)
+        const sb = entryStateOrder(b)
+        if (sa !== sb) return sa - sb
+        return entryUpdatedAt(b) - entryUpdatedAt(a)
+      })
+    default:
+      return arr
+  }
+}
+
 export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -84,13 +164,16 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
   const [selectedSet, setSelectedSet] = useState<Set<string>>(new Set())
   const [deleting, setDeleting] = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
+  const [addingToCollection, setAddingToCollection] = useState(false)
   const [creatingWorkspace, setCreatingWorkspace] = useState(false)
+  const [collectionTargetId, setCollectionTargetId] = useState('')
   const [query, setQuery] = useState('')
 
   const selectedFilters = useLibraryStore((s) => s.selectedFilters)
   const setSelectedFilters = useLibraryStore((s) => s.setSelectedFilters)
   const sortBy = useLibraryStore((s) => s.sortBy)
   const viewMode = useLibraryStore((s) => s.viewMode)
+  const cardColumns = useLibraryStore((s) => s.cardColumns)
 
   const selectionKey = (wsId: string, itemId: string) => `${wsId}:${itemId}`
 
@@ -185,6 +268,16 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
     [collectionWorkspaces],
   )
 
+  useEffect(() => {
+    if (collectionWorkspaces.length === 0) {
+      if (collectionTargetId) setCollectionTargetId('')
+      return
+    }
+    if (!collectionTargetId || !collectionWorkspaces.some((ws) => ws.workspace_id === collectionTargetId)) {
+      setCollectionTargetId(collectionWorkspaces[0].workspace_id)
+    }
+  }, [collectionTargetId, collectionWorkspaces])
+
   const visibleWorkspaces = useMemo(() => {
     if (!data) return []
     if (!(showAll || showCollections || showRunning)) return []
@@ -192,7 +285,7 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
       const wsItems = itemsByWorkspace.get(ws.workspace_id) ?? []
       if (typeFilters.length > 0 && !wsItems.some((item) => typeFilters.includes(item.type))) return false
       if (showRunning && !(ws.status === 'running' || wsItems.some(isItemGenerating))) return false
-      if (!matchesQuery(normalizedQuery, [ws.name, ...wsItems.flatMap((item) => [item.name, item.source_value, item.workspace_name])])) return false
+      if (!matchesQuery(normalizedQuery, [ws.name, ...wsItems.flatMap((item) => [item.name, item.source_value, item.workspace_name, item.description])])) return false
       return true
     })
   }, [data, showAll, showCollections, showRunning, collectionWorkspaces, itemsByWorkspace, typeFilters, normalizedQuery])
@@ -222,12 +315,42 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
       items = items.filter((item) => !visibleWorkspaceIds.has(item.workspace_id))
     }
     if (normalizedQuery) {
-      items = items.filter((item) => matchesQuery(normalizedQuery, [item.name, item.source_value, item.workspace_name]))
+      items = items.filter((item) => matchesQuery(normalizedQuery, [item.name, item.source_value, item.workspace_name, item.description]))
     }
     return sortItems(items, sortBy)
   }, [scopedItems, showAll, showRunning, showCollections, typeFilters, visibleWorkspaceIds, normalizedQuery, sortBy])
 
-  const hasVisibleEntries = visibleWorkspaces.length > 0 || visibleItems.length > 0
+  const visibleEntries = useMemo<LibraryEntry[]>(() => {
+    const workspaceEntries: LibraryEntry[] = visibleWorkspaces.map((workspace) => ({
+      kind: 'workspace',
+      workspace,
+      items: itemsByWorkspace.get(workspace.workspace_id) ?? [],
+    }))
+    const itemEntries: LibraryEntry[] = visibleItems.map((item) => ({ kind: 'item', item }))
+    return sortLibraryEntries([...workspaceEntries, ...itemEntries], sortBy)
+  }, [visibleWorkspaces, visibleItems, itemsByWorkspace, sortBy])
+
+  const hasVisibleEntries = visibleEntries.length > 0
+
+  const selectedItemRefs = useMemo(() => {
+    const refs = new Map<string, { workspace_id: string; item_id: string }>()
+    Array.from(selectedSet).forEach((key) => {
+      if (key.startsWith('ws:')) {
+        const wsId = key.slice(3)
+        ;(itemsByWorkspace.get(wsId) ?? []).forEach((item) => {
+          refs.set(`${item.workspace_id}:${item.item_id}`, {
+            workspace_id: item.workspace_id,
+            item_id: item.item_id,
+          })
+        })
+        return
+      }
+      const [ws, ...rest] = key.split(':')
+      const itemId = rest.join(':')
+      if (ws && itemId) refs.set(key, { workspace_id: ws, item_id: itemId })
+    })
+    return Array.from(refs.values())
+  }, [selectedSet, itemsByWorkspace])
 
   const selectAll = useCallback(() => {
     const next = new Set<string>()
@@ -324,6 +447,39 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
     }
   }, [selectedSet, visibleItems, load])
 
+  const handleBatchAddToCollection = useCallback(async () => {
+    if (!collectionTargetId) {
+      toast.error('请先选择目标合集')
+      return
+    }
+    if (selectedItemRefs.length === 0) {
+      toast.error('请选择要加入合集的内容')
+      return
+    }
+    setAddingToCollection(true)
+    const targetName = collectionWorkspaces.find((ws) => ws.workspace_id === collectionTargetId)?.name || '合集'
+    try {
+      const res = await batchAddItemsToWorkspace(collectionTargetId, selectedItemRefs)
+      if (res.added > 0) {
+        toast.success(`已加入 ${res.added} 项到「${targetName}」${res.skipped ? `，${res.skipped} 项已存在` : ''}`)
+        setSelectedSet(new Set())
+        setSelecting(false)
+      } else if (res.skipped > 0) {
+        toast.info(`选中内容已在「${targetName}」中`)
+      } else {
+        toast.error('没有内容被加入合集')
+      }
+      if (res.failed > 0) {
+        toast.error(`${res.failed} 项加入失败，请检查目标合集类型`)
+      }
+      await load()
+    } catch {
+      toast.error('加入合集失败，请重试')
+    } finally {
+      setAddingToCollection(false)
+    }
+  }, [collectionTargetId, selectedItemRefs, collectionWorkspaces, load])
+
   const handleCreateCollection = useCallback(async () => {
     if (!kind) return
     setCreatingWorkspace(true)
@@ -347,6 +503,21 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
       await load()
     } catch {
       toast.error('重命名合集失败，请重试')
+    }
+  }, [load])
+
+  const handleToggleFavorite = useCallback(async (item: LibraryItem) => {
+    try {
+      if (item.favorite) {
+        await unfavoriteItem(item.workspace_id, item.item_id)
+        toast.success('已取消收藏')
+      } else {
+        await favoriteItem(item.workspace_id, item.item_id)
+        toast.success(`已加入${item.workspace_kind === 'replica' ? '复刻' : '笔记'}收藏`)
+      }
+      await load()
+    } catch {
+      toast.error('收藏状态更新失败，请重试')
     }
   }, [load])
 
@@ -425,7 +596,7 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
             </button>
           </div>
         </div>
-        <div className="lib-actions">
+          <div className="lib-actions">
           {hasVisibleEntries && (
             <>
               {selectMode ? (
@@ -449,6 +620,29 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
                     <Sparkles size={13} />
                     {analyzing ? '分析中…' : '批量分析'}
                   </button>
+                  {kind && collectionWorkspaces.length > 0 && (
+                    <div className="batch-collection-control">
+                      <select
+                        value={collectionTargetId}
+                        onChange={(event) => setCollectionTargetId(event.target.value)}
+                        title="选择目标合集"
+                      >
+                        {collectionWorkspaces.map((ws) => (
+                          <option key={ws.workspace_id} value={ws.workspace_id}>
+                            {ws.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className={`btn btn-sm${selectedItemRefs.length > 0 ? ' btn-secondary' : ''}`}
+                        disabled={addingToCollection || selectedItemRefs.length === 0 || !collectionTargetId}
+                        onClick={handleBatchAddToCollection}
+                      >
+                        <FolderInput size={13} />
+                        {addingToCollection ? '加入中…' : `加入合集${selectedItemRefs.length > 0 ? ` (${selectedItemRefs.length})` : ''}`}
+                      </button>
+                    </div>
+                  )}
                 </>
               ) : (
                 <button className="btn btn-sm" onClick={enterSelectMode}>选择</button>
@@ -513,28 +707,30 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
               </div>
             </div>
           ) : (
-            <div className={`note-grid${viewMode === 'list' ? ' is-list' : ''}`}>
-              {visibleWorkspaces.map((ws) => (
-                <WorkspaceCard
-                  key={ws.workspace_id}
-                  workspace={ws}
-                  items={itemsByWorkspace.get(ws.workspace_id) ?? []}
-                  selectMode={selectMode}
-                  selected={selectedSet.has(`ws:${ws.workspace_id}`)}
-                  onToggleSelect={toggleWorkspaceSelect}
-                  onDelete={handleDeleteWorkspace}
-                  onRename={handleRenameWorkspace}
-                />
-              ))}
-              {visibleItems.map((item) => (
-                <ItemCard
-                  key={`${item.workspace_id}:${item.item_id}`}
-                  item={item}
-                  selected={selectedSet.has(selectionKey(item.workspace_id, item.item_id))}
-                  selectMode={selectMode}
-                  onToggleSelect={toggleSelect}
-                  onDelete={handleDeleteOne}
-                />
+            <div className={`note-grid note-grid--cols-${cardColumns}${viewMode === 'list' ? ' is-list' : ''}`}>
+              {visibleEntries.map((entry) => (
+                entry.kind === 'workspace' ? (
+                  <WorkspaceCard
+                    key={entry.workspace.workspace_id}
+                    workspace={entry.workspace}
+                    items={entry.items}
+                    selectMode={selectMode}
+                    selected={selectedSet.has(`ws:${entry.workspace.workspace_id}`)}
+                    onToggleSelect={toggleWorkspaceSelect}
+                    onDelete={handleDeleteWorkspace}
+                    onRename={handleRenameWorkspace}
+                  />
+                ) : (
+                  <ItemCard
+                    key={`${entry.item.workspace_id}:${entry.item.item_id}`}
+                    item={entry.item}
+                    selected={selectedSet.has(selectionKey(entry.item.workspace_id, entry.item.item_id))}
+                    selectMode={selectMode}
+                    onToggleSelect={toggleSelect}
+                    onDelete={handleDeleteOne}
+                    onToggleFavorite={handleToggleFavorite}
+                  />
+                )
               ))}
             </div>
           )}

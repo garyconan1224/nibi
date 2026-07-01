@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, CheckCircle2, ChevronDown, Clock, Copy, FileText, Film, Image as ImageIcon, Layers, LayoutTemplate, Link2, Lock, PenTool, PlayCircle, Plus, Search, Settings2, Target, Video, Wand2, X } from 'lucide-react'
+import { Check, CheckCircle2, ChevronDown, Clock, Copy, FileAudio, FileText, Film, Image as ImageIcon, Layers, LayoutTemplate, Link2, Lock, PenTool, PlayCircle, Plus, Search, Settings2, Target, Upload, Video, Wand2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -35,6 +35,7 @@ import {
   updateWorkspace as updateWorkspaceSvc,
 } from '@/services/workspaces'
 import { fetchLinkPreview } from '@/services/linkPreview'
+import { batchAddItemsToWorkspace, fetchLibrary, type LibraryItem } from '@/services/library'
 import type {
   AnalysisScope,
   ItemType,
@@ -71,8 +72,13 @@ interface AddMaterialModalProps {
   localFile?: string
   /** 本地文件：原始文件名 */
   localFileName?: string
+  /** 本地文件：素材类型 */
+  localFileType?: ItemType
   /** 本地文件：所在 workspace ID */
   localWsId?: string
+  /** 从全局弹窗选择并上传本地文件 */
+  onPickLocalFile?: () => void
+  localUploadPending?: boolean
   /** 合集类型，从合集详情页传入时启用硬锁 */
   workspaceKind?: 'note' | 'replica'
 }
@@ -153,6 +159,30 @@ function formatDuration(sec: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
+function noteTypeFromLocalFile(type?: ItemType): NoteMediaKind {
+  if (type === 'audio') return 'audio'
+  if (type === 'image' || type === 'text') return 'image_text'
+  return 'video'
+}
+
+function localFileTypeLabel(type?: ItemType): string {
+  if (type === 'audio') return '音频'
+  if (type === 'image') return '图片'
+  if (type === 'text') return '文本'
+  return '视频'
+}
+
+function itemTypeLabel(type?: ItemType | string): string {
+  if (type === 'audio') return '音频'
+  if (type === 'image') return '图片'
+  if (type === 'text') return '文本'
+  return '视频'
+}
+
+function libraryItemKey(item: LibraryItem): string {
+  return `${item.workspace_id}:${item.item_id}`
+}
+
 export function AddMaterialModal({
   open,
   onOpenChange,
@@ -166,7 +196,10 @@ export function AddMaterialModal({
   onAdded,
   localFile,
   localFileName,
+  localFileType,
   localWsId,
+  onPickLocalFile,
+  localUploadPending,
   workspaceKind,
 }: AddMaterialModalProps) {
   const isLocalFile = !!localFile
@@ -199,6 +232,12 @@ export function AddMaterialModal({
   const [workspaceNameDraft, setWorkspaceNameDraft] = useState('')
   const [workspaceNameOverrides, setWorkspaceNameOverrides] = useState<Record<string, string>>({})
   const [advancedOpen, setAdvancedOpen] = useState(false) // 「高级设置」折叠
+  const [existingPanelOpen, setExistingPanelOpen] = useState(false)
+  const [existingLoading, setExistingLoading] = useState(false)
+  const [existingAdding, setExistingAdding] = useState(false)
+  const [existingItems, setExistingItems] = useState<LibraryItem[]>([])
+  const [existingSelectedIds, setExistingSelectedIds] = useState<Set<string>>(new Set())
+  const [existingQuery, setExistingQuery] = useState('')
   const sniffTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   // R4.7: 收集所有可用视觉模型（provider 有 vision 能力 + 模型有 vision 标签）
@@ -221,6 +260,11 @@ export function AddMaterialModal({
   const getWorkspaceLabel = useCallback((workspaceId: string, fallback = '当前合集') => {
     return workspaceNameOverrides[workspaceId] ?? workspaceLookup.get(workspaceId)?.name ?? fallback
   }, [workspaceLookup, workspaceNameOverrides])
+  const targetWorkspaceId = workspaceIds[0] ?? ''
+  const targetExistingItemIds = useMemo(
+    () => new Set(workspaceLookup.get(targetWorkspaceId)?.items.map((item) => item.item_id) ?? []),
+    [targetWorkspaceId, workspaceLookup],
+  )
   const lockedWorkspaceKind = workspaceKind ?? selectedWorkspaces[0]?.kind
   const targetWorkspaceKind: 'note' | 'replica' = lockedWorkspaceKind ?? (selectedAction === 'replica' ? 'replica' : 'note')
   const selectableWorkspaces = useMemo(
@@ -232,6 +276,24 @@ export function AddMaterialModal({
     if (!q) return selectableWorkspaces
     return selectableWorkspaces.filter((ws) => ws.name.toLowerCase().includes(q))
   }, [selectableWorkspaces, workspaceQuery])
+
+  const filteredExistingItems = useMemo(() => {
+    const q = existingQuery.trim().toLowerCase()
+    const list = q
+      ? existingItems.filter((item) => {
+        const haystack = [item.name, item.source_value, item.workspace_name, item.description ?? ''].join(' ').toLowerCase()
+        return haystack.includes(q)
+      })
+      : existingItems
+    return list.slice(0, 60)
+  }, [existingItems, existingQuery])
+
+  const selectedExistingRefs = useMemo(
+    () => existingItems
+      .filter((item) => existingSelectedIds.has(libraryItemKey(item)))
+      .map((item) => ({ workspace_id: item.workspace_id, item_id: item.item_id })),
+    [existingItems, existingSelectedIds],
+  )
 
   // 硬锁：仅「从合集详情页进入」(workspaceKind prop) 才把动作锁成合集 kind。
   // 普通添加流程（未选合集）不锁，笔记/复刻自由选。
@@ -273,7 +335,7 @@ export function AddMaterialModal({
         : '输入素材链接'
   const autoResolvedNoteType: NoteMediaKind =
     isLocalFile
-      ? 'video'
+      ? noteTypeFromLocalFile(localFileType)
       : effectiveSniff?.primary_type === 'video'
         ? 'video'
         : effectiveSniff?.primary_type === 'audio'
@@ -324,6 +386,11 @@ export function AddMaterialModal({
     setSubmitting(false)
     setRenamingWorkspaceId(null)
     setWorkspaceNameDraft('')
+    setExistingPanelOpen(false)
+    setExistingItems([])
+    setExistingSelectedIds(new Set())
+    setExistingQuery('')
+    setExistingAdding(false)
     setLinkDesc('')
     setCoverUrl('')
     setLinkTitle('')
@@ -470,6 +537,69 @@ export function AddMaterialModal({
     }
   }, [onWorkspaceUpdated, renamingWorkspaceId, workspaceNameDraft])
 
+  const loadExistingMaterials = useCallback(async () => {
+    if (!targetWorkspaceId) {
+      toast.info('请先选择一个合集')
+      return
+    }
+    setExistingPanelOpen(true)
+    setExistingLoading(true)
+    setError(null)
+    try {
+      const library = await fetchLibrary(false)
+      const candidates = library.items.filter((item) => (
+        item.workspace_kind === targetWorkspaceKind
+        && item.status === 'done'
+        && item.workspace_id !== targetWorkspaceId
+        && !targetExistingItemIds.has(item.item_id)
+      ))
+      setExistingItems(candidates)
+      setExistingSelectedIds(new Set())
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '读取已分析内容失败'
+      setError(msg)
+      toast.error(msg)
+    } finally {
+      setExistingLoading(false)
+    }
+  }, [targetExistingItemIds, targetWorkspaceId, targetWorkspaceKind])
+
+  const toggleExistingItem = useCallback((itemKey: string) => {
+    setExistingSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(itemKey)) next.delete(itemKey)
+      else next.add(itemKey)
+      return next
+    })
+  }, [])
+
+  const handleAddExistingMaterials = useCallback(async () => {
+    if (!targetWorkspaceId) {
+      toast.info('请先选择一个合集')
+      return
+    }
+    if (selectedExistingRefs.length === 0) {
+      toast.info('请先选择要加入的内容')
+      return
+    }
+    const toastId = `workspace-add-existing-${targetWorkspaceId}`
+    setExistingAdding(true)
+    toast.loading('正在加入已分析内容…', { id: toastId })
+    try {
+      const result = await batchAddItemsToWorkspace(targetWorkspaceId, selectedExistingRefs)
+      toast.success(`已加入 ${result.added} 项内容${result.skipped ? `，跳过 ${result.skipped} 项` : ''}`, { id: toastId })
+      onAdded?.()
+      setExistingSelectedIds(new Set())
+      setExistingPanelOpen(false)
+      onOpenChange(false)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '加入内容失败'
+      toast.error(msg, { id: toastId })
+    } finally {
+      setExistingAdding(false)
+    }
+  }, [onAdded, onOpenChange, selectedExistingRefs, targetWorkspaceId])
+
   const handleGenerateNote = async () => {
     if (isLocalFile) {
       // 本地文件：savePreflight + startItemPipeline，绕开 generateNote 的 URL 校验
@@ -479,7 +609,8 @@ export function AddMaterialModal({
       try {
         const wsId = localWsId || workspaceIds[0]
         if (!wsId) { setError('未找到合集'); return }
-        const videoTask = selectedNoteType === 'auto' || selectedNoteType === 'video'
+        const resolvedNoteType = selectedNoteType === 'auto' ? autoResolvedNoteType : selectedNoteType
+        const videoTask = resolvedNoteType === 'video'
         const effInterval = videoTask
           ? (captureMode === 'auto' ? computeAutoInterval(videoDuration) : frameInterval)
           : undefined
@@ -508,7 +639,15 @@ export function AddMaterialModal({
         toast.success('任务已创建', { description: localFileName || '本地文件' })
         onAdded?.()
         onOpenChange(false)
-        navigate(`/processing/${task_id}`, { state: { url: localFileName || '', workspaceId: wsId, itemId: localFile, taskType: selectedAction === 'replica' ? 'replica' : 'note' } })
+        navigate(`/processing/${task_id}`, {
+          state: {
+            url: localFileName || '',
+            workspaceId: wsId,
+            itemId: localFile,
+            taskType: selectedAction === 'replica' ? 'replica' : 'note',
+            itemType: localFileType ?? (resolvedNoteType === 'audio' ? 'audio' : resolvedNoteType === 'image_text' ? 'image' : 'video'),
+          },
+        })
       } catch (e) {
         const msg = e instanceof Error ? e.message : '提交失败'
         setError(msg)
@@ -588,9 +727,9 @@ export function AddMaterialModal({
         <div className="m-body">
           {error && <div className="modal-error">{error}</div>}
 
-          {/* ① 视频源 */}
+          {/* ① 素材源 */}
           <div className="m-section">
-            <div className="eyebrow" style={{ marginBottom: 10 }}>① 视频源</div>
+            <div className="eyebrow" style={{ marginBottom: 10 }}>① 素材源</div>
             {isLocalFile ? (
               <div className="sniff-card">
                 <div className="sniff-thumb">
@@ -601,12 +740,23 @@ export function AddMaterialModal({
                       onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                     />
                   ) : (
-                    <PlayCircle size={20} style={{ color: 'var(--mut)' }} />
+                    localFileType === 'audio' ? (
+                      <FileAudio size={20} style={{ color: 'var(--mut)' }} />
+                    ) : localFileType === 'image' ? (
+                      <ImageIcon size={20} style={{ color: 'var(--mut)' }} />
+                    ) : localFileType === 'text' ? (
+                      <FileText size={20} style={{ color: 'var(--mut)' }} />
+                    ) : (
+                      <PlayCircle size={20} style={{ color: 'var(--mut)' }} />
+                    )
                   )}
                 </div>
                 <div className="sniff-meta">
                   <div className="sniff-title">{localFileName || '本地文件'}</div>
                   <div className="sniff-tags">
+                    <span className="kw" style={{ fontSize: 11 }}>
+                      本地{localFileTypeLabel(localFileType)}
+                    </span>
                     {videoDuration > 0 && (
                       <span className="kw" style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                         <Clock size={11} /> {formatDuration(videoDuration)}
@@ -636,15 +786,103 @@ export function AddMaterialModal({
                   }}
                   placeholder="B站 / 小红书 / 抖音 / YouTube / 本地文件路径"
                 />
+                {onPickLocalFile && (
+                  <button
+                    type="button"
+                    className="pp-add"
+                    onClick={onPickLocalFile}
+                    disabled={localUploadPending}
+                  >
+                    <Upload size={11} />
+                    {localUploadPending ? '上传中…' : '本地上传'}
+                  </button>
+                )}
               </div>
             )}
             {!isLocalFile && !urlValue && !effectiveSniff && (
               <div className="modal-kw-row">
                 <span className="kw"><Link2 size={11} /> 支持网络链接</span>
-                <span className="kw">本地版无大小限制</span>
+                <span className="kw"><Upload size={11} /> 支持本地上传</span>
                 <span className="kw" data-state={internalSniff ? 'recognized' : undefined}>
                   {internalSniff ? '已识别' : '输入后自动识别'}
                 </span>
+              </div>
+            )}
+            {!isLocalFile && targetWorkspaceId && (
+              <div className="existing-material-entry">
+                <button
+                  type="button"
+                  className="pp-add"
+                  onClick={() => {
+                    if (existingPanelOpen) {
+                      setExistingPanelOpen(false)
+                      return
+                    }
+                    void loadExistingMaterials()
+                  }}
+                >
+                  <Layers size={11} />
+                  已分析内容
+                </button>
+                <span className="kw">从笔记库选择已完成内容加入当前合集</span>
+              </div>
+            )}
+            {existingPanelOpen && (
+              <div className="existing-material-panel">
+                <div className="pp-search">
+                  <Search size={14} />
+                  <input
+                    placeholder="搜索标题、来源或合集..."
+                    value={existingQuery}
+                    onChange={(event) => setExistingQuery(event.target.value)}
+                  />
+                </div>
+                <div className="existing-material-list">
+                  {existingLoading ? (
+                    <div className="existing-material-empty">正在读取已分析内容…</div>
+                  ) : filteredExistingItems.length === 0 ? (
+                    <div className="existing-material-empty">暂无可加入的已完成内容</div>
+                  ) : (
+                    filteredExistingItems.map((item) => {
+                      const itemKey = libraryItemKey(item)
+                      return (
+                        <button
+                          key={itemKey}
+                          type="button"
+                          className="existing-material-row"
+                          data-on={existingSelectedIds.has(itemKey)}
+                          onClick={() => toggleExistingItem(itemKey)}
+                        >
+                          <span className="pp-check">
+                            <Check size={11} strokeWidth={3} />
+                          </span>
+                          <span className="existing-material-thumb">
+                            {item.thumbnail ? (
+                              <img src={item.thumbnail} alt="" loading="lazy" />
+                            ) : (
+                              itemTypeLabel(item.type).slice(0, 1)
+                            )}
+                          </span>
+                          <span className="existing-material-main">
+                            <strong>{item.name || '未命名内容'}</strong>
+                            <em>{item.workspace_name} · {itemTypeLabel(item.type)} · {item.source === 'local' ? '本地' : '链接'}</em>
+                          </span>
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+                <div className="existing-material-foot">
+                  <span>已选 {selectedExistingRefs.length} 项</span>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={existingAdding || selectedExistingRefs.length === 0}
+                    onClick={() => void handleAddExistingMaterials()}
+                  >
+                    {existingAdding ? '加入中…' : '加入当前合集'}
+                  </button>
+                </div>
               </div>
             )}
             {effectiveSniff && effectiveSniff.confident === false && (

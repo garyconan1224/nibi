@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { ArrowRight, Play, Mic, Image, FileText } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTaskStore } from '@/store/taskStore'
@@ -138,6 +139,7 @@ interface RecentTasksProps {
 
 export function RecentTasks({ tasks: tasksProp }: RecentTasksProps) {
   const navigate = useNavigate()
+  const [failedThumbs, setFailedThumbs] = useState<Set<string>>(new Set())
   usePipelineTasks({ pollInterval: 5000 })
   const storeTasks = useTaskStore((s) => s.tasks)
   const tasks = tasksProp ?? storeTasks
@@ -202,7 +204,7 @@ export function RecentTasks({ tasks: tasksProp }: RecentTasksProps) {
 
       <div className="note-grid">
         {cards.map((card) => {
-          const hasThumb = !!card.thumb
+          const hasThumb = !!card.thumb && card.type !== 'audio' && !failedThumbs.has(card.id)
           const coverTypeClass = hasThumb ? '' : COVER_CLASS[card.type] || 'cover-video'
           const pillClass = STATE_PILL_CLASS[card.state] || 'status-pill'
           const statusLabel = STATE_STATUS_LABEL[card.state] || card.state
@@ -225,6 +227,11 @@ export function RecentTasks({ tasks: tasksProp }: RecentTasksProps) {
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = 'none'
+                      setFailedThumbs((prev) => {
+                        const next = new Set(prev)
+                        next.add(card.id)
+                        return next
+                      })
                     }}
                   />
                 ) : null}
