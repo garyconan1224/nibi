@@ -280,6 +280,10 @@ def _build_attempts(
         attempts.append({**base_opts, "extractor_args": extractor_args})
     else:
         direct_opts = {k: v for k, v in base_opts.items() if k != "proxy"}
+        # 非 YouTube（B站/抖音/小红书等国内平台）强制直连：
+        # yt-dlp 在未设 proxy 时会读环境变量 HTTP_PROXY/HTTPS_PROXY，
+        # 显式设 "" 同时禁用 opts 代理和环境变量代理，避免被终端代理拖死。
+        direct_opts["proxy"] = ""
         bili_extras = _bilibili_yt_dlp_extras() if _is_bilibili_url(url) else {}
 
         def _append_bili_variants(core: dict[str, Any]) -> None:

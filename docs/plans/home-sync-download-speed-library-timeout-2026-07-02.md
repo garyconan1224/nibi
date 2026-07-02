@@ -1,12 +1,28 @@
-# 修复计划：首页残留已删任务 / 下载太慢 / 处理中资料库加载失败
+# 修复计划：下载卡死(代理) / 首页残留已删任务 / 资料库加载失败 / 反选清空精简
 
 > 日期：2026-07-02　分支：`feat/exp-redesign-p1`
 > 作者：Claude（桌面/终端）　执行：小米　审查：Codex
-> 用户已拍板：
-> - 问题1 → 「删除时同步清缓存」（前端即时移除 + 后端根治，见下）
-> - 问题2 → 三管齐下：先排查网络/代理 → 改用 DASH+分片并发 → 接入 aria2c 多线程（**已同意安装 aria2c**；不做登录 cookie）
+> 用户反馈的问题：1) 笔记页删任务后首页残留；2) 下载太慢（卡死）；3) 处理中打开资料库报「加载失败」；4) 添加素材弹框「反选/清空」重复。
+>
+> **重要更新**：问题2 的真凶经 Claude 实测已确认是**代理拖死 B 站下载**（不是下载方式问题），因此原定的 aria2c/DASH 方向作废，改为「强制 B 站直连」。详见任务 2。
+>
+> 首页「最近任务」= 只删被删的那一条，保留最近 8 条其余内容（用户明确）。
 
-三个任务相互独立，建议按 **任务1 → 任务3 → 任务2** 顺序做（先修数据一致性和加载失败这类确定性 bug，再调下载性能）。
+四个任务相互独立，建议按 **任务2（最影响体验，已定位）→ 任务1 → 任务3 → 任务4** 顺序做。
+
+---
+
+## 参考项目 / 技术资料（Claude 已查证）
+
+- **BiliNote**（本 app 的同类参考）：https://github.com/JefferyHcool/BiliNote
+  - 它的「全局代理」设计明确写着**只作用于 AI 接口、转写接口、YouTube 下载**，并用 `HTTP_PROXY` 环境变量兜底。→ 佐证我们任务2 的修复方向：**代理是给 YouTube 等境外站的，B 站不该走代理**。
+- **BBDown**（专用 B 站命令行下载器，速度参考）：https://github.com/nilaoda/BBDown
+  - 提供 `--upos-host` 切换 CDN 镜像（如 `upos-sz-mirroraliov.bilivideo.com`）来提速——**B 站真正的第二瓶颈是 CDN 选择**（默认 CDN 慢，镜像快）。作为任务2 的「可选备选」，仅在直连后仍慢时才考虑。
+  - 可选 CDN 镜像：`upos-sz-mirroraliov / mirrorcos / mirrorcosb / mirrorbos / mirrorhw .bilivideo.com`。
+- yt-dlp 相关佐证：
+  - B 站限速 issue：https://github.com/yt-dlp/yt-dlp/issues/10849 （社区普遍反映默认 CDN 慢）
+  - CDN 选择需求：https://github.com/yt-dlp/yt-dlp/issues/14498 （yt-dlp 无内置 CDN 切换，需改 URL host）
+  - 结论：**aria2c 多线程对「CDN 本身慢/代理卡死」无效**，所以本次不上 aria2c，先解决代理。
 
 ---
 
@@ -47,12 +63,13 @@
 - 用 try/except 包住，单个删除失败不阻塞主流程。
 - 注意：只有「合集里删单条」才需要这步（1-A 处理的是整个合集 trashed 的情况；单 item 删除时合集通常仍存在）。
 
-**1-C 前端：删除成功后即时清本地 taskStore（体验，避免等 5 秒轮询）**
-- 在 `frontend/src/store/taskStore.ts` 新增一个 action：`removeByProject(projectId: string)`，从 `tasks` 里过滤掉 `project_id === projectId` 的任务（`TaskRecord.project_id` 就是 workspace_id，见 `frontend/src/types/task.ts:27`）。
-- 在 `frontend/src/pages/LibraryPage/index.tsx` 的 `handleDeleteOne` / `handleDeleteWorkspace` / `handleBatchDelete` 成功回调里：
-  - 删合集：`useTaskStore.getState().removeByProject(wsId)`。
-  - 删单条 item：`LibraryItem` 上有 `workspace_id`，同样调 `removeByProject(item.workspace_id)`（同合集其它未删 item 的任务会被 1-A/后端下次轮询自动补回，可接受；若要更精确可跳过 1-C 的单条场景，仅靠后端）。
-- 目的仅是「立即消失」，最终一致性由 1-A/1-B 保证。
+**1-C 前端：删除成功后即时与后端对账（体验，避免等 5 秒轮询）**
+> 用户明确：首页「最近任务」是**只删被删的那一条，保留最近 8 条其余内容**（`RecentTasks` 取 `tasks.slice(0, 8)`）。所以**不要**按 workspace 批量清前端缓存（合集里删单条会误伤同合集其它视频的卡片，造成"闪一下又回来"）。
+- 正确做法：在 `frontend/src/pages/LibraryPage/index.tsx` 的 `handleDeleteOne` / `handleDeleteWorkspace` / `handleBatchDelete` 成功回调里，**主动触发一次 task 列表刷新**，让前端 `taskStore` 立即与后端对账（后端已由 1-A/1-B 清掉被删任务）。
+  - 实现：把 `usePipelineTasks` 里那次 `GET /pipeline/tasks` 的拉取逻辑抽成可手动调用的 `refetch()`，或复用现有轮询函数，在删除成功后立即调用一次。
+  - 效果：被删的那条立刻消失，其余 7 条不受影响，若不足 8 条会自然补上下一条。
+- 若抽 `refetch` 成本高，退而求其次：新增 `taskStore.removeTask(taskId)` 的精确删除——但前端需要拿到被删 item 的 task_id。当前 `LibraryItem` 不带 task_id，需后端在 library/删除响应里回带，改动更大，**优先用 refetch 方案**。
+- 最终一致性由 1-A/1-B 保证，1-C 只为「即时」。
 
 ### 验收
 1. 起后端（**确认是新进程**：`ps aux | grep uvicorn` 看启动时间晚于本次改动，命令含 `.venv` 和 `--reload`）。
@@ -106,60 +123,80 @@
 
 ---
 
-## 任务 2：B 站批量下载太慢
+## 任务 2：B 站批量下载卡死（几十 B/s，ETA 好几小时）—— 真凶是代理
 
 ### 现象
-截图里下载速度从 31KiB/s 一路掉到几百 B/s、ETA 越来越长，2% 卡很久。
+- 正在跑的任务（BV1q44y1k718 / BV1Av411N7mX，都是 5–11 秒的**超短视频**，总共不到 1MB）卡在 1%，速度 26–46 B/s、ETA 3–4 小时、单调衰减。
+- 5 秒的视频理应零点几秒下完。
 
-### 根因（部分已核实，部分需你实测）
-- 当前默认 `format=best`、`concurrent_fragment_downloads=5`、**无外部下载器**：`shared/video_download_ytdlp.py`（`_build_attempts` 约 211 行、`base_opts` 约 228 行）。
-- 日志里 `proxy=空`，且速度衰减到字节级，是典型的 **B 站服务端单连接限速**，不是纯代码 bug。
-- B 站 DASH 是「单文件 + 支持 range」的形态，`concurrent_fragment_downloads` 对它帮助有限；**真正提速靠 aria2c 多连接（-x）**。
+### 根因（Claude 已实测确认，非猜测）
+下载配置里开着代理：`GET /download_config` → `http_proxy: http://127.0.0.1:7890`（Clash）。**B 站是国内站，被代理绕到境外节点后媒体流下载会崩/被拖到字节级**。实测证据：
 
-按你定的方向，分三步（**先做 2-A 实测，可能直接解决，就不必上 aria2c**）：
+| 方式 | 结果 |
+|---|---|
+| 直连 + cookie + header（`.venv/bin/yt-dlp`，同一 BV） | 3.96–11 MiB/s，**瞬间下完** |
+| 走代理 7890（显式 `--proxy`） | `SSL: UNEXPECTED_EOF_WHILE_READING`，连接反复断、卡死 |
+| 应用实际任务 | 30 B/s、ETA 4h（= 代理卡死的表现） |
 
-**2-A：先排查网络/代理（零依赖，先做）**
-- 查当前下载代理设置：`curl -s http://localhost:8000/settings | python -m json.tool` 看 `download.http_proxy`（字段名见 `backend/app/services/pipeline_tasks.py:484` 的 `_s("http_proxy")`）；或看设置页「下载」`frontend/src/pages/SettingPage/DownloadSettingsPage`。
-- 手动测速对照（在项目 `.venv` 里）：
-  - 直连：`.venv/bin/yt-dlp -f "bv*+ba/b" -o '/tmp/t.%(ext)s' 'https://www.bilibili.com/video/BV1Av411N7mX' --newline`
-  - 走代理（若你有）：加 `--proxy http://127.0.0.1:你的端口`
-- 对比两者速度。若走代理明显变快 → 让用户在设置页填 `http_proxy` 即可，**任务2 到此结束**，把结论回报。
-- 若直连本身就慢/衰减 → 进入 2-B/2-C。
+**为什么代码里"B站先直连"没生效**：`shared/video_download_ytdlp.py` 的 `_build_attempts` 里，B 站"直连"尝试只是**省略了 `proxy` 参数**（`direct_opts = {k:v ... if k != "proxy"}`）。但 yt-dlp 在没有 `proxy` 选项时**会读进程环境变量 `HTTP_PROXY/HTTPS_PROXY/ALL_PROXY`**。后端进程是从带代理 env 的终端启动的，所以"直连"尝试实际仍走了环境代理 → 卡死。（`_resolve_download_kwargs` 又把 `download_config.http_proxy=7890` 兜底传进来，双重来源。）
 
-**2-B：B 站改用 DASH 分离流 + 提高分片并发（纯配置，无新依赖）**
-文件 `shared/video_download_ytdlp.py`。
-- 确认 B 站分支已在跑 DASH：`_build_attempts` 里 B 站会 strip 掉 `format`，让 yt-dlp 用默认 `bv*+ba/b`（DASH）。核对实际下载的确是分离流合并（看日志 format id）。
-- 把 B 站的 `concurrent_fragment_downloads` 默认从 5 提到 **16**（仅对分片式生效；单文件 DASH 靠 2-C）。改动点在 `base_opts["concurrent_fragment_downloads"]`（约 236 行），建议只针对 `_is_bilibili_url(url)` 提高，避免影响其它站点。
+> 结论：这跟 DASH/分片并发/aria2c **无关**——连接被代理拖死，加多线程也没用。**核心修复是让 B 站强制直连**。原计划的 aria2c/DASH 降为可选的后续提速项，本次不做。
 
-**2-C：接入 aria2c 外部下载器（需安装，用户已同意）**
-- 安装（一次性）：`brew install aria2`，装完 `which aria2c` 确认。
-- 文件 `shared/video_download_ytdlp.py`，`_build_attempts` 的 `base_opts`：**仅当** `shutil.which("aria2c")` 存在时，注入：
-  ```python
-  "external_downloader": "aria2c",
-  "external_downloader_args": {
-      "aria2c": ["-x", "16", "-s", "16", "-k", "1M"]
-  },
-  ```
-  （`-x16` 每主机 16 连接、`-s16` 单任务 16 分段、`-k1M` 每段 1MB。）
-- 用 `shutil.which` 守卫，**没装 aria2c 时不注入**，保持旧行为，避免报错。
-- 注意与 `progress_hooks`：用了 external_downloader 后 yt-dlp 的进度回调粒度会变（可能不再逐帧回调百分比）。核对 `progress_callback`/`speed_callback`（`backend/app/services/pipeline_tasks.py:529-531`）在 aria2c 下是否还有值；若进度条不动，需在计划外单独评估，先保证「能更快下完」。
+### 修复方案
+
+**2-核心：B 站（及其它国内平台）强制直连，显式关代理**
+文件 `shared/video_download_ytdlp.py`，`_build_attempts` 的 B 站分支。
+- 给 B 站的"直连"变体**显式设置 `"proxy": ""`**（空字符串），而不是省略该键。yt-dlp 里 `proxy=""` 会**同时禁用 opts 代理和环境变量代理**，才是真直连。
+  - 即把现在的 `direct_opts = {k: v for k, v in base_opts.items() if k != "proxy"}` 改成在 B 站直连变体里带上 `"proxy": ""`。
+- 顺序保持：先直连变体（proxy=""），把带 `normalized_proxy` 的代理变体放到最后做兜底（极少数网络确实要靠代理访问 B 站）。
+- 校验：改完后应用日志里 B 站首个策略应立刻跑到 KiB/MiB 级并秒下短视频。
+
+**2-核心（可选加固）：代理只对境外站生效**
+- 在 `_resolve_download_kwargs`（`backend/app/services/pipeline_tasks.py:484`）或 `_build_attempts` 里，判断 `_is_bilibili_url` / 其它国内域名时，把 `proxy` 归一化为 `""`；只有 YouTube 等境外站才用 `download_config.http_proxy`。
+- 这样即便用户在设置里填了代理，也不会拖垮 B 站。
+
+**用户可立即自救（不用等改代码）**：设置页「下载」把 `http_proxy` 清空（只下 B 站时）；或在 Clash 规则里让 `bilibili.com`/`*.bilivideo.com`/`*.akamaized.net` 走 DIRECT。
+
+**2-可选备选（仅当直连后仍慢才做，本次先不实现）**：CDN 镜像切换
+- 若强制直连后 B 站速度仍只有 ~1MB/s（默认 CDN 慢），参考 BBDown 的思路：把 yt-dlp 拿到的媒体 URL host 替换成更快的镜像（如 `upos-sz-mirroraliov.bilivideo.com`）。
+- yt-dlp 无内置切换，需在 format 选好后改 URL（成本较高），**留作后续单独任务**，除非直连仍不达标。
+
+**2-后续（可选，本次不做）**：装 `aria2c` 多连接（`brew install aria2` + `external_downloader`，用 `shutil.which` 守卫）进一步提速——但要先把代理问题解决，否则无效。留作后续单独任务。
 
 ### 验收
-1. 记录基线：用 2-A 的手动命令测一个 BV 号的平均速度/耗时。
-2. 依次开启 2-B、2-C，各测同一个 BV 号，记录速度对比（写进 `docs/test-reports/`）。
-3. 在真实 UI（`./dev.sh` 起服务）跑一个 B 站批量任务，确认：
-   - 下载速度明显提升、ETA 收敛；
-   - 处理中页面进度条仍在动（aria2c 下重点回归这条）；
-   - 下载完成后能正常进入后续 pipeline。
-4. **确认没装 aria2c 的机器上仍能正常下载**（守卫生效）。
+1. 记录基线：`.venv/bin/yt-dlp --cookies /Users/conan/.local/bilibili_cookies/www.bilibili.com_cookies.txt -f "bv*/b" 'https://www.bilibili.com/video/BV1q44y1k718' -o /tmp/x.%(ext)s`（应 MiB/s 秒下）。
+2. 改完后端（**确认新进程**），在真实 UI 跑一个 B 站批量任务：
+   - 下载策略 1 立刻上 KiB/MiB 级，短视频秒下、长视频 ETA 收敛；
+   - `curl -s 'http://localhost:8000/pipeline/tasks?include_result=true&limit=3'` 看 `download_speed` 应是 KiB/MiB 级而非 B/s。
+3. 回归：设置里**保留** `http_proxy=7890` 的情况下，B 站仍能直连快下（证明 `proxy=""` 生效）；同时确认 YouTube 链接仍能走代理下载（若你有 YT 场景）。
+
+---
+
+## 任务 4：添加素材弹框「反选 / 清空」二选一（小改）
+
+### 现象
+`添加素材 → 批量合集` 里有 `全选 / 反选 / 清空` 三个按钮，用户觉得「反选」和「清空」重复，只保留一个。
+
+### 说明
+严格说两者不同（反选 = 取未选的；清空 = 全不选），但用户要精简。按「保留直觉的一对（全选 / 清空）」处理。
+
+### 修复
+文件 `frontend/src/components/workspace/AddMaterialModal.tsx`（约 1138–1151 行）。
+- **删掉「反选」按钮**那个 `<button>`（`onClick` 里构造 invert 的那段，label 是 `反选`），保留「全选」（1131–1137）和「清空」（1152–1158）。
+- 若 `.batch-source-control-actions` 的样式依赖按钮数量（如等宽三列），顺带核对 `library.css`/相关 css 不要留空位。
+
+### 验收
+- 弹框里只剩「全选 / 清空」；点全选全勾、点清空全清；`npm run build` 通过。
 
 ---
 
 ## 给小米的红线
 - 后端改动验证前，先确认跑的是**新进程**（`ps aux | grep uvicorn` 看启动时间 + 含 `.venv`/`--reload`），别对着旧进程测。
 - 前端改完跑 `cd frontend && npm run build` 核对（不要只信 `tsc`）。
-- `brew install aria2` 属新依赖，用户已同意；但**只装 aria2c 这一项**，不要顺手装别的。
+- 任务2 本次**不装 aria2c、不改 DASH/并发**，只做「强制 B 站直连」；aria2c 留作后续单独任务。
+- 任务2 改代理逻辑时，**不要动 YouTube 分支的代理**（境外站要靠代理），只改国内站直连。
 - 任务3-B 若发现会破坏卡片封面/类型，立即停下回报，可只交付 3-A。
+- 任务1 前端只删「被删的那一条」，不要按 workspace 批量清缓存（会误伤首页其它卡片）。
 - 不改 `.env`、不动 DB schema、不 `git push`、不在脏树上跑「单 commit 过审」。
 - 每个任务各自 commit，信息写清对应任务号，方便 Codex 分别审查。
-- 三个任务都要求「自己跑数据验证 + 附证据」，不许只看代码猜。
+- 四个任务都要求「自己跑数据验证 + 附证据」，不许只看代码猜。
