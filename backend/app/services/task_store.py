@@ -96,8 +96,13 @@ class TaskStore:
         return record
 
     def get(self, task_id: str) -> Optional[TaskRecord]:
-        with self._lock:
-            return self._records.get(task_id)
+        if self._lock.acquire(timeout=0.2):
+            try:
+                return self._records.get(task_id)
+            finally:
+                self._lock.release()
+        # 任务进度/日志写盘较频繁；读 UI 状态时允许返回当前内存快照，避免列表页阻塞。
+        return self._records.get(task_id)
 
     def update(self, task_id: str, **kwargs: object) -> TaskRecord:
         with self._lock:
@@ -132,8 +137,12 @@ class TaskStore:
             return rec
 
     def list_all(self) -> List[TaskRecord]:
-        with self._lock:
-            return list(self._records.values())
+        if self._lock.acquire(timeout=0.2):
+            try:
+                return list(self._records.values())
+            finally:
+                self._lock.release()
+        return list(self._records.values())
 
     def delete(self, task_id: str) -> bool:
         """从持久化存储中删除一条任务记录。"""

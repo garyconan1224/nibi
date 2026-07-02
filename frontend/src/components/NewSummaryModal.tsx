@@ -6,11 +6,12 @@
  * 模型选择记忆上次（configStore）。
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { HelpCircle } from 'lucide-react'
 import { useProviderStore, type Model } from '@/store/providerStore'
 import { useConfigStore } from '@/store/configStore'
+import { fetchTemplates, type VideoTemplateItem } from '@/services/templates'
 
 import './new-summary-modal.css'
 
@@ -39,7 +40,9 @@ const MORE_STYLES: { value: string; label: string; desc: string }[] = [
   { value: 'science_popularization', label: '知识科普', desc: '通俗语言讲原理+类比+常见误区，适合科普' },
 ]
 
-const QUICK_VALUES = new Set(QUICK_CARDS.map((c) => c.value))
+const TEMPLATE_ORDER = new Map(
+  [...QUICK_CARDS, ...MORE_STYLES].map((style, index) => [style.value, index]),
+)
 
 /* ── 接口 ───────────────────────────────────────────────── */
 
@@ -65,6 +68,7 @@ export function NewSummaryModal({
   const [template, setTemplate] = useState(defaultTemplate || 'standard')
   const [background, setBackground] = useState('')
   const [searchWeb, setSearchWeb] = useState(false)
+  const [styleTemplates, setStyleTemplates] = useState<VideoTemplateItem[]>([])
   const userPickedRef = useRef(false)
 
   // defaultTemplate 异步到达时自动选中，但不覆盖用户已手动选择的模板
@@ -76,6 +80,34 @@ export function NewSummaryModal({
     userPickedRef.current = true
     setTemplate(value)
   }
+
+  useEffect(() => {
+    let cancelled = false
+    fetchTemplates('style_video_with_frames')
+      .then((items) => {
+        if (!cancelled) setStyleTemplates(items)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  const templateOptions = useMemo(() => {
+    if (styleTemplates.length === 0) return [...QUICK_CARDS, ...MORE_STYLES]
+    return [...styleTemplates]
+      .sort((a, b) => {
+        const ai = TEMPLATE_ORDER.get(a.template_id) ?? 1000
+        const bi = TEMPLATE_ORDER.get(b.template_id) ?? 1000
+        return ai - bi || a.name.localeCompare(b.name, 'zh-Hans-CN')
+      })
+      .map((item) => ({
+        value: item.template_id,
+        label: item.name,
+        desc: item.description || item.use_case || '',
+      }))
+  }, [styleTemplates])
+  const quickOptions = templateOptions.slice(0, 7)
+  const moreOptions = templateOptions.slice(7)
+  const quickValues = new Set(quickOptions.map((c) => c.value))
 
   // ── 模型选择：复用 providerStore + configStore 记忆 ──
   const providers = useProviderStore((s) => s.providers)
@@ -137,7 +169,7 @@ export function NewSummaryModal({
           <div className="nsm-section">
             <div className="nsm-section-label">常用模板</div>
             <div className="nsm-grid">
-              {QUICK_CARDS.map((c) => (
+              {quickOptions.map((c) => (
                 <button
                   key={c.value}
                   className={`nsm-card ${template === c.value ? 'active' : ''}`}
@@ -155,25 +187,25 @@ export function NewSummaryModal({
             <div className="nsm-row">
               <span className="nsm-section-label" style={{ margin: 0 }}>更多模板：</span>
               <select
-                value={QUICK_VALUES.has(template) ? '' : template}
+                value={quickValues.has(template) ? '' : template}
                 onChange={(e) => e.target.value && chooseTemplate(e.target.value)}
                 className="nsm-select"
               >
                 <option value="" disabled>选择其他模板</option>
-                {MORE_STYLES.map((o) => (
+                {moreOptions.map((o) => (
                   <option key={o.value} value={o.value} title={o.desc}>{o.label}</option>
                 ))}
               </select>
               <span
-                title={MORE_STYLES.find((o) => o.value === template)?.desc}
-                style={{ display: QUICK_VALUES.has(template) ? 'none' : 'inline-flex', cursor: 'help' }}
+                title={moreOptions.find((o) => o.value === template)?.desc}
+                style={{ display: quickValues.has(template) ? 'none' : 'inline-flex', cursor: 'help' }}
               >
                 <HelpCircle size={14} style={{ opacity: 0.5 }} />
               </span>
             </div>
-            {!QUICK_VALUES.has(template) && MORE_STYLES.find((o) => o.value === template) && (
+            {!quickValues.has(template) && moreOptions.find((o) => o.value === template) && (
               <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
-                {MORE_STYLES.find((o) => o.value === template)!.desc}
+                {moreOptions.find((o) => o.value === template)!.desc}
               </div>
             )}
           </div>

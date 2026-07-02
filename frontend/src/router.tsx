@@ -35,6 +35,7 @@ const FavoritesPage = lazy(() => import('@/pages/FavoritesPage/FavoritesPage'))
 const SearchPage = lazy(() => import('@/pages/SearchPage/SearchPage'))
 const WorkbenchPage = lazy(() => import('@/pages/WorkbenchPage/index'))
 const ProcessingPage = lazy(() => import('@/pages/result/ProcessingPage/index'))
+const BatchProcessingPage = lazy(() => import('@/pages/result/BatchProcessingPage/index'))
 const StoryboardPage = lazy(() => import('@/pages/StoryboardPage/index'))
 const LibraryPage = lazy(() => import('@/pages/LibraryPage/index'))
 const NoteShell = lazy(() => import('@/pages/result/NoteShell/index'))
@@ -107,6 +108,10 @@ export const router = createBrowserRouter([
         loader: ({ params }) => redirect(`/workspaces/${params.workspaceId}/items/${params.itemId}/text_detail`),
       },
       {
+        path: 'processing/batch/:workspaceId',
+        element: withSuspense(<BatchProcessingPage />),
+      },
+      {
         path: 'processing/:taskId',
         element: withSuspense(<ProcessingPage />),
       },
@@ -125,6 +130,7 @@ export const router = createBrowserRouter([
           { path: 'monitor', element: withSuspense(<DeployMonitorPage />) },
           { path: 'trash', element: withSuspense(<TrashPage />) },
           { path: 'video-templates', element: withSuspense(<VideoTemplatesPage />) },
+          { path: 'style-templates', element: withSuspense(<VideoTemplatesPage />) },
           { path: 'about', element: withSuspense(<AboutPage />) },
           // 旧路由重定向（向后兼容）
           { path: 'providers', element: <Navigate to="/settings/providers-models" replace /> },

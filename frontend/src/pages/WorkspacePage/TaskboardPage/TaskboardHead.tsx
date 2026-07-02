@@ -183,6 +183,10 @@ export function TaskboardHead({
             <Plus size={14} />
             加入素材
           </button>
+          <button className="btn" onClick={() => onMenuAction?.('queue')}>
+            <List size={14} />
+            任务中
+          </button>
           <button className="btn" onClick={onExport}>
             <Download size={14} />
             导出

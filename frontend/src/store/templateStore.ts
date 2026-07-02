@@ -21,9 +21,19 @@ interface TemplateStoreState {
 }
 
 const emptyCache = (): CategoryCache => ({ templates: [], loaded: false })
+const emptyCaches = (): Record<TemplateCategory, CategoryCache> => ({
+  video: emptyCache(),
+  text: emptyCache(),
+  style_video_with_frames: emptyCache(),
+  style_video_text_only: emptyCache(),
+  style_audio: emptyCache(),
+  style_image_text: emptyCache(),
+  style_replica: emptyCache(),
+  style_text: emptyCache(),
+})
 
 export const useTemplateStore = create<TemplateStoreState>((set, get) => ({
-  caches: { video: emptyCache(), text: emptyCache() },
+  caches: emptyCaches(),
   loading: false,
   error: null,
 
@@ -45,7 +55,7 @@ export const useTemplateStore = create<TemplateStoreState>((set, get) => ({
     if (category) {
       set((s) => ({ caches: { ...s.caches, [category]: emptyCache() } }))
     } else {
-      set({ caches: { video: emptyCache(), text: emptyCache() } })
+      set({ caches: emptyCaches() })
     }
   },
 

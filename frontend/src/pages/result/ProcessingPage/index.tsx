@@ -9,6 +9,7 @@ import { isTaskTerminal, getStatusText } from '@/types/task'
 import { getPipelineTask } from '@/services/pipeline'
 import { categorizeError } from '@/lib/errorCategories'
 import { platformPrefixFromUrl } from '@/lib/platformPrefix'
+import { inferContentTags } from '@/lib/contentTags'
 import MusicModeConfirmModal from '@/components/workspace/MusicModeConfirmModal'
 import {
   Dialog,
@@ -32,6 +33,8 @@ interface LocationState {
   url?: string
   taskType?: string
   itemType?: string
+  backPath?: string
+  backLabel?: string
 }
 
 const STUCK_MS = 10 * 60 * 1000
@@ -139,10 +142,10 @@ export default function ProcessingPage() {
     if (analyze && analyze.task_id !== taskId) {
       navigate(`/processing/${analyze.task_id}`, {
         replace: true,
-        state: { workspaceId, itemId, taskType: state?.taskType, itemType: state?.itemType },
+        state: { ...state, workspaceId, itemId, taskType: state?.taskType, itemType: state?.itemType },
       })
     }
-  }, [task, allTasks, taskId, navigate, workspaceId, itemId])
+  }, [task, allTasks, taskId, navigate, workspaceId, itemId, state])
 
   const progress = task?.progress ?? 0
   const status = task?.status ?? 'PENDING'
@@ -253,6 +256,7 @@ export default function ProcessingPage() {
     (payload.video_title as string) ||
     (task?.payload?.title as string) ||
     safeHostname
+  const contentTags = inferContentTags([title, url, sourceType, noteKind, payload, result])
   // 图文笔记封面：cover_thumbnail（PROBE 后已有 static URL）→ image_infos[0].static_url
   // 注意：result.images[0] 是本地文件路径，不能直接进 img src，不使用
   const resultImageInfos = (result.image_infos as Array<{ static_url?: string }>) ?? []
@@ -305,6 +309,10 @@ export default function ProcessingPage() {
     }
   }
 
+  const handleBack = () => {
+    navigate(state?.backPath || '/library')
+  }
+
   const autoOpenRef = useRef('')
   useEffect(() => {
     const shouldAutoOpen = resultIntent === 'replica' || resultItemType === 'audio'
@@ -338,7 +346,7 @@ export default function ProcessingPage() {
       <div className="proc-wrap">
         <div className="proc-main">
           <div className="proc-topbar">
-            <button className="proc-back" onClick={() => navigate('/library')} title="返回资料库">
+            <button className="proc-back" onClick={handleBack} title={state?.backLabel || '返回资料库'}>
               <ArrowLeft size={18} />
             </button>
             <div className="proc-top-title">{title}</div>
@@ -427,6 +435,15 @@ export default function ProcessingPage() {
                   </span>
                 )}
               </div>
+              {contentTags.length > 0 && (
+                <div className="proc-tags" aria-label="内容标签">
+                  {contentTags.map((tag) => (
+                    <span key={tag} className="proc-tag">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
               <div className="actions">
                 {!isSuccess && (
                   <button className="btn" onClick={handleCancel}>

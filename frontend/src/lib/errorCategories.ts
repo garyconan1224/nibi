@@ -1,5 +1,5 @@
 /** 错误分类——将后端原始错误文本映射为人类可读的类别与建议 */
-export type ErrorCategory = 'network' | 'quota' | 'model_not_configured' | 'unsupported' | 'general'
+export type ErrorCategory = 'network' | 'quota' | 'model_not_configured' | 'unsupported' | 'interrupted' | 'general'
 
 export interface CategorizedError {
   category: ErrorCategory
@@ -9,6 +9,7 @@ export interface CategorizedError {
 
 /** 关键词 → 分类映射，命中即停（按优先级从上到下） */
 const CATEGORY_RULES: Array<{ pattern: RegExp; category: ErrorCategory }> = [
+  { pattern: /后端重启|任务中断|server.*restart|interrupted|worker.*lost/i, category: 'interrupted' },
   { pattern: /429|限流|rate.?limit|quota.*exceed|配额/i, category: 'quota' },
   { pattern: /timeout|timed.?out|connect.*refus|ConnectionError|network|网络|ECONNREFUSED|ENOTFOUND/i, category: 'network' },
   { pattern: /no enabled provider|unsupported provider|需要.*api.?key|api.?key.*missing|api.?key.*required|未配置.*模型|模型.*未配置|model.*not.*(found|configured)|no.*provider/i, category: 'model_not_configured' },
@@ -31,6 +32,10 @@ const SUGGESTIONS: Record<ErrorCategory, { friendly: string; suggestion: string 
   unsupported: {
     friendly: '不支持的内容或格式',
     suggestion: '当前平台或链接格式暂不支持，请尝试其他链接或本地文件。',
+  },
+  interrupted: {
+    friendly: '任务被服务重启中断',
+    suggestion: '服务重启会让正在下载或分析的任务失败。请点击重试，或进入批量处理页逐项重试。',
   },
   general: {
     friendly: '处理过程中发生错误',

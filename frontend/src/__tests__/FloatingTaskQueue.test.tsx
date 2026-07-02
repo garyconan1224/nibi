@@ -105,9 +105,40 @@ describe('FloatingTaskQueue v2', () => {
     ).toBeTruthy()
   })
 
-  it('查看全部跳转到现有 /workspaces 入口', () => {
+  it('服务重启中断显示明确错误文案', () => {
+    useTaskStore.setState({
+      tasks: [
+        makeTask({
+          task_id: 'interrupted',
+          status: 'FAILED',
+          payload: { title: '中断任务' },
+          error: '后端重启，任务中断',
+        }),
+      ],
+    })
+
+    render(<FloatingTaskQueue />)
+    fireEvent.click(screen.getByRole('button', { name: /任务/ }))
+
+    expect(screen.getByText('任务被服务重启中断')).toBeTruthy()
+    expect(screen.getByTitle('后端重启，任务中断')).toBeTruthy()
+  })
+
+  it('查看全部优先跳转到当前合集的批量处理页', () => {
     useTaskStore.setState({
       tasks: [makeTask({ status: 'DOWNLOAD' })],
+    })
+
+    render(<FloatingTaskQueue />)
+    fireEvent.click(screen.getByRole('button', { name: /任务/ }))
+    fireEvent.click(screen.getByRole('button', { name: '查看全部' }))
+
+    expect(navigateMock).toHaveBeenCalledWith('/processing/batch/workspace-1')
+  })
+
+  it('查看全部没有有效合集时回退到 /workspaces', () => {
+    useTaskStore.setState({
+      tasks: [makeTask({ project_id: 'default_project', status: 'DOWNLOAD' })],
     })
 
     render(<FloatingTaskQueue />)

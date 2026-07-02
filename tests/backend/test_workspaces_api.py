@@ -95,6 +95,54 @@ def test_get_workspace_derived_fields_present(client: TestClient) -> None:
         assert key in ws, f"缺少字段: {key}"
 
 
+def test_resolve_batch_source_multi_url(client: TestClient) -> None:
+    """多链接文本解析为 multi_url，不触发外部平台网络解析。"""
+    resp = client.post(
+        "/workspaces/batch-sources/resolve",
+        json={
+            "source": "\n".join([
+                "https://www.youtube.com/watch?v=abc123",
+                "https://www.bilibili.com/video/BV1xx411c7mD?p=2",
+            ])
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["source_type"] == "multi_url"
+    assert len(data["items"]) == 2
+    assert data["items"][1]["source_url"].endswith("?p=2")
+
+
+def test_import_batch_source_creates_workspace_cover(client: TestClient) -> None:
+    """批量导入的新合集应从首个条目的远端封面派生合集封面和素材封面。"""
+    thumb = "https://i.ytimg.com/vi/abc123/hqdefault.jpg"
+    resp = client.post(
+        "/workspaces/batch-sources/import",
+        json={
+            "workspace_name": "批量测试合集",
+            "source_type": "multi_url",
+            "source_url": "",
+            "start": False,
+            "items": [
+                {
+                    "source_url": "https://www.youtube.com/watch?v=abc123",
+                    "title": "第一条",
+                    "platform": "youtube",
+                    "index": 1,
+                    "duration_seconds": 12,
+                    "thumbnail": thumb,
+                    "external_id": "abc123",
+                }
+            ],
+        },
+    )
+    assert resp.status_code == 200
+    workspace = resp.json()["workspace"]
+    assert workspace["name"] == "批量测试合集"
+    assert workspace["cover_thumbnail"] == thumb
+    assert workspace["items"][0]["thumbnail"] == thumb
+
+
 def test_items_count_by_type_after_adding_items(client: TestClient) -> None:
     """添加素材后，items_count_by_type 数字正确累加。"""
     resp = client.post("/workspaces", json={"name": "素材计数测试"})

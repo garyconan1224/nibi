@@ -358,7 +358,15 @@ class WorkspaceRecord:
             raw_kind = "note"
         # 老数据兼容：缺 source 字段默认 "manual"
         raw_source = str(data.get("source") or "manual")
-        if raw_source not in ("manual", "inbox", "bilibili_favorites", "bilibili_multipart", "bilibili_uploader"):
+        if raw_source not in (
+            "manual",
+            "inbox",
+            "multi_url",
+            "youtube_playlist",
+            "bilibili_favorites",
+            "bilibili_multipart",
+            "bilibili_uploader",
+        ):
             raw_source = "manual"
         raw_source_meta = data.get("source_meta") or {}
         if not isinstance(raw_source_meta, dict):

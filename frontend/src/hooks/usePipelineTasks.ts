@@ -9,6 +9,9 @@ interface UsePipelineTasksOptions {
   projectId?: string
   pollInterval?: number // 毫秒，默认 3000
   enabled?: boolean
+  limit?: number
+  includeLogs?: boolean
+  includeResult?: boolean
 }
 
 /**
@@ -22,6 +25,9 @@ export const usePipelineTasks = (options: UsePipelineTasksOptions = {}) => {
     projectId,
     pollInterval = 3000,
     enabled = true,
+    limit = 50,
+    includeLogs = false,
+    includeResult = false,
   } = options
 
   const { setTasks, updateTask, setIsPolling } = useTaskStore()
@@ -44,9 +50,9 @@ export const usePipelineTasks = (options: UsePipelineTasksOptions = {}) => {
     try {
       const url = '/pipeline/tasks'
       const params: Record<string, string | boolean | number> = {
-        include_logs: false,
-        include_result: false,
-        limit: 50,
+        include_logs: includeLogs,
+        include_result: includeResult,
+        limit,
       }
       if (projectId) params.project_id = projectId
       // 后端 list_tasks 直接返回裸数组 [...], 不是 { data: [...] } 包装格式
@@ -73,7 +79,7 @@ export const usePipelineTasks = (options: UsePipelineTasksOptions = {}) => {
       }
       isFirstRunRef.current = false
     }
-  }, [projectId, setTasks])
+  }, [projectId, setTasks, limit, includeLogs, includeResult])
 
   // ── Per-task 精准轮询：仅对非终结状态任务调用 GET /pipeline/tasks/{task_id} ──
   useEffect(() => {
@@ -174,4 +180,3 @@ export const usePipelineTasks = (options: UsePipelineTasksOptions = {}) => {
 
   return { fetchTasks }
 }
-

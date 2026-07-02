@@ -118,6 +118,58 @@ export async function probeDuration(url: string): Promise<{ duration_sec: number
   return res.data
 }
 
+export interface BatchSourceItem {
+  source_url: string
+  title: string
+  platform?: string
+  index?: number
+  duration_seconds?: number | null
+  thumbnail?: string | null
+  external_id?: string
+}
+
+export interface BatchSourceResolveResponse {
+  source_type: 'multi_url' | 'youtube_playlist' | 'bilibili_multipart' | 'bilibili_favorites' | 'bilibili_uploader'
+  source_url: string
+  title: string
+  items: BatchSourceItem[]
+  meta?: Record<string, unknown>
+}
+
+export interface BatchSourceImportRequest {
+  workspace_name?: string
+  kind?: 'note' | 'replica'
+  source_type: string
+  source_url?: string
+  items: BatchSourceItem[]
+  start?: boolean
+  embed_frames?: boolean
+  image_mode?: string
+  frame_interval?: number
+  vision_model?: string
+  intent?: string
+  replica_kind?: string
+  note_media_kind?: string
+  summary_template?: string
+  diarize?: boolean
+  user_notes?: string
+}
+
+export async function resolveBatchSource(source: string): Promise<BatchSourceResolveResponse> {
+  const res = await http.post<BatchSourceResolveResponse>(`${BASE}/batch-sources/resolve`, { source })
+  return res.data
+}
+
+export async function importBatchSource(
+  req: BatchSourceImportRequest,
+): Promise<{ workspace: WorkspaceRecord; items_added: number; tasks: { task_id: string; item_id: string; item_type: string }[] }> {
+  const res = await http.post<{ workspace: WorkspaceRecord; items_added: number; tasks: { task_id: string; item_id: string; item_type: string }[] }>(
+    `${BASE}/batch-sources/import`,
+    req,
+  )
+  return res.data
+}
+
 /** GET /workspaces/{id}/items/{itemId}/probe-media — 探测本地素材时长+首帧封面（cv2，支持 flv/mkv 等） */
 export async function probeItemMedia(
   workspaceId: string,
@@ -260,7 +312,7 @@ export async function generateNote(
   visionModel: string = '',
   intent: string = 'note',
   noteMediaKind: string = 'auto',
-  extra?: { diarize?: boolean; summary_template?: string; user_notes?: string },
+  extra?: { diarize?: boolean; summary_template?: string; user_notes?: string; replica_kind?: string },
 ): Promise<GenerateNoteResponse> {
   const res = await http.post<GenerateNoteResponse>(
     `${BASE}/${workspaceId}/items/generate-note`,

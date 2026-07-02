@@ -3,6 +3,8 @@ import { toast } from 'sonner'
 import type { LibraryItem } from '@/services/library'
 import { Mic, Music, Play, Star } from 'lucide-react'
 import { resolveItemRoute } from '@/lib/resolveItemRoute'
+import { SYSTEM_TAG_DIMENSIONS } from '@/constants/tagDimensions'
+import type { ItemTags } from '@/types/workspace'
 import {
   STATE_LABEL,
   primaryStatusToState,
@@ -15,6 +17,15 @@ const TYPE_LABEL: Record<string, string> = {
   audio: 'AUDIO',
   image: 'IMAGE',
   text:  'TEXT',
+}
+
+function visibleTags(tags?: ItemTags): string[] {
+  if (!tags) return []
+  const systemTags = SYSTEM_TAG_DIMENSIONS
+    .map((dimension) => tags[dimension.key])
+    .filter((tag): tag is string => Boolean(tag))
+  const customTags = Array.isArray(tags.custom_tags) ? tags.custom_tags : []
+  return Array.from(new Set([...systemTags, ...customTags].map((tag) => tag.trim()).filter(Boolean))).slice(0, 4)
 }
 
 interface ItemCardProps {
@@ -80,14 +91,14 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete,
 
   const hasThumb = !!item.thumbnail
   const coverClass = hasThumb ? '' : `cover-${item.type}` || 'cover-video'
-  const pillClass = isDone ? 'status-pill status-done'
-    : isRunning ? 'status-pill status-run'
-    : isError ? 'status-pill status-error'
-    : 'status-pill'
+  const statusClass = isDone ? 'note-inline-chip note-inline-chip--done'
+    : isRunning ? 'note-inline-chip note-inline-chip--run'
+    : isError ? 'note-inline-chip note-inline-chip--error'
+    : 'note-inline-chip'
   const typeLabel = TYPE_LABEL[item.type] || 'ITEM'
+  const tags = visibleTags(item.tags)
 
   const metaLabels: string[] = [srcLabel || item.source]
-  if (hasDur) metaLabels.push(dur)
   if (item.type === 'video' && (item.frames_count ?? 0) > 0) metaLabels.push(`${item.frames_count} 帧`)
 
   return (
@@ -103,7 +114,6 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete,
             style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : null}
         <span className="media-chip">{typeLabel}</span>
-        <span className={pillClass}>{statusText[state] ?? stateLabel}</span>
         {!hasThumb && item.type === 'video' && (
           <div className="cover-icon"><Play fill="currentColor" /></div>
         )}
@@ -180,14 +190,6 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete,
                   <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
                 </svg>
               </button>
-              {hasDur && (
-                <span style={{
-                  borderRadius: 'var(--rs)', background: 'oklch(0% 0 0 / .55)',
-                  color: 'oklch(100% 0 0)', fontSize: 10, fontFamily: 'var(--fm)',
-                  fontWeight: 700, padding: '3px 6px', display: 'inline-flex',
-                  alignItems: 'center',
-                }}>{dur}</span>
-              )}
             </>
           )}
         </div>
@@ -201,6 +203,18 @@ export function ItemCard({ item, selected, selectMode, onToggleSelect, onDelete,
         </div>
 
         <p className="note-summary">{summaryLine}</p>
+
+        <div className="note-status-line">
+          <span className={statusClass}>{statusText[state] ?? stateLabel}</span>
+          {hasDur && <span className="note-inline-chip">{dur}</span>}
+          {item.favorite && <span className="note-inline-chip">已收藏</span>}
+        </div>
+
+        {tags.length > 0 && (
+          <div className="note-tag-row" aria-label="内容标签">
+            {tags.map((tag) => <span key={tag} className="note-tag-chip">{tag}</span>)}
+          </div>
+        )}
 
         <div className="note-meta-row">
           {metaLabels.map((label, i) => (

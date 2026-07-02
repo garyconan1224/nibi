@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, CheckSquare, Play, Download, X, ArrowLeftRight } from 'lucide-react'
+import { Plus, CheckSquare, Play, Download, X, ArrowLeftRight, Trash2 } from 'lucide-react'
 import { FileVideo, FileAudio, FileImage, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { useTaskStore } from '@/store/taskStore'
@@ -22,13 +22,25 @@ interface MaterialsTabProps {
   onNavigateToCompare?: () => void
   /** 选中集合变化时通知父组件（用于对比页） */
   onSelectedIdsChange?: (ids: Set<string>) => void
+  onToggleFavorite?: (item: WorkspaceItem) => void
+  onDelete?: (item: WorkspaceItem) => void
+  onDeleteSelected?: (itemIds: string[]) => void
 }
 
 /**
  * Materials tab — 素材网格 + 添加素材卡。
  * 设计稿来源：taskboard.jsx TBMaterials + legacy prototype .tb-mat-grid / .mat-add。
  */
-export function MaterialsTab({ items, workspaceId, onAddMaterial, onNavigateToCompare, onSelectedIdsChange }: MaterialsTabProps) {
+export function MaterialsTab({
+  items,
+  workspaceId,
+  onAddMaterial,
+  onNavigateToCompare,
+  onSelectedIdsChange,
+  onToggleFavorite,
+  onDelete,
+  onDeleteSelected,
+}: MaterialsTabProps) {
   const tasks = useTaskStore((s) => s.tasks)
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -155,6 +167,8 @@ export function MaterialsTab({ items, workspaceId, onAddMaterial, onNavigateToCo
             progress={getProgress(item)}
             selected={selectMode ? selectedIds.has(item.item_id) : undefined}
             onSelect={selectMode ? toggleSelect : undefined}
+            onToggleFavorite={onToggleFavorite}
+            onDelete={onDelete}
           />
         ))}
         {!selectMode && (
@@ -207,6 +221,14 @@ export function MaterialsTab({ items, workspaceId, onAddMaterial, onNavigateToCo
           >
             <Download size={13} />
             批量导出
+          </button>
+          <button
+            className="btn btn-ghost btn-sm btn-danger"
+            disabled={batchRunning}
+            onClick={() => onDeleteSelected?.([...selectedIds])}
+          >
+            <Trash2 size={13} />
+            删除选中
           </button>
           {onNavigateToCompare && selectedIds.size >= 2 && (
             <button

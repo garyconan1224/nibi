@@ -14,6 +14,7 @@ from backend.app.services.pipeline_tasks import (
     _BUILTIN_TEMPLATE_PROMPTS,
     list_video_templates,
 )
+from backend.app.services.summary_templates import TEMPLATES
 from shared.template_store import (
     VideoTemplate,
     create_template,
@@ -78,17 +79,28 @@ _TEXT_BUILTIN_IDS: set[str] = {f"text-builtin-{name}" for name in _TEXT_BUILTIN_
 
 class TemplateCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=60)
-    prompt: str = Field(..., min_length=1, max_length=5000)
-    category: str = Field(default="video", pattern="^(video|text)$")
+    prompt: str = Field(..., min_length=1, max_length=20000)
+    category: str = Field(default="video", pattern="^(video|text|style_[a-z_]+)$")
 
 
 class TemplateUpdateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=60)
-    prompt: str = Field(..., min_length=1, max_length=5000)
+    prompt: str = Field(..., min_length=1, max_length=20000)
+    category: Optional[str] = Field(default=None, pattern="^(video|text|style_[a-z_]+)$")
 
 
 class DuplicateRequest(BaseModel):
-    source_prompt: str = Field(..., min_length=1, max_length=5000)
+    source_prompt: str = Field(..., min_length=1, max_length=20000)
+
+
+STYLE_CATEGORIES: Dict[str, str] = {
+    "style_video_with_frames": "视频笔记提示词（带图）",
+    "style_video_text_only": "视频笔记提示词（不带图）",
+    "style_audio": "音频笔记提示词",
+    "style_image_text": "图文笔记提示词",
+    "style_replica": "复刻提示词",
+    "style_text": "文本 / 网页笔记提示词",
+}
 
 
 def _strip_required(value: str, field_name: str) -> str:
@@ -124,9 +136,94 @@ def _build_builtin_response(
     }
 
 
+def _is_style_category(category: Optional[str]) -> bool:
+    return bool(category and category.startswith("style_"))
+
+
+def _find_style_override(template_id: str) -> VideoTemplate | None:
+    for t in load_templates():
+        if t.template_id == template_id and t.category.startswith("style_"):
+            return t
+    return None
+
+
+def _delete_style_override(template_id: str) -> bool:
+    templates = load_templates()
+    next_templates = [
+        t for t in templates
+        if not (t.template_id == template_id and t.category.startswith("style_"))
+    ]
+    if len(next_templates) == len(templates):
+        return False
+    save_templates(next_templates)
+    return True
+
+
+def _upsert_style_override(
+    template_id: str,
+    name: str,
+    prompt: str,
+    category: str,
+) -> VideoTemplate:
+    import uuid
+    from datetime import datetime, timezone
+
+    templates = load_templates()
+    now = datetime.now(timezone.utc).isoformat()
+    for t in templates:
+        if t.template_id == template_id and t.category.startswith("style_"):
+            t.name = name
+            t.prompt = prompt
+            t.category = category
+            t.updated_at = now
+            save_templates(templates)
+            return t
+    t = VideoTemplate(
+        template_id=template_id or uuid.uuid4().hex[:12],
+        name=name,
+        prompt=prompt,
+        is_builtin=False,
+        category=category,
+        created_at=now,
+        updated_at=now,
+    )
+    templates.append(t)
+    save_templates(templates)
+    return t
+
+
+def _summary_builtin_response(template_id: str, category: str) -> Dict[str, Any]:
+    tpl = TEMPLATES[template_id]
+    override = _find_style_override(template_id)
+    return {
+        "template_id": template_id,
+        "name": override.name if override else tpl.label,
+        "prompt": override.prompt if override else tpl.system_prompt,
+        "is_builtin": True,
+        "category": category,
+        "created_at": "",
+        "updated_at": override.updated_at if override else "",
+        "overridden": override is not None,
+        "default_prompt": tpl.system_prompt,
+        "description": tpl.desc,
+        "use_case": tpl.use_case,
+    }
+
+
 @router.get("")
-def get_all_templates(category: Optional[str] = Query(None, pattern="^(video|text)$")) -> List[Dict[str, Any]]:
-    """返回模板列表。可选 ?category=video|text 过滤。"""
+def get_all_templates(
+    category: Optional[str] = Query(None, pattern="^(video|text|style_[a-z_]+)$"),
+) -> List[Dict[str, Any]]:
+    """返回模板列表。可选 ?category=video|text|style_* 过滤。"""
+    if _is_style_category(category):
+        assert category is not None
+        builtins = [_summary_builtin_response(tid, category) for tid in TEMPLATES.keys()]
+        customs = [
+            _template_to_response(t)
+            for t in load_templates_by_category(category)
+            if t.template_id not in TEMPLATES
+        ]
+        return builtins + customs
     if category == "text":
         builtins = [
             _build_builtin_response(name, prompt, "text", f"text-builtin-{name}")
@@ -151,7 +248,11 @@ def get_all_templates(category: Optional[str] = Query(None, pattern="^(video|tex
         for name, prompt in _TEXT_BUILTIN_PROMPTS.items()
     ]
     customs = [_template_to_response(t) for t in load_templates()]
-    return video_builtins + text_builtins + customs
+    style_builtins = [
+        _summary_builtin_response(tid, "style_video_with_frames")
+        for tid in TEMPLATES.keys()
+    ]
+    return video_builtins + text_builtins + style_builtins + customs
 
 
 # ── 向后兼容：旧 /video-templates 端点 ──────────────────────
@@ -161,8 +262,13 @@ def legacy_get_all_templates() -> List[Dict[str, Any]]:
     return get_all_templates(category="video")
 
 
-ALL_BUILTIN_IDS = BUILTIN_IDS | _TEXT_BUILTIN_IDS
-_ALL_BUILTIN_NAMES = set(_BUILTIN_TEMPLATE_PROMPTS.keys()) | set(_TEXT_BUILTIN_PROMPTS.keys())
+STYLE_BUILTIN_IDS = set(TEMPLATES.keys())
+ALL_BUILTIN_IDS = BUILTIN_IDS | _TEXT_BUILTIN_IDS | STYLE_BUILTIN_IDS
+_ALL_BUILTIN_NAMES = (
+    set(_BUILTIN_TEMPLATE_PROMPTS.keys())
+    | set(_TEXT_BUILTIN_PROMPTS.keys())
+    | {tpl.label for tpl in TEMPLATES.values()}
+)
 
 
 @router.post("", status_code=201)
@@ -182,6 +288,16 @@ def create_new_template(body: TemplateCreateRequest) -> Dict[str, Any]:
 
 @router.put("/{template_id}")
 def edit_template(template_id: str, body: TemplateUpdateRequest) -> Dict[str, Any]:
+    if template_id in STYLE_BUILTIN_IDS:
+        name = _strip_required(body.name, "模板名称")
+        prompt = _strip_required(body.prompt, "模板 prompt")
+        category = body.category if _is_style_category(body.category) else "style_video_with_frames"
+        t = _upsert_style_override(template_id, name, prompt, category)
+        resp = _summary_builtin_response(template_id, category)
+        resp["updated_at"] = t.updated_at
+        resp["overridden"] = True
+        return resp
+
     if template_id in ALL_BUILTIN_IDS:
         raise HTTPException(status_code=403, detail="内置模板不可编辑")
 
@@ -214,10 +330,45 @@ def remove_template(template_id: str) -> None:
         raise HTTPException(status_code=404, detail=f"模板不存在: {template_id}")
 
 
+@router.post("/{template_id}/reset")
+def reset_template(template_id: str) -> Dict[str, Any]:
+    if template_id not in STYLE_BUILTIN_IDS:
+        raise HTTPException(status_code=404, detail=f"仅内置风格模板支持重置: {template_id}")
+    _delete_style_override(template_id)
+    return _summary_builtin_response(template_id, "style_video_with_frames")
+
+
 @router.post("/{template_id}/duplicate", status_code=201)
 def copy_template(template_id: str, body: DuplicateRequest) -> Dict[str, Any]:
     """复制模板（内置或自定义均可），产出可编辑副本。"""
     source_prompt = _strip_required(body.source_prompt, "模板 prompt")
+
+    if template_id in STYLE_BUILTIN_IDS:
+        import uuid
+        from datetime import datetime, timezone
+
+        tpl = TEMPLATES[template_id]
+        existing_names = {t.name for t in load_templates()}
+        base = f"{tpl.label}（副本）"
+        copy_name = base
+        n = 1
+        while copy_name in existing_names:
+            copy_name = f"{base} {n}"
+            n += 1
+        now = datetime.now(timezone.utc).isoformat()
+        t = VideoTemplate(
+            template_id=uuid.uuid4().hex[:12],
+            name=copy_name,
+            prompt=source_prompt,
+            is_builtin=False,
+            category="style_video_with_frames",
+            created_at=now,
+            updated_at=now,
+        )
+        templates = load_templates()
+        templates.append(t)
+        save_templates(templates)
+        return _template_to_response(t)
 
     # 内置模板复制（视频 or 文字）
     if template_id in ALL_BUILTIN_IDS:

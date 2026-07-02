@@ -29,6 +29,7 @@ export function GlobalAddMaterialModal() {
   const {
     open,
     urlValue,
+    sourceText,
     sniffResult,
     localFile,
     localFileName,
@@ -136,6 +137,7 @@ export function GlobalAddMaterialModal() {
         }}
         sniffResult={sniffResult}
         urlValue={urlValue}
+        sourceText={sourceText}
         onAdded={handleAdded}
         localFile={localFile}
         localFileName={localFileName}

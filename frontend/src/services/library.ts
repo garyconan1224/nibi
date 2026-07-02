@@ -1,5 +1,6 @@
 // Library 聚合端点 —— GET /workspaces/library
 import { http } from './client'
+import type { ItemTags } from '@/types/workspace'
 
 export interface LibraryItem {
   item_id: string
@@ -20,6 +21,7 @@ export interface LibraryItem {
   results_summary: { has_summary: boolean; has_transcript: boolean }
   primary_task_status: string | null
   preflight?: { intent?: string; [key: string]: unknown }
+  tags?: ItemTags
   related_task_ids?: string[]
   uploader?: string | null
   has_subtitle?: boolean

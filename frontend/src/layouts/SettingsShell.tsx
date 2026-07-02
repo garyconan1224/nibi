@@ -7,7 +7,7 @@ import {
   Wifi,
   Monitor,
   Trash2,
-  Video,
+  Palette,
   Info,
   ArrowLeft,
 } from 'lucide-react'
@@ -57,7 +57,7 @@ export function SettingsShell() {
     { path: '/settings/network', icon: <Wifi size={16} />, label: t('layout.menu.network') },
     { path: '/settings/monitor', icon: <Monitor size={16} />, label: t('layout.menu.monitor') },
     { path: '/settings/trash', icon: <Trash2 size={16} />, label: '垃圾桶' },
-    { path: '/settings/video-templates', icon: <Video size={16} />, label: '视频模板' },
+    { path: '/settings/style-templates', icon: <Palette size={16} />, label: '风格模板' },
     { path: '/settings/about', icon: <Info size={16} />, label: t('layout.menu.about') },
   ]
 

@@ -5,9 +5,8 @@ import { AppShell } from '@/layouts/AppShell'
 const Index = () => (
   <AppShell>
     <Outlet />
-    <Toaster position="top-right" richColors />
+    <Toaster position="bottom-center" richColors visibleToasts={3} toastOptions={{ duration: 2200 }} />
   </AppShell>
 )
 
 export default Index
-

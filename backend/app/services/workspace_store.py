@@ -106,8 +106,13 @@ class WorkspaceStore:
         return rec
 
     def get(self, workspace_id: str) -> Optional[WorkspaceRecord]:
-        with self._lock:
-            return self._records.get(workspace_id)
+        if self._lock.acquire(timeout=0.2):
+            try:
+                return self._records.get(workspace_id)
+            finally:
+                self._lock.release()
+        # 写入正在 fsync 时，读路径仍可返回内存快照，避免列表页被长时间阻塞。
+        return self._records.get(workspace_id)
 
     def list_all(
         self,
@@ -122,7 +127,13 @@ class WorkspaceStore:
         include_trashed=True：返回全部（含 trashed），用于管理后台/调试。
         trashed_only 优先于 include_trashed。
         """
-        with self._lock:
+        if self._lock.acquire(timeout=0.2):
+            try:
+                recs = list(self._records.values())
+            finally:
+                self._lock.release()
+        else:
+            # 写锁繁忙时使用当前内存快照；这里不修改对象，只服务 UI 列表读取。
             recs = list(self._records.values())
         if trashed_only:
             recs = [r for r in recs if r.trashed]

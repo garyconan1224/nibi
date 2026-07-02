@@ -54,6 +54,7 @@ export function Composer({ onTaskCreated }: ComposerProps) {
     if (!nextUrl) return
     openAddMaterial({
       urlValue: nextUrl,
+      sourceText: url.trim(),
       sniffResult,
       onAdded: () => {
         setUrl('')

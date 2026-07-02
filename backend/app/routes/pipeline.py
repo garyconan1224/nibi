@@ -64,6 +64,11 @@ def list_tasks(
     all_recs = _store.list_all()
     if project_id:
         all_recs = [r for r in all_recs if r.project_id == project_id]
+    # 1-A：过滤掉已 trashed / 已不存在的工作空间的任务，避免首页「最近任务」残留已删笔记
+    # 用延迟导入避免循环引用（workspaces.py 在顶层 import 了本模块的 _runner）
+    from backend.app.routes.workspaces import _store as _ws_store
+    valid_ids = {ws.workspace_id for ws in _ws_store.list_all(include_trashed=False)}
+    all_recs = [r for r in all_recs if r.project_id in valid_ids]
     all_recs.sort(key=lambda r: r.created_at, reverse=True)
     if limit > 0:
         all_recs = all_recs[:limit]

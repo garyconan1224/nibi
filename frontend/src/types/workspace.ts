@@ -52,6 +52,8 @@ export interface WorkspaceItem {
   status: ItemStatus
   preflight: PreflightConfig
   results: Record<string, unknown>
+  thumbnail?: string | null
+  favorite?: boolean
   related_task_ids: string[]
   tags: ItemTags
   created_at: string

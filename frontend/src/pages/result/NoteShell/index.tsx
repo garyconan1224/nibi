@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Bold, BookOpenCheck, Brain, Camera, Check, ChevronDown, Download, ExternalLink, FileDown, FileText, FileType, Image, List, MessageCircle, Minus, Pause, Pencil, Play, Plus, Presentation, Sparkles, Subtitles, Trash2, Type, X } from 'lucide-react'
+import { ArrowLeft, Bold, BookOpenCheck, Brain, Camera, Check, ChevronDown, Code2, Download, ExternalLink, FileDown, FileText, FileType, Image, Italic, List, MessageCircle, Minus, Pause, Pencil, Play, Plus, Presentation, Sparkles, Strikethrough, Subtitles, Trash2, Type, Underline, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { downloadItemNoteExport, exportItemNoteObsidian, getItemNote, putItemNote, type ItemNoteExportFormat } from '@/services/workspaces'
@@ -23,6 +23,7 @@ import { MarkdownToc, extractToc, slugify } from '@/components/MarkdownToc'
 import { platformLabelFromUrl } from './note-shell-utils'
 import { Badge } from '@/components/ui/badge'
 import { SYSTEM_TAG_DIMENSIONS } from '@/constants/tagDimensions'
+import { inferContentTags } from '@/lib/contentTags'
 import NoteMediaCompanion, { type NoteMediaCompanionHandle } from './NoteMediaCompanion'
 import MilkdownEditor from './MilkdownEditor'
 import LNVideoPanel, { type LNVideoPanelHandle } from '@/pages/results/LearningNotesPage/LNVideoPanel'
@@ -357,13 +358,6 @@ function isCanceledExportError(error: unknown): boolean {
     || err?.message === 'canceled'
 }
 
-function showCanceledExportToast(toastId: string, message: string): void {
-  toast.dismiss(toastId)
-  window.setTimeout(() => {
-    toast.info(message, { id: `${toastId}-cancelled` })
-  }, 0)
-}
-
 /** frontmatter.tags → 标签 chips 展示。 */
 /* ────────────────── TagChips ────────────────── */
 
@@ -398,6 +392,14 @@ function TagChips({ tags }: TagChipsProps) {
       {all}
     </div>
   )
+}
+
+function hasRenderableTags(tags: Record<string, unknown>): boolean {
+  if (!tags || typeof tags !== 'object') return false
+  const hasSystemTag = SYSTEM_TAG_DIMENSIONS.some((dim) => Boolean(tags[dim.key]))
+  const customRaw = tags.custom_tags
+  const hasCustomTag = Array.isArray(customRaw) && customRaw.some((tag) => String(tag).trim())
+  return hasSystemTag || hasCustomTag
 }
 
 /* ────────────────── NoteShell ────────────────── */
@@ -439,7 +441,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const [editingBody, setEditingBody] = useState('')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mediaCompanionRef = useRef<NoteMediaCompanionHandle>(null)
-  // 标记是否从「应用到主笔记」触发的刷新，避免 debounce 冲突
+  // 标记程序化切换正文，避免 Milkdown 重挂时触发自动保存。
   const applyingRef = useRef(false)
 
   // Milkdown 重挂 key：noteId 变化（自然由 workspaceId/itemId 驱动）或 seedVersion 递增时重挂
@@ -492,6 +494,17 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const [renameTargetId, setRenameTargetId] = useState<string | null>(null)
   const [renameName, setRenameName] = useState('')
   const refreshSummaries = useCallback(() => setSummariesVersion((v) => v + 1), [])
+
+  const switchEditorBody = useCallback((body: string) => {
+    applyingRef.current = true
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+      debounceRef.current = null
+    }
+    setEditingBody(body)
+    setSeedVersion((v) => v + 1)
+    setSaveStatus('idle')
+  }, [])
 
   // 按 template 分组（两层下拉用）
   const templateGroups = useMemo(() => {
@@ -555,7 +568,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
       operationNoticeTimerRef.current = setTimeout(() => {
         setOperationNotice((current) => (current?.id === id ? null : current))
         operationNoticeTimerRef.current = null
-      }, 4200)
+      }, 2200)
     }
   }, [])
 
@@ -810,7 +823,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     try {
       const data = await getItemNote(workspaceId, itemId)
       setNote(data)
-      // 同步 editingBody（首次加载 或 应用到主笔记后刷新）
+      // 同步主笔记正文；AI 总结版本切换只做本地预览，不写回主笔记。
       const body = extractBody(data.note_md)
       setEditingBody(body)
     } catch (err: unknown) {
@@ -847,43 +860,35 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
 
   const handleEditorChange = useCallback((md: string) => {
     setEditingBody(md)
-    // 「应用到主笔记」触发的刷新已经在 fetchNote 里直接保存了，这里跳过
+    // 程序化版本切换触发的刷新不保存。
     if (applyingRef.current) {
       applyingRef.current = false
+      return
+    }
+    if (activeSummaryId) {
+      setSaveStatus('idle')
       return
     }
     // 清除旧定时器，1.5s 后自动保存
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => { doSave(md) }, 1500)
-  }, [doSave])
+  }, [activeSummaryId, doSave])
 
   // 组件卸载时清理定时器
   useEffect(() => {
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [])
 
-  // ─── 应用到主笔记 ───
-  const handleApplyToNote = useCallback(async (summary: ItemSummary) => {
-    // 标记 applying，防止 handleEditorChange 的 debounce 触发重复保存
-    applyingRef.current = true
-    // 清除进行中的 debounce
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current)
-      debounceRef.current = null
-    }
-    setSaveStatus('saving')
-    try {
-      const updated = await putItemNote(workspaceId, itemId, summary.content_md)
-      setNote(updated)
-      setEditingBody(summary.content_md)
-      setSeedVersion(v => v + 1) // 触发 Milkdown 重挂，显示新 summary 内容
-      setActiveSummaryId(summary.summary_id)
-      setSaveStatus('saved')
-      setSavedAt(formatTime(new Date()))
-    } catch {
-      setSaveStatus('failed')
-    }
-  }, [workspaceId, itemId])
+  const handleSelectMainNote = useCallback(() => {
+    if (!note) return
+    setActiveSummaryId(undefined)
+    switchEditorBody(extractBody(note.note_md))
+  }, [note, switchEditorBody])
+
+  const handleSelectSummary = useCallback((summary: ItemSummary) => {
+    setActiveSummaryId(summary.summary_id)
+    switchEditorBody(summary.content_md)
+  }, [switchEditorBody])
 
   // 切换视图模式（记忆 localStorage）
 
@@ -944,19 +949,14 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     const controller = new AbortController()
     exportAbortRef.current?.abort()
     exportAbortRef.current = controller
-    const toastId = 'note-export-obsidian'
     const cancelExport = () => {
       controller.abort()
       showOperationNotice('已取消导出 Obsidian 包', 'info')
-      showCanceledExportToast(toastId, '已取消导出 Obsidian 包')
     }
     setExportBusy('obsidian')
     showOperationNotice('正在导出 Obsidian 包…', 'loading', {
       actionLabel: '取消',
       onAction: cancelExport,
-    })
-    toast.loading('正在导出 Obsidian 包…', {
-      id: toastId,
     })
     try {
       const blob = await exportItemNoteObsidian(workspaceId, itemId, controller.signal)
@@ -970,16 +970,13 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
       a.remove()
       URL.revokeObjectURL(url)
       showOperationNotice('Obsidian 包已开始下载', 'success')
-      toast.success('Obsidian 包已开始下载', { id: toastId })
       setExportOpen(false)
     } catch (err) {
       if (isCanceledExportError(err)) {
         showOperationNotice('已取消导出 Obsidian 包', 'info')
-        showCanceledExportToast(toastId, '已取消导出 Obsidian 包')
         return
       }
       showOperationNotice('Obsidian 包导出失败，请重试', 'error')
-      toast.error('Obsidian 包导出失败，请重试', { id: toastId })
       console.error('Obsidian 导出失败:', err)
     } finally {
       if (exportAbortRef.current === controller) exportAbortRef.current = null
@@ -1021,19 +1018,14 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     const controller = new AbortController()
     exportAbortRef.current?.abort()
     exportAbortRef.current = controller
-    const toastId = `note-export-${format}`
     const cancelExport = () => {
       controller.abort()
       showOperationNotice(`已取消导出${label}`, 'info')
-      showCanceledExportToast(toastId, `已取消导出${label}`)
     }
     setExportBusy(format)
     showOperationNotice(`正在导出${label}…`, 'loading', {
       actionLabel: '取消',
       onAction: cancelExport,
-    })
-    toast.loading(`正在导出${label}…`, {
-      id: toastId,
     })
     try {
       await downloadItemNoteExport(
@@ -1044,16 +1036,13 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
         controller.signal,
       )
       showOperationNotice(`${label}已开始下载`, 'success')
-      toast.success(`${label}已开始下载`, { id: toastId })
       setExportOpen(false)
     } catch (err) {
       if (isCanceledExportError(err)) {
         showOperationNotice(`已取消导出${label}`, 'info')
-        showCanceledExportToast(toastId, `已取消导出${label}`)
         return
       }
       showOperationNotice(`${label} 导出失败，请稍后重试`, 'error')
-      toast.error(`${label} 导出失败，请稍后重试`, { id: toastId })
       console.error('笔记导出失败:', err)
     } finally {
       if (exportAbortRef.current === controller) exportAbortRef.current = null
@@ -1092,11 +1081,9 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     template: string; background: string; providerId: string; model: string; searchWeb: boolean
   }) => {
     const templateName = tl(opts.template)
-    const toastId = `note-summary-creating-${opts.template}`
     setCreatingSummary(true)
     setShowNewSummaryModal(false)
     showOperationNotice(`正在生成${templateName}…`, 'loading')
-    toast.loading(`正在生成${templateName}…`, { id: toastId })
     try {
       const s = await createSummary(workspaceId, itemId, opts.template, opts.background, {
         provider_id: opts.providerId,
@@ -1104,20 +1091,17 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
         search_web: opts.searchWeb,
       })
       showOperationNotice(`${templateName} v${s.version} 生成完成`, 'success')
-      toast.success(`${templateName} v${s.version} 生成完成`, { id: toastId })
       refreshSummaries()
     } catch (err: unknown) {
       const axiosData = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
       if (axiosData && axiosData.includes('chat model')) {
-        showOperationNotice('请先在设置中配置 LLM 模型', 'error')
-        toast.error('请先在设置中配置 LLM 模型', {
-          id: toastId,
-          action: { label: '去设置', onClick: () => navigate('/settings/models') },
+        showOperationNotice('请先在设置中配置 LLM 模型', 'error', {
+          actionLabel: '去设置',
+          onAction: () => navigate('/settings/models'),
         })
       } else {
         const msg = err instanceof Error ? err.message : '生成失败'
         showOperationNotice(msg, 'error')
-        toast.error(msg, { id: toastId })
       }
     } finally {
       setCreatingSummary(false)
@@ -1182,14 +1166,18 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
     setEditorPrefs(DEFAULT_EDITOR_PREFS)
   }, [])
 
-  const handleApplyBold = useCallback(() => {
-    const applied = useLnEditorStore.getState().wrapSelection('**', '**')
+  const handleWrapSelection = useCallback((before: string, after: string, label: string) => {
+    const applied = useLnEditorStore.getState().wrapSelection(before, after)
     if (!applied) {
       toast.error('未找到可编辑的笔记正文')
       return
     }
-    toast.success('已插入加粗标记')
+    toast.success(`已插入${label}标记`)
   }, [])
+
+  const handleApplyBold = useCallback(() => {
+    handleWrapSelection('**', '**', '加粗')
+  }, [handleWrapSelection])
 
   // ─── loading / error ───
   if (loading) {
@@ -1219,8 +1207,12 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
   const itemType = String(fm.type ?? 'text')
   const noteVersion = Number(fm.version ?? 1) || 1
   const noteCreatedAt = formatDateTime(String(fm.created_at ?? ''))
-  const tags = (fm.tags ?? {}) as Record<string, unknown>
-  const hasTags = tags && Object.keys(tags).length > 0
+  const rawTags = (fm.tags ?? {}) as Record<string, unknown>
+  const fallbackTags = inferContentTags([title, sourceUrl, itemType, editingBody, note.media])
+  const tags = hasRenderableTags(rawTags)
+    ? rawTags
+    : (fallbackTags.length > 0 ? { custom_tags: fallbackTags } : {})
+  const hasTags = hasRenderableTags(tags)
   const activeSummary = summaries.find((x) => x.summary_id === activeSummaryId)
   const versionButtonLabel = activeSummary
     ? `${tl(activeSummary.template)} · ${activeSummary.name || `v${activeSummary.version}`}`
@@ -1320,7 +1312,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                 <button
                   className={`nibi-note-version-main${!activeSummaryId ? ' is-active' : ''}`}
                   onClick={() => {
-                    setActiveSummaryId(undefined)
+                    handleSelectMainNote()
                     setTemplateDropOpen(false)
                   }}
                 >
@@ -1361,7 +1353,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                               <button
                                 className={`nibi-note-version-choice${isActive ? ' is-active' : ''}`}
                                 onClick={() => {
-                                  handleApplyToNote(s)
+                                  handleSelectSummary(s)
                                   setTemplateDropOpen(false)
                                 }}
                               >
@@ -1486,12 +1478,28 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                     ))}
                   </div>
                 </div>
+                <div className="nibi-note-pref-group">
+                  <span className="nibi-note-pref-label">选中文字</span>
+                  <div className="nibi-note-format-row">
+                    <button className="nibi-note-pref-icon-btn" onClick={handleApplyBold} title="加粗">
+                      <Bold size={13} />
+                    </button>
+                    <button className="nibi-note-pref-icon-btn" onClick={() => handleWrapSelection('*', '*', '斜体')} title="斜体">
+                      <Italic size={13} />
+                    </button>
+                    <button className="nibi-note-pref-icon-btn" onClick={() => handleWrapSelection('<u>', '</u>', '下划线')} title="下划线">
+                      <Underline size={13} />
+                    </button>
+                    <button className="nibi-note-pref-icon-btn" onClick={() => handleWrapSelection('~~', '~~', '删除线')} title="删除线">
+                      <Strikethrough size={13} />
+                    </button>
+                    <button className="nibi-note-pref-icon-btn" onClick={() => handleWrapSelection('`', '`', '行内代码')} title="行内代码">
+                      <Code2 size={13} />
+                    </button>
+                  </div>
+                </div>
                 <div className="nibi-note-pref-actions">
                   <button className="nibi-note-pref-ghost" onClick={handleResetEditorPrefs}>重置</button>
-                  <button className="nibi-note-pref-ghost nibi-note-pref-ghost--accent" onClick={handleApplyBold}>
-                    <Bold size={13} />
-                    加粗选中
-                  </button>
                 </div>
               </div>
             )}
@@ -1525,27 +1533,36 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
               <Download size={14} /> 导出<ChevronDown size={11} />
             </button>
             {exportOpen && (
-              <div className="nibi-note-export-menu" style={{ position: 'absolute', right: 0, top: 34, zIndex: 20, minWidth: 200, padding: '4px', border: '1px solid var(--bdr)', borderRadius: 'var(--radius-sm)', background: 'var(--bg)', boxShadow: 'var(--shadow-md)' }}>
-                <button className="btn-ghost" onClick={handleExportMarkdown} disabled={!!exportBusy} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><FileText size={13} /> {exportBusy === 'markdown' ? '导出中…' : '当前正文.md'}</button>
-                <button className="btn-ghost" onClick={handleExportObsidian} disabled={!!exportBusy} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><BookOpenCheck size={13} /> {exportBusy === 'obsidian' ? '导出中…' : 'Obsidian 包'}</button>
+              <div className="nibi-note-export-menu">
+                <button className="nibi-note-export-item" onClick={handleExportMarkdown} disabled={!!exportBusy}>
+                  <FileText size={15} />
+                  <span>{exportBusy === 'markdown' ? '导出中…' : '当前正文.md'}</span>
+                </button>
+                <button className="nibi-note-export-item" onClick={handleExportObsidian} disabled={!!exportBusy}>
+                  <BookOpenCheck size={15} />
+                  <span>{exportBusy === 'obsidian' ? '导出中…' : 'Obsidian 包'}</span>
+                </button>
                 {(isVideoNote || isAudioNote) && (
-                  <button className="btn-ghost" onClick={handleExportTranscript} disabled={!!exportBusy} style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}><Subtitles size={13} /> {exportBusy === 'transcript' ? '导出中…' : '转写文本.txt'}</button>
+                  <button className="nibi-note-export-item" onClick={handleExportTranscript} disabled={!!exportBusy}>
+                    <Subtitles size={15} />
+                    <span>{exportBusy === 'transcript' ? '导出中…' : '转写文本.txt'}</span>
+                  </button>
                 )}
                 {[
-                  { icon: <FileText size={13} />, label: 'HTML', format: 'html' as const },
-                  { icon: <FileDown size={13} />, label: 'PDF', format: 'pdf' as const },
-                  { icon: <FileType size={13} />, label: 'Word', format: 'docx' as const },
-                  { icon: <Image size={13} />, label: '长图', format: 'long_image' as const },
-                  { icon: <Presentation size={13} />, label: 'PPT', format: 'pptx' as const },
+                  { icon: <FileText size={15} />, label: 'HTML', format: 'html' as const },
+                  { icon: <FileDown size={15} />, label: 'PDF', format: 'pdf' as const },
+                  { icon: <FileType size={15} />, label: 'Word', format: 'docx' as const },
+                  { icon: <Image size={15} />, label: '长图', format: 'long_image' as const },
+                  { icon: <Presentation size={15} />, label: 'PPT', format: 'pptx' as const },
                 ].map((item) => (
                   <button
                     key={item.label}
-                    className="btn-ghost"
+                    className="nibi-note-export-item"
                     onClick={() => handleDownloadNoteExport(item.format)}
                     disabled={!!exportBusy}
-                    style={{ width: '100%', justifyContent: 'flex-start', height: 30, padding: '0 10px', fontSize: 12 }}
                   >
-                    {item.icon} {exportBusy === item.format ? '导出中…' : item.label}
+                    {item.icon}
+                    <span>{exportBusy === item.format ? '导出中…' : item.label}</span>
                   </button>
                 ))}
               </div>
@@ -1786,7 +1803,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                           <button
                             key={tmpl}
                             className="btn-ghost"
-                            onClick={() => { const first = templateGroups.get(tmpl)?.[0]; if (first) handleApplyToNote(first) }}
+                            onClick={() => { const first = templateGroups.get(tmpl)?.[0]; if (first) handleSelectSummary(first) }}
                             style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: tmpl === activeTemplate ? 'var(--accl)' : 'var(--bgalt)', color: tmpl === activeTemplate ? 'var(--acc)' : 'var(--mut)', fontWeight: tmpl === activeTemplate ? 600 : 400 }}
                           >
                             {tl(tmpl)}
@@ -1941,7 +1958,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                           <button
                             key={tmpl}
                             className="btn-ghost"
-                            onClick={() => { const first = templateGroups.get(tmpl)?.[0]; if (first) handleApplyToNote(first) }}
+                            onClick={() => { const first = templateGroups.get(tmpl)?.[0]; if (first) handleSelectSummary(first) }}
                             style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: tmpl === activeTemplate ? 'var(--accl)' : 'var(--bgalt)', color: tmpl === activeTemplate ? 'var(--acc)' : 'var(--mut)', fontWeight: tmpl === activeTemplate ? 600 : 400 }}
                           >
                             {tl(tmpl)}
@@ -2060,7 +2077,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                           <button
                             key={tmpl}
                             className="btn-ghost"
-                            onClick={() => { const first = templateGroups.get(tmpl)?.[0]; if (first) handleApplyToNote(first) }}
+                            onClick={() => { const first = templateGroups.get(tmpl)?.[0]; if (first) handleSelectSummary(first) }}
                             style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: tmpl === activeTemplate ? 'var(--accl)' : 'var(--bgalt)', color: tmpl === activeTemplate ? 'var(--acc)' : 'var(--mut)', fontWeight: tmpl === activeTemplate ? 600 : 400 }}
                           >
                             {tl(tmpl)}
@@ -2139,7 +2156,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                           <button
                             key={tmpl}
                             className="btn-ghost"
-                            onClick={() => { const first = templateGroups.get(tmpl)?.[0]; if (first) handleApplyToNote(first) }}
+                            onClick={() => { const first = templateGroups.get(tmpl)?.[0]; if (first) handleSelectSummary(first) }}
                             style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, background: tmpl === activeTemplate ? 'var(--accl)' : 'var(--bgalt)', color: tmpl === activeTemplate ? 'var(--acc)' : 'var(--mut)', fontWeight: tmpl === activeTemplate ? 600 : 400 }}
                           >
                             {tl(tmpl)}

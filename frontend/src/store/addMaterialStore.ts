@@ -4,6 +4,7 @@ import type { ItemType } from '@/types/workspace'
 
 export interface AddMaterialLaunchOptions {
   urlValue?: string
+  sourceText?: string
   sniffResult?: SniffResult | null
   localFile?: string
   localFileName?: string
@@ -20,6 +21,7 @@ interface AddMaterialStore extends AddMaterialLaunchOptions {
 
 const EMPTY_CONTEXT: AddMaterialLaunchOptions = {
   urlValue: undefined,
+  sourceText: undefined,
   sniffResult: undefined,
   localFile: undefined,
   localFileName: undefined,

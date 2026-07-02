@@ -17,18 +17,10 @@ import {
 } from '@/services/transcriber'
 import { Section } from '@/components/ui/section'
 import { FieldRow } from '@/components/ui/field-row'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Switch } from '@/components/ui/switch'
 import type { TranscriberType } from '@/store/configStore'
 
 /**
@@ -49,23 +41,15 @@ import type { TranscriberType } from '@/store/configStore'
  *   2. `cached === true` → 已就绪，绿色 outline；
  *   3. 其他              → 待下载 N MB / 大小未知，中性灰色。
  */
-const ModelStatusBadge = ({ status }: { status: WhisperModelStatus }) => {
+const modelStatusText = (status: WhisperModelStatus): string => {
   if (status.pending_mb > 0) {
     const total = status.estimated_size_mb
     const doneTotal = status.done_mb + status.pending_mb
     const pct = total > 0 ? Math.min(99, Math.round((doneTotal / total) * 100)) : null
-    return (
-      <Badge variant="secondary" className="bg-amber-100 text-amber-800 text-[10px]">
-        {pct !== null ? `下载中 ${pct}%` : `下载中 ${doneTotal.toFixed(0)} MB`}
-      </Badge>
-    )
+    return pct !== null ? `下载中 ${pct}%` : `下载中 ${doneTotal.toFixed(0)} MB`
   }
   if (status.cached) {
-    return (
-      <Badge variant="outline" className="border-emerald-500 text-emerald-700 text-[10px]">
-        已就绪
-      </Badge>
-    )
+    return '已就绪'
   }
   const sizeLabel =
     status.estimated_size_mb > 0
@@ -73,12 +57,11 @@ const ModelStatusBadge = ({ status }: { status: WhisperModelStatus }) => {
         ? `${(status.estimated_size_mb / 1024).toFixed(1)} GB`
         : `${status.estimated_size_mb} MB`
       : '大小未知'
-  return (
-    <Badge variant="outline" className="text-[10px] text-muted-foreground">
-      待下载 {sizeLabel}
-    </Badge>
-  )
+  return `待下载 ${sizeLabel}`
 }
+
+const nativeSelectClassName =
+  'flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
 
 const TranscriberPage = () => {
   const { t } = useTranslation('settings')
@@ -153,6 +136,7 @@ const TranscriberPage = () => {
   })
 
   const dirty = guard.dirtyMap
+  const commitDraft = guard.commit
 
   const patch = useCallback((p: Partial<TranscriberConfigPayload>) => {
     setDraft((prev) => ({ ...prev, ...p }))
@@ -193,7 +177,7 @@ const TranscriberPage = () => {
         },
       })
 
-      guard.commit(draft)
+      commitDraft(draft)
       toast.success(t('transcriber.saved'))
     } catch (error) {
       console.error('Failed to save transcriber config:', error)
@@ -201,7 +185,7 @@ const TranscriberPage = () => {
     } finally {
       setIsSaving(false)
     }
-  }, [draft, setConfig, guard, t])
+  }, [draft, setConfig, commitDraft, t])
 
   // SaveBar 桥：推送脏计数 + 保存/重置回调
   useEffect(() => {
@@ -211,8 +195,9 @@ const TranscriberPage = () => {
       onSave: handleSave,
       onReset: handleReset,
     })
-    return () => resetSaveBar()
-  }, [guard.dirtyCount, isSaving, handleSave, handleReset, setSaveBar, resetSaveBar])
+  }, [guard.dirtyCount, isSaving, handleSave, handleReset, setSaveBar])
+  // 只在卸载时归零，避免依赖更新时 reset/setSaveBar 循环
+  useEffect(() => () => resetSaveBar(), [resetSaveBar])
 
   // 判断当前是否为 macOS
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.userAgent)
@@ -316,29 +301,21 @@ const TranscriberPage = () => {
               hint={t('transcriber.engine.modelSize') + ' — tiny 最快，large-v3 最精准'}
               dirty={dirty.whisper_model_size}
             >
-              <Select
+              <select
+                id="whisper-model-size"
+                className={nativeSelectClassName}
                 value={draft.whisper_model_size}
-                onValueChange={(v) => patch({ whisper_model_size: v as any })}
+                onChange={(e) => patch({ whisper_model_size: e.target.value as any })}
               >
-                <SelectTrigger id="whisper-model-size">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {getWhisperModelSizes().map((size) => {
-                    const status = modelStatuses.find((m) => m.name === size)
-                    return (
-                      <SelectItem key={size} value={size}>
-                        <span className="flex items-center gap-2">
-                          <span>{size}</span>
-                          {status && (
-                            <ModelStatusBadge status={status} />
-                          )}
-                        </span>
-                      </SelectItem>
-                    )
-                  })}
-                </SelectContent>
-              </Select>
+                {getWhisperModelSizes().map((size) => {
+                  const status = modelStatuses.find((m) => m.name === size)
+                  return (
+                    <option key={size} value={size}>
+                      {status ? `${size} · ${modelStatusText(status)}` : size}
+                    </option>
+                  )
+                })}
+              </select>
             </FieldRow>
 
             {/* 缓存位置提示：下载慢时用户可自行排查磁盘空间/网络 */}
@@ -405,18 +382,18 @@ const TranscriberPage = () => {
             hint={t('transcriber.language.description')}
             dirty={dirty.language}
           >
-            <Select value={draft.language} onValueChange={(v) => patch({ language: v })}>
-              <SelectTrigger id="language">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {getLanguageOptions().map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <select
+              id="language"
+              className={nativeSelectClassName}
+              value={draft.language}
+              onChange={(e) => patch({ language: e.target.value })}
+            >
+              {getLanguageOptions().map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </FieldRow>
 
           {/* 设备选择 */}
@@ -426,18 +403,18 @@ const TranscriberPage = () => {
             hint={t('transcriber.device.description')}
             dirty={dirty.device}
           >
-            <Select value={draft.device} onValueChange={(v) => patch({ device: v as any })}>
-              <SelectTrigger id="device">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {getDeviceOptions(draft.type).map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <select
+              id="device"
+              className={nativeSelectClassName}
+              value={draft.device}
+              onChange={(e) => patch({ device: e.target.value as any })}
+            >
+              {getDeviceOptions(draft.type).map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </FieldRow>
         </div>
       </Section>
@@ -458,10 +435,21 @@ const TranscriberPage = () => {
                   自动检测并跳过无人声片段，省 10-30% 耗时
                 </p>
               </div>
-              <Switch
-                checked={draft.vad_filter}
-                onCheckedChange={(v) => patch({ vad_filter: v })}
-              />
+              <button
+                type="button"
+                role="switch"
+                aria-checked={draft.vad_filter}
+                onClick={() => patch({ vad_filter: !draft.vad_filter })}
+                className={`inline-flex h-5 w-9 shrink-0 items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                  draft.vad_filter ? 'bg-primary' : 'bg-input'
+                }`}
+              >
+                <span
+                  className={`block h-4 w-4 rounded-full bg-background shadow-lg transition-transform ${
+                    draft.vad_filter ? 'translate-x-4' : 'translate-x-0'
+                  }`}
+                />
+              </button>
             </div>
 
             {/* CPU 线程数 */}
@@ -471,21 +459,18 @@ const TranscriberPage = () => {
               hint="更多线程 = 更快计算，但会占用更多 CPU 资源"
               dirty={dirty.cpu_threads}
             >
-              <Select
+              <select
+                id="cpu-threads"
+                className={nativeSelectClassName}
                 value={String(draft.cpu_threads)}
-                onValueChange={(v) => patch({ cpu_threads: Number(v) })}
+                onChange={(e) => patch({ cpu_threads: Number(e.target.value) })}
               >
-                <SelectTrigger id="cpu-threads">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">自动</SelectItem>
-                  <SelectItem value="2">2 线程</SelectItem>
-                  <SelectItem value="4">4 线程</SelectItem>
-                  <SelectItem value="6">6 线程</SelectItem>
-                  <SelectItem value="8">8 线程</SelectItem>
-                </SelectContent>
-              </Select>
+                <option value="0">自动</option>
+                <option value="2">2 线程</option>
+                <option value="4">4 线程</option>
+                <option value="6">6 线程</option>
+                <option value="8">8 线程</option>
+              </select>
             </FieldRow>
 
             {/* 高级设置折叠 */}
@@ -508,21 +493,18 @@ const TranscriberPage = () => {
                 hint="越低越快。3 以上质量几乎无差别"
                 dirty={dirty.beam_size}
               >
-                <Select
+                <select
+                  id="beam-size"
+                  className={nativeSelectClassName}
                   value={String(draft.beam_size)}
-                  onValueChange={(v) => patch({ beam_size: Number(v) })}
+                  onChange={(e) => patch({ beam_size: Number(e.target.value) })}
                 >
-                  <SelectTrigger id="beam-size">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1（最快·贪心）</SelectItem>
-                    <SelectItem value="2">2</SelectItem>
-                    <SelectItem value="3">3（推荐）</SelectItem>
-                    <SelectItem value="4">4</SelectItem>
-                    <SelectItem value="5">5（默认·最准）</SelectItem>
-                  </SelectContent>
-                </Select>
+                  <option value="1">1（最快·贪心）</option>
+                  <option value="2">2</option>
+                  <option value="3">3（推荐）</option>
+                  <option value="4">4</option>
+                  <option value="5">5（默认·最准）</option>
+                </select>
               </FieldRow>
             )}
           </div>
@@ -533,4 +515,3 @@ const TranscriberPage = () => {
 }
 
 export default TranscriberPage
-

@@ -61,6 +61,9 @@ function getTaskTitle(task: TaskRecord): string {
   const vTitle = payload?.video_title as string | undefined
   if (vTitle?.trim()) return vTitle.trim()
 
+  const pTitle = payload?.title as string | undefined
+  if (pTitle?.trim()) return pTitle.trim()
+
   // download 用 url，analyze 用 source_url，两者都兜住
   const url = ((payload?.url as string) || (payload?.source_url as string) || '') || undefined
   if (url?.trim()) {
@@ -71,9 +74,6 @@ function getTaskTitle(task: TaskRecord): string {
       return url.trim().length > 40 ? url.trim().slice(0, 37) + '...' : url.trim()
     }
   }
-
-  const pTitle = payload?.title as string | undefined
-  if (pTitle?.trim()) return pTitle.trim()
 
   return task.task_id.slice(0, 8)
 }
@@ -104,7 +104,7 @@ export function FloatingTaskQueue() {
 
   /* current task id from URL path /processing/:taskId */
   const routeTaskId = useMemo(() => {
-    const m = location.pathname.match(/^\/processing\/(.+)/)
+    const m = location.pathname.match(/^\/processing\/(?!batch\/)([^/]+)/)
     return m ? m[1] : null
   }, [location.pathname])
 
@@ -164,10 +164,9 @@ export function FloatingTaskQueue() {
       }
     })
 
-    // 按更新时间排序，取前 8 个
+    // 按更新时间排序；批量导入时每个视频都应显示为独立子任务。
     return representativeTasks
       .sort((a, b) => timeOf(b.task.updated_at) - timeOf(a.task.updated_at))
-      .slice(0, 8)
       .map(({ groupKey, task: t, progress }) => {
         const state = displayState(t.status)
         const displayProgress = Math.round(progress * 100)
@@ -195,6 +194,15 @@ export function FloatingTaskQueue() {
   const avgPct = total
     ? Math.round(rows.reduce((a, r) => a + (r.progress || 0), 0) / total)
     : 0
+
+  const primaryWorkspaceId = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const row of rows) {
+      if (!row.workspaceId || row.workspaceId === 'default_project') continue
+      counts.set(row.workspaceId, (counts.get(row.workspaceId) ?? 0) + 1)
+    }
+    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? ''
+  }, [rows])
 
   const handleSelectTask = (row: QueueRow) => {
     setCurrentTask(row.id)
@@ -453,7 +461,10 @@ export function FloatingTaskQueue() {
             <button
               className="btn"
               style={{ flex: 1, height: 30, fontSize: 12 }}
-              onClick={() => { navigate('/workspaces'); setOpen(false) }}
+              onClick={() => {
+                navigate(primaryWorkspaceId ? `/processing/batch/${primaryWorkspaceId}` : '/workspaces')
+                setOpen(false)
+              }}
             >
               查看全部
             </button>

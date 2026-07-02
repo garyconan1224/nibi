@@ -1,10 +1,8 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileVideo, FileAudio, FileImage, FileText, MoreHorizontal, Film, Subtitles, Check } from 'lucide-react'
+import { FileVideo, FileAudio, FileImage, FileText, Check, Star, Trash2 } from 'lucide-react'
 import type { WorkspaceItem, ItemType } from '@/types/workspace'
-import { TranscriptPreviewModal } from '@/components/workspace/TranscriptPreviewModal'
-import { StoryboardLaunchModal } from './StoryboardLaunchModal'
 import { resolveItemRoute } from '@/lib/resolveItemRoute'
+import { SYSTEM_TAG_DIMENSIONS } from '@/constants/tagDimensions'
 
 /** 类型 → 图标 */
 const TYPE_ICON: Record<ItemType, React.ElementType> = {
@@ -33,12 +31,24 @@ const TYPE_TONE: Record<ItemType, string> = {
 function getMaterialThumbnail(item: WorkspaceItem): string | null {
   const results = item.results as Record<string, unknown>
   const candidates: Array<string | null | undefined> = [
+    item.thumbnail,
     typeof results.thumbnail === 'string' ? results.thumbnail : null,
+    typeof results.cover_thumbnail === 'string' ? results.cover_thumbnail : null,
+    typeof results.video_thumbnail_url === 'string' ? results.video_thumbnail_url : null,
     typeof results.cover_url === 'string' ? results.cover_url : null,
     typeof results.image_path === 'string' ? results.image_path : null,
     Array.isArray(results.image_paths) ? results.image_paths.find((entry): entry is string => typeof entry === 'string') : null,
     Array.isArray(results.frame_paths) ? results.frame_paths.find((entry): entry is string => typeof entry === 'string') : null,
+    Array.isArray(results.images) ? results.images.find((entry): entry is string => typeof entry === 'string') : null,
   ]
+  const frames = results.frames
+  if (Array.isArray(frames) && typeof frames[0] === 'object' && frames[0] !== null) {
+    const firstFrame = frames[0] as Record<string, unknown>
+    for (const key of ['thumbnail', 'frame_image_path', 'frame_image']) {
+      const value = firstFrame[key]
+      if (typeof value === 'string' && value.length > 0) candidates.push(value)
+    }
+  }
   return candidates.find((value): value is string => typeof value === 'string' && value.length > 0) ?? null
 }
 
@@ -58,6 +68,16 @@ const STATUS_LABEL: Record<string, string> = {
   failed: '失败',
 }
 
+function visibleTags(item: WorkspaceItem): string[] {
+  const itemTags = item.tags
+  if (!itemTags) return []
+  const systemTags = SYSTEM_TAG_DIMENSIONS
+    .map((dimension) => itemTags[dimension.key])
+    .filter((tag): tag is string => Boolean(tag))
+  const customTags = Array.isArray(itemTags.custom_tags) ? itemTags.custom_tags : []
+  return Array.from(new Set([...systemTags, ...customTags].map((tag) => tag.trim()).filter(Boolean))).slice(0, 5)
+}
+
 interface MaterialCardProps {
   item: WorkspaceItem
   workspaceId: string
@@ -67,43 +87,63 @@ interface MaterialCardProps {
   selected?: boolean
   /** 多选模式切换选中 */
   onSelect?: (itemId: string) => void
+  onToggleFavorite?: (item: WorkspaceItem) => void
+  onDelete?: (item: WorkspaceItem) => void
 }
 
 /**
  * 单张素材卡片。
  * 设计稿来源：taskboard.jsx MaterialCard + legacy prototype .mat-* 类。
  */
-export function MaterialCard({ item, workspaceId, progress, selected, onSelect }: MaterialCardProps) {
+export function MaterialCard({ item, workspaceId, progress, selected, onSelect, onToggleFavorite, onDelete }: MaterialCardProps) {
   const navigate = useNavigate()
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [sbOpen, setSbOpen] = useState(false)
-  const [transcriptOpen, setTranscriptOpen] = useState(false)
   const Icon = TYPE_ICON[item.type]
   const tone = TYPE_TONE[item.type]
   const dotColor = STATUS_DOT[item.status] ?? 'var(--ink-4)'
   const isRunning = item.status === 'processing'
-  const tags = item.tags?.custom_tags ?? []
+  const tags = visibleTags(item)
   const thumbnail = getMaterialThumbnail(item)
-
-  // Extract frame paths from item results (if available)
-  const framePaths: string[] = (item.results?.frame_paths as string[]) ?? []
+  const route = resolveItemRoute(workspaceId, item)
 
   const handleClick = () => {
     if (onSelect) {
       onSelect(item.item_id)
     } else {
-      navigate(resolveItemRoute(workspaceId, item))
+      navigate(route)
     }
   }
 
   return (
-    <>
     <div className="mat-card" data-type={item.type} data-selected={selected ? 'true' : undefined} onClick={handleClick}>
       <div className="mat-thumb">
         {/* 多选勾选框 */}
         {onSelect && (
           <div className="mat-select-chk" data-checked={selected ? 'true' : undefined} onClick={(e) => { e.stopPropagation(); onSelect(item.item_id) }}>
             {selected && <Check size={12} />}
+          </div>
+        )}
+        {!onSelect && (
+          <div className="mat-card-tools">
+            <button
+              className={`mat-icon-btn${item.favorite ? ' mat-icon-btn--active' : ''}`}
+              title={item.favorite ? '取消收藏' : '收藏'}
+              onClick={(event) => {
+                event.stopPropagation()
+                onToggleFavorite?.(item)
+              }}
+            >
+              <Star size={13} fill={item.favorite ? 'currentColor' : 'none'} />
+            </button>
+            <button
+              className="mat-icon-btn mat-icon-btn--danger"
+              title="删除"
+              onClick={(event) => {
+                event.stopPropagation()
+                onDelete?.(item)
+              }}
+            >
+              <Trash2 size={13} />
+            </button>
           </div>
         )}
         {thumbnail ? (
@@ -123,76 +163,6 @@ export function MaterialCard({ item, workspaceId, progress, selected, onSelect }
           </div>
         )}
 
-        {/* … 菜单 */}
-        <div style={{ position: 'absolute', top: 4, right: 4 }}>
-          <button
-            className="btn btn-ghost"
-            style={{ width: 24, height: 24, padding: 0 }}
-            onClick={(e) => { e.stopPropagation(); setMenuOpen((o) => !o) }}
-          >
-            <MoreHorizontal size={14} />
-          </button>
-          {menuOpen && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '100%',
-                right: 0,
-                background: 'var(--bg)',
-                border: '1px solid var(--border)',
-                borderRadius: 8,
-                padding: 4,
-                zIndex: 10,
-                minWidth: 120,
-                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  width: '100%',
-                  padding: '6px 10px',
-                  border: 'none',
-                  background: 'none',
-                  cursor: 'pointer',
-                  fontSize: 12,
-                  borderRadius: 4,
-                }}
-                onClick={() => { setMenuOpen(false); setSbOpen(true) }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-sunken)')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-              >
-                <Film size={13} />
-                生成分镜
-              </button>
-              {(item.type === 'video' || item.type === 'audio') && (
-                <button
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    width: '100%',
-                    padding: '6px 10px',
-                    border: 'none',
-                    background: 'none',
-                    cursor: 'pointer',
-                    fontSize: 12,
-                    borderRadius: 4,
-                  }}
-                  onClick={() => { setMenuOpen(false); setTranscriptOpen(true) }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--bg-sunken)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'none')}
-                >
-                  <Subtitles size={13} />
-                  快速抽字幕
-                </button>
-              )}
-            </div>
-          )}
-        </div>
       </div>
       <div className="mat-body">
         <div className="mat-title">{item.name || '未命名素材'}</div>
@@ -205,32 +175,27 @@ export function MaterialCard({ item, workspaceId, progress, selected, onSelect }
         </div>
         {tags.length > 0 && (
           <div className="mat-tags">
-            {tags.slice(0, 3).map((t) => (
+            {tags.slice(0, 4).map((t) => (
               <span key={t} className="kw">{t}</span>
             ))}
-            {tags.length > 3 && (
-              <span className="kw" style={{ opacity: 0.5 }}>+{tags.length - 3}</span>
+            {tags.length > 4 && (
+              <span className="kw" style={{ opacity: 0.5 }}>+{tags.length - 4}</span>
             )}
           </div>
         )}
+        <div className="mat-actions">
+          <span>{item.status === 'done' ? '已完成' : STATUS_LABEL[item.status] ?? item.status}</span>
+          <button
+            className="note-open"
+            onClick={(event) => {
+              event.stopPropagation()
+              navigate(route)
+            }}
+          >
+            打开
+          </button>
+        </div>
       </div>
     </div>
-      {sbOpen && (
-        <StoryboardLaunchModal
-          open={sbOpen}
-          itemName={item.name || '未命名素材'}
-          workspaceId={workspaceId}
-          framePaths={framePaths}
-          onClose={() => setSbOpen(false)}
-        />
-      )}
-      {transcriptOpen && (
-        <TranscriptPreviewModal
-          open={transcriptOpen}
-          sourceUrl={item.source_value}
-          onClose={() => setTranscriptOpen(false)}
-        />
-      )}
-    </>
   )
 }

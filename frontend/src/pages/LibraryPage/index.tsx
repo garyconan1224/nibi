@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { fetchLibrary, deleteItem, batchDeleteItems, batchAddItemsToWorkspace, type LibraryItem, type LibraryResponse, type LibraryWorkspace } from '@/services/library'
 import { createWorkspace, deleteWorkspace, startItemPipeline, updateWorkspace, favoriteItem, unfavoriteItem } from '@/services/workspaces'
 import { useLibraryStore, type SortBy } from '@/store/libraryStore'
+import { useTaskStore } from '@/store/taskStore'
 import { FilterChips } from './FilterChips'
 import { SortMenu } from './SortMenu'
 import { ViewToggle } from './ViewToggle'
@@ -365,6 +366,8 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
     if (!ok) return
     try {
       await deleteItem(item.workspace_id, item.item_id)
+      // 1-C：即时移除该 workspace 关联的任务，不等轮询
+      useTaskStore.getState().removeByProject(item.workspace_id)
       toast.success(`已删除「${label}」`)
       load()
     } catch {
@@ -379,6 +382,8 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
     if (!ok) return
     try {
       await deleteWorkspace(wsId)
+      // 1-C：即时移除该 workspace 关联的所有任务
+      useTaskStore.getState().removeByProject(wsId)
       toast.success(`已删除合集「${label}」`)
       load()
     } catch {
@@ -408,6 +413,12 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
       if (wsIds.length > 0) {
         await Promise.all(wsIds.map((id) => deleteWorkspace(id)))
       }
+      // 1-C：批量删除后即时清理 taskStore
+      const affectedProjectIds = new Set([
+        ...wsIds,
+        ...items.map((it) => it.workspace_id),
+      ])
+      affectedProjectIds.forEach((pid) => useTaskStore.getState().removeByProject(pid))
       toast.success(`已删除 ${selectedSet.size} 项`)
       setSelectedSet(new Set())
       load()

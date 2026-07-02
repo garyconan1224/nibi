@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+STYLE_TEMPLATE_PREFIX = "style"
+
 
 @dataclass
 class SummaryTemplate:
@@ -265,11 +267,55 @@ TEMPLATES: dict[str, SummaryTemplate] = {
 }
 
 
+def _custom_style_template(template_id: str) -> SummaryTemplate | None:
+    try:
+        from shared.template_store import load_templates
+    except Exception:
+        return None
+
+    for item in load_templates():
+        if item.template_id != template_id:
+            continue
+        if not item.category.startswith(STYLE_TEMPLATE_PREFIX):
+            continue
+        prompt = item.prompt.strip()
+        if not prompt:
+            continue
+        if "{transcript}" in prompt:
+            system_prompt = f"你是一个专业的{item.name}整理助手。"
+            user_prompt = prompt
+        else:
+            system_prompt = prompt
+            user_prompt = f"请基于以下内容生成「{item.name}」Markdown 笔记：\n\n{{transcript}}"
+        return SummaryTemplate(
+            id=item.template_id,
+            label=item.name,
+            desc=item.name,
+            use_case="自定义风格",
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            output_format="markdown",
+        )
+    return None
+
+
 def get_template(template_id: str) -> SummaryTemplate:
     """获取指定 ID 的模板，未知 ID 回退到 concise。"""
+    custom = _custom_style_template(template_id)
+    if custom is not None:
+        return custom
     return TEMPLATES.get(template_id, TEMPLATES["concise"])
 
 
 def list_template_ids() -> list[str]:
     """返回所有可用模板 ID。"""
-    return list(TEMPLATES.keys())
+    ids = list(TEMPLATES.keys())
+    try:
+        from shared.template_store import load_templates
+
+        for item in load_templates():
+            if item.category.startswith(STYLE_TEMPLATE_PREFIX) and item.template_id not in ids:
+                ids.append(item.template_id)
+    except Exception:
+        pass
+    return ids

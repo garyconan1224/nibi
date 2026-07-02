@@ -1,7 +1,10 @@
-import { useMemo } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Clock3, ExternalLink, FileText, RefreshCw, ScrollText, Video } from 'lucide-react'
+import { resolveItemRoute } from '@/lib/resolveItemRoute'
 import { useTaskStore } from '@/store/taskStore'
-import { isTaskTerminal, getStatusText, type TaskRecord } from '@/types/task'
+import { isTaskTerminal, getStatusText, type TaskLogEntry, type TaskRecord } from '@/types/task'
+import type { WorkspaceItem, WorkspaceRecord } from '@/types/workspace'
 
 /** 任务在「同素材一行」聚合时的状态排序：运行中 > 排队 > 失败 > 已完成 */
 function statusRank(status: string): number {
@@ -11,21 +14,124 @@ function statusRank(status: string): number {
   return 4 // DOWNLOAD / ASR / VLM / FRAMES / SUM / RUNNING…
 }
 
-const STATE_DOT: Record<string, string> = {
-  running: 'var(--ink)',
-  queued: 'var(--ink-4)',
-  error: 'var(--accent-pink)',
+const timeOf = (value: string | undefined): number => {
+  const parsed = Date.parse(value || '')
+  return Number.isFinite(parsed) ? parsed : 0
 }
 
 /**
- * Queue tab — 显示活跃任务（running / queued / failed）。
+ * Queue tab — 显示当前合集的批量子任务状态。
  * 设计稿来源：taskboard.jsx TBQueue（简化版，去掉系统检测和并行滑块）。
  */
 interface QueueTabProps {
   workspaceId: string
+  workspace?: WorkspaceRecord | null
 }
 
-export function QueueTab({ workspaceId }: QueueTabProps) {
+type QueueState = 'running' | 'queued' | 'error' | 'done'
+
+interface QueueRow {
+  groupKey: string
+  task: TaskRecord
+  tasks: TaskRecord[]
+  item?: WorkspaceItem
+  title: string
+  sourceUrl: string
+  thumbnail: string
+  state: QueueState
+  progress: number
+  logs: Array<TaskLogEntry & { taskType: string }>
+  updatedAt: number
+}
+
+function pickString(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
+function normalizeProgress(value: number | undefined): number {
+  const raw = Number.isFinite(value) ? Number(value) : 0
+  const pct = raw > 1 ? raw / 100 : raw
+  return Math.min(1, Math.max(0, pct))
+}
+
+function payloadUrl(task: TaskRecord): string {
+  const payload = (task.payload ?? {}) as Record<string, unknown>
+  return pickString(payload.url) || pickString(payload.source_url)
+}
+
+function taskTitle(task: TaskRecord): string {
+  const payload = (task.payload ?? {}) as Record<string, unknown>
+  return pickString(payload.title)
+    || pickString(payload.video_title)
+    || pickString(payload.name)
+    || payloadUrl(task)
+    || task.task_type
+}
+
+function itemThumbnail(item?: WorkspaceItem): string {
+  if (!item) return ''
+  if (item.thumbnail) return item.thumbnail
+  const results = item.results ?? {}
+  return [
+    results.thumbnail,
+    results.video_thumbnail_url,
+    results.cover_thumbnail,
+    results.cover_url,
+    results.cover,
+    results.static_url,
+    results.image_path,
+  ].map(pickString).find(Boolean) || ''
+}
+
+function rowState(tasks: TaskRecord[], item?: WorkspaceItem): QueueState {
+  if (item?.status === 'failed' || tasks.some((t) => t.status === 'FAILED')) return 'error'
+  if (tasks.some((t) => !isTaskTerminal(t.status) && t.status !== 'PENDING')) return 'running'
+  if (tasks.some((t) => t.status === 'PENDING')) return 'queued'
+  if (item?.status === 'done' || tasks.some((t) => t.status === 'SUCCESS')) return 'done'
+  return 'running'
+}
+
+function rowProgress(tasks: TaskRecord[], state: QueueState): number {
+  if (state === 'done') return 1
+  const download = tasks.find((t) => t.task_type === 'download')
+  const main = tasks.find((t) => ['note', 'analyze', 'text', 'audio', 'image', 'create', 'storyboard'].includes(t.task_type))
+  if (download && main) {
+    return normalizeProgress(download.progress) * 0.25 + normalizeProgress(main.progress) * 0.75
+  }
+  const maxProgress = Math.max(0, ...tasks.map((t) => normalizeProgress(t.progress)))
+  if (state === 'error') return Math.max(maxProgress, 0.05)
+  if (state === 'queued') return 0
+  return maxProgress
+}
+
+function formatEta(seconds: number | null): string {
+  if (!seconds || !Number.isFinite(seconds) || seconds <= 0) return '—'
+  if (seconds < 60) return `约 ${Math.ceil(seconds)} 秒`
+  if (seconds < 3600) return `约 ${Math.ceil(seconds / 60)} 分`
+  return `约 ${(seconds / 3600).toFixed(1)} 小时`
+}
+
+function estimateRemainingSeconds(rows: QueueRow[]): number | null {
+  const active = rows.filter((row) => row.state === 'running' && row.progress > 0.02 && row.progress < 0.98)
+  if (active.length === 0) return null
+  const starts = active.map((row) => timeOf(row.task.created_at)).filter(Boolean)
+  if (starts.length === 0) return null
+  const oldest = Math.min(...starts)
+  const avgProgress = active.reduce((sum, row) => sum + row.progress, 0) / active.length
+  if (avgProgress <= 0.02) return null
+  const elapsed = Math.max(1, (Date.now() - oldest) / 1000)
+  return elapsed * (1 - avgProgress) / avgProgress
+}
+
+function shortTime(value: string): string {
+  const ts = timeOf(value)
+  if (!ts) return '--:--'
+  return new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(new Date(ts))
+}
+
+export function QueueTab({ workspaceId, workspace }: QueueTabProps) {
+  const navigate = useNavigate()
+  const [openLogKey, setOpenLogKey] = useState<string | null>(null)
   const allTasks = useTaskStore((s) => s.tasks)
   const retryTask = useTaskStore((s) => s.retryTask)
   const tasks = useMemo(
@@ -33,46 +139,73 @@ export function QueueTab({ workspaceId }: QueueTabProps) {
     [allTasks, workspaceId],
   )
 
-  // 同素材的 download + analyze 是两个独立 task，按 project_id + url 归并成一行，
-  // 避免「下载完成→脱组→冒出新分析任务」的重复行；进度按 download 30% + analyze 70% 加权。
-  const rows = useMemo(() => {
+  const rows = useMemo<QueueRow[]>(() => {
+    const itemById = new Map<string, WorkspaceItem>()
+    const itemByTaskId = new Map<string, WorkspaceItem>()
+    const itemByUrl = new Map<string, WorkspaceItem>()
+    for (const item of workspace?.items ?? []) {
+      itemById.set(item.item_id, item)
+      itemByUrl.set(item.source_value, item)
+      for (const taskId of item.related_task_ids ?? []) {
+        itemByTaskId.set(taskId, item)
+      }
+    }
+
     const groups = new Map<string, TaskRecord[]>()
     for (const t of tasks) {
       const payload = (t.payload ?? {}) as Record<string, unknown>
-      const url = (payload.url as string) || (payload.source_url as string) || ''
-      const key = `${t.project_id}::${url || t.task_id}`
+      const payloadItemId = pickString(payload.item_id)
+      const url = payloadUrl(t)
+      const item = (payloadItemId && itemById.get(payloadItemId)) || itemByTaskId.get(t.task_id) || itemByUrl.get(url)
+      const key = `${t.project_id}::${item?.item_id || url || t.task_id}`
       const group = groups.get(key) || []
       group.push(t)
       groups.set(key, group)
     }
-    // 整组未完成（任一非终态，或有 FAILED）才显示
-    const activeGroups = Array.from(groups.entries()).filter(([, g]) =>
-      g.some((t) => !isTaskTerminal(t.status) || t.status === 'FAILED'),
-    )
-    return activeGroups.map(([groupKey, g]) => {
+
+    return Array.from(groups.entries()).map(([groupKey, g]) => {
       g.sort((a, b) => statusRank(b.status) - statusRank(a.status))
       const representative = g[0]
-      const downloadTask = g.find((t) => t.task_type === 'download')
-      const analyzeTask = g.find((t) => t.task_type === 'analyze')
-      const dl = downloadTask ? (downloadTask.progress ?? 0) : 0
-      const an = analyzeTask ? (analyzeTask.progress ?? 0) : 0
-      let progress: number
-      if (downloadTask && analyzeTask) progress = dl * 0.3 + an * 0.7
-      else if (downloadTask) progress = dl
-      else if (analyzeTask) progress = an
-      else progress = representative.progress ?? 0
-      return { groupKey, task: representative, progress }
+      const payload = (representative.payload ?? {}) as Record<string, unknown>
+      const payloadItemId = pickString(payload.item_id)
+      const sourceUrl = payloadUrl(representative)
+      const item = (payloadItemId && itemById.get(payloadItemId)) || itemByTaskId.get(representative.task_id) || itemByUrl.get(sourceUrl)
+      const state = rowState(g, item)
+      const progress = rowProgress(g, state)
+      const logs = g
+        .flatMap((task) => (task.log ?? []).map((entry) => ({ ...entry, taskType: task.task_type })))
+        .sort((a, b) => timeOf(a.ts) - timeOf(b.ts))
+      return {
+        groupKey,
+        task: representative,
+        tasks: g,
+        item,
+        title: item?.name || taskTitle(representative),
+        sourceUrl: item?.source_value || sourceUrl,
+        thumbnail: itemThumbnail(item),
+        state,
+        progress,
+        logs,
+        updatedAt: Math.max(...g.map((task) => timeOf(task.updated_at))),
+      }
+    }).sort((a, b) => {
+      const rankDelta = statusRank(b.task.status) - statusRank(a.task.status)
+      if (rankDelta !== 0) return rankDelta
+      return b.updatedAt - a.updatedAt
     })
-  }, [tasks])
+  }, [tasks, workspace?.items])
 
-  const running = rows.filter((r) => statusRank(r.task.status) === 4).length
-  const queued = rows.filter((r) => r.task.status === 'PENDING').length
-  const failed = rows.filter((r) => r.task.status === 'FAILED').length
+  const running = rows.filter((r) => r.state === 'running').length
+  const queued = rows.filter((r) => r.state === 'queued').length
+  const failed = rows.filter((r) => r.state === 'error').length
+  const done = rows.filter((r) => r.state === 'done').length
+  const overall = rows.length ? Math.round(rows.reduce((sum, row) => sum + row.progress, 0) / rows.length * 100) : 0
+  const eta = estimateRemainingSeconds(rows)
 
   if (rows.length === 0) {
     return (
       <div className="tb-placeholder" style={{ minHeight: 240 }}>
-        暂无活跃任务
+        暂无任务
       </div>
     )
   }
@@ -91,7 +224,7 @@ export function QueueTab({ workspaceId }: QueueTabProps) {
               color: 'var(--ink-3)',
             }}
           >
-            BATCH QUEUE · 并行执行
+            BATCH QUEUE · 总状态
           </div>
           <h2
             className="display"
@@ -102,60 +235,125 @@ export function QueueTab({ workspaceId }: QueueTabProps) {
         </div>
       </div>
 
-      {/* Summary chips */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-        <span className="kw" style={{ background: 'var(--bg-sunken)', fontSize: 12, padding: '5px 11px' }}>
-          <span style={{ background: STATE_DOT.running, width: 6, height: 6, borderRadius: 99, display: 'inline-block', marginRight: 6 }} />
-          运行中 <b style={{ marginLeft: 4, fontFamily: 'var(--mono)' }}>{running}</b>
-        </span>
-        <span className="kw" style={{ background: 'var(--bg-sunken)', fontSize: 12, padding: '5px 11px' }}>
-          <span style={{ background: STATE_DOT.queued, width: 6, height: 6, borderRadius: 99, display: 'inline-block', marginRight: 6 }} />
-          排队中 <b style={{ marginLeft: 4, fontFamily: 'var(--mono)' }}>{queued}</b>
-        </span>
-        <span className="kw" style={{ background: 'var(--bg-sunken)', fontSize: 12, padding: '5px 11px' }}>
-          <span style={{ background: STATE_DOT.error, width: 6, height: 6, borderRadius: 99, display: 'inline-block', marginRight: 6 }} />
-          失败 <b style={{ marginLeft: 4, fontFamily: 'var(--mono)' }}>{failed}</b>
-        </span>
+      <div className="queue-overview">
+        <div className="queue-overview-main">
+          <div className="queue-overview-kicker">任务中 · {running + queued} 项仍在处理</div>
+          <div className="queue-overview-title">{overall}%</div>
+          <div className="queue-overview-bar" aria-label="总体进度">
+            <span style={{ width: `${overall}%` }} />
+          </div>
+        </div>
+        <div className="queue-overview-stats">
+          <span><FileText size={13} /> 总计 <b>{rows.length}</b></span>
+          <span><span className="queue-stat-dot" data-state="running" /> 运行 <b>{running}</b></span>
+          <span><span className="queue-stat-dot" data-state="queued" /> 排队 <b>{queued}</b></span>
+          <span><span className="queue-stat-dot" data-state="done" /> 完成 <b>{done}</b></span>
+          <span><span className="queue-stat-dot" data-state="error" /> 失败 <b>{failed}</b></span>
+          <span><Clock3 size={13} /> 剩余 <b>{formatEta(eta)}</b></span>
+        </div>
       </div>
 
-      {/* Queue rows */}
-      <div className="qp-list">
-        {rows.map(({ groupKey, task: t, progress }) => {
-          const isRunning = !isTaskTerminal(t.status) && t.status !== 'PENDING'
-          const isQueued = t.status === 'PENDING'
-          const isFailed = t.status === 'FAILED'
-          const payload = (t.payload ?? {}) as Record<string, unknown>
-          const pct = isRunning ? Math.round(progress * 100) : 0
-          const title = (payload.name as string) || (payload.video_title as string) || t.task_type
+      <div className="qp-list qp-list--detailed">
+        {rows.map((row) => {
+          const t = row.task
+          const pct = Math.round(row.progress * 100)
+          const failedTask = row.tasks.find((task) => task.status === 'FAILED')
+          const openLabel = row.state === 'done' ? '查看结果' : '查看进度'
+          const canOpenResult = Boolean(row.item)
+          const logOpen = openLogKey === row.groupKey
+          const latestLogs = row.logs.slice(-24)
+
+          const handleOpen = () => {
+            if (row.item && row.state === 'done') {
+              navigate(resolveItemRoute(workspaceId, row.item))
+              return
+            }
+            navigate(`/processing/${t.task_id}`, {
+              state: {
+                workspaceId,
+                itemId: row.item?.item_id,
+                url: row.sourceUrl,
+                taskType: t.task_type,
+                itemType: row.item?.type,
+                backPath: `/processing/batch/${workspaceId}`,
+                backLabel: '返回批量任务',
+              },
+            })
+          }
 
           return (
-            <div key={groupKey} className="qp-row" data-state={isFailed ? 'error' : isQueued ? 'queued' : 'running'}>
-              <div className="qp-dot" data-state={isFailed ? 'error' : isQueued ? 'queued' : 'running'} />
-              <div className="qp-t">
-                <div style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {title}
+            <div key={row.groupKey} className="qp-entry" data-state={row.state}>
+              <div className="qp-row qp-row--detailed" data-state={row.state}>
+                <div className="qp-thumb">
+                  {row.thumbnail ? (
+                    <img src={row.thumbnail} alt="" referrerPolicy="no-referrer" />
+                  ) : (
+                    <Video size={18} />
+                  )}
                 </div>
-                <div className="mono" style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>
-                  {getStatusText(t.status)}{t.error ? ` · ${t.error}` : ''}
+                <div className="qp-t">
+                  <div className="qp-title">{row.title}</div>
+                  <div className="qp-sub mono">
+                    {getStatusText(t.status)}{t.error ? ` · ${t.error}` : ''}{row.sourceUrl ? ` · ${row.sourceUrl}` : ''}
+                  </div>
                 </div>
-              </div>
-              <div className="qp-bar">
-                <span style={{ width: `${pct}%` }} />
-              </div>
-              <div className="mono qp-pct" style={{ width: 50, textAlign: 'right', color: isFailed ? 'var(--accent-pink)' : isRunning ? 'var(--ink)' : 'var(--ink-4)' }}>
-                {isRunning ? `${pct}%` : isQueued ? '—' : isFailed ? '失败' : '完成'}
-              </div>
-              <div className="qp-acts">
-                {isFailed && (
+                <div className="qp-progress-cell">
+                  <div className="qp-progress-meta">
+                    <span>{row.state === 'done' ? '完成' : row.state === 'error' ? '失败' : row.state === 'queued' ? '排队中' : `${pct}%`}</span>
+                    <span>{shortTime(t.updated_at)}</span>
+                  </div>
+                  <div className="qp-bar">
+                    <span style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+                <div className="qp-acts">
                   <button
                     className="btn btn-ghost"
-                    style={{ height: 26, fontSize: 11 }}
-                    onClick={() => retryTask(t.task_id)}
+                    style={{ height: 30, fontSize: 12 }}
+                    onClick={() => setOpenLogKey(logOpen ? null : row.groupKey)}
                   >
-                    <RefreshCw size={12} /> 重试
+                    <ScrollText size={13} /> 日志
                   </button>
-                )}
+                  <button
+                    className="btn btn-ghost"
+                    style={{ height: 30, fontSize: 12 }}
+                    onClick={handleOpen}
+                    title={canOpenResult ? openLabel : '打开处理页'}
+                  >
+                    <ExternalLink size={13} /> {openLabel}
+                  </button>
+                  {row.state === 'error' && failedTask && (
+                    <button
+                      className="btn btn-ghost"
+                      style={{ height: 30, fontSize: 12 }}
+                      onClick={() => retryTask(failedTask.task_id)}
+                    >
+                      <RefreshCw size={12} /> 重试
+                    </button>
+                  )}
+                </div>
               </div>
+              {logOpen && (
+                <div className="qp-log">
+                  <div className="qp-log-head">实时日志 · {latestLogs.length || 0} 条</div>
+                  {latestLogs.length === 0 ? (
+                    <div className="qp-log-empty">暂无日志，任务开始后会自动写入。</div>
+                  ) : latestLogs.map((entry, index) => (
+                    <div key={`${entry.ts}-${index}`} className="qp-log-line" data-level={entry.level}>
+                      <span>{shortTime(entry.ts)}</span>
+                      <span>{entry.taskType}</span>
+                      <p>{entry.message}</p>
+                    </div>
+                  ))}
+                  {row.state === 'error' && failedTask?.error && (
+                    <div className="qp-log-line" data-level="error">
+                      <span>{shortTime(failedTask.updated_at)}</span>
+                      <span>error</span>
+                      <p>{failedTask.error}</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )
         })}

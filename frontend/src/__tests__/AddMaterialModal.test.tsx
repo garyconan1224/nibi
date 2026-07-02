@@ -248,6 +248,125 @@ describe('AddMaterialModal', () => {
     })
   })
 
+  it('B 站视频链接带 favlist 来源参数时仍按单条内容提交', async () => {
+    const url = 'https://www.bilibili.com/video/BV1y1QzB1EK3/?spm_id_from=333.1387.favlist.content.click&vd_source=d0c732f14ae6900c501b38a4d1c34b7d'
+
+    render(
+      <AddMaterialModal
+        open={true}
+        onOpenChange={vi.fn()}
+        workspaceIds={['ws-1']}
+        urlValue={url}
+        sniffResult={{
+          primary_type: 'video',
+          possible_types: ['video'],
+          platform: 'bilibili',
+          title: '收藏夹来源单条视频',
+          thumbnail: null,
+          content_type_header: null,
+        }}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /开始生成/ }))
+
+    await waitFor(() => {
+      expect(generateNoteMock).toHaveBeenCalledWith(
+        'ws-1',
+        url,
+        '收藏夹来源单条视频',
+        true,
+        'vision',
+        10,
+        '',
+        'note',
+        'auto',
+        { diarize: false, summary_template: 'standard', user_notes: '' },
+      )
+    })
+    expect(navigateMock).toHaveBeenCalledWith('/processing/task-note-1', {
+      state: {
+        url,
+        workspaceId: 'ws-1',
+        taskType: 'note',
+        itemId: 'item-1',
+        itemType: 'video',
+      },
+    })
+  })
+
+  it('单条链接可用 link preview 补回协议相对封面', async () => {
+    fetchLinkPreviewMock.mockResolvedValueOnce({
+      title: '预览标题',
+      description: '',
+      image_url: '//i1.hdslb.com/bfs/archive/cover.jpg@100w_100h_1c.png',
+      source: 'og',
+    })
+
+    render(
+      <AddMaterialModal
+        open={true}
+        onOpenChange={vi.fn()}
+        workspaceIds={['ws-1']}
+        urlValue="https://www.bilibili.com/video/BV1y1QzB1EK3/"
+        sniffResult={{
+          primary_type: 'video',
+          possible_types: ['video'],
+          platform: 'bilibili',
+          title: null,
+          thumbnail: null,
+          content_type_header: null,
+        }}
+      />,
+    )
+
+    await waitFor(() => {
+      const image = document.body.querySelector('.sniff-thumb img') as HTMLImageElement | null
+      expect(image?.getAttribute('src')).toBe('https://i1.hdslb.com/bfs/archive/cover.jpg@100w_100h_1c.png')
+    })
+  })
+
+  it('自动识别为批量时可以手动切回单条内容', async () => {
+    const url = 'https://www.bilibili.com/video/BV1xx411c7mD?p=2'
+
+    render(
+      <AddMaterialModal
+        open={true}
+        onOpenChange={vi.fn()}
+        workspaceIds={['ws-1']}
+        urlValue={url}
+        sniffResult={{
+          primary_type: 'video',
+          possible_types: ['video'],
+          platform: 'bilibili',
+          title: '分 P 单条视频',
+          thumbnail: null,
+          content_type_header: null,
+        }}
+      />,
+    )
+
+    expect(screen.getAllByRole('button', { name: /解析批量来源/ }).length).toBeGreaterThan(0)
+
+    fireEvent.click(screen.getByRole('button', { name: /单条内容/ }))
+    fireEvent.click(screen.getByRole('button', { name: /开始生成/ }))
+
+    await waitFor(() => {
+      expect(generateNoteMock).toHaveBeenCalledWith(
+        'ws-1',
+        url,
+        '分 P 单条视频',
+        true,
+        'vision',
+        10,
+        '',
+        'note',
+        'auto',
+        { diarize: false, summary_template: 'standard', user_notes: '' },
+      )
+    })
+  })
+
   it('选择复刻时提交 intent=replica', async () => {
     generateNoteMock.mockResolvedValueOnce({
       task_id: 'task-replica-1',

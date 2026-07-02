@@ -22,13 +22,15 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { useProviderStore } from '@/store/providerStore'
-import type { SniffResult } from '@/services/workspaces'
+import type { BatchSourceItem, BatchSourceResolveResponse, SniffResult } from '@/services/workspaces'
 import {
   createWorkspace as createWorkspaceSvc,
   ensureInbox,
   generateNote,
+  importBatchSource,
   probeDuration,
   probeItemMedia,
+  resolveBatchSource,
   savePreflight,
   sniffUrl,
   startItemPipeline,
@@ -36,6 +38,7 @@ import {
 } from '@/services/workspaces'
 import { fetchLinkPreview } from '@/services/linkPreview'
 import { batchAddItemsToWorkspace, fetchLibrary, type LibraryItem } from '@/services/library'
+import { fetchTemplates, type VideoTemplateItem } from '@/services/templates'
 import type {
   AnalysisScope,
   ItemType,
@@ -67,6 +70,7 @@ interface AddMaterialModalProps {
   onWorkspaceUpdated?: (workspace: WorkspaceRecord) => void
   sniffResult?: SniffResult | null
   urlValue?: string
+  sourceText?: string
   onAdded?: () => void
   /** 本地文件：上传后的 item ID */
   localFile?: string
@@ -85,6 +89,7 @@ interface AddMaterialModalProps {
 
 type NoteMediaKind = 'auto' | 'video' | 'image_text' | 'audio'
 type ActionType = 'note' | 'replica' | 'ai_video' | 'storyboard' | 'rewrite'
+type SourceMode = 'auto' | 'single' | 'batch'
 
 const NOTE_TYPE_CARDS: { value: NoteMediaKind; label: string; desc: string }[] = [
   { value: 'auto', label: '自动识别', desc: '由系统判断笔记类型' },
@@ -139,6 +144,10 @@ const STYLE_DESCRIPTIONS: Record<string, string> = {
   science_popularization: '通俗语言讲原理+类比+常见误区，适合科普',
 }
 
+const STYLE_ORDER: Map<string, number> = new Map(
+  [...PRIMARY_STYLES, ...MORE_STYLES].map((style, index) => [style.id, index]),
+)
+
 /** 智能截帧间隔：按时长取约 25 张画面，clamp 到 5~60 秒；拿不到时长默认 10 */
 function computeAutoInterval(durationSec?: number): number {
   if (!durationSec || durationSec <= 0) return 10
@@ -179,8 +188,75 @@ function itemTypeLabel(type?: ItemType | string): string {
   return '视频'
 }
 
+function normalizePreviewImageUrl(url?: string | null): string {
+  const value = (url ?? '').trim()
+  if (!value) return ''
+  return value.startsWith('//') ? `https:${value}` : value
+}
+
+function previewImageFallback(url: string): string {
+  if (!url.includes('hdslb.com')) return ''
+  const clean = url.replace(/@[^/?#]+(?=($|[?#]))/, '')
+  return clean !== url ? clean : ''
+}
+
 function libraryItemKey(item: LibraryItem): string {
   return `${item.workspace_id}:${item.item_id}`
+}
+
+const BATCH_URL_RE = /https?:\/\/[^\s，。！？；：“”‘’（）【】《》]+/g
+
+function batchUrlsFromText(input: string): string[] {
+  const matches = input.match(BATCH_URL_RE) ?? []
+  return Array.from(new Set(matches.map((url) => url.replace(/[).,，。；;]+$/, ''))))
+}
+
+function hasExplicitBilibiliPart(input: string): boolean {
+  const urls = batchUrlsFromText(input)
+  const candidates = urls.length > 0 ? urls : [input.trim()]
+  return candidates.some((candidate) => {
+    try {
+      const url = new URL(candidate.startsWith('http') ? candidate : `https://${candidate}`)
+      if (!/bilibili\.com$/i.test(url.hostname) && !/\.bilibili\.com$/i.test(url.hostname)) return false
+      if (!/\/video\/BV/i.test(url.pathname)) return false
+      const page = Number(url.searchParams.get('p') || '0')
+      return page > 1
+    } catch {
+      return false
+    }
+  })
+}
+
+function hasExplicitBilibiliCollection(input: string): boolean {
+  const urls = batchUrlsFromText(input)
+  const candidates = urls.length > 0 ? urls : [input.trim()]
+  return candidates.some((candidate) => {
+    try {
+      const url = new URL(candidate.startsWith('http') ? candidate : `https://${candidate}`)
+      if (!/bilibili\.com$/i.test(url.hostname) && !/\.bilibili\.com$/i.test(url.hostname)) return false
+      const path = url.pathname.toLowerCase()
+      if (url.hostname.toLowerCase() === 'space.bilibili.com') return true
+      if (path.includes('favlist') || path.includes('medialist/play')) return true
+      if (path.includes('collectiondetail') || path.includes('seriesdetail')) return true
+      return url.searchParams.has('fid') || url.searchParams.has('sid')
+    } catch {
+      return false
+    }
+  })
+}
+
+function looksLikeBatchSource(input: string): boolean {
+  const value = input.trim()
+  if (!value) return false
+  if (batchUrlsFromText(value).length > 1) return true
+  if (/youtube\.com\/playlist|[?&]list=|youtu\.be\/.*[?&]list=/i.test(value)) return true
+  if (hasExplicitBilibiliPart(value)) return true
+  if (hasExplicitBilibiliCollection(value)) return true
+  return false
+}
+
+function batchSourceItemKey(item: BatchSourceItem, index: number): string {
+  return item.external_id?.trim() || item.source_url || `batch-item-${index}`
 }
 
 export function AddMaterialModal({
@@ -193,6 +269,7 @@ export function AddMaterialModal({
   onWorkspaceUpdated,
   sniffResult,
   urlValue,
+  sourceText,
   onAdded,
   localFile,
   localFileName,
@@ -225,6 +302,12 @@ export function AddMaterialModal({
   const [diarizeOn, setDiarizeOn] = useState(false)
   const [userNotes, setUserNotes] = useState('')
   const [noteStyle, setNoteStyle] = useState('standard')
+  const [sourceMode, setSourceMode] = useState<SourceMode>('auto')
+  const [styleTemplates, setStyleTemplates] = useState<VideoTemplateItem[]>([])
+  const [batchResult, setBatchResult] = useState<BatchSourceResolveResponse | null>(null)
+  const [batchSelectedKeys, setBatchSelectedKeys] = useState<Set<string>>(new Set())
+  const [batchResolving, setBatchResolving] = useState(false)
+  const [batchImporting, setBatchImporting] = useState(false)
   const [workspacePickerOpen, setWorkspacePickerOpen] = useState(false)
   const [workspaceQuery, setWorkspaceQuery] = useState('')
   const [creatingWorkspace, setCreatingWorkspace] = useState(false)
@@ -239,6 +322,7 @@ export function AddMaterialModal({
   const [existingSelectedIds, setExistingSelectedIds] = useState<Set<string>>(new Set())
   const [existingQuery, setExistingQuery] = useState('')
   const sniffTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const autoBatchResolveKeyRef = useRef('')
 
   // R4.7: 收集所有可用视觉模型（provider 有 vision 能力 + 模型有 vision 标签）
   const visionModels = providers
@@ -288,6 +372,40 @@ export function AddMaterialModal({
     return list.slice(0, 60)
   }, [existingItems, existingQuery])
 
+  useEffect(() => {
+    let cancelled = false
+    fetchTemplates('style_video_with_frames')
+      .then((items) => {
+        if (!cancelled) setStyleTemplates(items)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  const styleOptions = useMemo(() => {
+    if (styleTemplates.length === 0) {
+      return [...PRIMARY_STYLES, ...MORE_STYLES].map((style) => ({
+        id: style.id,
+        label: style.label,
+        desc: STYLE_DESCRIPTIONS[style.id] ?? '',
+      }))
+    }
+    return [...styleTemplates]
+      .sort((a, b) => {
+        const ai = STYLE_ORDER.get(a.template_id) ?? 1000
+        const bi = STYLE_ORDER.get(b.template_id) ?? 1000
+        return ai - bi || a.name.localeCompare(b.name, 'zh-Hans-CN')
+      })
+      .map((item) => ({
+        id: item.template_id,
+        label: item.name,
+        desc: item.description || item.use_case || STYLE_DESCRIPTIONS[item.template_id] || '',
+      }))
+  }, [styleTemplates])
+
+  const primaryStyleOptions = styleOptions.slice(0, 7)
+  const moreStyleOptions = styleOptions.slice(7)
+
   const selectedExistingRefs = useMemo(
     () => existingItems
       .filter((item) => existingSelectedIds.has(libraryItemKey(item)))
@@ -321,10 +439,40 @@ export function AddMaterialModal({
   // 本地文件不参与链接识别：屏蔽 url/sniff，避免残留的 sniffResult 误显示「已识别视频」卡片、
   // 也避免链接探测 useEffect 把 probeItemMedia 探到的本地时长清零覆盖。
   const effectiveUrl = isLocalFile ? '' : (urlValue ?? internalUrl).trim()
+  const batchSourceText = isLocalFile ? '' : (sourceText ?? urlValue ?? internalUrl).trim()
+  const isPastedMultiUrlSource = batchUrlsFromText(batchSourceText).length > 1
+  const detectedBatchSource = looksLikeBatchSource(batchSourceText)
+  const isBatchMode = !isLocalFile && (
+    sourceMode === 'batch'
+    || (sourceMode === 'auto' && (detectedBatchSource || Boolean(batchResult)))
+  )
+  const canResolveBatchSource = !isLocalFile && isBatchMode && Boolean(batchSourceText)
+  const showBatchSourcePanel = !isLocalFile && (isBatchMode || Boolean(batchResult))
+  const shouldBlockSingleSubmit = !isLocalFile && isBatchMode
+  const selectedBatchItems = useMemo(() => {
+    if (!batchResult) return []
+    return batchResult.items.filter((item, index) => batchSelectedKeys.has(batchSourceItemKey(item, index)))
+  }, [batchResult, batchSelectedKeys])
+  const isBatchSubmitReady = isBatchMode && Boolean(batchResult)
+  const primaryActionDisabled = isBatchMode
+    ? (!canResolveBatchSource || batchResolving || batchImporting || (isBatchSubmitReady && selectedBatchItems.length === 0))
+    : ((!isLocalFile && !effectiveUrl) || submitting)
+  const primaryActionLabel = isBatchMode
+    ? batchResolving
+      ? '解析中…'
+      : batchImporting
+        ? '提交中…'
+        : batchResult
+          ? `提交批量 (${selectedBatchItems.length})`
+          : '解析批量来源'
+    : submitting
+      ? '处理中…'
+      : '开始生成'
   const effectiveSniff = isLocalFile ? null : (sniffResult ?? internalSniff)
   // 稳定原始值供 link-preview effect 依赖（避免 effectiveSniff 对象身份抖动）
   const sniffThumbnail = effectiveSniff?.thumbnail ?? null
   const sniffTitle = effectiveSniff?.title ?? null
+  const previewThumbUrl = normalizePreviewImageUrl(sniffThumbnail || coverUrl)
   const workspaceSummary = workspaceIds[0] ? getWorkspaceLabel(workspaceIds[0], '当前合集') : ''
   const sourceSummary = isLocalFile
     ? (localFileName || '本地文件')
@@ -365,6 +513,17 @@ export function AddMaterialModal({
     }
   }, [])
 
+  const switchSourceMode = useCallback((mode: Exclude<SourceMode, 'auto'>) => {
+    setSourceMode(mode)
+    setError(null)
+    if (mode === 'single') {
+      setBatchResult(null)
+      setBatchSelectedKeys(new Set())
+      setBatchResolving(false)
+      autoBatchResolveKeyRef.current = ''
+    }
+  }, [])
+
   useEffect(() => {
     if (!open) return
     setInternalUrl('')
@@ -373,6 +532,7 @@ export function AddMaterialModal({
     setDiarizeOn(false)
     setUserNotes('')
     setNoteStyle('standard')
+    setSourceMode('auto')
     setSelectedAction('note')
     setSelectedNoteType('auto')
     setReplicaKind('prompt')
@@ -391,13 +551,18 @@ export function AddMaterialModal({
     setExistingSelectedIds(new Set())
     setExistingQuery('')
     setExistingAdding(false)
+    setBatchResult(null)
+    setBatchSelectedKeys(new Set())
+    setBatchResolving(false)
+    setBatchImporting(false)
+    autoBatchResolveKeyRef.current = ''
     setLinkDesc('')
     setCoverUrl('')
     setLinkTitle('')
     userToggledRef.current = false
     // 每次重开恢复到当前 provider 能力下的默认值，避免上次展开/切换残留到这次弹框。
     setEmbedFrames(hasVisionModel)
-  }, [open, urlValue])
+  }, [open, urlValue, sourceText])
 
   useEffect(() => {
     if (!open || !urlValue?.trim()) return
@@ -463,7 +628,7 @@ export function AddMaterialModal({
         if (cancelled) return
         if (p.image_url && !sniffThumbnail) {
           // B站封面是协议相对 URL（//i1.hdslb.com/...），补 https 否则 localhost(http) 下加载失败
-          setCoverUrl(p.image_url.startsWith('//') ? `https:${p.image_url}` : p.image_url)
+          setCoverUrl(normalizePreviewImageUrl(p.image_url))
         }
         if (p.title && !sniffTitle) setLinkTitle(p.title)
         if (p.description) setLinkDesc(p.description)
@@ -600,6 +765,99 @@ export function AddMaterialModal({
     }
   }, [onAdded, onOpenChange, selectedExistingRefs, targetWorkspaceId])
 
+  const handleResolveBatchSource = useCallback(async (sourceOverride?: string, silent = false) => {
+    const source = (sourceOverride ?? batchSourceText).trim()
+    if (!source) {
+      setError('请先输入批量来源链接')
+      return
+    }
+    setBatchResolving(true)
+    setError(null)
+    try {
+      const result = await resolveBatchSource(source)
+      setBatchResult(result)
+      setBatchSelectedKeys(new Set(result.items.map((item, index) => batchSourceItemKey(item, index))))
+      if (!silent) toast.success('批量来源已解析', { description: `${result.items.length} 条内容` })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '批量来源解析失败'
+      setError(msg)
+      if (!silent) toast.error(msg)
+    } finally {
+      setBatchResolving(false)
+    }
+  }, [batchSourceText])
+
+  useEffect(() => {
+    if (!open || !canResolveBatchSource || batchResult || batchResolving || batchImporting) return
+    if (!detectedBatchSource && sourceMode !== 'batch') return
+    const source = batchSourceText.trim()
+    if (!source || autoBatchResolveKeyRef.current === source) return
+    const timer = window.setTimeout(() => {
+      autoBatchResolveKeyRef.current = source
+      void handleResolveBatchSource(source, true)
+    }, 500)
+    return () => window.clearTimeout(timer)
+  }, [
+    open,
+    canResolveBatchSource,
+    batchResult,
+    batchResolving,
+    batchImporting,
+    detectedBatchSource,
+    sourceMode,
+    batchSourceText,
+    handleResolveBatchSource,
+  ])
+
+  const handleImportBatchSource = async () => {
+    if (!batchResult || batchResult.items.length === 0) return
+    if (selectedBatchItems.length === 0) {
+      setError('请至少选择 1 条要导入的视频')
+      return
+    }
+    setBatchImporting(true)
+    setError(null)
+    try {
+      const resolvedNoteKind = selectedNoteType === 'auto' ? 'video' : selectedNoteType
+      const effInterval = captureMode === 'auto' ? computeAutoInterval(videoDuration) : frameInterval
+      const effVisionModel = selectedVisionModel === '__default__' ? '' : selectedVisionModel
+      const result = await importBatchSource({
+        workspace_name: batchResult.title || '批量导入合集',
+        kind: selectedAction === 'replica' ? 'replica' : 'note',
+        source_type: batchResult.source_type,
+        source_url: batchResult.source_url,
+        items: selectedBatchItems,
+        start: true,
+        embed_frames: resolvedNoteKind === 'video' ? embedFrames : false,
+        image_mode: selectedAction === 'replica' ? 'replica_prompt' : 'vision',
+        frame_interval: effInterval,
+        vision_model: effVisionModel,
+        intent: selectedAction === 'replica' ? 'replica' : 'note',
+        replica_kind: replicaKind,
+        note_media_kind: resolvedNoteKind,
+        summary_template: noteStyle,
+        diarize: diarizeOn,
+        user_notes: userNotes,
+      })
+      toast.success('批量合集已创建', { description: `${result.items_added} 条内容已加入任务队列` })
+      onWorkspaceUpdated?.(result.workspace)
+      onAdded?.()
+      onOpenChange(false)
+      navigate(`/processing/batch/${result.workspace.workspace_id}`, {
+        state: {
+          workspace: result.workspace,
+          taskIds: result.tasks.map((task) => task.task_id),
+        },
+      })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '批量导入失败'
+      setError(msg)
+      toast.error(msg)
+    } finally {
+      setBatchImporting(false)
+    }
+  }
+
   const handleGenerateNote = async () => {
     if (isLocalFile) {
       // 本地文件：savePreflight + startItemPipeline，绕开 generateNote 的 URL 校验
@@ -663,6 +921,10 @@ export function AddMaterialModal({
       setError('请先输入素材链接')
       return
     }
+    if (shouldBlockSingleSubmit || isPastedMultiUrlSource) {
+      setError('检测到批量来源，请先解析批量来源并导入为合集')
+      return
+    }
     setSubmitting(true)
     setError(null)
 
@@ -702,7 +964,7 @@ export function AddMaterialModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="remix-modal-content"
+        className={`remix-modal-content${isBatchMode ? ' remix-modal-content--batch' : ''}`}
         overlayClassName="remix-modal-backdrop"
         showCloseButton={false}
       >
@@ -730,6 +992,24 @@ export function AddMaterialModal({
           {/* ① 素材源 */}
           <div className="m-section">
             <div className="eyebrow" style={{ marginBottom: 10 }}>① 素材源</div>
+            {!isLocalFile && (
+              <div className="modal-source-mode">
+                <button
+                  type="button"
+                  data-active={!isBatchMode ? 'true' : undefined}
+                  onClick={() => switchSourceMode('single')}
+                >
+                  单条内容
+                </button>
+                <button
+                  type="button"
+                  data-active={isBatchMode ? 'true' : undefined}
+                  onClick={() => switchSourceMode('batch')}
+                >
+                  批量合集
+                </button>
+              </div>
+            )}
             {isLocalFile ? (
               <div className="sniff-card">
                 <div className="sniff-thumb">
@@ -783,6 +1063,9 @@ export function AddMaterialModal({
                     setInternalUrl(e.target.value)
                     setError(null)
                     setInternalSniff(null)
+                    setBatchResult(null)
+                    setBatchSelectedKeys(new Set())
+                    autoBatchResolveKeyRef.current = ''
                   }}
                   placeholder="B站 / 小红书 / 抖音 / YouTube / 本地文件路径"
                 />
@@ -806,6 +1089,126 @@ export function AddMaterialModal({
                 <span className="kw" data-state={internalSniff ? 'recognized' : undefined}>
                   {internalSniff ? '已识别' : '输入后自动识别'}
                 </span>
+              </div>
+            )}
+            {!isLocalFile && showBatchSourcePanel && (
+              <div className="batch-source-panel">
+                <div className="batch-source-toolbar">
+                  <button
+                    type="button"
+                    className="pp-add"
+                    onClick={() => void handleResolveBatchSource()}
+                    disabled={!canResolveBatchSource || batchResolving || batchImporting}
+                  >
+                    <Layers size={11} />
+                    {batchResolving ? '解析中…' : '解析批量来源'}
+                  </button>
+                  <span className="kw">B 站多 P / 收藏夹 / UP 主页 / 系列 / YouTube 播放列表 / 多链接</span>
+                </div>
+                {batchResult && (
+                  <div className="batch-source-result">
+                    <div className="batch-source-result-head">
+                      <div className="batch-source-title-wrap">
+                        <div className="batch-source-title">
+                          {batchResult.title || '批量来源'}
+                        </div>
+                        <div className="mono batch-source-meta">
+                          {batchResult.source_type} · 已选 {selectedBatchItems.length} / {batchResult.items.length} 条
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-primary batch-source-import-btn"
+                        onClick={handleImportBatchSource}
+                        disabled={batchImporting || selectedBatchItems.length === 0}
+                      >
+                        {batchImporting ? '导入中…' : `导入 ${selectedBatchItems.length} 条为新合集`}
+                      </button>
+                    </div>
+                    <div className="batch-source-controls">
+                      <span className="kw">每条视频会创建一个子任务，并自动归入同一合集</span>
+                      <div className="batch-source-control-actions">
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => setBatchSelectedKeys(new Set(batchResult.items.map((item, idx) => batchSourceItemKey(item, idx))))}
+                        >
+                          全选
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => {
+                            const next = new Set<string>()
+                            batchResult.items.forEach((item, idx) => {
+                              const key = batchSourceItemKey(item, idx)
+                              if (!batchSelectedKeys.has(key)) next.add(key)
+                            })
+                            setBatchSelectedKeys(next)
+                          }}
+                        >
+                          反选
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => setBatchSelectedKeys(new Set())}
+                        >
+                          清空
+                        </button>
+                      </div>
+                    </div>
+                    <div className="batch-source-list">
+                      {batchResult.items.map((item, idx) => {
+                        const itemKey = batchSourceItemKey(item, idx)
+                        const checked = batchSelectedKeys.has(itemKey)
+                        return (
+                          <button
+                            key={itemKey}
+                            type="button"
+                            className="batch-source-row"
+                            data-selected={checked ? 'true' : undefined}
+                            onClick={() => {
+                              setBatchSelectedKeys((current) => {
+                                const next = new Set(current)
+                                if (next.has(itemKey)) next.delete(itemKey)
+                                else next.add(itemKey)
+                                return next
+                              })
+                            }}
+                          >
+                            <span aria-hidden className="batch-source-check">
+                              <Check size={13} />
+                            </span>
+                            <span className="batch-source-thumb" data-empty={item.thumbnail ? undefined : 'true'}>
+                              {item.thumbnail ? (
+                                <img
+                                  src={item.thumbnail}
+                                  alt=""
+                                  referrerPolicy="no-referrer"
+                                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                                />
+                              ) : (
+                                <Video size={15} />
+                              )}
+                            </span>
+                            <span className="batch-source-main">
+                              <span className="batch-source-item-title">
+                                {item.index ? `P${item.index} · ` : ''}{item.title || item.source_url}
+                              </span>
+                              <span className="mono batch-source-url">
+                                {item.source_url}
+                              </span>
+                            </span>
+                            <span className="kw batch-source-duration">
+                              {item.duration_seconds ? formatDuration(Math.round(item.duration_seconds)) : item.platform || '视频'}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             {!isLocalFile && targetWorkspaceId && (
@@ -885,20 +1288,29 @@ export function AddMaterialModal({
                 </div>
               </div>
             )}
-            {effectiveSniff && effectiveSniff.confident === false && (
+            {!isBatchMode && effectiveSniff && effectiveSniff.confident === false && (
               <div style={{ fontSize: 12, color: 'var(--mut)', marginTop: 6 }}>
                 无法确认链接类型，将自动识别
               </div>
             )}
-            {effectiveSniff && effectiveSniff.confident !== false && (
+            {!isBatchMode && effectiveSniff && effectiveSniff.confident !== false && (
               <div className="sniff-card">
                 <div className="sniff-thumb">
-                  {(effectiveSniff.thumbnail || coverUrl) ? (
+                  {previewThumbUrl ? (
                     <img
-                      src={effectiveSniff.thumbnail || coverUrl}
+                      src={previewThumbUrl}
                       alt=""
                       referrerPolicy="no-referrer"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                      onError={(e) => {
+                        const img = e.currentTarget
+                        const fallback = previewImageFallback(img.src)
+                        if (fallback && img.dataset.fallbackApplied !== 'true') {
+                          img.dataset.fallbackApplied = 'true'
+                          img.src = fallback
+                          return
+                        }
+                        img.style.display = 'none'
+                      }}
                     />
                   ) : (
                     <ImageIcon size={20} style={{ color: 'var(--mut)' }} />
@@ -926,7 +1338,7 @@ export function AddMaterialModal({
                 </div>
               </div>
             )}
-            {sniffFailed && !effectiveSniff && effectiveUrl && (
+            {!isBatchMode && sniffFailed && !effectiveSniff && effectiveUrl && (
               <div style={{ fontSize: 12, color: 'var(--mut)', marginTop: 6 }}>
                 无法识别该链接，可仍尝试提交
               </div>
@@ -1176,23 +1588,27 @@ export function AddMaterialModal({
                           <SelectContent>
                             <SelectGroup>
                               <SelectLabel style={{ fontSize: 11, color: 'var(--mut)' }}>常用风格</SelectLabel>
-                              {PRIMARY_STYLES.map(opt => (
+                              {primaryStyleOptions.map(opt => (
                                 <SelectItem key={opt.id} value={opt.id}>
                                   {opt.label}
-                                  <span style={{ fontSize: 11, color: 'var(--mut)', marginLeft: 6 }}>{STYLE_DESCRIPTIONS[opt.id]}</span>
+                                  <span style={{ fontSize: 11, color: 'var(--mut)', marginLeft: 6 }}>{opt.desc}</span>
                                 </SelectItem>
                               ))}
                             </SelectGroup>
-                            <SelectSeparator />
-                            <SelectGroup>
-                              <SelectLabel style={{ fontSize: 11, color: 'var(--mut)' }}>更多风格</SelectLabel>
-                              {MORE_STYLES.map(opt => (
-                                <SelectItem key={opt.id} value={opt.id}>
-                                  {opt.label}
-                                  <span style={{ fontSize: 11, color: 'var(--mut)', marginLeft: 6 }}>{STYLE_DESCRIPTIONS[opt.id]}</span>
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
+                            {moreStyleOptions.length > 0 && (
+                              <>
+                                <SelectSeparator />
+                                <SelectGroup>
+                                  <SelectLabel style={{ fontSize: 11, color: 'var(--mut)' }}>更多风格</SelectLabel>
+                                  {moreStyleOptions.map(opt => (
+                                    <SelectItem key={opt.id} value={opt.id}>
+                                      {opt.label}
+                                      <span style={{ fontSize: 11, color: 'var(--mut)', marginLeft: 6 }}>{opt.desc}</span>
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              </>
+                            )}
                           </SelectContent>
                         </Select>
                       </div>
@@ -1374,18 +1790,19 @@ export function AddMaterialModal({
             <button
               type="button"
               className="btn btn-primary"
-              onClick={handleGenerateNote}
-              disabled={(!isLocalFile && !effectiveUrl) || submitting}
-              title="开始生成"
+              onClick={() => {
+                if (isBatchMode) {
+                  if (batchResult) void handleImportBatchSource()
+                  else void handleResolveBatchSource()
+                  return
+                }
+                void handleGenerateNote()
+              }}
+              disabled={primaryActionDisabled}
+              title={isBatchMode ? (batchResult ? '提交批量任务' : '解析批量来源') : '开始生成'}
             >
-              {submitting ? (
-                '处理中…'
-              ) : (
-                <>
-                  <Wand2 size={14} />
-                  开始生成
-                </>
-              )}
+              <Wand2 size={14} />
+              {primaryActionLabel}
             </button>
           </div>
         </div>

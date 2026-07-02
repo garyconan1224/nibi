@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { QueueTab } from '@/pages/WorkspacePage/TaskboardPage/QueueTab'
 import { useTaskStore } from '@/store/taskStore'
@@ -39,7 +40,11 @@ describe('QueueTab', () => {
       ],
     })
 
-    render(<QueueTab workspaceId="workspace-a" />)
+    render(
+      <MemoryRouter>
+        <QueueTab workspaceId="workspace-a" />
+      </MemoryRouter>,
+    )
 
     expect(screen.getByText('A task')).toBeTruthy()
     expect(screen.queryByText('B task')).toBeNull()

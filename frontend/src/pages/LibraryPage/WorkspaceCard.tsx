@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { LibraryWorkspace, LibraryItem } from '@/services/library'
+import { SYSTEM_TAG_DIMENSIONS } from '@/constants/tagDimensions'
 
 const TYPE_TONE: Record<string, { badge: string; label: string }> = {
   video: { badge: 'collection-mini--video', label: 'VIDEO' },
@@ -42,6 +43,20 @@ function getPreviewSlots(items: LibraryItem[]): Array<LibraryItem | null> {
     .slice(0, 4)
   while (visible.length < 4) visible.push(null)
   return visible
+}
+
+function aggregateTags(items: LibraryItem[]): string[] {
+  const tags: string[] = []
+  for (const item of items) {
+    const itemTags = item.tags
+    if (!itemTags) continue
+    for (const dimension of SYSTEM_TAG_DIMENSIONS) {
+      const tag = itemTags[dimension.key]
+      if (tag) tags.push(tag)
+    }
+    if (Array.isArray(itemTags.custom_tags)) tags.push(...itemTags.custom_tags)
+  }
+  return Array.from(new Set(tags.map((tag) => tag.trim()).filter(Boolean))).slice(0, 5)
 }
 
 interface WorkspaceCardProps {
@@ -88,6 +103,8 @@ export function WorkspaceCard({
     : workspace.kind === 'replica'
       ? '空复刻合集：适合先收纳参考图、视频与分镜素材。'
       : '空笔记合集：适合按主题收纳视频、音频、图片和文本。'
+  const coverThumbnail = workspace.cover_thumbnail
+  const collectionTags = useMemo(() => aggregateTags(items), [items])
 
   const handleSave = async () => {
     const nextName = draftName.trim()
@@ -116,7 +133,6 @@ export function WorkspaceCard({
     >
       <div className="note-cover collection-cover">
         <span className="media-chip">COLLECTION</span>
-        <span className="status-pill status-done">文件夹</span>
         {selectMode ? (
           <span
             onClick={(event) => {
@@ -148,29 +164,39 @@ export function WorkspaceCard({
           )
         )}
 
-        <div className="collection-folder">
-          <div className="collection-tab" />
-          <div className="collection-preview-grid">
-            {previewSlots.map((item, index) => {
-              const tone = item ? TYPE_TONE[item.type]?.badge.replace('collection-mini', 'collection-preview-tile') : 'collection-preview-tile--empty'
-              return (
-                <div
-                  key={item?.item_id ?? `empty-${index}`}
-                  className={`collection-preview-tile ${tone ?? 'collection-preview-tile--video'}`}
-                >
-                  {item?.thumbnail ? (
-                    <img src={item.thumbnail} alt="" loading="lazy" />
-                  ) : (
-                    <div className="collection-preview-fallback">
-                      <span>{item ? (TYPE_TONE[item.type]?.label ?? item.type.toUpperCase()) : (workspace.kind === 'replica' ? 'REPLICA' : 'NOTE')}</span>
-                      <strong>{item?.name || (index === 0 ? '先往这个合集里放一条内容' : '等待内容')}</strong>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+        {coverThumbnail ? (
+          <div className="collection-hero-cover">
+            <img src={coverThumbnail} alt={`${workspace.name} 封面`} loading="lazy" />
+            <div className="collection-hero-overlay">
+              <span>{workspace.kind === 'replica' ? 'REPLICA COLLECTION' : 'NOTE COLLECTION'}</span>
+              <strong>{workspace.items_count} 项内容</strong>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="collection-folder">
+            <div className="collection-tab" />
+            <div className="collection-preview-grid">
+              {previewSlots.map((item, index) => {
+                const tone = item ? TYPE_TONE[item.type]?.badge.replace('collection-mini', 'collection-preview-tile') : 'collection-preview-tile--empty'
+                return (
+                  <div
+                    key={item?.item_id ?? `empty-${index}`}
+                    className={`collection-preview-tile ${tone ?? 'collection-preview-tile--video'}`}
+                  >
+                    {item?.thumbnail ? (
+                      <img src={item.thumbnail} alt="" loading="lazy" />
+                    ) : (
+                      <div className="collection-preview-fallback">
+                        <span>{item ? (TYPE_TONE[item.type]?.label ?? item.type.toUpperCase()) : (workspace.kind === 'replica' ? 'REPLICA' : 'NOTE')}</span>
+                        <strong>{item?.name || (index === 0 ? '先往这个合集里放一条内容' : '等待内容')}</strong>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="note-card-body">
@@ -209,6 +235,17 @@ export function WorkspaceCard({
         </div>
 
         <p className="note-summary">{summaryText}</p>
+
+        <div className="note-status-line">
+          <span className="note-inline-chip note-inline-chip--done">文件夹</span>
+          <span className="note-inline-chip">{workspace.kind === 'replica' ? '复刻合集' : '笔记合集'}</span>
+        </div>
+
+        {collectionTags.length > 0 && (
+          <div className="note-tag-row" aria-label="合集标签">
+            {collectionTags.map((tag) => <span key={tag} className="note-tag-chip">{tag}</span>)}
+          </div>
+        )}
 
         <div className="note-meta-row">
           <span>合集</span>

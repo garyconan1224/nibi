@@ -3,13 +3,22 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { getWorkspace, getItemNote, downloadCollectionHtml, mergeNotes } from '@/services/workspaces'
+import {
+  getWorkspace,
+  getItemNote,
+  downloadCollectionHtml,
+  mergeNotes,
+  favoriteItem,
+  removeWorkspaceItem,
+  unfavoriteItem,
+} from '@/services/workspaces'
 import type { MergedNote } from '@/services/workspaces'
+import { batchDeleteItems } from '@/services/library'
 import { AddMaterialModal } from '@/components/workspace/AddMaterialModal'
 import { usePipelineTasks } from '@/hooks/usePipelineTasks'
 import { withStatusToast } from '@/lib/statusToast'
 
-import type { WorkspaceRecord } from '@/types/workspace'
+import type { WorkspaceItem, WorkspaceRecord } from '@/types/workspace'
 
 import { ChatTab } from './ChatTab'
 import { KnowledgeQATab } from './KnowledgeQATab'
@@ -51,7 +60,13 @@ export default function TaskboardPage() {
 
   const abortRef = useRef<AbortController | null>(null)
 
-  usePipelineTasks({ projectId: id, pollInterval: 5000, enabled: Boolean(id) })
+  usePipelineTasks({
+    projectId: id,
+    pollInterval: 5000,
+    enabled: Boolean(id),
+    limit: 300,
+    includeLogs: true,
+  })
 
   useEffect(() => {
     if (!id) return
@@ -88,6 +103,44 @@ export default function TaskboardPage() {
   const refresh = () => {
     if (!workspace) return
     getWorkspace(workspace.workspace_id).then(setWorkspace).catch(() => {})
+  }
+
+  const handleDeleteItem = async (item: WorkspaceItem) => {
+    if (!workspace) return
+    const label = item.name || '未命名素材'
+    if (!window.confirm(`确定删除「${label}」？`)) return
+    try {
+      const updated = await removeWorkspaceItem(workspace.workspace_id, item.item_id)
+      setWorkspace(updated)
+      toast.success(`已删除「${label}」`)
+    } catch {
+      toast.error('删除失败，请重试')
+    }
+  }
+
+  const handleDeleteSelectedItems = async (itemIds: string[]) => {
+    if (!workspace || itemIds.length === 0) return
+    if (!window.confirm(`确定删除选中的 ${itemIds.length} 项？此操作不可撤销。`)) return
+    try {
+      await batchDeleteItems(itemIds.map((itemId) => ({ workspace_id: workspace.workspace_id, item_id: itemId })))
+      toast.success(`已删除 ${itemIds.length} 项`)
+      refresh()
+    } catch {
+      toast.error('批量删除失败，请重试')
+    }
+  }
+
+  const handleToggleFavorite = async (item: WorkspaceItem) => {
+    if (!workspace) return
+    try {
+      const updated = item.favorite
+        ? await unfavoriteItem(workspace.workspace_id, item.item_id)
+        : await favoriteItem(workspace.workspace_id, item.item_id)
+      setWorkspace(updated)
+      toast.success(item.favorite ? '已取消收藏' : '已收藏')
+    } catch {
+      toast.error('收藏状态更新失败，请重试')
+    }
   }
 
   if (loading) {
@@ -202,6 +255,9 @@ export default function TaskboardPage() {
           onAddMaterial={() => setAddOpen(true)}
           onNavigateToCompare={() => setCompareOpen(true)}
           onSelectedIdsChange={setCompareSelectedIds}
+          onToggleFavorite={handleToggleFavorite}
+          onDelete={handleDeleteItem}
+          onDeleteSelected={handleDeleteSelectedItems}
         />
       </div>
 
@@ -232,11 +288,14 @@ export default function TaskboardPage() {
       {/* ── Modal：更多功能面板（队列/收藏/版本/标签/AI对话/知识库/风格报告） ── */}
       {morePanelId && (
         <div className="tb-modal-overlay" onClick={() => setMorePanelId(null)}>
-          <div className="tb-modal" onClick={(e) => e.stopPropagation()}>
+          <div
+            className={`tb-modal${morePanelId === 'queue' ? ' tb-modal--queue' : ''}`}
+            onClick={(e) => e.stopPropagation()}
+          >
             <button className="tb-modal-close" onClick={() => setMorePanelId(null)}>
               <X size={18} />
             </button>
-            {morePanelId === 'queue' && <QueueTab workspaceId={workspace.workspace_id} />}
+            {morePanelId === 'queue' && <QueueTab workspaceId={workspace.workspace_id} workspace={workspace} />}
             {morePanelId === 'favs' && (
               <FavoritesTab
                 favoriteIds={workspace.favorites}

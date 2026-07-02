@@ -32,8 +32,9 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from urllib.parse import quote, urlparse
+from urllib.parse import parse_qs, quote, urlparse
 
+import httpx
 from backend.app.models.tasks import TERMINAL_STATUS_VALUES, TaskStatus
 
 # 项目根目录（backend/app/routes/workspaces.py → routes → app → backend → root）
@@ -71,6 +72,7 @@ from backend.app.services.video_result_demo import build_demo_video_result
 from backend.app.services.workspace_search_service import search_one_workspace
 from backend.app.services.workspace_store import WorkspaceStore
 from shared.config import DATA_DIR
+from shared.settings_store import load_settings
 from shared.url_sniffer import sniff_url
 
 # 复用 pipeline 路由的 runner / store 单例，避免重复初始化任务引擎
@@ -349,7 +351,8 @@ def _autotag_items_for_task(task: TaskRecord, runner) -> None:  # type: ignore[t
         for item in ws.items:
             if task.task_id not in item.related_task_ids:
                 continue
-            if item.tags:
+            existing_tags = item.tags if isinstance(item.tags, dict) else {}
+            if existing_tags.get("_generated_at"):
                 continue
             try:
                 tags = generate_tags(item, ws, task_store=runner.store)
@@ -357,6 +360,19 @@ def _autotag_items_for_task(task: TaskRecord, runner) -> None:  # type: ignore[t
                 tags = {}
             if not tags:
                 continue
+            existing_custom = [
+                str(tag).strip()
+                for tag in existing_tags.get("custom_tags", [])
+                if str(tag).strip()
+            ]
+            generated_custom = [
+                str(tag).strip()
+                for tag in tags.get("custom_tags", [])
+                if str(tag).strip()
+            ]
+            if existing_custom:
+                merged_custom = list(dict.fromkeys(existing_custom + generated_custom))[:10]
+                tags = {**tags, "custom_tags": merged_custom}
             try:
                 _store.update_item(ws.workspace_id, item.item_id, tags=tags)
             except Exception:
@@ -373,7 +389,7 @@ def _on_analysis_success_autotag(completed_task: TaskRecord, runner) -> None:  #
     ).start()
 
 
-for _tt in ("analyze", "text", "audio", "image"):
+for _tt in ("analyze", "note", "text", "audio", "image"):
     _pipeline_runner.register_success_callback(_tt, _on_analysis_success_autotag)
 
 
@@ -678,6 +694,42 @@ class GenerateNoteRequest(BaseModel):
     )
 
 
+class BatchSourceItemRequest(BaseModel):
+    source_url: str = Field(min_length=1, description="单个视频链接")
+    title: str = Field(default="", description="显示标题")
+    platform: str = Field(default="", description="bilibili|youtube|...")
+    index: int = Field(default=0, ge=0, description="来源中的顺序，从 1 开始")
+    duration_seconds: Optional[float] = Field(default=None, ge=0)
+    thumbnail: Optional[str] = Field(default=None)
+    external_id: str = Field(default="", description="平台侧 ID，如 bvid:p1 或 YouTube video id")
+
+
+class BatchSourceResolveRequest(BaseModel):
+    source: str = Field(min_length=1, max_length=20000, description="播放列表链接、多 P 链接或多链接文本")
+
+
+class BatchSourceImportRequest(BaseModel):
+    workspace_name: str = Field(default="", max_length=120)
+    kind: str = Field(default="note", pattern="^(note|replica)$")
+    source_type: str = Field(
+        default="multi_url",
+        pattern="^(multi_url|youtube_playlist|bilibili_multipart|bilibili_favorites|bilibili_uploader)$",
+    )
+    source_url: str = Field(default="", max_length=2000)
+    items: List[BatchSourceItemRequest] = Field(default_factory=list)
+    start: bool = Field(default=True, description="创建合集后是否立即启动每条笔记任务")
+    embed_frames: bool = Field(default=True)
+    image_mode: str = Field(default="vision")
+    frame_interval: int = Field(default=5, ge=1, le=120)
+    vision_model: str = Field(default="")
+    intent: str = Field(default="note")
+    replica_kind: str = Field(default="prompt")
+    note_media_kind: str = Field(default="video")
+    summary_template: str = Field(default="standard")
+    diarize: bool = Field(default=False)
+    user_notes: str = Field(default="", max_length=8000)
+
+
 class PreflightSaveRequest(BaseModel):
     """前置配置保存请求体（设计文档第 4 章）。"""
 
@@ -912,31 +964,13 @@ def _infer_upload_item_type(filename: str, content_type: Optional[str]) -> str:
 
 
 def _cover_thumbnail(rec: WorkspaceRecord) -> Optional[str]:
-    """从第一个 video item 的结果里提取封面缩略图路径，找不到返回 None。
-
-    按优先级尝试四个路径：
-      item.results.cover_thumbnail
-      item.results.frames[0].thumbnail
-      item.results.frames[0].frame_image_path
-      item.results.frames[0].frame_image
-    """
+    """从合集内第一个可用 item 缩略图提取合集封面，找不到返回 None。"""
     for item in rec.items:
-        r = item.results or {}
-        if r.get("cover_thumbnail"):
-            return str(r["cover_thumbnail"])
-        # item.results 未同步时，从 task store 回填 cover_thumbnail（与 create_summary 同思路）
-        for _tid in reversed(item.related_task_ids or []):
-            _t = _pipeline_runner.store.get(_tid)
-            if _t and _t.result and _t.result.get("cover_thumbnail"):
-                return str(_t.result["cover_thumbnail"])
-        if item.type != "video":
-            continue
-        frames = r.get("frames") or []
-        if frames and isinstance(frames[0], dict):
-            f0 = frames[0]
-            for key in ("thumbnail", "frame_image_path", "frame_image"):
-                if f0.get(key):
-                    return str(f0[key])
+        overlay = _sync_item_with_tasks(item) or {}
+        results = overlay.get("results") or item.results or {}
+        thumb = _item_thumbnail(item, results)
+        if thumb:
+            return thumb
     return None
 
 
@@ -1058,7 +1092,10 @@ def _enrich_workspace(rec: WorkspaceRecord) -> Dict[str, Any]:
         overlay = _sync_item_with_tasks(item_obj)
         if overlay:
             item_dict.update(overlay)
-        item_dict["primary_view"] = _compute_primary_view(item_obj, item_dict.get("results") or {})
+        results = item_dict.get("results") or {}
+        item_dict["thumbnail"] = _item_thumbnail(item_obj, results)
+        item_dict["primary_view"] = _compute_primary_view(item_obj, results)
+        item_dict["favorite"] = item_obj.item_id in rec.favorites
     d["current_step"] = _current_step(rec)
     d["items_count_by_type"] = _items_count_by_type(rec)
     d["cover_thumbnail"] = _cover_thumbnail(rec)
@@ -1169,6 +1206,467 @@ def _platform_prefix_from_url(url: str) -> str:
             return name
     parts = host.replace("www.", "").split(".")
     return parts[-2] if len(parts) >= 2 else host
+
+
+_BATCH_SOURCE_MAX_ITEMS = 300
+_BATCH_BVID_RE = re.compile(r"(BV[0-9A-Za-z]{8,})")
+_BATCH_HTTP_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/125.0.0.0 Safari/537.36"
+    ),
+    "Referer": "https://www.bilibili.com/",
+}
+
+
+def _extract_urls_for_batch(source: str) -> List[str]:
+    urls = [m.group(0).rstrip(").,，。；;") for m in _GENERIC_URL_RE.finditer(source or "")]
+    if not urls and _BILIBILI_BV_RE.match((source or "").strip()):
+        urls = [(source or "").strip()]
+    seen: set[str] = set()
+    unique: List[str] = []
+    for url in urls:
+        if url not in seen:
+            seen.add(url)
+            unique.append(url)
+    return unique[:_BATCH_SOURCE_MAX_ITEMS]
+
+
+def _validate_batch_network_url(raw: str) -> str:
+    """批量来源 URL 校验：保留 query，特别是 B 站多 P 的 p= 参数。"""
+    value = (raw or "").strip()
+    if not value:
+        raise HTTPException(status_code=400, detail="batch item url 不能为空")
+    if _BILIBILI_BV_RE.match(value):
+        value = f"https://www.bilibili.com/video/{value}"
+    else:
+        match = _GENERIC_URL_RE.search(value)
+        if match:
+            value = match.group(0).rstrip(").,，。；;")
+        if "://" not in value:
+            value = f"https://{value}"
+    parsed = urlparse(value)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise HTTPException(status_code=400, detail=f"invalid url: {raw}")
+    clean = f"{parsed.scheme}://{parsed.netloc}{parsed.path.rstrip('/')}"
+    if parsed.query:
+        clean += f"?{parsed.query}"
+    return clean
+
+
+def _batch_bvid_from_url(url: str) -> str:
+    match = _BATCH_BVID_RE.search(url or "")
+    return match.group(1) if match else ""
+
+
+def _bilibili_part_url(bvid: str, page: int) -> str:
+    page_num = max(1, int(page or 1))
+    return f"https://www.bilibili.com/video/{bvid}?p={page_num}"
+
+
+def _expand_b23_url(url: str) -> str:
+    if "b23.tv" not in (url or "").lower():
+        return url
+    try:
+        with httpx.Client(timeout=10.0, headers=_BATCH_HTTP_HEADERS, follow_redirects=True) as client:
+            resp = client.get(url)
+            resp.raise_for_status()
+            return str(resp.url)
+    except Exception:
+        return url
+
+
+def _resolve_bilibili_multipart_source(url: str) -> Dict[str, Any]:
+    bvid = _batch_bvid_from_url(url)
+    if not bvid:
+        raise HTTPException(status_code=400, detail="未识别到 B 站 BV 号")
+    api_url = "https://api.bilibili.com/x/web-interface/view"
+    try:
+        with httpx.Client(timeout=12.0, headers=_BATCH_HTTP_HEADERS, follow_redirects=True) as client:
+            resp = client.get(api_url, params={"bvid": bvid})
+            resp.raise_for_status()
+            payload = resp.json()
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"B 站分 P 信息获取失败: {exc}") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail="B 站分 P 信息返回格式异常") from exc
+
+    if int(payload.get("code") or 0) != 0:
+        msg = payload.get("message") or "B 站接口返回失败"
+        raise HTTPException(status_code=502, detail=str(msg))
+    data = payload.get("data") or {}
+    pages = data.get("pages") or []
+    title = str(data.get("title") or bvid)
+    cover = data.get("pic") or None
+    items: List[Dict[str, Any]] = []
+    if isinstance(pages, list) and pages:
+        for idx, page in enumerate(pages[:_BATCH_SOURCE_MAX_ITEMS], start=1):
+            if not isinstance(page, dict):
+                continue
+            page_num = int(page.get("page") or idx)
+            part = str(page.get("part") or f"P{page_num}")
+            display_title = part if part == title else f"{title} · P{page_num} {part}"
+            items.append({
+                "source_url": _bilibili_part_url(bvid, page_num),
+                "title": display_title,
+                "platform": "bilibili",
+                "index": page_num,
+                "duration_seconds": float(page.get("duration") or 0) or None,
+                "thumbnail": cover,
+                "external_id": f"{bvid}:p{page_num}",
+            })
+    if not items:
+        items.append({
+            "source_url": f"https://www.bilibili.com/video/{bvid}",
+            "title": title,
+            "platform": "bilibili",
+            "index": 1,
+            "duration_seconds": float(data.get("duration") or 0) or None,
+            "thumbnail": cover,
+            "external_id": bvid,
+        })
+    return {
+        "source_type": "bilibili_multipart",
+        "source_url": f"https://www.bilibili.com/video/{bvid}",
+        "title": title,
+        "items": items,
+        "meta": {"bvid": bvid, "part_count": len(items)},
+    }
+
+
+def _youtube_thumbnail(entry: Dict[str, Any]) -> Optional[str]:
+    thumb = entry.get("thumbnail")
+    if isinstance(thumb, str) and thumb:
+        return thumb
+    thumbs = entry.get("thumbnails")
+    if isinstance(thumbs, list):
+        for item in reversed(thumbs):
+            if isinstance(item, dict) and item.get("url"):
+                return str(item["url"])
+    return None
+
+
+def _normalize_remote_asset_url(value: Any) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    clean = value.strip()
+    if not clean:
+        return None
+    if clean.startswith("//"):
+        return f"https:{clean}"
+    return clean
+
+
+def _fetch_bilibili_video_brief(client: httpx.Client, bvid: str) -> Dict[str, Any]:
+    if not bvid:
+        return {}
+    try:
+        resp = client.get(
+            "https://api.bilibili.com/x/web-interface/view",
+            params={"bvid": bvid},
+        )
+        resp.raise_for_status()
+        payload = resp.json()
+    except Exception:
+        return {}
+    try:
+        code = int(payload.get("code") or 0)
+    except Exception:
+        code = -1
+    if code != 0:
+        return {}
+    data = payload.get("data") or {}
+    if not isinstance(data, dict):
+        return {}
+    owner = data.get("owner") if isinstance(data.get("owner"), dict) else {}
+    return {
+        "title": str(data.get("title") or "").strip(),
+        "thumbnail": _normalize_remote_asset_url(data.get("pic")),
+        "duration_seconds": float(data.get("duration") or 0) or None,
+        "uploader": str(owner.get("name") or "").strip(),
+    }
+
+
+def _is_youtube_playlist_url(url: str) -> bool:
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    if not any(host.endswith(h) for h in ("youtube.com", "youtu.be")):
+        return False
+    if parsed.path.rstrip("/") == "/playlist":
+        return True
+    return bool(parse_qs(parsed.query).get("list"))
+
+
+def _resolve_youtube_playlist_source(url: str) -> Dict[str, Any]:
+    try:
+        import yt_dlp  # type: ignore
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="yt-dlp 未安装，无法解析 YouTube 播放列表") from exc
+
+    opts = {
+        "extract_flat": "in_playlist",
+        "quiet": True,
+        "skip_download": True,
+        "ignoreerrors": True,
+        "nocheckcertificate": True,
+    }
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"YouTube 播放列表解析失败: {exc}") from exc
+
+    if not isinstance(info, dict):
+        raise HTTPException(status_code=502, detail="YouTube 播放列表返回格式异常")
+    entries = [entry for entry in (info.get("entries") or []) if isinstance(entry, dict)]
+    if not entries:
+        raise HTTPException(status_code=400, detail="未解析到播放列表视频")
+    title = str(info.get("title") or "YouTube 播放列表")
+    items: List[Dict[str, Any]] = []
+    for idx, entry in enumerate(entries[:_BATCH_SOURCE_MAX_ITEMS], start=1):
+        source_url = entry.get("webpage_url") or entry.get("url") or entry.get("id") or ""
+        source_url = str(source_url)
+        if source_url and not source_url.startswith(("http://", "https://")):
+            source_url = f"https://www.youtube.com/watch?v={source_url}"
+        if not source_url:
+            continue
+        items.append({
+            "source_url": _validate_batch_network_url(source_url),
+            "title": str(entry.get("title") or f"视频 {idx}"),
+            "platform": "youtube",
+            "index": int(entry.get("playlist_index") or idx),
+            "duration_seconds": float(entry.get("duration") or 0) or None,
+            "thumbnail": _youtube_thumbnail(entry),
+            "external_id": str(entry.get("id") or ""),
+        })
+    if not items:
+        raise HTTPException(status_code=400, detail="播放列表条目缺少可用视频链接")
+    return {
+        "source_type": "youtube_playlist",
+        "source_url": url,
+        "title": title,
+        "items": items,
+        "meta": {"playlist_id": str(info.get("id") or ""), "item_count": len(items)},
+    }
+
+
+def _flat_entry_url(entry: Dict[str, Any], platform: str) -> str:
+    raw = str(entry.get("webpage_url") or entry.get("url") or entry.get("id") or "").strip()
+    if not raw:
+        return ""
+    if raw.startswith("//"):
+        raw = f"https:{raw}"
+    if raw.startswith(("http://", "https://")):
+        return raw
+    if platform == "bilibili":
+        bvid = _batch_bvid_from_url(raw)
+        if bvid:
+            return f"https://www.bilibili.com/video/{bvid}"
+    if platform == "youtube":
+        return f"https://www.youtube.com/watch?v={raw}"
+    return raw
+
+
+def _resolve_ytdlp_collection_source(url: str, *, source_type: str, platform: str, fallback_title: str) -> Dict[str, Any]:
+    try:
+        import yt_dlp  # type: ignore
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="yt-dlp 未安装，无法解析批量来源") from exc
+
+    opts = {
+        "extract_flat": "in_playlist",
+        "quiet": True,
+        "skip_download": True,
+        "ignoreerrors": True,
+        "nocheckcertificate": True,
+        "playlistend": _BATCH_SOURCE_MAX_ITEMS,
+    }
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"批量来源解析失败: {exc}") from exc
+
+    if not isinstance(info, dict):
+        raise HTTPException(status_code=502, detail="批量来源返回格式异常")
+    entries = [entry for entry in (info.get("entries") or []) if isinstance(entry, dict)]
+    title = str(info.get("title") or fallback_title)
+    items: List[Dict[str, Any]] = []
+    bili_client: Optional[httpx.Client] = None
+    bili_brief_cache: Dict[str, Dict[str, Any]] = {}
+    if platform == "bilibili":
+        bili_client = httpx.Client(timeout=5.0, headers=_BATCH_HTTP_HEADERS, follow_redirects=True)
+    try:
+        for idx, entry in enumerate(entries[:_BATCH_SOURCE_MAX_ITEMS], start=1):
+            source_url = _flat_entry_url(entry, platform)
+            if not source_url:
+                continue
+            try:
+                source_url = _validate_batch_network_url(source_url)
+            except HTTPException:
+                continue
+            entry_id = str(entry.get("id") or "").strip()
+            bvid = _batch_bvid_from_url(source_url) or _batch_bvid_from_url(entry_id)
+            raw_title = str(entry.get("title") or "").strip()
+            thumbnail = _youtube_thumbnail(entry)
+            duration_seconds = float(entry.get("duration") or 0) or None
+            brief: Dict[str, Any] = {}
+            if bili_client and bvid and (not raw_title or raw_title == bvid or not thumbnail or not duration_seconds):
+                brief = bili_brief_cache.get(bvid) or _fetch_bilibili_video_brief(bili_client, bvid)
+                bili_brief_cache[bvid] = brief
+            display_title = raw_title
+            if not display_title or display_title == bvid:
+                display_title = str(brief.get("title") or "").strip()
+            if not thumbnail:
+                thumbnail = _normalize_remote_asset_url(brief.get("thumbnail"))
+            if not duration_seconds:
+                duration_seconds = brief.get("duration_seconds")
+            items.append({
+                "source_url": source_url,
+                "title": display_title or entry_id or bvid or f"视频 {idx}",
+                "platform": platform,
+                "index": int(entry.get("playlist_index") or idx),
+                "duration_seconds": duration_seconds,
+                "thumbnail": thumbnail,
+                "external_id": entry_id or bvid,
+            })
+    finally:
+        if bili_client is not None:
+            bili_client.close()
+    if not items:
+        raise HTTPException(status_code=400, detail="未解析到可选择的视频条目")
+    return {
+        "source_type": source_type,
+        "source_url": url,
+        "title": title,
+        "items": items,
+        "meta": {"item_count": len(items), "extractor": str(info.get("extractor_key") or "")},
+    }
+
+
+def _classify_bilibili_collection_url(url: str) -> Optional[str]:
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    path = parsed.path.lower()
+    query = parse_qs(parsed.query)
+    if "space.bilibili.com" in host:
+        return "bilibili_uploader"
+    if any(part in path for part in ("favlist", "medialist", "collectiondetail", "seriesdetail")):
+        return "bilibili_favorites"
+    if query.get("fid") or query.get("sid"):
+        return "bilibili_favorites"
+    return None
+
+
+def _resolve_multi_url_source(urls: List[str], *, title: str = "批量链接合集") -> Dict[str, Any]:
+    items: List[Dict[str, Any]] = []
+    for idx, raw_url in enumerate(urls[:_BATCH_SOURCE_MAX_ITEMS], start=1):
+        url = _validate_batch_network_url(raw_url)
+        items.append({
+            "source_url": url,
+            "title": _derive_item_name(url),
+            "platform": _platform_prefix_from_url(url),
+            "index": idx,
+            "duration_seconds": None,
+            "thumbnail": None,
+            "external_id": "",
+        })
+    if not items:
+        raise HTTPException(status_code=400, detail="未识别到可导入链接")
+    return {
+        "source_type": "multi_url",
+        "source_url": urls[0] if len(urls) == 1 else "",
+        "title": title,
+        "items": items,
+        "meta": {"item_count": len(items)},
+    }
+
+
+def _resolve_batch_source(source: str) -> Dict[str, Any]:
+    raw = (source or "").strip()
+    urls = _extract_urls_for_batch(raw)
+    if len(urls) > 1:
+        return _resolve_multi_url_source(urls)
+
+    url = _validate_batch_network_url(urls[0] if urls else raw)
+    url = _expand_b23_url(url)
+    platform = _platform_prefix_from_url(url)
+    if platform == "youtube" and _is_youtube_playlist_url(url):
+        return _resolve_youtube_playlist_source(url)
+    if platform == "bilibili":
+        collection_type = _classify_bilibili_collection_url(url)
+        if collection_type:
+            fallback = "UP 主投稿合集" if collection_type == "bilibili_uploader" else "B 站视频合集"
+            return _resolve_ytdlp_collection_source(
+                url,
+                source_type=collection_type,
+                platform="bilibili",
+                fallback_title=fallback,
+            )
+    if platform == "bilibili" and _batch_bvid_from_url(url):
+        return _resolve_bilibili_multipart_source(url)
+    return _resolve_multi_url_source([url])
+
+
+def _inject_active_chat_provider(payload: Dict[str, Any]) -> None:
+    try:
+        settings = load_settings()
+        for provider in settings.providers:
+            if not provider.enabled or not provider.api_key.strip():
+                continue
+            if "chat" in provider.capabilities:
+                payload["api_key"] = provider.api_key
+                if hasattr(provider, "default_models") and provider.default_models:
+                    payload["text_model"] = provider.default_models.get("chat", "")
+                break
+    except Exception:
+        pass
+
+
+def _create_batch_note_task(
+    workspace_id: str,
+    item: WorkspaceItem,
+    req: BatchSourceImportRequest,
+) -> TaskRecord:
+    batch_meta = (item.results or {}).get("batch_source") if isinstance(item.results, dict) else {}
+    batch_meta = batch_meta if isinstance(batch_meta, dict) else {}
+    payload: Dict[str, Any] = {
+        "url": item.source_value,
+        "title": item.name,
+        "video_title": item.name,
+        "workspace_id": workspace_id,
+        "item_id": item.item_id,
+        "preflight": {
+            "embed_frames": req.embed_frames,
+            "image_mode": req.image_mode,
+            "frame_prompt": {
+                "mode": "interval",
+                "interval_sec": req.frame_interval,
+            },
+            "intent": req.intent or "note",
+        },
+        "intent": req.intent or "note",
+        "replica_kind": req.replica_kind or "prompt",
+        "note_media_kind": req.note_media_kind or "video",
+        "source_type": "link",
+        "kind_hint": item.type,
+        "summary_template": req.summary_template or "standard",
+        "diarize": req.diarize,
+        "batch_source": {
+            "source_type": req.source_type,
+            "source_url": req.source_url,
+            "workspace_id": workspace_id,
+            "index": batch_meta.get("index"),
+            "total": len(req.items),
+        },
+    }
+    if req.vision_model.strip():
+        payload["vision_model"] = req.vision_model.strip()
+    if req.user_notes.strip():
+        payload["user_notes"] = req.user_notes.strip()
+    _inject_active_chat_provider(payload)
+    return _pipeline_runner.create_task(workspace_id, "note", payload)
 
 
 @router.post("/auto-create")
@@ -1587,6 +2085,7 @@ def get_library(include_trashed: bool = False) -> Dict[str, Any]:
                 },
                 "primary_task_status": _item_primary_task_status(item),
                 "preflight": item.preflight.to_dict() if hasattr(item, 'preflight') else {},
+                "tags": item.tags or {},
                 "uploader": str(results.get("video_uploader") or "") or None,
                 "has_subtitle": bool(results.get("subtitle_paths")),
                 "has_chapters": bool(results.get("chapters") or (results.get("av_synthesis") or {}).get("chapters")),
@@ -1681,6 +2180,119 @@ def batch_add_items_to_workspace(req: BatchAddToWorkspaceRequest) -> Dict[str, A
         "added_ids": added,
         "skipped_ids": skipped,
         "failures": failed,
+    }
+
+
+@router.post("/batch-sources/resolve")
+def resolve_batch_source(req: BatchSourceResolveRequest) -> Dict[str, Any]:
+    """解析批量来源：B 站多 P / YouTube 播放列表 / 多链接文本。"""
+    return _resolve_batch_source(req.source)
+
+
+@router.post("/batch-sources/import")
+def import_batch_source(req: BatchSourceImportRequest) -> Dict[str, Any]:
+    """把解析后的批量来源导入为新合集，并可立即启动每条笔记任务。"""
+    if not req.items:
+        raise HTTPException(status_code=400, detail="items 不能为空")
+    if len(req.items) > _BATCH_SOURCE_MAX_ITEMS:
+        raise HTTPException(status_code=400, detail=f"一次最多导入 {_BATCH_SOURCE_MAX_ITEMS} 条")
+
+    now = datetime.now(timezone.utc).isoformat()
+    first_title = (req.items[0].title or "").strip()
+    workspace_name = (
+        req.workspace_name.strip()
+        or (f"批量合集 · {first_title}" if first_title else "")
+        or f"批量合集 · {datetime.now().strftime('%m%d-%H%M')}"
+    )
+    if len(workspace_name) > 120:
+        workspace_name = workspace_name[:120].rstrip()
+    workspace_id = str(uuid.uuid4())
+    items: List[WorkspaceItem] = []
+    intent = req.intent or ("replica" if req.kind == "replica" else "note")
+
+    for idx, entry in enumerate(req.items, start=1):
+        url = _validate_batch_network_url(entry.source_url)
+        title = (entry.title or "").strip() or _derive_item_name(url)
+        thumb = (entry.thumbnail or "").strip() or None
+        platform = (entry.platform or "").strip() or _platform_prefix_from_url(url)
+        item = WorkspaceItem(
+            item_id=str(uuid.uuid4()),
+            type=ItemType.VIDEO.value,
+            source="url",
+            source_value=url,
+            name=title,
+            status=ItemStatus.PENDING.value,
+            preflight=PreflightConfig(
+                intent=intent,
+                tasks={
+                    "summary": {
+                        "embed_frames": req.embed_frames,
+                        "summary_template": req.summary_template,
+                        "diarize": req.diarize,
+                    },
+                    **({"replica_kind": req.replica_kind} if req.kind == "replica" else {}),
+                },
+            ),
+            results={
+                "video_title": title,
+                "video_thumbnail_url": thumb,
+                "cover_thumbnail": thumb,
+                "duration_sec": entry.duration_seconds,
+                "default_summary_template": req.summary_template,
+                "batch_source": {
+                    "source_type": req.source_type,
+                    "source_url": req.source_url,
+                    "platform": platform,
+                    "index": entry.index or idx,
+                    "external_id": entry.external_id,
+                },
+            },
+            tags={
+                "custom_tags": [tag for tag in ["批量导入", platform, "视频合集"] if tag],
+            },
+        )
+        items.append(item)
+
+    rec = WorkspaceRecord(
+        workspace_id=workspace_id,
+        name=workspace_name,
+        status=WorkspaceStatus.PROCESSING.value if req.start else WorkspaceStatus.ACTIVE.value,
+        kind=req.kind,
+        source=req.source_type,
+        source_meta={
+            "source_type": req.source_type,
+            "source_url": req.source_url,
+            "items_total": len(items),
+            "imported_at": now,
+        },
+        items=items,
+    )
+    rec = _store.create(rec)
+
+    tasks: List[Dict[str, Any]] = []
+    if req.start:
+        for item in list(rec.items):
+            try:
+                task_rec = _create_batch_note_task(rec.workspace_id, item, req)
+            except ValueError as err:
+                raise HTTPException(status_code=409, detail=str(err)) from err
+            rec = _store.update_item(
+                rec.workspace_id,
+                item.item_id,
+                related_task_ids=list(item.related_task_ids) + [task_rec.task_id],
+                status=ItemStatus.PROCESSING.value,
+            )
+            tasks.append({
+                "task_id": task_rec.task_id,
+                "item_id": item.item_id,
+                "item_type": item.type,
+            })
+
+    latest = _store.get(rec.workspace_id) or rec
+    return {
+        "workspace": _enrich_workspace(latest),
+        "items_added": len(items),
+        "tasks": tasks,
     }
 
 
@@ -1916,10 +2528,21 @@ async def upload_item(
 
 @router.delete("/{workspace_id}/items/{item_id}")
 def remove_item(workspace_id: str, item_id: str) -> Dict[str, Any]:
+    # 1-B：删 item 前先取出 related_task_ids，删除后同步清理 task_store
+    item = None
+    ws = _store.get(workspace_id)
+    if ws is not None:
+        item = next((it for it in ws.items if it.item_id == item_id), None)
+    related_tids = list(item.related_task_ids) if item else []
     try:
         rec = _store.remove_item(workspace_id, item_id)
     except KeyError as err:
         raise HTTPException(status_code=404, detail=str(err)) from err
+    for tid in related_tids:
+        try:
+            _pipeline_runner.store.delete(tid)
+        except Exception:
+            pass  # 单个删除失败不阻塞主流程
     return rec.to_dict()
 
 

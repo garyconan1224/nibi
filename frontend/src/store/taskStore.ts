@@ -16,6 +16,7 @@ interface TaskStoreState {
   setTasks: (tasks: TaskRecord[]) => void
   addTask: (task: TaskRecord) => void
   removeTask: (taskId: string) => void
+  removeByProject: (projectId: string) => void
   updateTask: (taskId: string, task: Partial<TaskRecord>) => void
   setCurrentTask: (taskId: string | null) => void
   setIsPolling: (isPolling: boolean) => void
@@ -117,6 +118,12 @@ export const useTaskStore = create<TaskStoreState>()(
             ? state.hiddenTaskIds
             : [...state.hiddenTaskIds, taskId],
           tasks: state.tasks.filter((t) => t.task_id !== taskId),
+        })),
+
+      // 1-C：删除合集/笔记后即时清空该 project 关联的所有任务，不等 5s 轮询
+      removeByProject: (projectId) =>
+        set((state) => ({
+          tasks: state.tasks.filter((t) => t.project_id !== projectId),
         })),
 
       updateTask: (taskId, updates) =>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Pencil, Trash2, Copy, Plus, X } from 'lucide-react'
+import { Pencil, RotateCcw, Trash2, Copy, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,23 +13,33 @@ import {
   updateTemplate,
   deleteTemplate,
   duplicateTemplate,
+  resetTemplate,
 } from '@/services/templates'
 
 type ModalMode = 'closed' | 'create' | 'edit'
 
 const CATEGORY_META: Record<TemplateCategory, { label: string; desc: string }> = {
-  video: {
-    label: '视频模板',
-    desc: '自定义视频类型模板，在分析时与内置 6 类一起出现在 Preflight 选择中',
-  },
-  text: {
-    label: '文字模板',
-    desc: '自定义文字分析模板，覆盖摘要/要点/金句/改写/联想等任务',
-  },
+  video: { label: '旧视频分类', desc: '兼容旧视频分类模板。新总结请使用下面的风格模板。' },
+  text: { label: '旧文字模板', desc: '兼容旧文字模板。新总结请使用下面的风格模板。' },
+  style_video_with_frames: { label: '视频笔记（带图）', desc: '视频转写 + 关键帧配图的真实总结提示词。' },
+  style_video_text_only: { label: '视频笔记（不带图）', desc: '只基于视频转写生成纯文本笔记的提示词。' },
+  style_audio: { label: '音频笔记', desc: '音频转写、章节整理、会议/播客等风格提示词。' },
+  style_image_text: { label: '图文笔记', desc: '图片、OCR、图文内容总结的提示词。' },
+  style_replica: { label: '复刻提示词', desc: '内容复刻、结构拆解、创作参考提示词。' },
+  style_text: { label: '文本 / 网页', desc: '网页、长文本、粘贴文本总结提示词。' },
 }
 
+const STYLE_CATEGORIES: TemplateCategory[] = [
+  'style_video_with_frames',
+  'style_video_text_only',
+  'style_audio',
+  'style_image_text',
+  'style_replica',
+  'style_text',
+]
+
 export default function VideoTemplatesPage() {
-  const [category, setCategory] = useState<TemplateCategory>('video')
+  const [category, setCategory] = useState<TemplateCategory>('style_video_with_frames')
   const [templates, setTemplates] = useState<VideoTemplateItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -105,7 +115,7 @@ export default function VideoTemplatesPage() {
         await createTemplate({ name, prompt, category })
         toast.success(`模板「${name}」已创建`)
       } else {
-        await updateTemplate(editingId, { name, prompt })
+        await updateTemplate(editingId, { name, prompt, category })
         toast.success(`模板「${name}」已更新`)
       }
       useTemplateStore.getState().invalidate(category)
@@ -147,6 +157,21 @@ export default function VideoTemplatesPage() {
     }
   }
 
+  const handleReset = async (t: VideoTemplateItem) => {
+    if (!confirm(`确定将「${t.name}」恢复为默认提示词？`)) return
+    setBusyId(t.template_id)
+    try {
+      await resetTemplate(t.template_id)
+      useTemplateStore.getState().invalidate(category)
+      toast.success(`「${t.name}」已恢复默认`)
+      await reload()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '重置失败')
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   const meta = CATEGORY_META[category]
 
   return (
@@ -158,10 +183,11 @@ export default function VideoTemplatesPage() {
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
-            <TabsList>
-              <TabsTrigger value="video">视频模板</TabsTrigger>
-              <TabsTrigger value="text">文字模板</TabsTrigger>
-            </TabsList>
+              <TabsList className="flex flex-wrap">
+                {STYLE_CATEGORIES.map((cat) => (
+                  <TabsTrigger key={cat} value={cat}>{CATEGORY_META[cat].label}</TabsTrigger>
+                ))}
+              </TabsList>
             <p className="text-sm text-muted-foreground mt-2">{meta.desc}</p>
           </div>
           <Button size="sm" onClick={openCreate}>
@@ -197,7 +223,7 @@ export default function VideoTemplatesPage() {
                         : 'bg-green-100 text-green-700'
                     }`}
                   >
-                    {t.is_builtin ? '内置' : '自定义'}
+                    {t.is_builtin ? (t.overridden ? '内置已改' : '内置') : '自定义'}
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground truncate max-w-lg">
@@ -206,48 +232,38 @@ export default function VideoTemplatesPage() {
                 </p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7"
+                  onClick={() => openEdit(t)}
+                  disabled={busyId === t.template_id}
+                  title={t.is_builtin ? '编辑内置风格覆盖' : '编辑'}
+                >
+                  <Pencil className="size-3.5" />
+                </Button>
                 {t.is_builtin ? (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-7"
-                      disabled
-                      title="内置模板不可编辑"
-                    >
-                      <Pencil className="size-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-7"
-                      disabled
-                      title="内置模板不可删除"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  </>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7"
+                    onClick={() => handleReset(t)}
+                    disabled={busyId === t.template_id || !t.overridden}
+                    title="重置默认"
+                  >
+                    <RotateCcw className="size-3.5" />
+                  </Button>
                 ) : (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-7"
-                      onClick={() => openEdit(t)}
-                      disabled={busyId === t.template_id}
-                    >
-                      <Pencil className="size-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-7"
-                      onClick={() => handleDelete(t)}
-                      disabled={busyId === t.template_id}
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
-                  </>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7"
+                    onClick={() => handleDelete(t)}
+                    disabled={busyId === t.template_id}
+                    title="删除"
+                  >
+                    <Trash2 className="size-3.5" />
+                  </Button>
                 )}
                 <Button
                   variant="ghost"
@@ -274,8 +290,8 @@ export default function VideoTemplatesPage() {
               <div className="flex items-center justify-between px-5 py-4 border-b border-border">
                 <h3 className="font-semibold">
                   {modalMode === 'create'
-                    ? `新建${CATEGORY_META[category].label.replace('模板', '')}模板`
-                    : `编辑${CATEGORY_META[category].label.replace('模板', '')}模板`}
+                    ? `新建${CATEGORY_META[category].label}风格`
+                    : `编辑${CATEGORY_META[category].label}风格`}
                 </h3>
                 <Button variant="ghost" size="icon" className="size-7" onClick={closeModal}>
                   <X className="size-4" />
@@ -289,27 +305,25 @@ export default function VideoTemplatesPage() {
                   <Input
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
-                    placeholder="例：学术讲座"
+                    placeholder="例：技术教程精读"
                     maxLength={60}
                   />
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1.5 block">
-                    System Prompt
+                    提示词
                   </label>
                   <Textarea
                     value={formPrompt}
                     onChange={(e) => setFormPrompt(e.target.value)}
                     placeholder={
-                      category === 'text'
-                        ? '请对以下文本进行分析：\n1. 核心摘要\n2. 关键要点\n3. 金句摘录'
-                        : '这是一段学术讲座类视频的转写文本。请按以下结构输出总结：\n1. 一句话摘要（30字以内）\n2. 核心论点列表\n3. 关键引用\n4. 研究启示'
+                      '写清楚这个风格的角色、结构、输出要求。如果需要完全控制用户提示词，可包含 {transcript} 占位符。'
                     }
                     rows={8}
-                    maxLength={5000}
+                    maxLength={20000}
                   />
                   <p className="text-[11px] text-muted-foreground mt-1">
-                    {formPrompt.length}/5000
+                    {formPrompt.length}/20000
                   </p>
                 </div>
               </div>
