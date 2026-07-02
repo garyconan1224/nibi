@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Trash2, Plus, Inbox, Filter, Sparkles, FolderInput } from 'lucide-react'
+import { Trash2, Plus, Inbox, Filter, FolderInput } from 'lucide-react'
 import { toast } from 'sonner'
 import { fetchLibrary, deleteItem, batchDeleteItems, batchAddItemsToWorkspace, type LibraryItem, type LibraryResponse, type LibraryWorkspace } from '@/services/library'
-import { createWorkspace, deleteWorkspace, startItemPipeline, updateWorkspace, favoriteItem, unfavoriteItem } from '@/services/workspaces'
+import { createWorkspace, deleteWorkspace, updateWorkspace, favoriteItem, unfavoriteItem } from '@/services/workspaces'
 import { useLibraryStore, type SortBy } from '@/store/libraryStore'
 import { useTaskStore } from '@/store/taskStore'
 import { FilterChips } from './FilterChips'
@@ -164,7 +164,6 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
   const [selecting, setSelecting] = useState(false)
   const [selectedSet, setSelectedSet] = useState<Set<string>>(new Set())
   const [deleting, setDeleting] = useState(false)
-  const [analyzing, setAnalyzing] = useState(false)
   const [addingToCollection, setAddingToCollection] = useState(false)
   const [creatingWorkspace, setCreatingWorkspace] = useState(false)
   const [collectionTargetId, setCollectionTargetId] = useState('')
@@ -429,35 +428,6 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
     }
   }, [selectedSet, load])
 
-  // I2.1: 批量分析（仅图片）— 对选中 image 素材循环调 start，复用已存 preflight + 浮动队列
-  const handleBatchAnalyze = useCallback(async () => {
-    if (selectedSet.size === 0) return
-    const imageItems = visibleItems.filter(
-      (it) => it.type === 'image' && selectedSet.has(selectionKey(it.workspace_id, it.item_id)),
-    )
-    if (imageItems.length === 0) {
-      toast.error('请选择图片笔记（仅图片支持批量分析）')
-      return
-    }
-    setAnalyzing(true)
-    try {
-      let ok = 0
-      for (const it of imageItems) {
-        try {
-          await startItemPipeline(it.workspace_id, it.item_id)
-          ok++
-        } catch {
-          /* 单个失败不中断其余 */
-        }
-      }
-      toast.success(`已触发 ${ok}/${imageItems.length} 个图片分析，进度见右上角任务队列`)
-      setSelectedSet(new Set())
-      load()
-    } finally {
-      setAnalyzing(false)
-    }
-  }, [selectedSet, visibleItems, load])
-
   const handleBatchAddToCollection = useCallback(async () => {
     if (!collectionTargetId) {
       toast.error('请先选择目标合集')
@@ -621,15 +591,6 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
                   >
                     <Trash2 size={13} />
                     删除 {selectedSet.size > 0 ? `(${selectedSet.size})` : ''}
-                  </button>
-                  <button
-                    className={`btn btn-sm${selectedSet.size > 0 ? ' btn-secondary' : ''}`}
-                    disabled={analyzing || selectedSet.size === 0}
-                    onClick={handleBatchAnalyze}
-                    title="仅对选中的图片笔记触发分析（按已存配置），进度见右上角任务队列"
-                  >
-                    <Sparkles size={13} />
-                    {analyzing ? '分析中…' : '批量分析'}
                   </button>
                   {kind && collectionWorkspaces.length > 0 && (
                     <div className="batch-collection-control">
