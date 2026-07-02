@@ -4960,6 +4960,7 @@ def _strip_frontmatter(md: str) -> str:
 
 class MergeRequest(BaseModel):
     item_ids: List[str]
+    style: str = "综合大纲"  # 融合风格：综合大纲 / 知识图谱 / 精华摘要
 
 
 @router.post("/{workspace_id}/merge")
@@ -4993,19 +4994,15 @@ def merge_notes(workspace_id: str, req: MergeRequest) -> Dict[str, Any]:
 
     # 调用 LLM 合成综合笔记
     combined = "\n\n---\n\n".join(notes_to_merge)
-    prompt = f"""你是一个内容整合助手。请阅读以下多篇素材笔记，将它们融合成一篇**连贯、有条理的综合笔记**。
 
-要求：
-1. 提炼各素材的共同主题和关键信息
-2. 按逻辑结构组织（如：概述、要点、对比分析、总结）
-3. 保留重要细节，删除冗余
-4. 用 Markdown 格式输出（h2/h3 + 正文 + 列表）
-
-素材笔记如下：
-
-{combined}
-
-请输出综合笔记的 Markdown 正文（不要包含 frontmatter）："""
+    # 按风格选择不同的 prompt
+    style_prompts = {
+        "综合大纲": "你是一个内容整合助手。请阅读以下多篇素材笔记，将它们融合成一篇**连贯、有条理的综合笔记**。\n\n要求：\n1. 提炼各素材的共同主题和关键信息\n2. 按逻辑结构组织（如：概述、要点、对比分析、总结）\n3. 保留重要细节，删除冗余\n4. 用 Markdown 格式输出（h2/h3 + 正文 + 列表）",
+        "知识图谱": "你是一个知识整理助手。请阅读以下多篇素材笔记，提取其中的**核心概念和它们之间的关系**，组织成知识图谱式的笔记。\n\n要求：\n1. 识别所有关键概念（人物、术语、理论、事件等）\n2. 标注概念之间的关系（因果、包含、对比、时序等）\n3. 用 Markdown 格式输出，使用层级标题和列表呈现知识结构\n4. 在末尾附一个「概念关系总览」小节，用列表列出关键关系",
+        "精华摘要": "你是一个信息提炼助手。请阅读以下多篇素材笔记，提取每篇的**核心精华**，合并成一份精炼摘要。\n\n要求：\n1. 每个素材提炼 2-4 条最关键的要点\n2. 合并重复观点，按主题归类\n3. 使用简洁的要点列表 + 一句话总结\n4. 全文不超过 1500 字，用 Markdown 格式输出",
+    }
+    prompt = style_prompts.get(req.style, style_prompts["综合大纲"])
+    prompt = prompt + f"\n\n素材笔记如下：\n\n{combined}\n\n请输出综合笔记的 Markdown 正文（不要包含 frontmatter）："
 
     try:
         from backend.app.services.av_synthesis.llm import _call_llm  # noqa: PLC0415
@@ -5024,7 +5021,7 @@ def merge_notes(workspace_id: str, req: MergeRequest) -> Dict[str, Any]:
 
     # 存入合集级载体（不新增 item，避免污染素材网格）
     merged = MergedNote(
-        title="综合笔记",
+        title=f"{req.style} - 综合笔记",
         item_ids=req.item_ids,
         content_md=merged_md,
     )
