@@ -57,6 +57,14 @@ export async function cancelPipelineTask(taskId: string): Promise<void> {
 }
 
 /**
+ * 删除已终结的 pipeline 任务记录
+ * DELETE /pipeline/tasks/{task_id}
+ */
+export async function deletePipelineTask(taskId: string): Promise<void> {
+  await http.delete(`${PIPELINE_TASKS_URL}/${taskId}`)
+}
+
+/**
  * 重试失败的 pipeline 任务
  * POST /pipeline/tasks/{task_id}/retry
  *

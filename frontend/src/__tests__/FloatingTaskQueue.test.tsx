@@ -4,8 +4,9 @@ import { FloatingTaskQueue } from '@/components/FloatingTaskQueue'
 import { useTaskStore } from '@/store/taskStore'
 import type { TaskRecord } from '@/types/task'
 
-const { cancelMock, navigateMock, retryMock, routeState } = vi.hoisted(() => ({
+const { cancelMock, deleteMock, navigateMock, retryMock, routeState } = vi.hoisted(() => ({
   cancelMock: vi.fn(),
+  deleteMock: vi.fn(),
   navigateMock: vi.fn(),
   retryMock: vi.fn(),
   routeState: { pathname: '/' },
@@ -22,6 +23,7 @@ vi.mock('@/hooks/usePipelineTasks', () => ({
 
 vi.mock('@/services/pipeline', () => ({
   cancelPipelineTask: cancelMock,
+  deletePipelineTask: deleteMock,
   retryPipelineTask: retryMock,
 }))
 
@@ -54,8 +56,10 @@ describe('FloatingTaskQueue v2', () => {
     routeState.pathname = '/'
     navigateMock.mockReset()
     cancelMock.mockReset()
+    deleteMock.mockReset()
     retryMock.mockReset()
     cancelMock.mockResolvedValue({})
+    deleteMock.mockResolvedValue({})
     retryMock.mockResolvedValue(makeTask({ task_id: 'task-retry', status: 'PENDING' }))
     useTaskStore.setState({
       tasks: [],
@@ -167,7 +171,7 @@ describe('FloatingTaskQueue v2', () => {
     })
   })
 
-  it('FAILED 任务支持重试和本地隐藏', async () => {
+  it('FAILED 任务支持重试和后端清除', async () => {
     useTaskStore.setState({
       tasks: [makeTask({ task_id: 'task-failed', status: 'FAILED', payload: { title: 'Failed task' } })],
     })
@@ -178,9 +182,42 @@ describe('FloatingTaskQueue v2', () => {
 
     await waitFor(() => expect(retryMock).toHaveBeenCalledWith('task-failed'))
 
-    fireEvent.click(screen.getByRole('button', { name: '隐藏失败任务 Failed task' }))
+    fireEvent.click(screen.getByRole('button', { name: '清除失败任务 Failed task' }))
 
     expect(useTaskStore.getState().tasks.find((t) => t.task_id === 'task-failed')).toBeUndefined()
+    await waitFor(() => expect(deleteMock).toHaveBeenCalledWith('task-failed'))
+  })
+
+  it('清除 FAILED 分组时会删除同一行里的所有失败任务', async () => {
+    useTaskStore.setState({
+      tasks: [
+        makeTask({
+          task_id: 'note-failed-a',
+          project_id: 'workspace-1',
+          task_type: 'note',
+          payload: { url: 'https://example.com/same-video', title: 'Failed group' },
+          status: 'FAILED',
+        }),
+        makeTask({
+          task_id: 'note-failed-b',
+          project_id: 'workspace-1',
+          task_type: 'note',
+          payload: { url: 'https://example.com/same-video', title: 'Failed group' },
+          status: 'FAILED',
+          updated_at: '2026-05-25T00:01:00.000Z',
+        }),
+      ],
+    })
+
+    render(<FloatingTaskQueue />)
+    fireEvent.click(screen.getByRole('button', { name: /任务/ }))
+    fireEvent.click(screen.getByRole('button', { name: '清除失败任务 Failed group' }))
+
+    expect(useTaskStore.getState().tasks).toHaveLength(0)
+    await waitFor(() => {
+      expect(deleteMock).toHaveBeenCalledWith('note-failed-a')
+      expect(deleteMock).toHaveBeenCalledWith('note-failed-b')
+    })
   })
 
   it('当前 processing 路由任务显示查看中标记', () => {

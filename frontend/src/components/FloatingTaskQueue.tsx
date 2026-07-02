@@ -3,8 +3,10 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { RotateCcw, X } from 'lucide-react'
 import { useTaskStore } from '@/store/taskStore'
 import { usePipelineTasks } from '@/hooks/usePipelineTasks'
+import { deletePipelineTask } from '@/services/pipeline'
 import { PROCESSING_STAGES, isTaskTerminal, type TaskRecord } from '@/types/task'
 import { categorizeError } from '@/lib/errorCategories'
+import { toast } from 'sonner'
 import './FloatingTaskQueue.css'
 
 /* ── helpers ── */
@@ -22,6 +24,7 @@ interface QueueRow {
   stageFull?: string
   workspaceId: string
   itemId?: string
+  failedTaskIds: string[]
 }
 
 function displayState(status: string): DisplayState {
@@ -161,13 +164,14 @@ export function FloatingTaskQueue() {
         groupKey,
         task: representative,
         progress: weightedProgress,
+        failedTaskIds: group.filter((t) => t.status === 'FAILED').map((t) => t.task_id),
       }
     })
 
     // 按更新时间排序；批量导入时每个视频都应显示为独立子任务。
     return representativeTasks
       .sort((a, b) => timeOf(b.task.updated_at) - timeOf(a.task.updated_at))
-      .map(({ groupKey, task: t, progress }) => {
+      .map(({ groupKey, task: t, progress, failedTaskIds }) => {
         const state = displayState(t.status)
         const displayProgress = Math.round(progress * 100)
         const payload = (t.payload ?? {}) as Record<string, unknown>
@@ -182,6 +186,7 @@ export function FloatingTaskQueue() {
           stageFull: t.error || undefined,
           workspaceId: t.project_id,
           itemId: payload?.item_id as string | undefined,
+          failedTaskIds,
         }
       })
   }, [tasks])
@@ -215,9 +220,18 @@ export function FloatingTaskQueue() {
     setOpen(false)
   }
 
-  const handleCancelOrHide = (row: QueueRow) => {
+  const handleCancelOrHide = async (row: QueueRow) => {
     if (row.status === 'FAILED') {
-      removeTask(row.id)
+      const taskIds = row.failedTaskIds.length > 0 ? row.failedTaskIds : [row.id]
+      for (const taskId of taskIds) {
+        removeTask(taskId)
+      }
+      const results = await Promise.allSettled(taskIds.map((taskId) => deletePipelineTask(taskId)))
+      const failedDeletes = results.filter((result) => result.status === 'rejected')
+      if (failedDeletes.length > 0) {
+        console.error('[FloatingTaskQueue] delete failed tasks failed:', failedDeletes)
+        toast.error('清除历史任务失败，请稍后再试')
+      }
       return
     }
     void cancelTask(row.id)
@@ -435,11 +449,11 @@ export function FloatingTaskQueue() {
                     )}
                     <button
                       className="btn btn-ghost"
-                      aria-label={r.status === 'FAILED' ? `隐藏失败任务 ${r.title}` : `取消任务 ${r.title}`}
+                      aria-label={r.status === 'FAILED' ? `清除失败任务 ${r.title}` : `取消任务 ${r.title}`}
                       style={{ height: 20, padding: '0 7px', fontSize: 10, color: 'var(--ink-3)' }}
                       onClick={(e) => {
                         e.stopPropagation()
-                        handleCancelOrHide(r)
+                        void handleCancelOrHide(r)
                       }}
                     >
                       <X size={10} />
