@@ -1,15 +1,10 @@
-/** 10 个 Tab 的 id */
+/** 6 个 Tab 的 id */
 export type TabId =
   | 'materials'
-  | 'queue'
   | 'favs'
-  | 'history'
-  | 'tags'
   | 'chat'
-  | 'knowledgeQA'
   | 'export'
   | 'style'
-  | 'compare'
 
 /** 设计稿中素材卡片的状态 */
 export type MaterialState = 'done' | 'running' | 'queued' | 'error'

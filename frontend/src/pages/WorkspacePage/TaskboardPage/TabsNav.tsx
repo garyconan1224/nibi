@@ -1,29 +1,19 @@
 import {
   Layers,
-  List,
   Star,
-  Clock,
-  Tag,
   Sparkles,
-  ArrowLeftRight,
   Archive,
   MessageCircle,
-  BookOpen,
 } from 'lucide-react'
 import type { TabDef, TabId } from './types'
 
-/** 9 个 Tab 的静态定义（icon + 中英文 label）。count 由外部注入。 */
+/** 6 个 Tab 的静态定义（icon + 中英文 label）。count 由外部注入。 */
 const TAB_DEFS: TabDef[] = [
   { id: 'materials', label: '素材', en: 'Materials', icon: Layers, count: null },
-  { id: 'queue', label: '队列', en: 'Queue', icon: List, count: null },
   { id: 'favs', label: '收藏夹', en: 'Favorites', icon: Star, count: null },
-  { id: 'history', label: '版本', en: 'Versions', icon: Clock, count: null },
-  { id: 'tags', label: '标签库', en: 'Tag Library', icon: Tag, count: null },
   { id: 'chat', label: 'AI 对话', en: 'Task Chat', icon: MessageCircle, count: null },
-  { id: 'knowledgeQA', label: '知识库', en: 'KB QA', icon: BookOpen, count: null },
   { id: 'export', label: '导出', en: 'Export', icon: Archive, count: null },
   { id: 'style', label: '风格报告', en: 'Style Report', icon: Sparkles, count: null, disabled: true, disabledHint: 'Phase [C]' },
-  { id: 'compare', label: '对比', en: 'Compare', icon: ArrowLeftRight, count: null },
 ]
 
 interface TabsNavProps {

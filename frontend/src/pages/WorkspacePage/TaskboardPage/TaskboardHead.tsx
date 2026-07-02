@@ -4,16 +4,11 @@ import {
   Pencil,
   Plus,
   Download,
-  ArrowLeftRight,
   Sparkles,
   Share2,
   MoreHorizontal,
-  List,
   Star,
-  Clock,
-  Tag,
   MessageCircle,
-  BookOpen,
   Layers,
   FileText,
   Globe,
@@ -40,7 +35,6 @@ interface TaskboardHeadProps {
   onEditBackground?: () => void
   onAddMaterial?: () => void
   onExport?: () => void
-  onCompare?: () => void
   onMerge?: () => void
   onShareMarkdown?: () => void
   onShareHtml?: () => void
@@ -86,12 +80,8 @@ function getCoverSlots(items: WorkspaceItem[] = []): Array<WorkspaceItem | null>
 
 /** 「更多」菜单默认项 */
 const MORE_ITEMS: MoreMenuItem[] = [
-  { id: 'queue', label: '队列', icon: List },
   { id: 'favs', label: '收藏夹', icon: Star },
-  { id: 'history', label: '版本', icon: Clock },
-  { id: 'tags', label: '标签库', icon: Tag },
   { id: 'chat', label: 'AI 对话', icon: MessageCircle },
-  { id: 'knowledgeQA', label: '知识库', icon: BookOpen },
   { id: 'style', label: '风格报告', icon: Sparkles, disabled: true, disabledHint: 'Phase [C]' },
 ]
 
@@ -110,7 +100,6 @@ export function TaskboardHead({
   onEditBackground,
   onAddMaterial,
   onExport,
-  onCompare,
   onMerge,
   onShareMarkdown,
   onShareHtml,
@@ -183,21 +172,17 @@ export function TaskboardHead({
             <Plus size={14} />
             加入素材
           </button>
-          <button className="btn" onClick={() => onMenuAction?.('queue')}>
-            <List size={14} />
-            任务中
-          </button>
           <button className="btn" onClick={onExport}>
             <Download size={14} />
             导出
           </button>
-          <button className="btn" onClick={onCompare}>
-            <ArrowLeftRight size={14} />
-            对比
-          </button>
           <button className="btn" onClick={onMerge}>
             <Sparkles size={14} />
             融合
+          </button>
+          <button className="btn" onClick={() => onMenuAction?.('chat')}>
+            <MessageCircle size={14} />
+            AI 对话
           </button>
           {/* 分享下拉 */}
           <div className="tb-head-more-wrap" ref={shareRef}>

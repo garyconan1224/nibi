@@ -21,17 +21,12 @@ import { withStatusToast } from '@/lib/statusToast'
 import type { WorkspaceItem, WorkspaceRecord } from '@/types/workspace'
 
 import { ChatTab } from './ChatTab'
-import { KnowledgeQATab } from './KnowledgeQATab'
-import { CompareTab } from './CompareTab'
 import { ExportTab } from './ExportTab'
 import { FavoritesTab } from './FavoritesTab'
 import { MaterialsTab } from './MaterialsTab'
-import { QueueTab } from './QueueTab'
-import { TagsTab } from './TagsTab'
 import { BackgroundEditor } from './BackgroundEditor'
 import { TaskboardHead } from './TaskboardHead'
 import type { TabId } from './types'
-import { VersionsTab } from './VersionsTab'
 import './taskboard.css'
 
 /**
@@ -48,9 +43,8 @@ export default function TaskboardPage() {
   const [bgOpen, setBgOpen] = useState(false)
   const [compareSelectedIds, setCompareSelectedIds] = useState<Set<string>>(new Set())
 
-  // Modal 状态：导出 / 对比 / 更多功能面板
+  // Modal 状态：导出 / 更多功能面板
   const [exportOpen, setExportOpen] = useState(false)
-  const [compareOpen, setCompareOpen] = useState(false)
   const [morePanelId, setMorePanelId] = useState<TabId | null>(null)
 
   // 融合状态
@@ -93,7 +87,7 @@ export default function TaskboardPage() {
 
   /** 「更多」菜单点击处理 */
   const handleMenuAction = (menuId: string) => {
-    const validIds: TabId[] = ['queue', 'favs', 'history', 'tags', 'chat', 'knowledgeQA', 'style']
+    const validIds: TabId[] = ['favs', 'chat', 'style']
     if (validIds.includes(menuId as TabId)) {
       setMorePanelId(menuId as TabId)
     }
@@ -172,13 +166,6 @@ export default function TaskboardPage() {
         onEditBackground={() => setBgOpen(true)}
         onAddMaterial={() => setAddOpen(true)}
         onExport={() => setExportOpen(true)}
-        onCompare={() => {
-          if (compareSelectedIds.size < 2) {
-            toast.info('请先在素材网格中多选至少 2 个素材，再点击对比')
-            return
-          }
-          setCompareOpen(true)
-        }}
         onMerge={async () => {
           const ids = [...compareSelectedIds]
           if (ids.length < 2) {
@@ -253,7 +240,6 @@ export default function TaskboardPage() {
           items={workspace.items}
           workspaceId={workspace.workspace_id}
           onAddMaterial={() => setAddOpen(true)}
-          onNavigateToCompare={() => setCompareOpen(true)}
           onSelectedIdsChange={setCompareSelectedIds}
           onToggleFavorite={handleToggleFavorite}
           onDelete={handleDeleteItem}
@@ -273,29 +259,16 @@ export default function TaskboardPage() {
         </div>
       )}
 
-      {/* ── Modal：对比 ── */}
-      {compareOpen && (
-        <div className="tb-modal-overlay" onClick={() => setCompareOpen(false)}>
-          <div className="tb-modal" onClick={(e) => e.stopPropagation()}>
-            <button className="tb-modal-close" onClick={() => setCompareOpen(false)}>
-              <X size={18} />
-            </button>
-            <CompareTab workspace={workspace} selectedIds={compareSelectedIds} />
-          </div>
-        </div>
-      )}
-
-      {/* ── Modal：更多功能面板（队列/收藏/版本/标签/AI对话/知识库/风格报告） ── */}
+      {/* ── Modal：更多功能面板（收藏/AI对话/风格报告） ── */}
       {morePanelId && (
         <div className="tb-modal-overlay" onClick={() => setMorePanelId(null)}>
           <div
-            className={`tb-modal${morePanelId === 'queue' ? ' tb-modal--queue' : ''}`}
+            className="tb-modal"
             onClick={(e) => e.stopPropagation()}
           >
             <button className="tb-modal-close" onClick={() => setMorePanelId(null)}>
               <X size={18} />
             </button>
-            {morePanelId === 'queue' && <QueueTab workspaceId={workspace.workspace_id} workspace={workspace} />}
             {morePanelId === 'favs' && (
               <FavoritesTab
                 favoriteIds={workspace.favorites}
@@ -303,16 +276,7 @@ export default function TaskboardPage() {
                 workspaceId={workspace.workspace_id}
               />
             )}
-            {morePanelId === 'history' && <VersionsTab />}
-            {morePanelId === 'tags' && (
-              <TagsTab
-                items={workspace.items}
-                workspaceId={workspace.workspace_id}
-                onTagsChanged={refresh}
-              />
-            )}
             {morePanelId === 'chat' && <ChatTab workspace={workspace} />}
-            {morePanelId === 'knowledgeQA' && <KnowledgeQATab workspace={workspace} />}
             {morePanelId === 'style' && (
               <div className="tb-placeholder">Phase [C] 开放</div>
             )}

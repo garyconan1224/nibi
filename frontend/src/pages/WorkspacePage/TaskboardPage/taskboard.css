@@ -483,8 +483,10 @@
   margin-left: auto;
 }
 .mat-card[data-selected='true'] {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+  background: color-mix(in oklch, var(--accent) 8%, var(--bg-card, #fff));
 }
 .mat-select-chk {
   position: absolute;
