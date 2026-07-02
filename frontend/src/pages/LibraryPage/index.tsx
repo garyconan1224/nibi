@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Trash2, Plus, Inbox, Filter, FolderInput } from 'lucide-react'
+import { Trash2, Plus, Inbox, Filter, FolderInput, FolderPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { fetchLibrary, deleteItem, batchDeleteItems, batchAddItemsToWorkspace, type LibraryItem, type LibraryResponse, type LibraryWorkspace } from '@/services/library'
 import { createWorkspace, deleteWorkspace, updateWorkspace, favoriteItem, unfavoriteItem } from '@/services/workspaces'
@@ -567,14 +567,10 @@ export default function LibraryPage({ kind }: { kind?: 'note' | 'replica' } = {}
                 onClick={handleCreateCollection}
                 disabled={creatingWorkspace}
               >
-                <Plus size={15} />
+                <FolderPlus size={15} />
                 {creatingWorkspace ? '创建中…' : '新建合集'}
               </button>
             )}
-            <button className="lib-cta lib-cta-secondary" onClick={() => setSelectedFilters(['collection'])}>
-              <Plus size={15} />
-              查看合集
-            </button>
           </div>
         </div>
           <div className="lib-actions">
