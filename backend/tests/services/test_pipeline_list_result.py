@@ -8,8 +8,10 @@
 from pathlib import Path
 
 from backend.app.models.tasks import TaskRecord, TaskStatus
+from backend.app.models.workspace import WorkspaceRecord
 from backend.app.routes import pipeline
 from backend.app.services.task_store import TaskStore
+from backend.app.services.workspace_store import WorkspaceStore
 
 
 def _seed_store(tmp_path: Path) -> TaskStore:
@@ -34,8 +36,21 @@ def _seed_store(tmp_path: Path) -> TaskStore:
     return store
 
 
+def _seed_ws_store(tmp_path: Path) -> WorkspaceStore:
+    """创建含 ws-1 的 workspace store，让 1-A 过滤能通过。"""
+    ws_tmp = tmp_path / "ws_data"
+    ws_tmp.mkdir()
+    ws = WorkspaceStore(root=ws_tmp)
+    ws.create(WorkspaceRecord(workspace_id="ws-1", name="test"))
+    return ws
+
+
 def test_list_tasks_light_includes_cover_fields(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline, "_store", _seed_store(tmp_path))
+    # 1-A 过滤需要 workspace store 包含 task 的 project_id，否则任务被滤掉
+    import backend.app.routes.workspaces as ws_mod
+
+    monkeypatch.setattr(ws_mod, "_store", _seed_ws_store(tmp_path))
     rows = pipeline.list_tasks(include_result=False)
     assert len(rows) == 1
     result = rows[0]["result"]
@@ -50,6 +65,9 @@ def test_list_tasks_light_includes_cover_fields(tmp_path, monkeypatch):
 
 def test_list_tasks_full_includes_everything(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline, "_store", _seed_store(tmp_path))
+    import backend.app.routes.workspaces as ws_mod
+
+    monkeypatch.setattr(ws_mod, "_store", _seed_ws_store(tmp_path))
     rows = pipeline.list_tasks(include_result=True)
     result = rows[0]["result"]
     assert "summary_md" in result

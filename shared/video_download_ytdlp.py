@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import subprocess
 from collections.abc import Callable
 from typing import Any
@@ -246,6 +247,20 @@ def _build_attempts(
     if format_selector:
         base_opts["format"] = format_selector
     normalized_proxy = _normalize_proxy(proxy)
+
+    # 2-B：B站 DASH 分离流下载，提高分片并发从默认5→16，减轻单连接限速
+    if _is_bilibili_url(url):
+        frag = base_opts.get("concurrent_fragment_downloads", 5)
+        if isinstance(frag, int) and frag < 16:
+            base_opts["concurrent_fragment_downloads"] = 16
+
+    # 2-C：aria2c 多连接下载器（用户已同意 brew install aria2），未装时自动跳过
+    _aria2c_path = shutil.which("aria2c")
+    if _aria2c_path:
+        base_opts["external_downloader"] = _aria2c_path
+        base_opts["external_downloader_args"] = {
+            "aria2c": ["-x", "16", "-s", "16", "-k", "1M"],
+        }
 
     attempts: list[dict[str, Any]] = []
     if _is_youtube_url(url):
