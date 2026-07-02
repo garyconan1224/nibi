@@ -224,6 +224,49 @@ export default function TaskboardPage() {
         onMenuAction={handleMenuAction}
       />
 
+      {/* ── 融合笔记置顶展示 ── */}
+      {mergedNotes.length > 0 && (
+        <div style={{ margin: '16px 0', border: '1px solid var(--line)', borderRadius: 10, padding: 16, background: 'var(--bg-card)' }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-1)', marginBottom: 12 }}>
+            ✨ 融合笔记（{mergedNotes.length}）
+          </div>
+          {mergedNotes.map((mn) => (
+            <details key={mn.merged_id} style={{ marginBottom: 8 }}>
+              <summary style={{ cursor: 'pointer', fontSize: 13, color: 'var(--ink-2)', padding: '6px 0' }}>
+                {mn.title}
+                <span style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 12 }}>
+                  {mn.item_ids.length} 素材 · {new Date(mn.created_at).toLocaleString('zh-CN')}
+                </span>
+              </summary>
+              <div
+                className="tb-merged-content"
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  lineHeight: 1.8,
+                  fontSize: 13,
+                  color: 'var(--ink-1)',
+                  padding: '12px 0',
+                  borderTop: '1px solid var(--line)',
+                  marginTop: 8,
+                }}
+              >
+                {mn.content_md}
+              </div>
+              <button
+                className="btn btn-sm"
+                style={{ marginTop: 8 }}
+                onClick={async () => {
+                  await navigator.clipboard.writeText(mn.content_md)
+                  toast.success('已复制到剪贴板')
+                }}
+              >
+                复制内容
+              </button>
+            </details>
+          ))}
+        </div>
+      )}
+
       {/* 素材网格 — 默认主体 */}
       <div className="tb-body">
         <MaterialsTab
@@ -302,49 +345,6 @@ export default function TaskboardPage() {
           }}
           onClose={() => setMergeOpen(false)}
         />
-      )}
-
-      {/* ── 融合笔记置顶展示 ── */}
-      {mergedNotes.length > 0 && (
-        <div style={{ margin: '16px 0', border: '1px solid var(--line)', borderRadius: 10, padding: 16, background: 'var(--bg-card)' }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-1)', marginBottom: 12 }}>
-            ✨ 融合笔记（{mergedNotes.length}）
-          </div>
-          {mergedNotes.map((mn) => (
-            <details key={mn.merged_id} style={{ marginBottom: 8 }}>
-              <summary style={{ cursor: 'pointer', fontSize: 13, color: 'var(--ink-2)', padding: '6px 0' }}>
-                {mn.title}
-                <span style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 12 }}>
-                  {mn.item_ids.length} 素材 · {new Date(mn.created_at).toLocaleString('zh-CN')}
-                </span>
-              </summary>
-              <div
-                className="tb-merged-content"
-                style={{
-                  whiteSpace: 'pre-wrap',
-                  lineHeight: 1.8,
-                  fontSize: 13,
-                  color: 'var(--ink-1)',
-                  padding: '12px 0',
-                  borderTop: '1px solid var(--line)',
-                  marginTop: 8,
-                }}
-              >
-                {mn.content_md}
-              </div>
-              <button
-                className="btn btn-sm"
-                style={{ marginTop: 8 }}
-                onClick={async () => {
-                  await navigator.clipboard.writeText(mn.content_md)
-                  toast.success('已复制到剪贴板')
-                }}
-              >
-                复制内容
-              </button>
-            </details>
-          ))}
-        </div>
       )}
 
       {/* ── AddMaterialModal ── */}
