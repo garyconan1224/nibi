@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, CheckCircle2, ChevronDown, Clock, Copy, FileAudio, FileText, Film, Image as ImageIcon, Layers, LayoutTemplate, Link2, Lock, PenTool, PlayCircle, Plus, Search, Settings2, Target, Upload, Video, Wand2, X } from 'lucide-react'
+import { Check, CheckCircle2, ChevronDown, Clock, Copy, FileAudio, FileText, Image as ImageIcon, Layers, LayoutTemplate, Link2, Lock, PenTool, PlayCircle, Plus, Search, Settings2, Upload, Video, Wand2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -287,7 +287,7 @@ export function AddMaterialModal({
   const [submitting, setSubmitting] = useState(false)
   const [selectedAction, setSelectedAction] = useState<ActionType>('note')
   const [selectedNoteType, setSelectedNoteType] = useState<NoteMediaKind>('auto')
-  const [replicaKind, setReplicaKind] = useState<'prompt' | 'story' | 'compete'>('prompt')
+  const [replicaKind, setReplicaKind] = useState<'prompt'>('prompt')
   const [embedFrames, setEmbedFrames] = useState(false) // R4.7: 默认关，检测到视觉模型后自动开
   const [selectedVisionModel, setSelectedVisionModel] = useState('') // 空=用系统默认
   const [frameInterval, setFrameInterval] = useState(5)
@@ -1511,31 +1511,12 @@ export function AddMaterialModal({
                 <button
                   type="button"
                   className="note-type-card"
-                  data-active={replicaKind === 'prompt'}
-                  onClick={() => setReplicaKind('prompt')}
-                >
-                  <div className="ntc-l"><Copy size={16} style={{ display: 'inline', verticalAlign: '-3px', marginRight: 4 }} /> 复刻提示词</div>
-                  <div className="ntc-d">逐帧画面描述 → AI 生图/生视频提示词</div>
-                </button>
-                <button
-                  type="button"
-                  className="note-type-card"
-                  data-active={false}
+                  data-active={true}
                   disabled
-                  style={{ opacity: 0.5, cursor: 'not-allowed' }}
+                  style={{ cursor: 'default' }}
                 >
-                  <div className="ntc-l"><Film size={16} style={{ display: 'inline', verticalAlign: '-3px', marginRight: 4 }} /> 拉片分析 <span style={{ fontSize: 11, color: 'var(--mut)' }}>即将上线</span></div>
-                  <div className="ntc-d">逐镜头拆解景别/构图/运镜/转场</div>
-                </button>
-                <button
-                  type="button"
-                  className="note-type-card"
-                  data-active={false}
-                  disabled
-                  style={{ opacity: 0.5, cursor: 'not-allowed' }}
-                >
-                  <div className="ntc-l"><Target size={16} style={{ display: 'inline', verticalAlign: '-3px', marginRight: 4 }} /> 竞品对标 <span style={{ fontSize: 11, color: 'var(--mut)' }}>即将上线</span></div>
-                  <div className="ntc-d">内容结构/爆点/钩子/节奏拆解</div>
+                  <div className="ntc-l"><Copy size={16} style={{ display: 'inline', verticalAlign: '-3px', marginRight: 4 }} /> 提示词复刻</div>
+                  <div className="ntc-d">从视频/图片逐帧提取可复用的画面提示词，用于二次创作/出图</div>
                 </button>
               </div>
             )}

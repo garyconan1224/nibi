@@ -4,8 +4,11 @@ import {
   AlertCircle,
   ArrowUpRight,
   BookOpen,
+  Check,
   Database,
   Loader2,
+  MessageSquarePlus,
+  Plus,
   RefreshCw,
   Send,
 } from 'lucide-react'
@@ -20,6 +23,7 @@ import {
   type KnowledgeAskResponse,
   type KnowledgeStatus,
 } from '@/services/knowledge'
+import { fetchLibrary } from '@/services/library'
 import type { SearchSource } from '@/services/search'
 import { cn } from '@/lib/utils'
 
@@ -28,6 +32,12 @@ type KnowledgeMessage = {
   role: 'user' | 'assistant'
   content: string
   sources?: SearchSource[]
+}
+
+type WorkspaceOption = {
+  id: string
+  name: string
+  kind: string
 }
 
 function formatDate(value: string | null | undefined): string {
@@ -63,6 +73,50 @@ export default function KnowledgePage() {
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<KnowledgeMessage[]>([])
   const scrollRef = useRef<HTMLDivElement | null>(null)
+
+  // 合集范围选择
+  const [workspaceOptions, setWorkspaceOptions] = useState<WorkspaceOption[]>([])
+  const [selectedWorkspaceIds, setSelectedWorkspaceIds] = useState<string[]>([])
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const pickerRef = useRef<HTMLDivElement | null>(null)
+
+  // 加载可选的合集列表（note + replica 类型）
+  useEffect(() => {
+    let cancelled = false
+    fetchLibrary(false)
+      .then((lib) => {
+        if (cancelled) return
+        const options: WorkspaceOption[] = (lib.items ?? [])
+          .filter((item) => item.workspace_kind === 'note' || item.workspace_kind === 'replica')
+          .map((item) => ({
+            id: item.workspace_id,
+            name: item.workspace_name || item.workspace_id,
+            kind: item.workspace_kind,
+          }))
+        // 去重（同一 workspace_id 可能有多条 item）
+        const seen = new Set<string>()
+        const unique = options.filter((o) => {
+          if (seen.has(o.id)) return false
+          seen.add(o.id)
+          return true
+        })
+        setWorkspaceOptions(unique)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  // 点击外部关闭下拉
+  useEffect(() => {
+    if (!pickerOpen) return
+    const handler = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [pickerOpen])
 
   const refreshStatus = useCallback(async () => {
     try {
@@ -101,6 +155,13 @@ export default function KnowledgePage() {
     return Math.round((status.indexed_item_count / status.item_count) * 100)
   }, [status])
 
+  const selectedWorkspaceCount = selectedWorkspaceIds.length
+  const placeholderText = status?.ready
+    ? selectedWorkspaceCount > 0
+      ? `向 ${selectedWorkspaceCount} 个合集提问`
+      : '向所有笔记提问'
+    : '索引就绪后可提问'
+
   const handleRebuild = async () => {
     setRebuilding(true)
     try {
@@ -113,6 +174,23 @@ export default function KnowledgePage() {
     } finally {
       setRebuilding(false)
     }
+  }
+
+  const handleNewConversation = () => {
+    setMessages([])
+    setInput('')
+    toast.success('已开启新对话')
+  }
+
+  const toggleWorkspace = (wsId: string) => {
+    setSelectedWorkspaceIds((prev) =>
+      prev.includes(wsId) ? prev.filter((id) => id !== wsId) : [...prev, wsId],
+    )
+  }
+
+  const clearWorkspaceFilter = () => {
+    setSelectedWorkspaceIds([])
+    setPickerOpen(false)
   }
 
   const handleAsk = async () => {
@@ -132,7 +210,11 @@ export default function KnowledgePage() {
     setInput('')
     setAsking(true)
     try {
-      const res: KnowledgeAskResponse = await askKnowledge(question)
+      const res: KnowledgeAskResponse = await askKnowledge(
+        question,
+        10,
+        selectedWorkspaceIds.length > 0 ? selectedWorkspaceIds : undefined,
+      )
       const assistantMessage: KnowledgeMessage = {
         id: `a-${Date.now()}`,
         role: 'assistant',
@@ -158,6 +240,10 @@ export default function KnowledgePage() {
       void handleAsk()
     }
   }
+
+  const selectedNames = selectedWorkspaceIds
+    .map((id) => workspaceOptions.find((o) => o.id === id)?.name ?? id)
+    .join('、')
 
   return (
     <main className="flex h-full min-h-0 flex-col bg-background">
@@ -217,13 +303,95 @@ export default function KnowledgePage() {
         ) : null}
 
         <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-border bg-card">
+          {/* 工具栏：合集选择 + 新对话 */}
+          <div className="flex items-center gap-2 border-b border-border px-4 py-2">
+            <div ref={pickerRef} className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPickerOpen((v) => !v)}
+                className="gap-1 text-xs"
+              >
+                <Plus size={12} />
+                {selectedWorkspaceCount > 0
+                  ? `已选 ${selectedWorkspaceCount} 个合集`
+                  : '全部笔记'}
+              </Button>
+              {pickerOpen && (
+                <div className="absolute left-0 top-full z-50 mt-1 max-h-64 w-72 overflow-y-auto rounded-md border border-border bg-card shadow-lg">
+                  <div className="flex items-center justify-between border-b border-border px-3 py-2">
+                    <span className="text-xs font-medium text-muted-foreground">选择合集范围</span>
+                    {selectedWorkspaceCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={clearWorkspaceFilter}
+                        className="text-xs text-violet-600 hover:text-violet-700"
+                      >
+                        清除全部
+                      </button>
+                    )}
+                  </div>
+                  {workspaceOptions.length === 0 ? (
+                    <div className="px-3 py-4 text-xs text-muted-foreground">暂无可选合集</div>
+                  ) : (
+                    workspaceOptions.map((ws) => {
+                      const isSelected = selectedWorkspaceIds.includes(ws.id)
+                      return (
+                        <button
+                          key={ws.id}
+                          type="button"
+                          onClick={() => toggleWorkspace(ws.id)}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-muted/60"
+                        >
+                          <span
+                            className={cn(
+                              'flex size-4 shrink-0 items-center justify-center rounded border',
+                              isSelected
+                                ? 'border-violet-400 bg-violet-100 text-violet-700'
+                                : 'border-border',
+                            )}
+                          >
+                            {isSelected ? <Check size={10} /> : null}
+                          </span>
+                          <span className="truncate">{ws.name}</span>
+                          <span className="shrink-0 text-[10px] text-muted-foreground">
+                            {ws.kind === 'replica' ? '复刻' : '笔记'}
+                          </span>
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+              )}
+            </div>
+            {selectedWorkspaceCount > 0 && (
+              <span className="text-xs text-muted-foreground" title={selectedNames}>
+                限定：{selectedNames.length > 30 ? selectedNames.slice(0, 30) + '…' : selectedNames}
+              </span>
+            )}
+            <div className="flex-1" />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleNewConversation}
+              disabled={messages.length === 0}
+              className="gap-1 text-xs"
+              title="开启新对话"
+            >
+              <MessageSquarePlus size={14} />
+              新对话
+            </Button>
+          </div>
+
           <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
             {messages.length === 0 && !asking ? (
               <div className="flex h-full min-h-[260px] items-center justify-center text-center text-sm text-muted-foreground">
                 {status?.item_count === 0
                   ? '先去做几篇笔记，知识库会自动收录。'
                   : status?.ready
-                    ? '向所有笔记提问，答案会附上来源。'
+                    ? selectedWorkspaceCount > 0
+                      ? `已限定 ${selectedWorkspaceCount} 个合集，输入问题开始提问。`
+                      : '向所有笔记提问，答案会附上来源。'
                     : '刷新索引后开始提问。'}
               </div>
             ) : (
@@ -254,7 +422,7 @@ export default function KnowledgePage() {
                 className="min-h-[52px] resize-none text-sm"
                 rows={2}
                 disabled={asking || !status?.ready}
-                placeholder={status?.ready ? '向所有笔记提问' : '索引就绪后可提问'}
+                placeholder={placeholderText}
               />
               <Button size="sm" onClick={() => void handleAsk()} disabled={!canAsk}>
                 {asking ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}

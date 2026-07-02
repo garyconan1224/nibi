@@ -39,10 +39,11 @@ export async function rebuildKnowledge(force = false): Promise<KnowledgeStatus> 
 export async function askKnowledge(
   question: string,
   topK = 10,
+  workspaceIds?: string[],
 ): Promise<KnowledgeAskResponse> {
   const res = await http.post<KnowledgeAskResponse>(
     '/knowledge/ask',
-    { question, top_k: topK },
+    { question, top_k: topK, workspace_ids: workspaceIds?.length ? workspaceIds : undefined },
     { timeout: 180000 },
   )
   return res.data

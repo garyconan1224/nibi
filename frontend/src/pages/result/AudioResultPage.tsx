@@ -120,6 +120,16 @@ export default function AudioResultPage() {
     }
   }
 
+  const handleDownloadAudio = useCallback(() => {
+    if (fetchState.kind !== 'ready') return
+    const url = fetchState.data.audio.url
+    if (!url) return
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fetchState.data.audio.filename || fetchState.data.audio.title || 'audio'
+    a.click()
+  }, [fetchState])
+
   const audioRef = useRef<HTMLAudioElement>(null)
 
   useEffect(() => {
@@ -376,6 +386,11 @@ export default function AudioResultPage() {
           <span className="mono" style={{ fontSize: 10, padding: '2px 8px', borderRadius: 6, background: 'var(--wrn)', color: '#fff', fontWeight: 600 }} title="demo fixture">DEMO</span>
         )}
         <div style={{ marginLeft: 'auto' }} />
+        {result.audio.url && (
+          <button className="btn-ghost" style={{ height: 28, padding: '0 10px', fontSize: 12 }} onClick={handleDownloadAudio} title="导出音频">
+            <Download size={13} /> 音频
+          </button>
+        )}
         <div style={{ position: 'relative' }}>
           <button className="btn-ghost" style={{ height: 28, padding: '0 10px', fontSize: 12 }} onClick={() => setExportOpen(!exportOpen)} title="导出字幕">
             <Download size={13} /> 字幕

@@ -39,8 +39,8 @@ class ProviderUpdateRequest(BaseModel):
 
 
 @router.get("")
-def list_providers() -> list[Dict[str, Any]]:
-    """获取所有配置的提供商列表"""
+def list_providers() -> Dict[str, Any]:
+    """获取所有配置的提供商列表，并附全局默认 provider 信息。"""
     settings = load_settings()
     out: list = []
     for p in settings.providers:
@@ -56,7 +56,15 @@ def list_providers() -> list[Dict[str, Any]]:
                 "default_models": dict(p.default_models),
             }
         )
-    return out
+    # Also return the top-level defaults so callers can tell which
+    # provider is currently the global default for each role.
+    return {
+        "data": out,
+        "default_provider_for_chat": settings.default_provider_for_chat,
+        "default_provider_for_vision": settings.default_provider_for_vision,
+        "default_provider_for_embedding": settings.default_provider_for_embedding,
+        "default_provider_for_rerank": settings.default_provider_for_rerank,
+    }
 
 
 @router.get("/{provider_id}/models")

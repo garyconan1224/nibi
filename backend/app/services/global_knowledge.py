@@ -34,6 +34,15 @@ from shared.settings_store import load_settings
 
 GLOBAL_CACHE_ID = "__global__"
 
+
+def _sub_cache_id(workspace_ids: List[str]) -> str:
+    """Derive a stable, ordered cache id from a workspace-id list.
+
+    The id is deterministic per sorted set so repeated queries with the same
+    scope hit the same cache, and it never collides with ``GLOBAL_CACHE_ID``.
+    """
+    return f"__global_sub__:{','.join(sorted(workspace_ids))}"
+
 _state_lock = threading.Lock()
 _rebuild_state: Dict[str, Any] = {
     "running": False,
@@ -305,33 +314,98 @@ def ask_global(
     *,
     question: str,
     top_k: int = 10,
+    workspace_ids: Optional[List[str]] = None,
     store: Optional[WorkspaceStore] = None,
     task_store: Any = None,
     api_key: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Ask across the global cache without triggering rebuild inline."""
+    """Ask across the global cache without triggering rebuild inline.
+
+    When ``workspace_ids`` is non-empty, only those workspaces are searched;
+    otherwise all indexable workspaces are included.
+    """
 
     effective_store = store or WorkspaceStore()
-    status = get_global_status(store=effective_store, task_store=task_store)
-    if status["item_count"] <= 0:
-        return {"answer": "（暂无可用于知识库问答的笔记）", "sources": [], "status": status}
-    if not status["ready"]:
-        raise RuntimeError("knowledge index is not ready; rebuild first")
-
-    eff_key = _resolve_api_key(api_key)
     settings = load_settings()
     embedding_model = get_embedding_model_for_rag(settings)
-    records = _indexable_records(effective_store, task_store)
+    all_records = _indexable_records(effective_store, task_store)
+
+    # Filter by workspace_ids when provided
+    if workspace_ids:
+        ws_set = set(workspace_ids)
+        records = [r for r in all_records if r.workspace_id in ws_set]
+        if not records:
+            return {"answer": "（所选合集中暂无可用于知识库问答的笔记）", "sources": [], "status": get_global_status(store=effective_store, task_store=task_store)}
+    else:
+        records = all_records
+
+    item_count = sum(sum(1 for it in rec.items if _item_has_data(it, task_store)) for rec in records)
+    if item_count <= 0:
+        return {"answer": "（暂无可用于知识库问答的笔记）", "sources": [], "status": get_global_status(store=effective_store, task_store=task_store)}
+
     cur_hash = _global_items_hash(records)
+    if workspace_ids:
+        cur_hash = hashlib.sha256((cur_hash + ",".join(sorted(workspace_ids))).encode("utf-8")).hexdigest()
+
+    eff_key = _resolve_api_key(api_key)
     cached = _load_from_cache(GLOBAL_CACHE_ID, cur_hash, embedding_model) or _load_short_cache(
         cur_hash, embedding_model
     )
-    if cached is None:
+
+    # Sub-range: build a temporary index if no cache hit.
+    # Use a dedicated cache id so sub-range caches never collide with global.
+    if cached is None and workspace_ids:
+        sub_cache_id = _sub_cache_id(workspace_ids)
+        with tempfile.TemporaryDirectory(prefix="subidx_") as td:
+            paths, source_map, _ = collect_all_json_paths(
+                Path(td),
+                store=effective_store,
+                task_store=task_store,
+            )
+            # Filter paths to only requested workspaces.
+            # collect_all_json_paths writes dest/<ws_id>/..., so the first
+            # directory component relative to the temp root is the workspace id.
+            # Use .resolve() on both sides: macOS /var is a symlink to
+            # /private/var, so relative_to would otherwise raise ValueError.
+            td_resolved = Path(td).resolve()
+            ws_set = set(workspace_ids)
+            sub_paths: List[Path] = []
+            for p in paths:
+                try:
+                    rel_parts = p.resolve().relative_to(td_resolved).parts
+                except ValueError:
+                    continue
+                if len(rel_parts) >= 1 and rel_parts[0] in ws_set:
+                    sub_paths.append(p)
+            sub_source_map = {
+                k: v
+                for k, v in source_map.items()
+                if any(f'{ws_id}/' in k or k.endswith(f'/{ws_id}') for ws_id in workspace_ids)
+            }
+            if sub_paths:
+                from shared.knowledge_base import load_folder_as_knowledge
+
+                knowledge = load_folder_as_knowledge(
+                    eff_key.strip(),
+                    td,
+                    embedding_model=embedding_model,
+                    only_paths=sub_paths,
+                )
+                if isinstance(knowledge, ShortKnowledge):
+                    _persist_short_cache(sub_cache_id, cur_hash, embedding_model, knowledge, sub_source_map)
+                elif isinstance(knowledge, LongKnowledge):
+                    _persist_long_cache(sub_cache_id, cur_hash, knowledge, sub_source_map)
+                cached = (knowledge, sub_source_map)
+    if cached is None and not workspace_ids:
         raise RuntimeError("knowledge index is not ready; rebuild first")
+    if cached is None:
+        return {"answer": "（所选合集索引未就绪，请先刷新索引）", "sources": [], "status": get_global_status(store=effective_store, task_store=task_store)}
+
     if len(cached) == 3:
         knowledge, source_map, _ = cached
     else:
         knowledge, source_map = cached
+
     sources_out: List[Dict[str, Any]] = []
     context_parts: List[str] = []
     if isinstance(knowledge, LongKnowledge):

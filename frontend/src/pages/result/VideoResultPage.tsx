@@ -130,6 +130,16 @@ export default function VideoResultPage() {
     }
   }
 
+  const handleDownloadVideo = useCallback(() => {
+    if (fetchState.kind !== 'ready') return
+    const url = fetchState.data.video.url
+    if (!url) return
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fetchState.data.video.title || 'video'
+    a.click()
+  }, [fetchState])
+
   const videoRef = useRef<HTMLVideoElement>(null)
   const activeThumbRef = useRef<HTMLButtonElement>(null)
 
@@ -441,6 +451,48 @@ export default function VideoResultPage() {
     toast.success(`已复制 ${sorted.length} 帧提示词`)
   }, [selectedFrames, frames])
 
+  // 一键全复制（所有帧）
+  const handleCopyAll = useCallback(() => {
+    if (!frames.length) return
+    const lines: string[] = []
+    for (const f of frames) {
+      const prompt = f.prompt_mj || f.prompt_video || ''
+      if (!prompt) continue
+      const idx = frames.indexOf(f)
+      lines.push(`--- Frame ${idx} (${f.ts}) ${f.title} ---\n${prompt}`)
+    }
+    navigator.clipboard?.writeText(lines.join('\n\n')).catch(() => {})
+    toast.success(`已复制 ${lines.length} 帧提示词`)
+  }, [frames])
+
+  // 导出提示词脚本（.md）
+  const handleExportPromptScript = useCallback(() => {
+    if (!frames.length) return
+    const lines = [
+      `# 复刻提示词脚本`,
+      `> 视频：${result?.video.title ?? '-'}`,
+      `> 共 ${frames.length} 帧`,
+      ``,
+    ]
+    for (const f of frames) {
+      const prompt = f.prompt_mj || f.prompt_video || ''
+      if (!prompt) continue
+      const idx = frames.indexOf(f)
+      lines.push(`## Frame ${idx} — ${f.ts} — ${f.title}`)
+      lines.push('')
+      lines.push(prompt)
+      lines.push('')
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `prompt-script-${result?.video.title || 'video'}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('提示词脚本已导出')
+  }, [frames, result?.video.title])
+
   // C-3: 导出复刻包
   const handleExportReproduce = useCallback(async () => {
     if (!selectedFrames.size) return
@@ -683,6 +735,11 @@ export default function VideoResultPage() {
             </button>
           </div>
           <div style={{ marginLeft: 'auto' }} />
+          {result.video.url && (
+            <button className="btn-ghost" style={{ height: 28, padding: '0 10px', fontSize: 12 }} onClick={handleDownloadVideo} title="导出视频">
+              <Download size={13} /> 视频
+            </button>
+          )}
           <div style={{ position: 'relative' }}>
             <button className="btn-ghost" style={{ height: 28, padding: '0 10px', fontSize: 12 }} onClick={() => setExportOpen(!exportOpen)} title="导出字幕">
               <Download size={13} /> 字幕
@@ -896,6 +953,21 @@ export default function VideoResultPage() {
             </button>
           </div>
           <div className="vd-nav-spacer" />
+          {!isLearning && (
+            <>
+              <button className="btn-ghost vd-nav-btn vd-nav-btn--compact" onClick={handleCopyAll} title="一键复制全部帧提示词">
+                <Copy size={12} /> 全复制
+              </button>
+              <button className="btn-ghost vd-nav-btn vd-nav-btn--compact" onClick={handleExportPromptScript} title="导出提示词脚本(.md)">
+                <FileText size={12} /> 导出脚本
+              </button>
+            </>
+          )}
+          {result.video.url && (
+            <button className="btn-ghost vd-nav-btn vd-nav-btn--compact" onClick={handleDownloadVideo} title="导出视频">
+              <Download size={12} /> 视频
+            </button>
+          )}
           <button
             className="btn-ghost vd-nav-btn vd-nav-btn--compact"
             onClick={() => navigate('/replicas')}
@@ -960,6 +1032,12 @@ export default function VideoResultPage() {
               <div className="vd-select-actions">
                 <button className="vd-btn-tool" onClick={handleBatchCopy} title="复制选中帧提示词">
                   <Copy size={12} /> 复制提示词
+                </button>
+                <button className="vd-btn-tool" onClick={handleCopyAll} title="复制全部帧提示词">
+                  <Copy size={12} /> 全复制
+                </button>
+                <button className="vd-btn-tool" onClick={handleExportPromptScript} title="导出提示词脚本(.md)">
+                  <FileText size={12} /> 导出脚本
                 </button>
                 <button className="vd-btn-tool" onClick={handleExportReproduce} disabled={exporting} title="导出复刻包">
                   <Download size={12} /> {exporting ? '导出中…' : '导出复刻包'}

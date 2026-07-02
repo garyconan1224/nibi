@@ -94,7 +94,9 @@ const ModelManagementPage = () => {
     try {
       setListLoading(true)
       const res = await http.get('/providers')
-      const list: ProviderSummary[] = res.data.data ?? res.data
+      const payload: any = res.data.data ?? res.data
+      // /providers now returns { data: [...], default_provider_for_chat: "...", ... }
+      const list: ProviderSummary[] = Array.isArray(payload) ? payload : (payload.data ?? [])
       setProviders(list.map(p => ({
         ...p,
         models: [],

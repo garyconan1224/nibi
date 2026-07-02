@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, BarChart2, Check, Copy, FileText, Settings2, Star } from 'lucide-react'
+import { ArrowLeft, BarChart2, Check, Copy, Download, FileText, Settings2, Star } from 'lucide-react'
 
 import {
   type ImageCompareResult,
@@ -180,6 +180,14 @@ export default function ImageResultPage() {
     setPromptVersions((prev) => [...prev, pv])
     toast.success(`已保存 v${pv.version}`)
   }, [workspaceId, itemId])
+
+  const handleDownloadImage = useCallback(() => {
+    if (!result?.image.image_url) return
+    const a = document.createElement('a')
+    a.href = result.image.image_url
+    a.download = result.image.title || 'image'
+    a.click()
+  }, [result?.image.image_url, result?.image.title])
 
   const openPicker = useCallback(() => {
     if (!formatsCfg) return
@@ -455,6 +463,14 @@ export default function ImageResultPage() {
           >
             <BarChart2 size={14} />
             {compareLoading ? '对比分析中...' : '多图对比'}
+          </button>
+          <button
+            className="im-btn-sub"
+            onClick={handleDownloadImage}
+            title="导出原图"
+          >
+            <Download size={14} />
+            导出原图
           </button>
           <span className="im-shortcut-hint">
             快捷键：C 复制 · F 收藏 · 1/2/3 切格式

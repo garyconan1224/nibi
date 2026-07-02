@@ -14,6 +14,8 @@ export interface ProviderInfo {
 
 /** GET /providers — 获取所有已启用的 provider。 */
 export async function listProviders(): Promise<ProviderInfo[]> {
-  const { data } = await http.get<ProviderInfo[]>('/providers')
-  return data.filter((p) => p.enabled && p.capabilities.includes('chat'))
+  // 后端从裸数组改为 { data: [...], default_provider_for_* }，两种结构都兼容
+  const res = await http.get<ProviderInfo[] | { data: ProviderInfo[] }>('/providers')
+  const list: ProviderInfo[] = Array.isArray(res.data) ? res.data : (res.data?.data ?? [])
+  return list.filter((p) => p.enabled && p.capabilities.includes('chat'))
 }

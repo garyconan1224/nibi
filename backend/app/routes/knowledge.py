@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Global knowledge endpoints."""
 
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -20,6 +20,7 @@ router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 class KnowledgeAskRequest(BaseModel):
     question: str = Field(..., min_length=1)
     top_k: int = Field(default=10, ge=1, le=30)
+    workspace_ids: Optional[List[str]] = None
 
 
 class KnowledgeRebuildRequest(BaseModel):
@@ -48,6 +49,7 @@ def knowledge_ask(req: KnowledgeAskRequest) -> Dict[str, Any]:
         return ask_global(
             question=req.question,
             top_k=req.top_k,
+            workspace_ids=req.workspace_ids,
             task_store=_pipeline_runner.store,
         )
     except RuntimeError as err:
