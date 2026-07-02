@@ -771,8 +771,9 @@ export interface MergedNote {
 export async function mergeNotes(
   workspaceId: string,
   itemIds: string[],
+  style: string = '综合大纲',
 ): Promise<MergedNote> {
-  const res = await http.post(`${BASE}/${workspaceId}/merge`, { item_ids: itemIds })
+  const res = await http.post(`${BASE}/${workspaceId}/merge`, { item_ids: itemIds, style })
   return res.data as MergedNote
 }
 

@@ -8,6 +8,7 @@ import {
   getItemNote,
   downloadCollectionHtml,
   mergeNotes,
+  listMergedNotes,
   favoriteItem,
   removeWorkspaceItem,
   unfavoriteItem,
@@ -26,6 +27,7 @@ import { FavoritesTab } from './FavoritesTab'
 import { MaterialsTab } from './MaterialsTab'
 import { BackgroundEditor } from './BackgroundEditor'
 import { TaskboardHead } from './TaskboardHead'
+import { MergeModal } from './MergeModal'
 import type { TabId } from './types'
 import './taskboard.css'
 
@@ -41,15 +43,15 @@ export default function TaskboardPage() {
   const [error, setError] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [bgOpen, setBgOpen] = useState(false)
-  const [compareSelectedIds, setCompareSelectedIds] = useState<Set<string>>(new Set())
 
   // Modal 状态：导出 / 更多功能面板
   const [exportOpen, setExportOpen] = useState(false)
   const [morePanelId, setMorePanelId] = useState<TabId | null>(null)
 
   // 融合状态
+  const [mergeOpen, setMergeOpen] = useState(false)
   const [mergeLoading, setMergeLoading] = useState(false)
-  const [mergeResult, setMergeResult] = useState<MergedNote | null>(null)
+  const [mergedNotes, setMergedNotes] = useState<MergedNote[]>([])
 
 
   const abortRef = useRef<AbortController | null>(null)
@@ -81,6 +83,11 @@ export default function TaskboardPage() {
           setLoading(false)
         }
       })
+
+    // 页面加载时拉融合笔记列表（持久展示）
+    listMergedNotes(id)
+      .then(setMergedNotes)
+      .catch(() => {})
 
     return () => ac.abort()
   }, [id])
@@ -166,29 +173,12 @@ export default function TaskboardPage() {
         onEditBackground={() => setBgOpen(true)}
         onAddMaterial={() => setAddOpen(true)}
         onExport={() => setExportOpen(true)}
-        onMerge={async () => {
-          const ids = [...compareSelectedIds]
-          if (ids.length < 2) {
-            toast.info('请先在素材网格中多选 ≥2 个素材，再点击融合')
+        onMerge={() => {
+          if (workspace.items.length < 2) {
+            toast.info('合集内至少需要 2 个素材才可融合')
             return
           }
-          setMergeLoading(true)
-          try {
-            const result = await withStatusToast(
-              () => mergeNotes(workspace.workspace_id, ids),
-              {
-                id: `workspace-merge-${workspace.workspace_id}`,
-                loading: '正在融合笔记…',
-                success: '融合完成',
-                error: '融合失败，请重试',
-              },
-            )
-            setMergeResult(result)
-          } catch {
-            /* withStatusToast 已提示 */
-          } finally {
-            setMergeLoading(false)
-          }
+          setMergeOpen(true)
         }}
         onShareMarkdown={async () => {
           if (workspace.items.length === 0) {
@@ -240,7 +230,6 @@ export default function TaskboardPage() {
           items={workspace.items}
           workspaceId={workspace.workspace_id}
           onAddMaterial={() => setAddOpen(true)}
-          onSelectedIdsChange={setCompareSelectedIds}
           onToggleFavorite={handleToggleFavorite}
           onDelete={handleDeleteItem}
           onDeleteSelected={handleDeleteSelectedItems}
@@ -284,48 +273,77 @@ export default function TaskboardPage() {
         </div>
       )}
 
-      {/* ── 融合加载中 ── */}
-      {mergeLoading && (
-        <div className="tb-modal-overlay">
-          <div className="tb-modal" style={{ textAlign: 'center', padding: '48px 32px' }}>
-            <div style={{ fontSize: 32, marginBottom: 16 }}>✨</div>
-            <div style={{ fontSize: 16, color: 'var(--ink-2)' }}>正在融合笔记，请稍候…</div>
-            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 8 }}>
-              LLM 合成中，通常需要 10-30 秒
-            </div>
-          </div>
-        </div>
+      {/* ── Modal：融合弹框 ── */}
+      {mergeOpen && (
+        <MergeModal
+          items={workspace.items}
+          loading={mergeLoading}
+          onConfirm={async (itemIds, style) => {
+            setMergeLoading(true)
+            try {
+              await withStatusToast(
+                () => mergeNotes(workspace.workspace_id, itemIds, style),
+                {
+                  id: `workspace-merge-${workspace.workspace_id}`,
+                  loading: '正在融合笔记…',
+                  success: '融合完成',
+                  error: '融合失败，请重试',
+                },
+              )
+              // 刷新融合笔记列表
+              setMergeOpen(false)
+              const updated = await listMergedNotes(workspace.workspace_id)
+              setMergedNotes(updated)
+            } catch {
+              /* withStatusToast 已提示 */
+            } finally {
+              setMergeLoading(false)
+            }
+          }}
+          onClose={() => setMergeOpen(false)}
+        />
       )}
 
-      {/* ── Modal：融合结果 ── */}
-      {mergeResult && (
-        <div className="tb-modal-overlay" onClick={() => setMergeResult(null)}>
-          <div className="tb-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 700 }}>
-            <button className="tb-modal-close" onClick={() => setMergeResult(null)}>
-              <X size={18} />
-            </button>
-            <h2 style={{ fontSize: 20, marginBottom: 8 }}>{mergeResult.title}</h2>
-            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 16 }}>
-              融合了 {mergeResult.item_ids.length} 个素材 · {new Date(mergeResult.created_at).toLocaleString('zh-CN')}
-            </div>
-            <div
-              className="tb-merged-content"
-              style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, fontSize: 14, color: 'var(--ink-1)' }}
-            >
-              {mergeResult.content_md}
-            </div>
-            <div style={{ marginTop: 20, textAlign: 'right' }}>
+      {/* ── 融合笔记置顶展示 ── */}
+      {mergedNotes.length > 0 && (
+        <div style={{ margin: '16px 0', border: '1px solid var(--line)', borderRadius: 10, padding: 16, background: 'var(--bg-card)' }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-1)', marginBottom: 12 }}>
+            ✨ 融合笔记（{mergedNotes.length}）
+          </div>
+          {mergedNotes.map((mn) => (
+            <details key={mn.merged_id} style={{ marginBottom: 8 }}>
+              <summary style={{ cursor: 'pointer', fontSize: 13, color: 'var(--ink-2)', padding: '6px 0' }}>
+                {mn.title}
+                <span style={{ fontSize: 11, color: 'var(--ink-4)', marginLeft: 12 }}>
+                  {mn.item_ids.length} 素材 · {new Date(mn.created_at).toLocaleString('zh-CN')}
+                </span>
+              </summary>
+              <div
+                className="tb-merged-content"
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  lineHeight: 1.8,
+                  fontSize: 13,
+                  color: 'var(--ink-1)',
+                  padding: '12px 0',
+                  borderTop: '1px solid var(--line)',
+                  marginTop: 8,
+                }}
+              >
+                {mn.content_md}
+              </div>
               <button
-                className="btn btn-primary"
+                className="btn btn-sm"
+                style={{ marginTop: 8 }}
                 onClick={async () => {
-                  await navigator.clipboard.writeText(mergeResult.content_md)
+                  await navigator.clipboard.writeText(mn.content_md)
                   toast.success('已复制到剪贴板')
                 }}
               >
                 复制内容
               </button>
-            </div>
-          </div>
+            </details>
+          ))}
         </div>
       )}
 
