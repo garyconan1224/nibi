@@ -143,7 +143,16 @@ export function RecentTasks({ tasks: tasksProp }: RecentTasksProps) {
   usePipelineTasks({ pollInterval: 5000 })
   const storeTasks = useTaskStore((s) => s.tasks)
   const tasks = tasksProp ?? storeTasks
-  const cards = tasks.slice(0, 8).map(taskToNoteCard)
+  // 过滤无意义卡：标题落到 getStatusText（无 video_title 也无 url），且无封面、无摘要
+  const meaningful = tasks.filter((t) => {
+    const payload = (t.payload ?? {}) as Record<string, unknown>
+    const result = (t.result ?? {}) as Record<string, unknown>
+    const hasTitle = !!(result.video_title || payload.video_title || payload.url)
+    const hasCover = !!(result.video_thumbnail_url || result.cover_thumbnail || result.audio)
+    const hasSummary = !!(result.note_summary || result.summary || result.description || result.video_title)
+    return hasTitle || hasCover || hasSummary
+  })
+  const cards = meaningful.slice(0, 8).map(taskToNoteCard)
   const totalCount = tasks.length
 
   // 封面 icon
