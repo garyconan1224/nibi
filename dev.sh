@@ -38,7 +38,12 @@ if [[ ! -x .venv/bin/uvicorn ]]; then
     exit 1
 fi
 printf "${BLUE}▶ 启动后端 :%s${NC}\n" "$BACKEND_PORT"
-nohup .venv/bin/uvicorn backend.app.main:app --reload --port "$BACKEND_PORT" \
+# --reload 只监视代码目录（backend/shared），不扫 data/（数千文件）与 .local/：
+# 未装 watchfiles 时 uvicorn 用 StatReload 轮询 stat，若监视整个仓库会与 yt-dlp
+# 下载往 data/ 写分片抢磁盘/CPU、拖慢下载。限定代码目录后既保留热重载又不影响下载。
+nohup .venv/bin/uvicorn backend.app.main:app --reload \
+    --reload-dir backend --reload-dir shared \
+    --port "$BACKEND_PORT" \
     > .local/backend.log 2>&1 &
 echo $! > .local/backend.pid
 

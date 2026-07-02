@@ -20,7 +20,7 @@ from backend.app.models.tasks import (
 from shared.config import ROOT_DIR
 
 TASK_STORE_PATH = ROOT_DIR / ".local" / "backend_tasks.json"
-MAX_LOG_ENTRIES = 500
+MAX_LOG_ENTRIES = 200  # 每个任务只保留最近 N 条日志（进度刷屏行无需全留）
 SAVE_DEBOUNCE_S = 0.5  # progress/download_speed 写入节流间隔
 
 
@@ -59,6 +59,12 @@ class TaskStore:
                     rec.status = TaskStatus.FAILED.value
                     rec.error = rec.error or "后端重启，任务中断"
                     rec.updated_at = _now_iso()
+                    dirty = True
+                # 历史日志裁剪：老任务可能残留数千行进度刷屏日志，导致本文件膨胀到
+                # 数十 MB，每次写盘（全量序列化 + fsync）耗时数百 ms，把下载/处理线程
+                # 饿死。加载时统一裁到 MAX_LOG_ENTRIES，落盘一次即根治历史膨胀。
+                if len(rec.log) > MAX_LOG_ENTRIES:
+                    rec.log = rec.log[-MAX_LOG_ENTRIES:]
                     dirty = True
                 self._records[rec.task_id] = rec
         # 有僵尸被清理就落盘一次，让磁盘文件也变干净（下次启动不再重复清理）
@@ -133,7 +139,17 @@ class TaskStore:
             if len(rec.log) > MAX_LOG_ENTRIES:
                 rec.log = rec.log[-MAX_LOG_ENTRIES:]
             rec.updated_at = _now_iso()
-            self._save()
+            # 写盘节流：下载/转写阶段进度日志高频（每秒多条），逐条全量重写会拖垮
+            # 下载线程。info 级日志按 SAVE_DEBOUNCE_S 合并落盘；warning/error 立即落盘
+            # 保证关键信息不丢。内存里的 log 始终是最新的（SSE/接口读内存不受影响）。
+            if level == "info":
+                now = time.monotonic()
+                if now - self._last_save_ts >= SAVE_DEBOUNCE_S:
+                    self._save()
+                    self._last_save_ts = now
+            else:
+                self._save()
+                self._last_save_ts = time.monotonic()
             return rec
 
     def list_all(self) -> List[TaskRecord]:

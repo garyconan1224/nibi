@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -477,11 +478,19 @@ def run_ytdlp_download(
             except ValueError:
                 percent = 0.0
             task_state.update({"status": "downloading", "percent": percent, "speed": speed, "eta": eta})
-            if progress_callback:
-                progress_callback(min(0.99, max(0.02, percent / 100.0)), f"{percent:.0f}% {speed} ETA {eta}")
-            # 独立地把实时速度字符串回调给上层，便于任务中心展示 MB/s / KB/s
-            if speed_callback:
-                speed_callback(speed)
+            # 节流：progress/speed 回调会持久化任务 JSON（fsync + 把每条进度写进 log），
+            # yt-dlp 下载中每个 chunk 都触发本 hook（分片并发时更密集），若逐 tick 落盘会
+            # 让 log 无限膨胀、每次全量重写越来越慢，反过来把下载线程饿死到 KiB/s（速度单调衰减）。
+            # 因此对落盘型回调限流为最多每 ~1s 一次；下载完成分支不受影响，保证最终态准确。
+            _now = time.monotonic()
+            _last = task_state.get("_last_emit_ts", 0.0)
+            if percent >= 99.0 or (_now - _last) >= 1.0:
+                task_state["_last_emit_ts"] = _now
+                if progress_callback:
+                    progress_callback(min(0.99, max(0.02, percent / 100.0)), f"{percent:.0f}% {speed} ETA {eta}")
+                # 独立地把实时速度字符串回调给上层，便于任务中心展示 MB/s / KB/s
+                if speed_callback:
+                    speed_callback(speed)
         elif d.get("status") == "finished":
             filename = d.get("filename", "")
             save_path = os.path.abspath(filename) if filename else ""
