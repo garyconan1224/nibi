@@ -1138,20 +1138,6 @@ export function AddMaterialModal({
                         <button
                           type="button"
                           className="btn btn-ghost"
-                          onClick={() => {
-                            const next = new Set<string>()
-                            batchResult.items.forEach((item, idx) => {
-                              const key = batchSourceItemKey(item, idx)
-                              if (!batchSelectedKeys.has(key)) next.add(key)
-                            })
-                            setBatchSelectedKeys(next)
-                          }}
-                        >
-                          反选
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-ghost"
                           onClick={() => setBatchSelectedKeys(new Set())}
                         >
                           清空
