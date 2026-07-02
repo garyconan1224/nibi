@@ -1,10 +1,26 @@
 # AI Handoff
 
-Last updated: 2026-06-23（**当前指针，给所有 AI 工具优先读取**）
+Last updated: 2026-07-02（**当前指针，给所有 AI 工具优先读取**）
 
-## 当前事实
+## 当前事实（2026-07-02）
 
-> **2026-06-23 更新（④15 左侧导航重塑完成）；下方「📦 归档参考」为 2026-06-21 及更早。**
+- **当前分支 `feat/global-knowledge`**（非 main）。以 `git log --oneline` 为准。
+- **本会话（2026-07-02）已完成的四批 + 一个根因修复：**
+  - **下载卡死根因修复**（`32858bf`）：`.local/backend_tasks.json` 曾达 40MB，每个进度 tick 全量重写 + fsync 把下载线程饿死到几十 B/s。修法=进度回调节流 + append_log 节流 + dev.sh 的 `--reload` 限定只监视 `backend/shared`。下载从 ETA 数小时 → 2.4–4.5s。
+  - **A（task1-4）**：删资料库「批量分析」按钮(`005a61a`)、资料库头部删「查看合集」(`36dbb78`)、首页最近任务回归修复(`b224588`，list_tasks 改为只排除 trashed 工作空间)、合集详情精简+融合重做(`86bd255`/`d052878`/`df34fab`/`4e939e9`)。
+  - **B（task5-7）**：task_store 改「一任务一文件」+ 迁移(`2865a50`)、清理测试任务(`d775df4` + `scripts/cleanup_test_tasks.py`)。374→79 真实任务。
+  - **C（global-knowledge）**：导航删资料库/加全局知识库(`abd2423`)、嵌入+重排模型可配置(`548280d`)、全局知识库问答页(`c7f4869`)。
+  - **D（本批，2026-07-02 待提交）**：知识库支持选合集范围(`workspace_ids`)、设置页供应商+模型合并+默认模型区、笔记按类型导出媒体（视频/音频/图）、复刻砍 story/compete 只留提示词复刻并打磨（卡片化+一键全复制+导出提示词脚本）。
+- **Claude 验收本会话发现并修复的 bug**：`GET /providers` 因返回值改 dict 但返回类型注解仍是 list → 500；`services/providers.ts` 未适配 dict 结构会崩。两处已修，`/providers` 恢复 200，前端 build 通过。
+- **验证状态**：前端 `npm run build` ✅；后端 import ✅(131 路由)；task_store/knowledge/provider 相关 pytest ✅；`/providers`、`/knowledge/ask(带范围)`、健康检查 ✅。
+- **本会话计划文档**（docs/plans/）：`home-sync-download-speed-library-timeout-2026-07-02.md`、`library-header-recenttasks-collection-detail-2026-07-02.md`、`task-store-refactor-and-cleanup-2026-07-02.md`、`global-knowledge-nav-embedding-rerank-2026-07-02.md`、`knowledge-scope-settings-export-replica-2026-07-02.md`（均已执行）。
+- **下一步**：① D 批 + 两处修复提交（待用户确认是否 push / merge）；② 待定新需求。复刻 story/compete 已砍；本地离线嵌入/重排模型留作后续。
+
+---
+
+### 📦 归档参考（2026-06-23 及更早）
+
+> **2026-06-23 更新（④15 左侧导航重塑完成）；下方为 2026-06-21 及更早。**
 
 - **基线 git `3ee64a2`（main）**；fix.py / fix_lint.py 已清理（2026-06-22）。
 - **19 条手测反馈按分类推进**（来源 `docs/test-reports/manual-local-video-2026-06-21.md`）：
