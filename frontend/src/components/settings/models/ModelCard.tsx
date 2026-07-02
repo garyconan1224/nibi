@@ -8,6 +8,8 @@ import {
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
+export type ModelRole = 'text' | 'vision' | 'embedding' | 'rerank'
+
 /**
  * 模型卡片（DESIGN_NOTES_SETTINGS.md §4.3 · Models）。
  *
@@ -29,8 +31,12 @@ export interface ModelCardProps {
   isVisionDefault: boolean
   /** 是否隐藏视觉切换（provider 不声明 vision capability 时） */
   hideVision?: boolean
-  /** 切换回调：role=text|vision；next=true 设为默认、false 取消 */
-  onToggleDefault: (role: 'text' | 'vision', next: boolean) => void
+  isEmbeddingDefault: boolean
+  isRerankDefault: boolean
+  hideEmbedding?: boolean
+  hideRerank?: boolean
+  /** 切换回调：next=true 设为默认、false 取消 */
+  onToggleDefault: (role: ModelRole, next: boolean) => void
 }
 
 export function ModelCard({
@@ -38,11 +44,27 @@ export function ModelCard({
   modelName,
   isTextDefault,
   isVisionDefault,
+  isEmbeddingDefault,
+  isRerankDefault,
   hideVision,
+  hideEmbedding,
+  hideRerank,
   onToggleDefault,
 }: ModelCardProps) {
   const { t } = useTranslation('settings')
   const displayName = modelName && modelName !== modelId ? modelName : null
+  const roleButtons: Array<{
+    role: ModelRole
+    label: string
+    active: boolean
+    hidden?: boolean
+    title: string
+  }> = [
+    { role: 'text', label: 'T', active: isTextDefault, title: t('model.defaultText.set') },
+    { role: 'vision', label: 'V', active: isVisionDefault, hidden: hideVision, title: t('model.defaultVision.set') },
+    { role: 'embedding', label: 'E', active: isEmbeddingDefault, hidden: hideEmbedding, title: '设为默认嵌入模型' },
+    { role: 'rerank', label: 'R', active: isRerankDefault, hidden: hideRerank, title: '设为默认重排模型' },
+  ]
 
   return (
     <div
@@ -59,57 +81,33 @@ export function ModelCard({
       </div>
       <TooltipProvider delayDuration={200}>
         <div className="flex shrink-0 items-center gap-1">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                aria-pressed={isTextDefault}
-                aria-label={t('model.defaultText.toggle')}
-                onClick={() => onToggleDefault('text', !isTextDefault)}
-                className={cn(
-                  'inline-flex size-6 items-center justify-center rounded-md border text-[10px] font-semibold transition-colors',
-                  isTextDefault
-                    ? 'border-violet-300 bg-violet-50 text-violet-700'
-                    : 'border-zinc-200 bg-white text-zinc-400 hover:border-zinc-300 hover:text-zinc-600',
-                )}
-              >
-                <Star
-                  className={cn('size-3', isTextDefault ? 'fill-violet-500 stroke-violet-500' : '')}
-                />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top">
-              {isTextDefault
-                ? t('model.defaultText.active')
-                : t('model.defaultText.set')}
-            </TooltipContent>
-          </Tooltip>
-
-          {hideVision ? null : (
-            <Tooltip>
+          {roleButtons.filter((item) => !item.hidden).map((item) => (
+            <Tooltip key={item.role}>
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  aria-pressed={isVisionDefault}
-                  aria-label={t('model.defaultVision.toggle')}
-                  onClick={() => onToggleDefault('vision', !isVisionDefault)}
+                  aria-pressed={item.active}
+                  aria-label={item.title}
+                  onClick={() => onToggleDefault(item.role, !item.active)}
                   className={cn(
                     'inline-flex size-6 items-center justify-center rounded-md border text-[10px] font-semibold transition-colors',
-                    isVisionDefault
+                    item.active
                       ? 'border-violet-300 bg-violet-50 text-violet-700'
                       : 'border-zinc-200 bg-white text-zinc-400 hover:border-zinc-300 hover:text-zinc-600',
                   )}
                 >
-                  V
+                  {item.role === 'text' ? (
+                    <Star className={cn('size-3', item.active ? 'fill-violet-500 stroke-violet-500' : '')} />
+                  ) : (
+                    item.label
+                  )}
                 </button>
               </TooltipTrigger>
               <TooltipContent side="top">
-                {isVisionDefault
-                  ? t('model.defaultVision.active')
-                  : t('model.defaultVision.set')}
+                {item.active ? '当前默认' : item.title}
               </TooltipContent>
             </Tooltip>
-          )}
+          ))}
         </div>
       </TooltipProvider>
     </div>
@@ -117,4 +115,3 @@ export function ModelCard({
 }
 
 export default ModelCard
-

@@ -22,9 +22,13 @@ from shared.knowledge_base import (
     VideoChunk,
     retrieve_with_sources,
 )
-from shared.config import RERANKER_MODEL
 from shared.sf_client import SiliconFlowError, rerank_documents
 from shared.settings_store import load_settings
+from shared.runtime_llm_config import (
+    get_embedding_model_for_rag,
+    get_openai_compat_api_key,
+    get_reranker_model_for_rag,
+)
 from src.vidmirror.core.providers import ChatRequest
 from src.vidmirror.core.providers.registry import create_default_registry
 
@@ -55,7 +59,9 @@ def _resolve_api_key(api_key: Optional[str]) -> str:
     if api_key and api_key.strip():
         return api_key.strip()
     settings = load_settings()
-    eff = (settings.openai_api_key or "").strip()
+    eff = str(getattr(settings, "openai_api_key", "") or "").strip()
+    if not eff:
+        eff = get_openai_compat_api_key(settings)
     if not eff:
         raise ValueError("RAG search requires an openai-compatible api key")
     return eff
@@ -141,12 +147,14 @@ def search_one_workspace(
 
     eff_key = _resolve_api_key(api_key)
     store = store or WorkspaceStore()
+    settings = load_settings()
+    embedding_model = get_embedding_model_for_rag(settings)
     rec = store.get(workspace_id)
     if rec is None:
         raise KeyError(f"workspace not found: {workspace_id}")
 
     knowledge, source_map = build_or_load_workspace_index(
-        workspace_id, eff_key, store=store, task_store=task_store
+        workspace_id, eff_key, embedding_model=embedding_model, store=store, task_store=task_store
     )
 
     sources_out: List[Dict[str, Any]] = []
@@ -185,8 +193,9 @@ def _retrieve_one(
     if rec is None:
         return [], [], {}, workspace_id, ""
     try:
+        embedding_model = get_embedding_model_for_rag(load_settings())
         knowledge, source_map = build_or_load_workspace_index(
-            workspace_id, api_key, store=store, task_store=task_store
+            workspace_id, api_key, embedding_model=embedding_model, store=store, task_store=task_store
         )
     except ValueError:
         return [], [], {}, workspace_id, rec.name
@@ -225,6 +234,8 @@ def search_across_workspaces(
         raise ValueError("query is required")
     eff_key = _resolve_api_key(api_key)
     store = store or WorkspaceStore()
+    settings = load_settings()
+    rerank_model = get_reranker_model_for_rag(settings)
 
     if workspace_ids:
         # 校验存在性，避免静默忽略
@@ -268,7 +279,7 @@ def search_across_workspaces(
     # reranker 二次精排（合并 score 量纲不一致问题）
     docs = [str(r.get("skeleton_text") or "")[:3000] for r, *_ in pool_raws]
     try:
-        rr = rerank_documents(eff_key, RERANKER_MODEL, query, docs, top_n=top_k)
+        rr = rerank_documents(eff_key, rerank_model, query, docs, top_n=top_k)
         order = [(int(item.get("index", -1)), float(item.get("relevance_score", 0.0))) for item in rr]
     except SiliconFlowError:
         # 降级：按原始 score 排序

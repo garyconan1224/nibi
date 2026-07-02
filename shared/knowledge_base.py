@@ -17,10 +17,10 @@ from shared.config import (
     EMBEDDING_MODEL,
     RAG_FINAL_TOP_N,
     RAG_TOP_K,
-    RERANKER_MODEL,
     SHORT_MODE_MAX_CHARS,
     embedding_char_limit_for_model,
 )
+from shared.runtime_llm_config import get_reranker_model_for_rag
 from shared.sf_client import SiliconFlowError, create_embeddings, rerank_documents
 
 # progress(0~1, 说明文案)，供 Streamlit 进度条使用
@@ -420,7 +420,8 @@ def retrieve_top3_skeletons(
     docs = [c.embed_text for c in candidates]
     results: list[dict[str, Any]] = []
     try:
-        results = rerank_documents(api_key, RERANKER_MODEL, query, docs, top_n=RAG_FINAL_TOP_N)
+        rerank_model = get_reranker_model_for_rag()
+        results = rerank_documents(api_key, rerank_model, query, docs, top_n=RAG_FINAL_TOP_N)
     except SiliconFlowError:
         # 重排序模型未开通或 id 变更（20012 等）时，降级为纯向量 Top-K
         results = [{"index": i} for i in range(min(RAG_FINAL_TOP_N, len(candidates)))]
@@ -451,7 +452,8 @@ def retrieve_with_sources(
     docs = [c.embed_text for c in candidates]
     results: list[dict[str, Any]] = []
     try:
-        results = rerank_documents(api_key, RERANKER_MODEL, query, docs, top_n=RAG_FINAL_TOP_N)
+        rerank_model = get_reranker_model_for_rag()
+        results = rerank_documents(api_key, rerank_model, query, docs, top_n=RAG_FINAL_TOP_N)
     except SiliconFlowError:
         results = [{"index": i, "relevance_score": 0.0} for i in range(min(RAG_FINAL_TOP_N, len(candidates)))]
 

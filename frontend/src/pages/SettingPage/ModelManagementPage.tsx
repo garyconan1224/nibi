@@ -9,6 +9,7 @@ import {
   ModelProviderGroup,
   type ModelProviderGroupItem,
 } from '@/components/settings/models/ModelProviderGroup'
+import type { ModelRole } from '@/components/settings/models/ModelCard'
 
 /** 后端 /providers 返回项 */
 interface ProviderSummary {
@@ -19,6 +20,7 @@ interface ProviderSummary {
   base_url: string
   has_api_key: boolean
   capabilities?: string[]
+  default_models?: Record<string, string>
 }
 
 interface ModelItem {
@@ -34,8 +36,8 @@ interface ProviderWithModels extends ProviderSummary {
   expanded: boolean
 }
 
-/** capability 过滤：chat=文本对话;vision=视觉理解 */
-type CapabilityFilter = 'all' | 'chat' | 'vision'
+/** capability 过滤：chat=文本对话;vision=视觉理解;embedding/rerank=知识库检索 */
+type CapabilityFilter = 'all' | 'chat' | 'vision' | 'embedding' | 'rerank'
 
 const ModelManagementPage = () => {
   const { t } = useTranslation('settings')
@@ -52,7 +54,40 @@ const ModelManagementPage = () => {
   const textModelId = useConfigStore((s) => s.textModelId)
   const visionProviderId = useConfigStore((s) => s.visionProviderId)
   const visionModelId = useConfigStore((s) => s.visionModelId)
+  const embeddingProviderId = useConfigStore((s) => s.embeddingProviderId)
+  const embeddingModelId = useConfigStore((s) => s.embeddingModelId)
+  const rerankProviderId = useConfigStore((s) => s.rerankProviderId)
+  const rerankModelId = useConfigStore((s) => s.rerankModelId)
   const setConfig = useConfigStore((s) => s.setConfig)
+
+  const modelCapability = capFilter === 'all' ? undefined : capFilter
+  const backendDefaults = useMemo(() => {
+    const findDefault = (role: 'chat' | 'vision' | 'embedding' | 'rerank') => {
+      const provider = providers.find((p) => (p.default_models?.[role] ?? '').trim())
+      return {
+        providerId: provider?.id ?? '',
+        modelId: provider?.default_models?.[role] ?? '',
+      }
+    }
+    return {
+      text: findDefault('chat'),
+      vision: findDefault('vision'),
+      embedding: findDefault('embedding'),
+      rerank: findDefault('rerank'),
+    }
+  }, [providers])
+  const effectiveTextDefault = backendDefaults.text.modelId
+    ? backendDefaults.text
+    : { providerId: textProviderId, modelId: textModelId }
+  const effectiveVisionDefault = backendDefaults.vision.modelId
+    ? backendDefaults.vision
+    : { providerId: visionProviderId, modelId: visionModelId }
+  const effectiveEmbeddingDefault = backendDefaults.embedding.modelId
+    ? backendDefaults.embedding
+    : { providerId: embeddingProviderId, modelId: embeddingModelId }
+  const effectiveRerankDefault = backendDefaults.rerank.modelId
+    ? backendDefaults.rerank
+    : { providerId: rerankProviderId, modelId: rerankModelId }
 
   /* ── 加载提供商列表 ── */
   const fetchProviders = async () => {
@@ -80,6 +115,26 @@ const ModelManagementPage = () => {
   useEffect(() => { fetchProviders() }, [])
 
   /* ── 展开/收起并加载模型 ── */
+  const fetchProviderModels = async (id: string) => {
+    const url = modelCapability
+      ? `/providers/${id}/models?capability=${modelCapability}`
+      : `/providers/${id}/models`
+    const res = await http.get(url)
+    const data = res.data.data ?? res.data
+    return data.models ?? []
+  }
+
+  const handleCapabilityFilter = (next: CapabilityFilter) => {
+    setCapFilter(next)
+    setProviders(prev => prev.map(p => ({
+      ...p,
+      models: [],
+      modelError: undefined,
+      loadingModels: false,
+      expanded: false,
+    })))
+  }
+
   const toggleProvider = async (id: string) => {
     setProviders(prev => prev.map(p => {
       if (p.id !== id) return p
@@ -95,11 +150,10 @@ const ModelManagementPage = () => {
     if (!provider || provider.models.length > 0 || provider.modelError) return
 
     try {
-      const res = await http.get(`/providers/${id}/models`)
-      const data = res.data.data ?? res.data
+      const models = await fetchProviderModels(id)
       setProviders(prev => prev.map(p =>
         p.id === id
-          ? { ...p, models: data.models ?? [], modelError: undefined, loadingModels: false }
+          ? { ...p, models, modelError: undefined, loadingModels: false }
           : p
       ))
     } catch (e) {
@@ -120,11 +174,10 @@ const ModelManagementPage = () => {
       p.id === id ? { ...p, models: [], modelError: undefined, loadingModels: true } : p
     ))
     try {
-      const res = await http.get(`/providers/${id}/models`)
-      const data = res.data.data ?? res.data
+      const models = await fetchProviderModels(id)
       setProviders(prev => prev.map(p =>
         p.id === id
-          ? { ...p, models: data.models ?? [], modelError: undefined, loadingModels: false }
+          ? { ...p, models, modelError: undefined, loadingModels: false }
           : p
       ))
       // 刷新成功，清除全局错误
@@ -138,13 +191,36 @@ const ModelManagementPage = () => {
     }
   }
 
-  /* ── 设为默认文本/视觉模型(role=text|vision);next=false 代表清除默认 ── */
-  const setAsDefault = (
+  /* ── 设为默认模型;next=false 代表清除默认 ── */
+  const setAsDefault = async (
     providerId: string,
-    role: 'text' | 'vision',
+    role: ModelRole,
     modelId: string,
     next: boolean,
   ) => {
+    const provider = providers.find((p) => p.id === providerId)
+    const backendRole = role === 'text' ? 'chat' : role
+    const default_models = { [backendRole]: next ? modelId : '' }
+    try {
+      const res = await http.put(`/providers/${providerId}`, { default_models })
+      const updated = res.data.data ?? res.data
+      setProviders(prev => prev.map(p =>
+        p.id === providerId
+          ? {
+              ...p,
+              default_models: updated.default_models ?? {
+                ...(provider?.default_models ?? {}),
+                [backendRole]: next ? modelId : '',
+              },
+            }
+          : p
+      ))
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '保存默认模型失败'
+      toast.error(msg)
+      return
+    }
+
     if (role === 'text') {
       setConfig(
         next
@@ -154,7 +230,7 @@ const ModelManagementPage = () => {
       toast.success(
         next ? t('model.defaultText.saved') : t('model.defaultText.cleared'),
       )
-    } else {
+    } else if (role === 'vision') {
       setConfig(
         next
           ? { visionProviderId: providerId, visionModelId: modelId }
@@ -163,6 +239,20 @@ const ModelManagementPage = () => {
       toast.success(
         next ? t('model.defaultVision.saved') : t('model.defaultVision.cleared'),
       )
+    } else if (role === 'embedding') {
+      setConfig(
+        next
+          ? { embeddingProviderId: providerId, embeddingModelId: modelId }
+          : { embeddingProviderId: '', embeddingModelId: '' },
+      )
+      toast.success(next ? '已保存默认嵌入模型' : '已清除默认嵌入模型')
+    } else {
+      setConfig(
+        next
+          ? { rerankProviderId: providerId, rerankModelId: modelId }
+          : { rerankProviderId: '', rerankModelId: '' },
+      )
+      toast.success(next ? '已保存默认重排模型' : '已清除默认重排模型')
     }
   }
 
@@ -171,7 +261,7 @@ const ModelManagementPage = () => {
   const groupedList: ModelProviderGroupItem[] = useMemo(
     () =>
       providers
-        // capability 过滤:all 通过;chat/vision 仅保留声明对应 capability 的 provider
+          // capability 过滤:all 通过;其余仅保留声明对应 capability 的 provider
         .filter((p) => {
           if (capFilter === 'all') return true
           return Array.isArray(p.capabilities) && p.capabilities.includes(capFilter)
@@ -220,6 +310,8 @@ const ModelManagementPage = () => {
     { key: 'all', label: t('model.filter.all') },
     { key: 'chat', label: t('model.filter.chat') },
     { key: 'vision', label: t('model.filter.vision') },
+    { key: 'embedding', label: '嵌入' },
+    { key: 'rerank', label: '重排' },
   ]
 
   return (
@@ -275,7 +367,7 @@ const ModelManagementPage = () => {
             <button
               key={c.key}
               type="button"
-              onClick={() => setCapFilter(c.key)}
+              onClick={() => handleCapabilityFilter(c.key)}
               className="chip"
               style={{
                 background:
@@ -339,10 +431,12 @@ const ModelManagementPage = () => {
               expanded={providers.find((p) => p.id === g.id)?.expanded ?? false}
               onToggleExpand={() => toggleProvider(g.id)}
               onRefresh={() => refreshModels(g.id)}
-              defaultText={{ providerId: textProviderId, modelId: textModelId }}
-              defaultVision={{ providerId: visionProviderId, modelId: visionModelId }}
+              defaultText={effectiveTextDefault}
+              defaultVision={effectiveVisionDefault}
+              defaultEmbedding={effectiveEmbeddingDefault}
+              defaultRerank={effectiveRerankDefault}
               onSetDefault={(role, modelId, next) =>
-                setAsDefault(g.id, role, modelId, next)
+                void setAsDefault(g.id, role, modelId, next)
               }
             />
           ))
@@ -353,4 +447,3 @@ const ModelManagementPage = () => {
 }
 
 export default ModelManagementPage
-

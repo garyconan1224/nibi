@@ -6,7 +6,7 @@ from dataclasses import asdict, replace
 from typing import Any, Dict, List
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from shared.settings_store import (
@@ -53,13 +53,17 @@ def list_providers() -> list[Dict[str, Any]]:
                 "capabilities": list(p.capabilities),
                 "base_url": p.base_url,
                 "has_api_key": bool(p.api_key.strip()),
+                "default_models": dict(p.default_models),
             }
         )
     return out
 
 
 @router.get("/{provider_id}/models")
-async def get_provider_models(provider_id: str) -> Dict[str, Any]:
+async def get_provider_models(
+    provider_id: str,
+    capability: str | None = Query(default=None, pattern="^(chat|vision|embedding|rerank)$"),
+) -> Dict[str, Any]:
     """调用上游 {base_url}/models 获取该 provider 支持的模型列表。
     返回格式: {"models": [{"id": "...", "name": "..."}]}
     失败时返回: {"models": [], "error": "错误信息"}，不抛 500。
@@ -68,6 +72,14 @@ async def get_provider_models(provider_id: str) -> Dict[str, Any]:
     profile = next((p for p in settings.providers if p.id == provider_id), None)
     if profile is None:
         raise HTTPException(status_code=404, detail=f"provider not found: {provider_id}")
+
+    if capability:
+        try:
+            provider = create_default_registry().build(profile)
+            model_ids = provider.list_models(capability)
+            return {"models": [{"id": mid, "name": mid} for mid in model_ids]}
+        except Exception as exc:  # noqa: BLE001
+            return {"models": [], "error": str(exc)}
 
     base_url = profile.base_url.rstrip("/") or "https://api.siliconflow.cn/v1"
     url = f"{base_url}/models"
@@ -198,8 +210,20 @@ def update_provider(provider_id: str, req: ProviderUpdateRequest) -> Dict[str, A
         profile_dict["base_url"] = req.base_url
     if req.enabled is not None:
         profile_dict["enabled"] = req.enabled
+    updated_default_models = dict(profile.default_models)
+    touched_model_roles: set[str] = set()
     if req.default_models is not None:
-        profile_dict["default_models"] = req.default_models
+        for raw_key, raw_value in req.default_models.items():
+            key = str(raw_key or "").strip()
+            if key not in {"chat", "vision", "embedding", "rerank"}:
+                continue
+            touched_model_roles.add(key)
+            value = str(raw_value or "").strip()
+            if value:
+                updated_default_models[key] = value
+            else:
+                updated_default_models.pop(key, None)
+        profile_dict["default_models"] = updated_default_models
 
     new_profile = ProviderProfile.from_dict(profile_dict)
 
@@ -208,8 +232,21 @@ def update_provider(provider_id: str, req: ProviderUpdateRequest) -> Dict[str, A
         new_profile if p.id == provider_id else p for p in settings.providers
     )
 
+    replace_kwargs: dict[str, Any] = {"providers": new_providers}
+    role_to_settings = {
+        "chat": ("text_model", "default_provider_for_chat"),
+        "vision": ("vision_model", "default_provider_for_vision"),
+        "embedding": ("embedding_model", "default_provider_for_embedding"),
+        "rerank": ("rerank_model", "default_provider_for_rerank"),
+    }
+    for role in touched_model_roles:
+        model_field, provider_field = role_to_settings[role]
+        model_value = updated_default_models.get(role, "")
+        replace_kwargs[model_field] = model_value
+        replace_kwargs[provider_field] = provider_id if model_value else ""
+
     # 保存设置
-    new_settings = replace(settings, providers=new_providers)
+    new_settings = replace(settings, **replace_kwargs)
     save_settings(new_settings)
 
     return {

@@ -375,6 +375,7 @@ class AppSettings:
     text_model: str = ""
     vision_model: str = ""
     embedding_model: str = ""
+    rerank_model: str = ""
     anthropic_model: str = ""
     providers: tuple[ProviderProfile, ...] = ()
     default_provider_for_chat: str = ""
@@ -400,6 +401,7 @@ class AppSettings:
             text_model=str(data.get("text_model") or ""),
             vision_model=str(data.get("vision_model") or ""),
             embedding_model=str(data.get("embedding_model") or ""),
+            rerank_model=str(data.get("rerank_model") or ""),
             anthropic_model=str(data.get("anthropic_model") or ""),
             providers=providers,
             default_provider_for_chat=str(data.get("default_provider_for_chat") or defaults.get("chat") or ""),
@@ -507,6 +509,7 @@ def _parse_providers_with_migration(data: dict[str, Any]) -> tuple[ProviderProfi
             "chat": str(data.get("text_model") or ""),
             "vision": str(data.get("vision_model") or ""),
             "embedding": str(data.get("embedding_model") or ""),
+            "rerank": str(data.get("rerank_model") or ""),
         },
         rate_limit_rpm=60,
         timeout_sec=120,

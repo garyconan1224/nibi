@@ -10,6 +10,7 @@ from typing import Literal
 from shared.api_key_resolver import resolve_api_key, resolve_anthropic_api_key
 from shared.config import (
     EMBEDDING_MODEL,
+    RERANKER_MODEL,
     TEXT_BACKEND_ANTHROPIC,
     TEXT_MODEL_ANALYZER,
     VISION_MODEL_ANALYZER,
@@ -23,6 +24,10 @@ Capability = Literal["chat", "vision", "embedding", "rerank"]
 
 def _registry():
     return create_default_registry()
+
+
+def _setting_str(value: object) -> str:
+    return value.strip() if isinstance(value, str) else ""
 
 
 def _profile_for_capability(settings: AppSettings, capability: Capability):
@@ -65,7 +70,7 @@ def get_anthropic_api_key(settings: AppSettings | None = None) -> str:
 
 def get_default_model(
     settings: AppSettings | None,
-    capability: Literal["chat", "vision", "embedding"],
+    capability: Capability,
     *,
     text_backend: str | None = None,
 ) -> str:
@@ -83,7 +88,12 @@ def get_default_model(
                 return m
         return (s.anthropic_model or "").strip() or "claude-sonnet-4-20250514"
 
-    cap_map: dict[str, Capability] = {"chat": "chat", "vision": "vision", "embedding": "embedding"}
+    cap_map: dict[str, Capability] = {
+        "chat": "chat",
+        "vision": "vision",
+        "embedding": "embedding",
+        "rerank": "rerank",
+    }
     p = _profile_for_capability(s, cap_map[capability])
     if p is not None:
         m = (p.default_models.get(capability) or "").strip()
@@ -91,10 +101,12 @@ def get_default_model(
             return m
 
     if capability == "vision":
-        return (s.vision_model or "").strip() or VISION_MODEL_ANALYZER
+        return _setting_str(s.vision_model) or VISION_MODEL_ANALYZER
     if capability == "embedding":
-        return (s.embedding_model or "").strip() or EMBEDDING_MODEL
-    return (s.text_model or "").strip() or TEXT_MODEL_ANALYZER
+        return _setting_str(s.embedding_model) or EMBEDDING_MODEL
+    if capability == "rerank":
+        return _setting_str(getattr(s, "rerank_model", "")) or RERANKER_MODEL
+    return _setting_str(s.text_model) or TEXT_MODEL_ANALYZER
 
 
 def get_vision_model_for_analyzer(settings: AppSettings | None = None) -> str:
@@ -110,6 +122,11 @@ def get_text_model_for_analyzer(settings: AppSettings | None = None) -> str:
 def get_embedding_model_for_rag(settings: AppSettings | None = None) -> str:
     m = get_default_model(settings, "embedding")
     return m or EMBEDDING_MODEL
+
+
+def get_reranker_model_for_rag(settings: AppSettings | None = None) -> str:
+    m = get_default_model(settings, "rerank")
+    return m or RERANKER_MODEL
 
 
 def get_vision_model_for_storyboard(settings: AppSettings | None = None) -> str:

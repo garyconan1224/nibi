@@ -133,7 +133,7 @@ def _cache_paths(workspace_id: str) -> Tuple[Path, Path]:
 
 
 def _load_from_cache(
-    workspace_id: str, expected_hash: str
+    workspace_id: str, expected_hash: str, embedding_model: str = EMBEDDING_MODEL
 ) -> Optional[Tuple[KnowledgeState, SourceMap]]:
     faiss_path, meta_path = _cache_paths(workspace_id)
     if not (faiss_path.exists() and meta_path.exists()):
@@ -143,6 +143,8 @@ def _load_from_cache(
     except Exception:
         return None
     if meta.get("items_hash") != expected_hash:
+        return None
+    if str(meta.get("embedding_model") or EMBEDDING_MODEL) != embedding_model:
         return None
     try:
         index = faiss.read_index(str(faiss_path))
@@ -216,7 +218,7 @@ def build_or_load_workspace_index(
         raise ValueError(f"workspace {workspace_id} has no items with analysis results")
 
     cur_hash = _items_hash(rec)
-    cached = _load_from_cache(workspace_id, cur_hash)
+    cached = _load_from_cache(workspace_id, cur_hash, embedding_model)
     if cached is not None:
         return cached
 

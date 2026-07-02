@@ -128,6 +128,14 @@ export interface ConfigState {
   visionProviderId: string
   /** 双模型：视觉处理模型 ID（视觉分析/抽帧描述，如 Qwen-VL） */
   visionModelId: string
+  /** RAG 嵌入模型 provider_id */
+  embeddingProviderId: string
+  /** RAG 嵌入模型 ID */
+  embeddingModelId: string
+  /** RAG 重排模型 provider_id */
+  rerankProviderId: string
+  /** RAG 重排模型 ID */
+  rerankModelId: string
 
   /** 音频转写配置 */
   transcriber: TranscriberConfig
@@ -218,6 +226,10 @@ const DEFAULT_CONFIG: Omit<ConfigState, ConfigStateActionKey> = {
   textModelId: '',
   visionProviderId: '',
   visionModelId: '',
+  embeddingProviderId: '',
+  embeddingModelId: '',
+  rerankProviderId: '',
+  rerankModelId: '',
 
   // 音频转写配置（本地 Faster Whisper 为默认，medium 模型，中文）
   transcriber: {
@@ -335,4 +347,3 @@ export const useConfigStore = create<ConfigState>()(
     },
   ),
 )
-

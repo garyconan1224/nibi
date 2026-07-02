@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Section } from '@/components/ui/section'
 import { ProviderIcon } from '@/components/settings/providers/ProviderIcon'
 import { ModelCard } from '@/components/settings/models/ModelCard'
+import type { ModelRole } from '@/components/settings/models/ModelCard'
 import { cn } from '@/lib/utils'
 
 /** 分组视图所需的 provider + 模型状态快照（由 ModelManagementPage 组装） */
@@ -31,7 +32,9 @@ export interface ModelProviderGroupProps {
   defaultText: { providerId: string; modelId: string }
   /** 当前默认视觉模型（若属于本 provider） */
   defaultVision: { providerId: string; modelId: string }
-  onSetDefault: (role: 'text' | 'vision', modelId: string, next: boolean) => void
+  defaultEmbedding: { providerId: string; modelId: string }
+  defaultRerank: { providerId: string; modelId: string }
+  onSetDefault: (role: ModelRole, modelId: string, next: boolean) => void
 }
 
 export function ModelProviderGroup({
@@ -41,12 +44,16 @@ export function ModelProviderGroup({
   onRefresh,
   defaultText,
   defaultVision,
+  defaultEmbedding,
+  defaultRerank,
   onSetDefault,
 }: ModelProviderGroupProps) {
   const { t } = useTranslation('settings')
 
   // capability 是 provider 级声明;缺 "vision" 时隐藏 V 按钮以避免误导
   const hasVision = Boolean(provider.capabilities?.includes('vision'))
+  const hasEmbedding = Boolean(provider.capabilities?.includes('embedding'))
+  const hasRerank = Boolean(provider.capabilities?.includes('rerank'))
 
   // 标题节点:整行可点击触发折叠;refresh 按钮自身 stopPropagation
   const titleNode = (
@@ -138,7 +145,15 @@ export function ModelProviderGroup({
               isVisionDefault={
                 defaultVision.providerId === provider.id && defaultVision.modelId === m.id
               }
+              isEmbeddingDefault={
+                defaultEmbedding.providerId === provider.id && defaultEmbedding.modelId === m.id
+              }
+              isRerankDefault={
+                defaultRerank.providerId === provider.id && defaultRerank.modelId === m.id
+              }
               hideVision={!hasVision}
+              hideEmbedding={!hasEmbedding}
+              hideRerank={!hasRerank}
               onToggleDefault={(role, next) => onSetDefault(role, m.id, next)}
             />
           ))}
@@ -149,4 +164,3 @@ export function ModelProviderGroup({
 }
 
 export default ModelProviderGroup
-
