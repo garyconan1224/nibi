@@ -51,6 +51,7 @@ export async function fetchLibrary(
 ): Promise<LibraryResponse> {
   const res = await http.get<LibraryResponse>('/workspaces/library', {
     params: includeTrashed ? { include_trashed: true } : undefined,
+    timeout: 60000,  // 3-A：资料库列表是重接口，批量处理时磁盘 I/O 抢跑可能 >15s
   })
   return res.data
 }
