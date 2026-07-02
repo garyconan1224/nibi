@@ -5,7 +5,6 @@ import {
   Plus,
   Sparkles,
   Film,
-  Library,
   FileText,
   Copy,
   BookOpen,
@@ -38,13 +37,12 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'home',       path: '/',           icon: Home,         label: '首页' },
   { id: 'notes',      path: '/notes',      icon: FileText,     label: '笔记' },
   { id: 'replicas',   path: '/replicas',   icon: Copy,         label: '复刻' },
-  { id: 'library',    path: '/library',    icon: Library,      label: '资料库' },
+  { id: 'knowledge',  path: '/knowledge',  icon: BookOpen,     label: '知识库' },
 ]
 
 const BOTTOM_ITEMS: NavItem[] = [
   { id: 'storyboard',  path: '/storyboard',  icon: Film,       label: '分镜' },
   { id: 'favorites',   path: '/favorites',   icon: Star,       label: '收藏夹' },
-  { id: 'knowledge',   path: '#',            icon: BookOpen,   label: '知识库',   placeholder: true },
   { id: 'director',    path: '#',            icon: Wand2,      label: 'AI 导演',  placeholder: true, badge: 'Phase C' },
   { id: 'search',      path: '/search',      icon: Search,     label: '搜索' },
   { id: 'settings',    path: '/settings',    icon: Settings,   label: '设置' },
@@ -205,6 +203,7 @@ export function AppShell({ children }: AppShellProps) {
     if (item.id === 'home') return location.pathname === '/'
     if (item.id === 'notes') return location.pathname.startsWith('/notes')
     if (item.id === 'replicas') return location.pathname.startsWith('/replicas')
+    if (item.id === 'knowledge') return location.pathname.startsWith('/knowledge')
     return location.pathname.startsWith(item.path)
   }
 
