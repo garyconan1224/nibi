@@ -1,8 +1,23 @@
 # AI Handoff
 
-Last updated: 2026-07-02（**当前指针，给所有 AI 工具优先读取**）
+Last updated: 2026-07-03（**当前指针，给所有 AI 工具优先读取**）
 
-## 当前事实（2026-07-02）
+## 当前事实（2026-07-03）
+
+- **当前分支 `codex/opensource-prep`**（非 main，未 push）。以 `git log --oneline` 为准。
+- **本会话（2026-07-03）主题：开源发布准备 + 收尾三批未提交功能。**
+- **本会话新增 3 个 commit（分支 `codex/opensource-prep`）：**
+  - `f210c7f` **feat(X接入)**：X/Twitter 帖子接入——`url_sniffer`/`platforms` 收录 x.com/twitter.com；`shared/twitter_share.py` 匿名抓取（syndication API 图文 + yt-dlp 视频）；`note_assembler` 将帖子正文作为「原帖背景」前置进 note.md；覆盖 `test_twitter_share` / `test_mixed_note_pipeline`。
+  - `65582bb` **feat(字幕翻译)**：`LNTranscriptPanel` 翻译按钮 + 目标语言 + 落盘缓存；后端 `/workspaces` 翻译端点（分块+并发+模型候选+force 重译）；provider 增 request timeout 透传；覆盖 `test_transcript_translation`。
+  - `96cf722` **chore(开源)**：CONTRIBUTING / SECURITY / SUPPORT + PR 模板 + frontend-build workflow + issue 模板/lint/qa-e2e 调整 + `docs/GITHUB_RELEASE_CHECKLIST.md`。
+- **在此之前已提交（39848da 及以下）**：ASR 繁转简统一到 asr_router 出口、字幕翻译落盘、混合笔记前端入口、总结配图 Stage 4、`chore: prepare repository for open source`。
+- **验证状态**：后端 `.venv/bin/pytest`（根 venv，非 backend/.venv）新增 4 组测试 **42 passed** ✅；前端 `pnpm build` ✅。⚠️ 注意：可用 venv 是**项目根 `.venv`**，`backend/.venv` 缺 faiss/httpx 不可用。
+- **未做 commit 级独立过审**：3 个 commit 是按主题从同一棵工作树拆的，只验证了最终整树 build+测试；若 Codex 要逐 commit 审，需另开干净 worktree。
+- **下一步**：开源发布清单（`docs/GITHUB_RELEASE_CHECKLIST.md`）——① 敏感信息扫描（rg 扫 key + gitleaks 扫历史）；② CI 三连 `py_compile`/`compileall`/前端 build；③ 建私有仓库→push→Actions 绿→最后转 public（**push 需用户明确点头**）。
+
+---
+
+## 当前事实（2026-07-02，已归档）
 
 - **当前分支 `feat/global-knowledge`**（非 main）。以 `git log --oneline` 为准。
 - **本会话（2026-07-02）已完成的四批 + 一个根因修复：**
