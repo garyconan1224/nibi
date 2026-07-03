@@ -47,3 +47,17 @@ runtime.log
 
 # Backend SQLite runtime db（运行时自动创建，不入仓）
 backend/vidmirror.db
+
+# ── 内部/本地专用，不进公开仓（本地保留）──
+# macOS 双击启动脚本
+*.command
+# 内部 AI 协作 / 计划 / 设计 / 手测文档
+.augment-guidelines
+AGENTS.md
+docs/AI_HANDOFF.md
+docs/plans/
+docs/archive/
+docs/test-reports/
+docs/design/
+docs/spec/
+docs/rules/
