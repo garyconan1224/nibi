@@ -76,6 +76,31 @@ open http://localhost:5177
 
 ---
 
+## ⚙️ 依赖说明
+
+### 🎬 FFmpeg
+
+音视频转码依赖 FFmpeg，需单独安装：
+
+```bash
+# macOS (brew)
+brew install ffmpeg
+
+# Ubuntu / Debian
+sudo apt update && sudo apt install -y ffmpeg
+
+# Windows
+# 请从官网下载安装：https://ffmpeg.org/download.html
+```
+
+### 🗣 语音转写引擎
+
+- **Apple Silicon (M 系列)**：默认走 MLX-Whisper，本地推理最快
+- **其它平台 / CPU**：可用 Fast-Whisper（首启自动下载模型）
+- **不想本地跑**：配置 `GROQ_API_KEY` 走远程转写
+
+---
+
 ## 🔑 环境变量
 
 | 变量 | 默认值 | 说明 |
@@ -130,12 +155,31 @@ python3 scripts/preflight_check.py
 
 ---
 
-## 🙏 致谢
+## 🧠 Roadmap
 
-Nibi 的产品形态与交互深受开源项目 [BiliNote](https://github.com/JefferyHcool/BiliNote) 启发，特此致谢。
+- [x] 多平台笔记（YouTube / Bilibili / 抖音 / 小红书 / X）
+- [x] 多引擎语音转写 + 繁转简
+- [x] 字幕翻译（落盘缓存）
+- [x] 多风格总结 + 时间戳锚点笔记
+- [x] 本地知识库 RAG 问答
+- [x] 多格式导出（含 PDF / Word / Obsidian）
+- [ ] 更多平台与更完善的桌面端体验
 
 ---
 
-## 📄 许可证
+## 🔎 代码参考 / 致谢
+
+- 产品形态与交互深受开源项目 [BiliNote](https://github.com/JefferyHcool/BiliNote) 启发，特此致谢。
+- 视频下载基于 [yt-dlp](https://github.com/yt-dlp/yt-dlp)，语音转写基于 [MLX-Whisper](https://github.com/ml-explore/mlx-examples) / [faster-whisper](https://github.com/SYSTRAN/faster-whisper)。
+
+---
+
+## 📜 License
 
 [MIT](LICENSE)
+
+---
+
+## ⭐ Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=garyconan1224/nibi&type=Date)](https://www.star-history.com/#garyconan1224/nibi&Date)
