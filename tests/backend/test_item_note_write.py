@@ -305,9 +305,9 @@ def test_export_item_note_obsidian_zip(client: TestClient):
 
 
 def test_export_item_note_rejects_unsupported_format(client: TestClient):
-    """note/export 目前只支持 Obsidian，避免误用旧 ws 级 PDF/Word 链路。"""
+    """note/export 支持 md/html/pdf/docx/long_image/pptx/obsidian；其余格式应 400。"""
     ws_id, item_id = _create_ws_and_item(client)
-    resp = client.get(f"/workspaces/{ws_id}/items/{item_id}/note/export?format=pdf")
+    resp = client.get(f"/workspaces/{ws_id}/items/{item_id}/note/export?format=xyz")
     assert resp.status_code == 400
 
 
