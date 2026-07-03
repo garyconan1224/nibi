@@ -618,6 +618,9 @@ export interface TranslateSegmentsResponse {
   target_lang: string
   segments: { idx: number; text: string }[]
   cached: boolean
+  complete?: boolean
+  filled?: number
+  total?: number
 }
 
 /** POST /workspaces/{id}/items/{item_id}/translate — 逐段翻译字幕 */
@@ -625,10 +628,12 @@ export async function translateTranscriptSegments(
   workspaceId: string,
   itemId: string,
   targetLang: string,
+  force = false,
 ): Promise<TranslateSegmentsResponse> {
   const res = await http.post<TranslateSegmentsResponse>(
     `${BASE}/${workspaceId}/items/${itemId}/translate`,
-    { target_lang: targetLang },
+    { target_lang: targetLang, force },
+    { timeout: 600_000 },
   )
   return res.data
 }

@@ -26,3 +26,4 @@ class ChatRequest:
     messages: list[dict[str, Any]]
     temperature: float = 0.7
     max_tokens: int = 2048
+    timeout: int | None = None

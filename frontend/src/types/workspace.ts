@@ -163,6 +163,16 @@ export interface NoteMedia {
   audio?: string           // audio 类型：音频 URL
 }
 
+export interface TranscriptTranslationSegment {
+  idx: number
+  text: string
+}
+
+export type TranscriptTranslations = Record<
+  string,
+  Record<number, string> | TranscriptTranslationSegment[]
+>
+
 /** R0.2: GET /…/note 返回的完整 note 数据 */
 export interface ItemNote {
   frontmatter: Record<string, unknown>
@@ -172,6 +182,7 @@ export interface ItemNote {
   note_dir: string
   media: NoteMedia         // R3.1: 媒体 URL（实时从 results 提取）
   transcript: unknown      // R3.1: 转录数据（video/audio 时为 list）
+  translations?: TranscriptTranslations | null
   summary_hint?: {
     content_category?: string
     default_template?: string

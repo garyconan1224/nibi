@@ -41,6 +41,17 @@ from backend.app.models.tasks import TERMINAL_STATUS_VALUES, TaskStatus
 _ROOT_DIR: Path = Path(__file__).resolve().parent.parent.parent.parent
 logger = logging.getLogger(__name__)
 
+_TRANSLATE_CHUNK_MAX_CHARS = 6000
+_TRANSLATE_CHUNK_MAX_LINES = 80
+_TRANSLATE_MAX_TOKENS = 9000
+_TRANSLATE_REQUEST_TIMEOUT = 120
+_TRANSLATE_MAX_WORKERS = 4
+_TRANSLATE_MODEL_CANDIDATES = (
+    "Pro/deepseek-ai/DeepSeek-V3.2",
+    "Qwen/Qwen2.5-72B-Instruct",
+    "Qwen/Qwen3-8B",
+)
+
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -4172,6 +4183,7 @@ class TranslateRequest(BaseModel):
     """字幕翻译请求体。"""
 
     target_lang: str = Field(..., description="目标语言代码，如 zh/en/ja")
+    force: bool = Field(False, description="是否忽略已有缓存并重新翻译")
 
 
 @router.post("/{workspace_id}/items/{item_id}/translate")
@@ -4180,7 +4192,7 @@ async def translate_transcript(
 ) -> Dict[str, Any]:
     """逐段翻译字幕并落盘缓存。
 
-    已在 results.translations[target_lang] 有缓存时直接返回，不重复调 LLM。
+    已在 results.translations[target_lang] 有缓存且 force=false 时直接返回，不重复调 LLM。
     """
     from fastapi.concurrency import run_in_threadpool
 
@@ -4198,17 +4210,32 @@ async def translate_transcript(
     if not lines:
         raise HTTPException(status_code=400, detail="该素材没有字幕可翻译")
 
-    # 检查缓存
+    # 检查缓存。旧版本可能落过只覆盖前半段的残缺译文；残缺缓存不能再返回给前端。
     results = dict(item.results or {})
     translations = dict(results.get("translations") or {})
-    if target_lang in translations:
-        return {"target_lang": target_lang, "segments": translations[target_lang], "cached": True}
 
     # 拼待翻译文本
     texts_to_translate = [str(ln.get("text", "")).strip() for ln in lines]
     non_empty = [t for t in texts_to_translate if t]
     if not non_empty:
         raise HTTPException(status_code=400, detail="字幕内容为空，无法翻译")
+
+    cached_segments = _normalize_translation_segments(translations.get(target_lang), len(texts_to_translate))
+    if cached_segments:
+        if _translation_complete(cached_segments, texts_to_translate):
+            if not req.force:
+                return {
+                    "target_lang": target_lang,
+                    "segments": cached_segments,
+                    "cached": True,
+                    "complete": True,
+                    "filled": _translation_filled_count(cached_segments, texts_to_translate),
+                    "total": len(non_empty),
+                }
+        else:
+            translations.pop(target_lang, None)
+            results["translations"] = translations
+            _store.update_item(workspace_id, item_id, results=results)
 
     def _do_translate() -> List[Dict[str, Any]]:
         return _translate_segments_batch(texts_to_translate, target_lang)
@@ -4220,12 +4247,26 @@ async def translate_transcript(
     except Exception as err:
         raise HTTPException(status_code=502, detail=f"翻译 LLM 调用失败: {err}") from err
 
+    if not _translation_complete(translated, texts_to_translate):
+        filled = _translation_filled_count(translated, texts_to_translate)
+        raise HTTPException(
+            status_code=502,
+            detail=f"字幕翻译结果不完整：{filled}/{len(non_empty)} 条，请重试",
+        )
+
     # 落盘缓存
     translations[target_lang] = translated
     results["translations"] = translations
     _store.update_item(workspace_id, item_id, results=results)
 
-    return {"target_lang": target_lang, "segments": translated, "cached": False}
+    return {
+        "target_lang": target_lang,
+        "segments": translated,
+        "cached": False,
+        "complete": True,
+        "filled": _translation_filled_count(translated, texts_to_translate),
+        "total": len(non_empty),
+    }
 
 
 def _translate_segments_batch(
@@ -4235,6 +4276,8 @@ def _translate_segments_batch(
 
     返回与输入 texts 对齐的 [{idx: int, text: str}, ...] 列表。
     """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     from src.vidmirror.core.providers import ChatRequest
     from src.vidmirror.core.providers.registry import create_default_registry
     from shared.settings_store import load_settings as _load_settings
@@ -4242,49 +4285,209 @@ def _translate_segments_batch(
     lang_names = {"zh": "简体中文", "en": "English", "ja": "日本語"}
     lang_display = lang_names.get(target_lang, target_lang)
 
-    # 构造输入：编号文本
-    numbered = "\n".join(f"[{i}] {t}" for i, t in enumerate(texts) if t.strip())
-
     system_prompt = (
         f"你是一个专业的字幕翻译器。请将以下编号的字幕行逐行翻译成{lang_display}。\n"
         f"严格要求：\n"
         f"1. 保持编号格式 [N] 译文，一行一段\n"
         f"2. 不要合并或拆分行\n"
-        f"3. 只输出译文，不要加任何解释或说明"
+        f"3. 只输出译文，不要加任何解释或说明\n"
+        f"4. 不要输出思考过程；如果模型支持，请使用 /no_think 模式"
     )
 
     settings = _load_settings()
     registry = create_default_registry()
     profile = registry.resolve_default_profile(settings, "chat")
     provider = registry.build(profile)
-    chat_model = str(profile.default_models.get("chat") or "").strip()
-    if not chat_model:
+    default_chat_model = str(profile.default_models.get("chat") or "").strip()
+    if not default_chat_model:
         raise RuntimeError("未配置 chat model")
+    try:
+        available_models = set(provider.list_models("chat"))
+    except Exception:
+        available_models = set()
+    chat_model = _select_translation_model(default_chat_model, available_models)
+    logger.info("translate_transcript: using model %s", chat_model)
 
-    raw = provider.chat(ChatRequest(
-        model=chat_model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": numbered},
-        ],
-        temperature=0.3,
-        max_tokens=4000,
-    ))
-
-    # 解析译文
     result: List[Dict[str, Any]] = []
-    # 初始化全空译文
     for idx in range(len(texts)):
         result.append({"idx": idx, "text": ""})
 
-    import re
-    for m in re.finditer(r"\[(\d+)\]\s*(.+)", raw):
-        idx = int(m.group(1))
-        translated_text = m.group(2).strip()
-        if 0 <= idx < len(texts):
-            result[idx]["text"] = translated_text
+    def _translate_chunk(chunk: List[tuple[int, str]]) -> Dict[int, str]:
+        numbered = "/no_think\n" + "\n".join(f"[{idx}] {text}" for idx, text in chunk)
+        raw = provider.chat(ChatRequest(
+            model=chat_model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": numbered},
+            ],
+            temperature=0.3,
+            max_tokens=_TRANSLATE_MAX_TOKENS,
+            timeout=_TRANSLATE_REQUEST_TIMEOUT,
+        ))
+        parsed = _parse_numbered_translation(raw)
+        missing = [idx for idx, _ in chunk if not parsed.get(idx)]
+        if missing:
+            retry_chunk = [(idx, text) for idx, text in chunk if idx in set(missing)]
+            retry_numbered = "/no_think\n" + "\n".join(f"[{idx}] {text}" for idx, text in retry_chunk)
+            retry_raw = provider.chat(ChatRequest(
+                model=chat_model,
+                messages=[
+                    {"role": "system", "content": f"{system_prompt}\n你上次漏了部分编号，这次必须返回下面每一个编号。"},
+                    {"role": "user", "content": retry_numbered},
+                ],
+                temperature=0.2,
+                max_tokens=_TRANSLATE_MAX_TOKENS,
+                timeout=_TRANSLATE_REQUEST_TIMEOUT,
+            ))
+            parsed.update(_parse_numbered_translation(retry_raw))
+            missing = [idx for idx, _ in chunk if not parsed.get(idx)]
+            if missing:
+                for idx, text in retry_chunk:
+                    if idx not in set(missing):
+                        continue
+                    single_raw = provider.chat(ChatRequest(
+                        model=chat_model,
+                        messages=[
+                            {"role": "system", "content": f"请将这一句字幕翻译成{lang_display}。只输出译文，不要解释，不要编号。"},
+                            {"role": "user", "content": text},
+                        ],
+                        temperature=0.2,
+                        max_tokens=512,
+                        timeout=_TRANSLATE_REQUEST_TIMEOUT,
+                    ))
+                    single_text = _parse_single_translation(single_raw, idx)
+                    if single_text:
+                        parsed[idx] = single_text
+                missing = [idx for idx, _ in chunk if not parsed.get(idx)]
+                if missing:
+                    sample = ", ".join(str(i) for i in missing[:8])
+                    raise RuntimeError(f"字幕翻译结果缺少编号：{sample}")
+        return parsed
+
+    chunks = _iter_translation_chunks(texts)
+    max_workers = min(_TRANSLATE_MAX_WORKERS, len(chunks)) or 1
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_chunk = {
+            executor.submit(_translate_chunk, chunk): (chunk_no, chunk)
+            for chunk_no, chunk in enumerate(chunks, start=1)
+        }
+        for future in as_completed(future_to_chunk):
+            chunk_no, chunk = future_to_chunk[future]
+            parsed = future.result()
+            for idx, translated_text in parsed.items():
+                if 0 <= idx < len(texts):
+                    result[idx]["text"] = translated_text
+            logger.info(
+                "translate_transcript: chunk %s/%s translated (%s lines)",
+                chunk_no,
+                len(chunks),
+                len(chunk),
+            )
 
     return result
+
+
+def _select_translation_model(default_model: str, available_models: set[str]) -> str:
+    """选择字幕翻译模型，优先使用稳定保持编号的大模型。"""
+    for candidate in _TRANSLATE_MODEL_CANDIDATES:
+        if candidate in available_models:
+            return candidate
+    return default_model
+
+
+def _iter_translation_chunks(texts: List[str]) -> List[List[tuple[int, str]]]:
+    """把字幕按行数和字符数切成适合单次 LLM 调用的小块。"""
+    chunks: List[List[tuple[int, str]]] = []
+    current: List[tuple[int, str]] = []
+    current_chars = 0
+    for idx, text in enumerate(texts):
+        clean = str(text or "").strip()
+        if not clean:
+            continue
+        line_chars = len(clean) + len(str(idx)) + 4
+        if current and (
+            len(current) >= _TRANSLATE_CHUNK_MAX_LINES
+            or current_chars + line_chars > _TRANSLATE_CHUNK_MAX_CHARS
+        ):
+            chunks.append(current)
+            current = []
+            current_chars = 0
+        current.append((idx, clean))
+        current_chars += line_chars
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def _parse_numbered_translation(raw: str) -> Dict[int, str]:
+    """解析 LLM 返回的 [idx] 译文行。"""
+    parsed: Dict[int, str] = {}
+    for line in str(raw or "").splitlines():
+        match = re.match(r"^\s*\[(\d+)\]\s*(.+?)\s*$", line)
+        if not match:
+            continue
+        idx = int(match.group(1))
+        text = match.group(2).strip()
+        if text:
+            parsed[idx] = text
+    return parsed
+
+
+def _parse_single_translation(raw: str, idx: int) -> str:
+    """解析单行补漏翻译，兼容模型返回纯文本或仍带编号。"""
+    parsed = _parse_numbered_translation(raw)
+    if parsed.get(idx):
+        return parsed[idx]
+    for line in str(raw or "").splitlines():
+        text = line.strip()
+        if not text or text == "/no_think":
+            continue
+        numbered = re.match(r"^\s*\[?(\d+)\]?[\.、:：\s-]+(.+?)\s*$", text)
+        if numbered:
+            if int(numbered.group(1)) != idx:
+                continue
+            text = numbered.group(2).strip()
+        if text:
+            return text
+    return ""
+
+
+def _normalize_translation_segments(value: Any, total: int) -> List[Dict[str, Any]]:
+    """兼容旧的 dict / list 两种译文缓存格式，统一成与字幕对齐的列表。"""
+    if not value:
+        return []
+    result = [{"idx": idx, "text": ""} for idx in range(total)]
+    if isinstance(value, list):
+        for seg in value:
+            if not isinstance(seg, dict):
+                continue
+            idx = seg.get("idx")
+            if isinstance(idx, int) and 0 <= idx < total:
+                result[idx]["text"] = str(seg.get("text") or "").strip()
+    elif isinstance(value, dict):
+        for idx_raw, text in value.items():
+            try:
+                idx = int(idx_raw)
+            except Exception:
+                continue
+            if 0 <= idx < total:
+                result[idx]["text"] = str(text or "").strip()
+    return result
+
+
+def _translation_filled_count(segments: List[Dict[str, Any]], source_texts: List[str]) -> int:
+    filled = 0
+    for idx, source in enumerate(source_texts):
+        if not str(source or "").strip():
+            continue
+        if idx < len(segments) and str(segments[idx].get("text") or "").strip():
+            filled += 1
+    return filled
+
+
+def _translation_complete(segments: List[Dict[str, Any]], source_texts: List[str]) -> bool:
+    total = sum(1 for text in source_texts if str(text or "").strip())
+    return total > 0 and _translation_filled_count(segments, source_texts) == total
 
 
 @router.patch("/{workspace_id}/items/{item_id}/transcript/segments/{segment_idx}")
@@ -4719,6 +4922,7 @@ def get_item_note(workspace_id: str, item_id: str) -> Dict[str, Any]:
         "note_dir": str(nd),
         "media": media,
         "transcript": transcript,
+        "translations": results.get("translations", {}),
         "summary_hint": summary_hint,
     }
 

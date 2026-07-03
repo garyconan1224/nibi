@@ -151,6 +151,7 @@ def chat_completion(
     messages: list[dict[str, Any]],
     temperature: float = 0.7,
     max_tokens: int = 8192,
+    timeout: int = 300,
 ) -> str:
     """OpenAI 兼容 /v1/chat/completions，返回 assistant 文本。"""
     payload = {
@@ -159,7 +160,7 @@ def chat_completion(
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
-    data = _post_json(api_key, "/chat/completions", payload, timeout=300)
+    data = _post_json(api_key, "/chat/completions", payload, timeout=timeout)
     choices = data.get("choices") or []
     if not choices:
         raise SiliconFlowError(f"无 choices 字段: {data}")

@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Star, Download, ChevronDown } from 'lucide-react'
 import { getWorkspace, getLnMarkdown, getItemResult, patchLnMarkdown, exportLnObsidian } from '@/services/workspaces'
 import type { VideoResultTranscriptLine } from '@/services/workspaces'
-import type { WorkspaceRecord, WorkspaceItem } from '@/types/workspace'
+import type { WorkspaceRecord, WorkspaceItem, TranscriptTranslations } from '@/types/workspace'
 import LNVideoPanel, { type LNVideoPanelHandle } from './LNVideoPanel'
 import LNNotesPanel from './LNNotesPanel'
 import LNTranscriptPanel from './LNTranscriptPanel'
@@ -13,7 +13,7 @@ import './learning-notes.css'
 type PageState =
   | { kind: 'loading' }
   | { kind: 'error'; message: string }
-  | { kind: 'ready'; workspace: WorkspaceRecord; videoItem: WorkspaceItem; markdown: string; transcript: VideoResultTranscriptLine[]; videoSrc: string }
+  | { kind: 'ready'; workspace: WorkspaceRecord; videoItem: WorkspaceItem; markdown: string; transcript: VideoResultTranscriptLine[]; videoSrc: string; translations: TranscriptTranslations | null }
 
 export default function LearningNotesPage() {
   const { workspaceId = '' } = useParams<{ workspaceId: string }>()
@@ -180,7 +180,15 @@ export default function LearningNotesPage() {
         }
         if (cancelled) return
 
-        setPageState({ kind: 'ready', workspace: ws, videoItem, markdown: md, transcript, videoSrc })
+        setPageState({
+          kind: 'ready',
+          workspace: ws,
+          videoItem,
+          markdown: md,
+          transcript,
+          videoSrc,
+          translations: (videoItem.results?.translations as TranscriptTranslations | undefined) ?? null,
+        })
         setMarkdown(md)
         lastSavedMarkdownRef.current = md
       } catch (err: unknown) {
@@ -302,6 +310,7 @@ export default function LearningNotesPage() {
                   onSeek={(sec) => videoPanelRef.current?.seekTo(sec)}
                   workspaceId={workspaceId}
                   itemId={pageState.videoItem.item_id}
+                  translations={pageState.translations}
                 />
               </div>
             </div>

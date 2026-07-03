@@ -5,6 +5,9 @@
 
 from __future__ import annotations
 
+import sys
+import types
+
 import pytest
 
 from backend.app.services.asr_router import select_asr_engine, run_local_asr_with_fallback
@@ -131,17 +134,48 @@ class TestRunLocalAsrWithFallback:
 
 
 class TestToSimplified:
-    def test_converts_traditional_to_simplified(self):
+    def _install_fake_opencc(self, monkeypatch):
+        class FakeOpenCC:
+            def __init__(self, config: str) -> None:
+                assert config == "t2s"
+
+            def convert(self, text: str) -> str:
+                table = str.maketrans({
+                    "為": "为",
+                    "什": "什",
+                    "麼": "么",
+                    "語": "语",
+                    "音": "音",
+                    "辨": "辨",
+                    "識": "识",
+                    "會": "会",
+                    "輸": "输",
+                    "出": "出",
+                    "繁": "繁",
+                    "體": "体",
+                    "這": "这",
+                    "第": "第",
+                    "二": "二",
+                    "段": "段",
+                })
+                return text.translate(table)
+
+        monkeypatch.setitem(sys.modules, "opencc", types.SimpleNamespace(OpenCC=FakeOpenCC))
+        monkeypatch.setattr("backend.app.services.asr_router._OPENCC_T2S", None)
+
+    def test_converts_traditional_to_simplified(self, monkeypatch):
         """繁体中文 segments → 出口为简体"""
+        self._install_fake_opencc(monkeypatch)
         from backend.app.services.asr_router import _to_simplified
         trad = "為什麼語音辨識會輸出繁體中文？"
         result = _to_simplified(trad)
         # 繁体 "為什麼" → 简体 "为什么"
         assert "為" not in result
-        assert "为什么" in result or "爲" not in result
+        assert "为什么" in result
 
-    def test_simplified_unchanged(self):
+    def test_simplified_unchanged(self, monkeypatch):
         """简体输入不变（t2s 幂等）"""
+        self._install_fake_opencc(monkeypatch)
         from backend.app.services.asr_router import _to_simplified
         simp = "语音识别输出简体中文"
         result = _to_simplified(simp)
@@ -149,6 +183,7 @@ class TestToSimplified:
 
     def test_router_outlet_converts_traditional(self, monkeypatch, tmp_path):
         """通过 router 的繁体 segments 在出口被转成简体"""
+        self._install_fake_opencc(monkeypatch)
         audio = tmp_path / "test.mp3"
         audio.write_bytes(b"fake-audio")
 
@@ -174,3 +209,22 @@ class TestToSimplified:
         # 各 segment 也应已转简体
         for seg in segs:
             assert "為什麼" not in seg["text"]
+
+    def test_opencc_unavailable_returns_original(self, monkeypatch):
+        """opencc 不可用时降级返回原文，不让 ASR 主流程失败。"""
+        import builtins
+        from backend.app.services.asr_router import _to_simplified
+
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "opencc":
+                raise ImportError("opencc unavailable")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.delitem(sys.modules, "opencc", raising=False)
+        monkeypatch.setattr("backend.app.services.asr_router._OPENCC_T2S", None)
+        monkeypatch.setattr(builtins, "__import__", fake_import)
+
+        trad = "為什麼語音辨識會輸出繁體中文？"
+        assert _to_simplified(trad) == trad

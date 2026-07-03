@@ -67,6 +67,7 @@ class AnthropicProvider(BaseProvider):
                 req.messages,
                 max_tokens=req.max_tokens,
                 temperature=req.temperature,
+                timeout=req.timeout or 300,
             )
         except AnthropicError as err:
             raise ProviderRequestError(str(err)) from err

@@ -1749,10 +1749,6 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
             {/* 转录 */}
             {!isPip && Array.isArray(note.transcript) && (note.transcript as VideoResultTranscriptLine[]).length > 0 ? (
               <div className="nibi-note-transcript-wrap">
-                <div className="nibi-note-transcript-head">
-                  <span>转录</span>
-                  <span className="nibi-note-transcript-count">{transcriptCount} 条</span>
-                </div>
                 <LNTranscriptPanel
                   transcript={note.transcript as VideoResultTranscriptLine[]}
                   currentTime={currentTime}
@@ -1760,6 +1756,9 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                   workspaceId={workspaceId}
                   itemId={itemId}
                   onSaved={refreshAfterTranscriptEdit}
+                  translations={note.translations ?? null}
+                  title="转录"
+                  countLabel={`${transcriptCount} 条`}
                 />
               </div>
             ) : !isPip ? (
@@ -1901,20 +1900,19 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
 	                </div>
 	              </div>
 	            )}
-	            {/* 转录 */}
-	            {!isPip && transcriptLines.length > 0 ? (
-	              <div className="nibi-note-transcript-wrap">
-	                <div className="nibi-note-transcript-head">
-	                  <span>转录文本</span>
-	                  <span className="nibi-note-transcript-count">{transcriptCount} 条</span>
-	                </div>
-	                <LNTranscriptPanel
-	                  transcript={transcriptLines}
+            {/* 转录 */}
+            {!isPip && transcriptLines.length > 0 ? (
+              <div className="nibi-note-transcript-wrap">
+                <LNTranscriptPanel
+                  transcript={transcriptLines}
                   currentTime={currentTime}
                   onSeek={handleSeek}
                   workspaceId={workspaceId}
                   itemId={itemId}
                   onSaved={refreshAfterTranscriptEdit}
+                  translations={note.translations ?? null}
+                  title="转录文本"
+                  countLabel={`${transcriptCount} 条`}
                 />
               </div>
             ) : !isPip ? (
@@ -2236,6 +2234,7 @@ export default function NoteShell({ workspaceId: propWs, itemId: propItem }: { w
                   workspaceId={workspaceId}
                   itemId={itemId}
                   sourceUrl={(note.frontmatter as Record<string, unknown>)?.source_url as string || ''}
+                  translations={note.translations ?? null}
                 />
               </section>
             )}

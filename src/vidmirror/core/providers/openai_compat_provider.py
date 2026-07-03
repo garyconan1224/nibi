@@ -83,6 +83,7 @@ class OpenAICompatProvider(BaseProvider):
                 req.messages,
                 temperature=req.temperature,
                 max_tokens=req.max_tokens,
+                timeout=req.timeout or 300,
             )
         except SiliconFlowError as err:
             raise ProviderRequestError(str(err)) from err

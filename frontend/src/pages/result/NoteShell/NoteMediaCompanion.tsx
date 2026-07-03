@@ -10,7 +10,7 @@ import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from '
 import LNVideoPanel, { type LNVideoPanelHandle } from '@/pages/results/LearningNotesPage/LNVideoPanel'
 import LNTranscriptPanel from '@/pages/results/LearningNotesPage/LNTranscriptPanel'
 import NoteAudioPanel, { type NoteAudioPanelHandle } from './NoteAudioPanel'
-import type { NoteMedia } from '@/types/workspace'
+import type { NoteMedia, TranscriptTranslations } from '@/types/workspace'
 
 // 复用 ln 样式（全部 scoped 在 .vm-ln-scope 下，不会污染 NoteShell）
 import '@/pages/results/LearningNotesPage/learning-notes.css'
@@ -30,6 +30,7 @@ interface NoteMediaCompanionProps {
   itemId?: string
   /** 原始来源URL（B站/抖音等网页链接），视频文件URL无法播放时降级展示 */
   sourceUrl?: string
+  translations?: TranscriptTranslations | null
 }
 
 export interface NoteMediaCompanionHandle {
@@ -37,7 +38,7 @@ export interface NoteMediaCompanionHandle {
 }
 
 const NoteMediaCompanion = forwardRef<NoteMediaCompanionHandle, NoteMediaCompanionProps>(function NoteMediaCompanion(
-  { media, transcript, workspaceId, itemId, sourceUrl },
+  { media, transcript, workspaceId, itemId, sourceUrl, translations },
   ref,
 ) {
   const [currentTime, setCurrentTime] = useState(0)
@@ -89,6 +90,7 @@ const NoteMediaCompanion = forwardRef<NoteMediaCompanionHandle, NoteMediaCompani
               onSeek={handleSeek}
               workspaceId={workspaceId || ''}
               itemId={itemId || ''}
+              translations={translations}
             />
           </div>
         )}
@@ -117,6 +119,7 @@ const NoteMediaCompanion = forwardRef<NoteMediaCompanionHandle, NoteMediaCompani
               onSeek={handleSeek}
               workspaceId={workspaceId || ''}
               itemId={itemId || ''}
+              translations={translations}
             />
           </div>
         )}
