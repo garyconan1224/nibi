@@ -6,6 +6,14 @@
 
 ---
 
+## 开源说明
+
+Nibi 是本地优先工具，运行时数据、模型配置、下载缓存和工作区内容默认保存在本机，不会提交到仓库。公开仓库不包含任何模型 API Key、Cookie、用户素材或运行结果。
+
+使用前请自行准备需要的模型服务 Key，并遵守第三方平台条款、内容版权和所在地法律法规。本项目只提供个人学习、研究和本地创作辅助能力，不提供绕过访问控制、批量搬运或侵权使用的保证。
+
+---
+
 ## 快速开始
 
 ```bash
@@ -20,7 +28,7 @@ open http://localhost:5177
 ```
 
 启动脚本会自动：
-- 检测/安装 brew、Python 3.10+、ffmpeg、Node、pnpm
+- 检测/安装 brew、Python 3.11+、ffmpeg、Node、pnpm
 - 创建 `.venv` 并安装依赖
 - 并行启动 FastAPI 后端（8000）+ Vite 前端（5177，可用 .env 覆盖）
 
@@ -101,8 +109,8 @@ python3 tests/e2e_qa.py
 | `BACKEND_PORT` | `8000` | 后端端口 |
 | `VITE_PORT` | `5177` | 前端端口 |
 | `SILICONFLOW_API_KEY` | - | 硅基流动 API Key（用于模型调用） |
-
----
+| `ANTHROPIC_API_KEY` | - | 可选，使用 Anthropic 模型时填写 |
+| `GROQ_API_KEY` | - | 可选，使用远程 ASR 时填写 |
 
 ---
 

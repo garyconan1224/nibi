@@ -1,186 +1,138 @@
-# 开源准备 · 仓库卫生扫描报告
+# 开源准备检查报告
 
-> 生成时间：2026-05-19
-> 工具：小米 2.5 Pro 终端
-> 范围：[D] 开源准备阶段前置扫描，不修任何东西
-> 当前 main HEAD：9997e5e
+> 更新时间：2026-07-03
+> 当前分支：`codex/opensource-prep`
+> 范围：仓库卫生、公开说明、CI 基础配置。未做业务功能实现，不 push。
 
----
+## 当前结论
 
-## 🔴 高风险（必须开源前修）
+项目可以进入开源准备流程，但还不能直接公开发布。
 
-✅ **无发现**。tracked 文件中未检出真实 API key 残留、密码字面量或邮箱泄露。
+主要原因：
 
-唯一命中项 `local_settings.example.py:4` 的 `sk-xxx...` 是模板占位符（文件头注释明确说明），非真实 key，无需处理。
+- 当前工作区仍包含一批未提交业务改动，涉及字幕翻译、mixed 笔记、X/Twitter 接入、Provider timeout、NoteShell UI 等，需要先拆分、验收并决定是否进入公开版。
+- GitHub Actions 原先引用已删除的 `app.py`，公开后 CI 会失败；本轮已修复。
+- 仓库包含大量内部协作文档、计划文档、历史截图和验收材料，公开前需要决定保留、精简或迁移到私有归档。
 
----
+## 本轮已处理
 
-## 🟡 待决策（用户拍板）
+1. 新建开源准备分支：`codex/opensource-prep`。
+2. 修复 CI 明确错误：
+   - `.github/workflows/lint.yml` 不再编译不存在的 `app.py`。
+   - 三个 GitHub Actions workflow 的 Python 版本统一为 `3.11`。
+3. 更新 README：
+   - 补充本地优先说明。
+   - 补充 API Key / Cookie / 用户素材不进仓库的公开说明。
+   - 补充第三方平台条款、版权和合法使用免责声明。
+   - 启动依赖改为 Python 3.11+。
 
-### 1. `.git` 体积 278MB — 是否做 history 清理？
+## 本轮验证
 
-`.git` 目录 278MB，对一个中小型项目偏大。可能原因：
-- 历史上曾 tracked 过大文件（图片/视频/数据集）后又删除
-- 多分支 worktree 累积
+已通过：
 
-**建议**：开源前用 `git-filter-repo` 或 `BFG Repo-Cleaner` 清理历史大文件，否则 clone 体验差。需要用户确认是否值得做。
+- `git diff --check`
+- `rg -n "app.py" .github` 无命中
+- `python3 -m py_compile backend/app/main.py`
+- `cd frontend && pnpm build`
 
-### 2. `docs/nibi-spec-merged.md` 死链 — 删引用还是补文件？
+未验证：
 
-3 处 archive 文件仍引用 `docs/nibi-spec-merged.md`（或 `../nibi-spec-merged.md`），但该文件不存在：
-- `docs/archive/plan-v1.md`
-- `docs/archive/design-spec-v1.md`
-- `docs/archive/spec-v3.md`
-- `docs/archive/spec-v2.md`
+- GitHub Actions 真实 runner 尚未运行。
+- 后端全量测试尚未运行。
+- 当前未提交业务改动尚未做功能验收。
 
-**建议**：这 4 个文件都在 `archive/` 里且已标记 DEPRECATED，直接把死链引用删掉即可，不需补文件。
+## 敏感信息扫描
 
-### 3. README 第 100 行 `TODO: 添加功能截图` — 补还是删？
+当前粗扫未发现明显真实密钥。
 
-README 里留了一个 TODO 标记。
+命中项：
 
-**选项**：
-- A）开源前补上功能截图（需要运行系统截图）
-- B）删掉 TODO 行和「截图」section，README 里不留 TODO
+- `local_settings.example.py` 中的 `sk-xxxxxxxx...` 是模板占位符。
+- 多处代码、测试和文档包含 `api_key`、`token`、`password` 字段名或 fake key，这是实现/测试语义，不是实密钥。
 
-### 4. README 第 7 行 API key 明文警告是否过时？
+开源前仍建议执行一次专门工具扫描，例如：
 
-> ⚠️ **API key 当前以明文保存在 `models.json` 与 `.env` 中。开源前 Phase 4 将引入加密存储。**
-
-当前 phase 编号体系已变（N1~N11），"Phase 4" 指向不明确。开源前需要更新或删除这行。
-
-### 5. `.gitignore` 覆盖完整性 — 是否需要补充？
-
-当前 `.gitignore` 工作正常：无不该 tracked 的文件被 track，无应 tracked 的文件被 ignore。
-
-已正确 ignore 的关键项：`.env`、`.venv/`、`node_modules/`、`__pycache__/`、`data/`、`.local/`、`*.DS_Store`。
-
-**可考虑补充**：`*.swp`（vim 临时文件）、`*.swo`。当前没有遗漏的硬性问题。
-
----
-
-## 🟢 健康（已 OK 的项）
-
-- **敏感信息**：无真实 API key / token / 密码泄露
-- **邮箱泄露**：tracked 文件中无邮箱地址
-- **TODO/FIXME**：代码中（排除 docs/）无 TODO/FIXME/HACK 标记
-- **本机路径**：仅出现在 locale 占位文案中（`/Users/you/cookies` 作为示例），非真实路径泄露
-- **README 命令可执行性**：`start.sh`、`backend/app/main.py`、`frontend/package.json`、`scripts/preflight_check.py`、`tests/e2e_qa.py` 均存在
-- **端口配置**：`.env.example` 中 `BACKEND_PORT=8000`、`VITE_PORT=5173` 与 README 一致
-- **.gitignore 覆盖**：无遗漏，`git ls-files` 未检出任何不该 tracked 的文件
-- **Legacy 入口**：`app.py` + `pages/` 已在 phase 1J 删除（commit f6db5c2），不存在于工作区
-- **大文件**：tracked 文件最大为 `frontend/pnpm-lock.yaml`（411KB），无 > 1MB 文件
-
----
-
-## 📋 6 项扫描原始结果
-
-### 1. 敏感信息泄漏扫描
-
-```
-# API key / token 模式
-local_settings.example.py:4:SILICONFLOW_API_KEY = "sk-xxxx..."（模板占位，非真实 key）
-
-# 本机绝对路径
-frontend/src/locales/en-US/settings.json:96:  /Users/you/cookies（示例文案）
-frontend/src/locales/zh-CN/settings.json:96:  /Users/you/cookies（示例文案）
-
-# 邮箱
-（无命中）
-
-# TODO / FIXME / HACK
-（无命中）
+```bash
+gitleaks detect --source . --no-git
+gitleaks detect --source .
 ```
 
-### 2. .gitignore 覆盖完整性
+第二条会扫描 git 历史，风险更高也更有价值。
 
-```
-# 不该 tracked 但被 track 的文件
-（无 — git ls-files 未检出 .DS_Store / .pyc / .log / .zip / .sqlite / node_modules）
+## 仓库体积与运行时数据
 
-# 应该 tracked 但被 ignore 的文件
-（无异常）
-```
+当前本地目录体积概况：
 
-已正确 ignore：`.env`、`.venv/`、`node_modules/`、`__pycache__/`、`data/`、`.local/`、`*.pytest_cache`、`frontend/dist/`
+- `.git`：约 89MB
+- `docs`：约 25MB
+- `data`：约 2.1GB，已被 `.gitignore` 忽略
+- `frontend/node_modules`：约 915MB，已被 `.gitignore` 忽略
+- `.local`：约 25MB，已被 `.gitignore` 忽略
 
-### 3. README 命令可执行性体检
+tracked 文件中有不少截图、设计稿和测试证据图片，主要集中在：
 
-```
-✅ start.sh                    存在
-✅ backend/app/main.py         存在
-✅ frontend/package.json       存在
-✅ scripts/preflight_check.py  存在
-✅ tests/e2e_qa.py             存在
-✅ 端口 5173/8000               .env.example 中确认
-⚠️ README:100  TODO: 添加功能截图（待决策）
-⚠️ README:7    "Phase 4" 引用过时
-```
+- `docs/design/`
+- `docs/e2e-test/screenshots/`
+- `docs/plans/r21-main-verify/`
+- `docs/archive/design-uploads-2026-05-25/`
 
-### 4. docs/ 内部链接死链扫描
+这些不是安全阻断，但会影响公开仓库的专业度和体积。建议开源前按“公开文档”和“内部过程证据”拆分。
 
-```
-❌ docs/nibi-spec-merged.md — 被 4 处 archive 文件引用，但文件不存在
-   - docs/archive/plan-v1.md
-   - docs/archive/design-spec-v1.md
-   - docs/archive/spec-v2.md
-   - docs/archive/spec-v3.md
+## CI 风险
 
-✅ docs/SPEC.md              存在
-✅ docs/EXECUTION_PLAN.md    存在
-✅ docs/AI_HANDOFF.md        存在
-✅ docs/COMPLETED_WORK.md    存在
-✅ docs/WORKFLOW.md          存在
-✅ docs/archive/README.md    存在
-✅ docs/archive/plan-v1.md   存在
-✅ docs/archive/migration-plan-v1.md   存在
-✅ docs/archive/phase-x-main-pipeline.md 存在
-✅ docs/archive/phase-2d-sqlite-evaluation.md 存在
-✅ docs/archive/worktree-inventory.md  存在
-```
+已修：
 
-### 5. 仓库大小 / 大文件审计
+- `lint.yml` 不再引用 `app.py`。
 
-```
-.git 目录：278MB
+仍待处理：
 
-Top 10 tracked 文件（按大小）：
-  411KB  frontend/pnpm-lock.yaml
-   67KB  docs/design/VidMirror.html
-   64KB  backend/app/services/pipeline_tasks.py
-   63KB  backend/app/routes/workspaces.py
-   58KB  docs/design/system_design_v1.1.md
-   52KB  docs/SPEC.md
-   50KB  docs/design/styles.css
-   49KB  docs/design/check/settings.png
-   49KB  docs/design/check/settings2.png
-   44KB  docs/archive/design-spec-v1.md
+- `requirements.txt` 包含 `pyannote.audio`、`marker-pdf`、`playwright`、`faiss-cpu` 等重依赖，CI 安装可能慢或失败。
+- `backend-tests.yml` 目前只跑 `pytest tests/backend -q`，而项目实际还有 `backend/tests/` 下的测试。需要决定公开 CI 跑哪一层。
+- `qa-e2e.yml` 运行 `python tests/e2e_qa.py`，是否能在无本地模型、无 API Key、无浏览器素材的 GitHub runner 上稳定通过，需要单独验证。
 
-无 > 1MB 的 tracked 文件。
-```
+建议下一步把 CI 拆成：
 
-### 6. 待清理 legacy 入口
+1. 最小静态检查：Python compile + frontend build。
+2. 纯单元测试：不依赖真实网络、模型 Key、下载平台。
+3. 手动触发 E2E：只在配置了 secrets 或本地执行时运行。
 
-```
-app.py — 已删除（phase 1J, commit f6db5c2）
-pages/ — 已删除（phase 1J, commit f6db5c2）
+## 文档公开策略
 
-最近 git 记录：
-  f6db5c2 chore(phase1j): 1J 清理 Streamlit 与老 React 组件，Phase 1 收口
-  2b08881 feat(2.6): add VidMirror logo and indigo theme
-  e973a2b feat(2.4): HistoryPanel live polling via st.fragment
+建议公开保留：
 
-Legacy 入口已彻底清除，无需额外处理。
-```
+- `README.md`
+- `LICENSE`
+- `.env.example`
+- `frontend/.env.example`
+- `docs/rules/` 中对外开发有用的工程规则
+- 必要的架构/接口说明
 
----
+建议公开前精简或迁移：
 
-## 🎯 建议下一步动作清单
+- `CLAUDE.md`
+- `AGENTS.md`
+- `GEMINI.md`（当前已 gitignore，但本地存在）
+- `docs/AI_HANDOFF.md`
+- `docs/COMPLETED_WORK.md`
+- `docs/EXECUTION_PLAN.md`
+- 大量 `docs/plans/`
+- 大量历史截图和验收报告
 
-按优先级排序：
+这些文档不是一定不能公开，但它们包含内部协作流程、代理分工、历史施工记录，会降低公开仓库的可读性。
 
-1. **（高）README 更新**：删掉第 7 行过时的 "Phase 4" API key 警告（或改写为当前准确描述），处理第 100 行 TODO 截图标记
-2. **（中）docs 死链清理**：删除 `docs/archive/` 中 4 个文件对 `nibi-spec-merged.md` 的引用（均为 deprecated 归档文件，影响小但开源前应干净）
-3. **（中）.git 体积调查**：278MB 偏大，开源前用 `git rev-list --objects --all | git cat-file --batch-check='%(objecttype) %(objectname) %(objectsize) %(rest)' | sort -rnk3 | head -20` 查历史大文件来源，决定是否做 BFG 清理
-4. **（低）.gitignore 补充**：可选加 `*.swp` / `*.swo`，当前无硬性遗漏
-5. **（低）docs/archive/ 死链**：如有意保持 archive 原貌可跳过，仅影响内部浏览
+## 当前阻断清单
+
+1. 未提交业务改动必须先拆分验收。
+2. X/Twitter 接入依赖非正式接口，且存在真实网络 integration 测试，建议不要作为第一版公开核心能力。
+3. CI 还未在当前分支实际跑通。
+4. 公开文档需要精简，避免把内部 handoff / 计划流直接暴露成主文档。
+5. 需要做 git 历史敏感信息扫描；如发现历史大文件或密钥，需在明确备份后再做历史清理。
+
+## 建议执行顺序
+
+1. 先整理当前未提交业务改动：拆 commit 或排除出公开版。
+2. 跑最小验证：`python -m py_compile backend/app/main.py`、后端纯单测、前端 build。
+3. 调整 CI 依赖范围，避免公开后 Actions 因重依赖或真实网络失败。
+4. 精简公开文档目录。
+5. 执行敏感信息和历史扫描。
+6. 先 push 到 GitHub 私有仓库，等 Actions 绿后再改公开。
