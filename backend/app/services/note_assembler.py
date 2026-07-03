@@ -428,7 +428,12 @@ def build_note_md(item: WorkspaceItem, frontmatter: Dict[str, Any]) -> str:
     # R3.5 优先：note_body = pipeline 自动生成的 standard 总结
     note_body = (item.results or {}).get("note_body", "")
     if note_body and isinstance(note_body, str) and note_body.strip():
-        return f"---\n{fm_yaml}---\n\n{note_body.strip()}"
+        # R26: 当存在 X 帖子正文时，将其作为前置背景拼入 note.md
+        tweet_text = (item.results or {}).get("tweet_text", "")
+        body = note_body.strip()
+        if isinstance(tweet_text, str) and tweet_text.strip():
+            body = f"## 原帖背景\n\n{tweet_text.strip()}\n\n---\n\n{body}"
+        return f"---\n{fm_yaml}---\n\n{body}"
 
     if item.type == "audio":
         body = _build_audio_note_body(item)

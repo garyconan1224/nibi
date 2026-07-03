@@ -949,11 +949,12 @@ def _generate_combined_summary(
     payload: Dict[str, Any],
     runner: Any,
     task_id: str,
+    tweet_text: str = "",
 ) -> str:
     """用 transcript + 帧描述 生成音视频合并总结。"""
     if not api_key or not text_model:
         return ""
-    if not transcript_text.strip() and not frame_descriptions.strip():
+    if not transcript_text.strip() and not frame_descriptions.strip() and not tweet_text.strip():
         return ""
 
     template = str(payload.get("video_template") or "").strip()
@@ -966,6 +967,7 @@ def _generate_combined_summary(
         video_template=template,
         summary_depth=depth,
         output_format=output_format,
+        tweet_text=tweet_text,
     )
 
     try:
@@ -991,6 +993,7 @@ def _build_combined_summary_prompt(
     video_template: str,
     summary_depth: str,
     output_format: str,
+    tweet_text: str = "",
 ) -> str:
     """构建音视频合并总结 prompt。"""
     parts: list[str] = []
@@ -1005,6 +1008,10 @@ def _build_combined_summary_prompt(
         parts.append(depth_map.get(summary_depth, depth_map["详细"]))
     if output_format:
         parts.append(f"输出格式要求：{output_format}")
+
+    # 帖子正文（如 X/Twitter）：作为背景上下文放在最前面
+    if tweet_text.strip():
+        parts.append(f"\n## 原帖正文（背景上下文）\n\n{tweet_text[:4000]}")
 
     if transcript_text.strip():
         parts.append(f"\n## 音频转写文本\n\n{transcript_text[:8000]}")
@@ -1154,6 +1161,14 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
 
         # 合并总结：transcript + frame descriptions → LLM
         transcript_text = subtitle_result.get("transcript_text", "")
+        # R26: X 帖子正文注入合并总结（从任务产物元数据中取）
+        _tweet_text = ""
+        _sniff_platform = str(payload.get("source_meta", {}) and (payload.get("source_meta") or {}).get("platform", ""))
+        # handle_note_task download 阶段的 dl_result["content"] 存了帖子正文
+        # 这里从 payload 取不到，改为从 record.result["tweet_text"] 取
+        _prev_rec = runner.store.get(record.task_id)
+        _prev_result = (_prev_rec.result or {}) if _prev_rec else {}
+        _tweet_text = str(_prev_result.get("tweet_text", "") or "")
         combined_summary = _generate_combined_summary(
             api_key=api_key,
             text_model=text_model,
@@ -1162,6 +1177,7 @@ def handle_analyze_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any
             payload=payload,
             runner=runner,
             task_id=task_id,
+            tweet_text=_tweet_text,
         )
 
         av_result: Dict[str, Any] = {
@@ -1342,6 +1358,13 @@ def _persist_intermediate(runner: TaskRunner, task_id: str, result_patch: Dict[s
 
 # ── note task 下载/识别/步骤调度 helpers ────────────────────
 
+def _extra_tweet_text(tweet_text: str) -> dict:
+    """构造包含 X 帖子正文的额外字段，仅当正文非空时返回。"""
+    if tweet_text.strip():
+        return {"tweet_text": tweet_text}
+    return {}
+
+
 def _resolve_b23_url(url: str) -> str:
     """解析 b23.tv 短链 → 真实 URL；非短链或解析失败返回原 URL。"""
     if "b23.tv" not in url.lower():
@@ -1359,7 +1382,7 @@ def _resolve_b23_url(url: str) -> str:
 def _classify_note_url(url: str) -> str:
     """根据 URL 形态给出下载器提示（非最终类型，仅用于选择下载器）。
 
-    返回: "xiaohongshu" | "bili_opus" | "text_page" | "video_audio" | "unknown"
+    返回: "xiaohongshu" | "twitter" | "bili_opus" | "text_page" | "video_audio" | "unknown"
     """
     # b23.tv 短链先解析到真实 URL，再按真实 URL 判断类型
     if "b23.tv" in url.lower():
@@ -1367,6 +1390,10 @@ def _classify_note_url(url: str) -> str:
     lower = url.lower()
     if is_xiaohongshu_url_or_text(url):
         return "xiaohongshu"
+    # X (Twitter)：x.com / twitter.com
+    from shared.twitter_share import is_twitter_url_or_text
+    if is_twitter_url_or_text(url):
+        return "twitter"
     # B站图文动态 /opus/ 路径（移动端 __INITIAL_STATE__ 适配器，不能走 load_url）
     if "bilibili.com" in lower and "/opus/" in lower:
         return "bili_opus"
@@ -1512,6 +1539,92 @@ def _download_note_source(
             "metadata": _nm,
         }
 
+    # ── X (Twitter) ──
+    if url_hint == "twitter":
+        from shared.twitter_share import fetch_twitter_meta, run_twitter_download
+        log("🐦 X 帖子 → 判断视频 vs 图文…")
+        try:
+            _tw_meta = fetch_twitter_meta(url)
+        except Exception as _e:
+            log(f"   ⚠️ syndication 查询失败({_e})，回落 yt-dlp")
+            _tw_meta = {"ok": False, "error": str(_e)}
+        if _tw_meta.get("ok") and _tw_meta.get("has_video"):
+            log("   🎬 视频帖 → yt-dlp 下载")
+            # 视频帖交给 yt-dlp（fall through 到 video_audio 分支走 yt-dlp）
+            out = run_ytdlp_download(
+                url=url,
+                output_dir=str(project_video_dir),
+                log=log,
+                progress_callback=lambda p, msg: runner.set_progress(task_id, 0.02 + p * 0.08, msg),
+                speed_callback=lambda s: runner.set_download_speed(task_id, s),
+                info_callback=lambda meta: _apply_ytdlp_metadata_to_task(record, runner, meta),
+                **dl_kwargs,
+            )
+            if not out.get("ok"):
+                return {"ok": False, "kind_hint": "video", "error": (out.get("error_full") or out.get("error") or "download failed")}
+            _apply_ytdlp_metadata_to_task(record, runner, out)
+            save_path = str(out.get("save_path") or "")
+            # 把帖子正文透传下去，供块 4 合并总结使用
+            _tw_text = _tw_meta.get("text", "") or out.get("description", "")
+            return {
+                "ok": True,
+                "kind_hint": "video",
+                "source_path": save_path,
+                "content": _tw_text,
+                "title": str(out.get("title") or _tw_meta.get("author", "")),
+                "images": [],
+                "video_file": save_path,
+                "metadata": out,
+                "tweet_text": _tw_text,
+            }
+        # 无视频：图文帖或纯文本帖
+        _image_out = get_workspace_root(record.project_id) / "image"
+        _image_out.mkdir(parents=True, exist_ok=True)
+        _tw_out = run_twitter_download(
+            url_or_text=url, output_dir=str(_image_out), log=log,
+            progress_callback=lambda p, msg: runner.set_progress(task_id, 0.02 + p * 0.08, msg),
+        )
+        if not _tw_out.get("ok"):
+            return {"ok": False, "kind_hint": "text", "error": _tw_out.get("error") or "X 帖子解析失败"}
+        _tw_tm = _tw_out.get("tweet_meta") or {}
+        _tw_desc = str(_tw_tm.get("desc") or "")
+        _tw_title = str(_tw_tm.get("title") or "")
+        if _tw_title and _tw_title != "X 帖子":
+            try:
+                _cur = dict(record.result or {})
+                _cur["video_title"] = _tw_title
+                runner.store.update(record.task_id, result=_cur)
+            except Exception:
+                pass
+        _note_type = str(_tw_tm.get("type") or "text")
+        if _note_type == "photo":
+            _tw_dir = _tw_out.get("save_path") or ""
+            _tw_imgs = sorted(
+                str(_p) for _p in Path(_tw_dir).glob("*")
+                if _p.suffix.lower() in (".jpg", ".jpeg", ".png", ".webp")
+            ) if _tw_dir and Path(_tw_dir).is_dir() else []
+            return {
+                "ok": True,
+                "kind_hint": "image_text",
+                "source_path": _tw_dir,
+                "content": _tw_desc,
+                "title": _tw_title,
+                "images": _tw_imgs,
+                "video_file": "",
+                "metadata": _tw_tm,
+            }
+        # 纯文本帖
+        return {
+            "ok": True,
+            "kind_hint": "text",
+            "source_path": "",
+            "content": _tw_desc,
+            "title": _tw_title,
+            "images": [],
+            "video_file": "",
+            "metadata": _tw_tm,
+        }
+
     # ── B站 opus 图文动态（移动端 HTML + __INITIAL_STATE__）──
     if url_hint == "bili_opus":
         from backend.app.downloaders.bilibili_opus import fetch_bilibili_opus, download_opus_images
@@ -1641,7 +1754,7 @@ def _probe_note_source(download_result: dict, payload: dict) -> dict:
 
     返回:
         {
-            "note_kind": "text" | "image_text" | "video" | "audio",
+            "note_kind": "text" | "image_text" | "mixed" | "video" | "audio",
             "source_title": str,
             "source_text": str,
             "images": list[str],
@@ -1659,6 +1772,8 @@ def _probe_note_source(download_result: dict, payload: dict) -> dict:
     if requested_kind and requested_kind != "auto":
         if requested_kind == "image_text" and images:
             kind = "image_text"
+        elif requested_kind == "mixed" and video_file and images:
+            kind = "mixed"
         elif requested_kind == "video" and video_file:
             kind = "video"
         elif requested_kind == "audio" and video_file:
@@ -2001,8 +2116,8 @@ def _image_intermediate_patch(
     images_from_download: List[str],
     data_dir: Path,
 ) -> Dict[str, Any]:
-    """图文笔记 PROBE 后写入中间结果，让处理页能展示首图封面和图片数量。"""
-    if note_kind != "image_text" or not images_from_download:
+    """图文/混合笔记 PROBE 后写入中间结果，让处理页能展示首图封面和图片数量。"""
+    if note_kind not in {"image_text", "mixed"} or not images_from_download:
         return {}
     cover = _img_to_static_url(images_from_download[0], data_dir)
     return {
@@ -2457,7 +2572,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     note_body = ""
     download_save_path = ""
     # PROBE 结果（download 后由内容识别填充）
-    note_kind = "text"  # 默认；PROBE 后可能变为 image_text / video / audio
+    note_kind = "text"  # 默认；PROBE 后可能变为 image_text / mixed / video / audio
     source_text_from_download = ""
     images_from_download: List[str] = []
     background_context = ""
@@ -2487,10 +2602,14 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
         images_from_download = list(dl_result.get("images") or [])
 
         completed_steps.append("download")
+        # R26: X 帖子正文——download 阶段的 tweet_text 写进 task.result，
+        # 供 analyze（av_combined）阶段的合并总结 prompt 使用
+        _tweet_text = str(dl_result.get("tweet_text", "") or dl_result.get("content", "") or "")
         _persist_intermediate(runner, task_id, {
             "completed_steps": completed_steps[:],
             "video_file": download_save_path,
             "source_path": str(dl_result.get("source_path") or ""),
+            **_extra_tweet_text(_tweet_text),
         })
 
     # ── 3.5. PROBE 阶段（M7: 内容识别 + 步骤裁剪）─────────────
@@ -2551,7 +2670,7 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     # 保存原始文本：source_text_from_download 后面会被 VLM 理解结果补充。
     raw_source_text = source_text_from_download
     image_infos: list[dict] = []  # 外层声明，供后面写入 result 使用
-    if note_kind == "image_text" and images_from_download:
+    if note_kind in {"image_text", "mixed"} and images_from_download:
         runner.store.update(task_id, status=TaskStatus.VLM.value)
         runner.set_progress(task_id, 0.15, "图集视觉理解中...")
 
@@ -2999,11 +3118,25 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
 
         # ── LLM 生成摘要（视频/音频类型有转录文本时）──
         llm_summary = ""
-        if api_key and transcript_text and len(transcript_text) > 50:
+        # R26: 提取 X 帖子正文，供 LLM 摘要作为背景上下文
+        _prev_for_llm = runner.store.get(task_id)
+        _prev_result_llm = (_prev_for_llm.result or {}) if _prev_for_llm else {}
+        _tweet_for_llm = str(_prev_result_llm.get("tweet_text", "") or "")
+        if api_key and (_tweet_for_llm or (transcript_text and len(transcript_text) > 50)):
             try:
                 from backend.app.services.av_synthesis.llm import llm_global_summary
                 runner.append_log(task_id, "📝 生成 LLM 摘要...")
-                llm_summary = llm_global_summary(transcript_text, api_key)
+                # 把帖子正文拼在 transcript 前面作为背景上下文
+                _summary_input = transcript_text
+                if _tweet_for_llm.strip() and transcript_text.strip():
+                    _summary_input = (
+                        f"【原帖正文（背景上下文）】\n{_tweet_for_llm[:2000]}\n\n"
+                        f"【视频转写文本】\n{transcript_text}"
+                    )
+                elif _tweet_for_llm.strip() and not transcript_text.strip():
+                    # 视频无语音但帖子有正文：直接用帖子正文生成摘要
+                    _summary_input = f"【原帖正文】\n{_tweet_for_llm[:4000]}"
+                llm_summary = llm_global_summary(_summary_input, api_key) if _summary_input.strip() else ""
                 if llm_summary:
                     runner.append_log(task_id, f"📝 LLM 摘要生成完成（{len(llm_summary)} 字）")
             except Exception as e:
@@ -3085,10 +3218,13 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
                     "video_title": _source_title or "",
                 },
             )
+            # R26: X 帖子正文作为背景上下文注入 standard 总结
+            _tweet_for_standard = str(_prev_for_llm.result.get("tweet_text", "") if _prev_for_llm and _prev_for_llm.result else "")
             _std_summary = generate_summary(
                 _tmp_item, summary_template_id,
                 embed_frames=_embed_frames,
                 max_embed_frames=_max_embed,
+                background=_tweet_for_standard if _tweet_for_standard.strip() else "",
             )
             if _std_summary and _std_summary.content_md:
                 note_body = _std_summary.content_md
@@ -3125,6 +3261,11 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     ):
         if _prev_result.get(_k) and not result.get(_k):
             result[_k] = _prev_result[_k]
+    # R26: 把 download 阶段写进的 tweet_text 保留到最终 result，供
+    # note_assembler.build_note_md 和前端 NoteShell 使用。
+    _tweet_result = str(_prev_result.get("tweet_text", "") or "")
+    if _tweet_result and not result.get("tweet_text"):
+        result["tweet_text"] = _tweet_result
     # 7.2 标题全链路：把下载阶段解析到的真实标题写入 result，
     # 供 success callback 回写 item.name（解决 NoteShell 显示 ID/BV 号的问题）
     if _source_title:
@@ -3139,15 +3280,15 @@ def handle_note_task(record: TaskRecord, runner: TaskRunner) -> Dict[str, Any]:
     if images_from_download:
         result["images"] = images_from_download
         result["image_count"] = len(images_from_download)
-    # image_text 分支：保存结构化图片信息（供前端 NoteMedia.image_infos）
-    if note_kind == "image_text" and image_infos:
+    # image_text / mixed 分支：保存结构化图片信息（供前端 NoteMedia.image_infos）
+    if note_kind in {"image_text", "mixed"} and image_infos:
         result["image_infos"] = image_infos
-    # image_text 分支：保存原始文本（供 source.md 显示原始依据，不受 _compose 覆盖）
+    # image_text / mixed 分支：保存原始文本（供 source.md 显示原始依据，不受 _compose 覆盖）
     # tab 会让 source.md 段间出现缩进噪声，统一替换为空格（与 source_text_enriched 清理对齐）
-    if note_kind == "image_text" and raw_source_text:
+    if note_kind in {"image_text", "mixed"} and raw_source_text:
         result["source_md_raw"] = raw_source_text.replace("\t", " ")
-    # image_text 分支：保存 VLM 理解后的富文本（含图片理解结果，供学习笔记生成和前端参考）
-    if note_kind == "image_text" and source_text_from_download and source_text_from_download != raw_source_text:
+    # image_text / mixed 分支：保存 VLM 理解后的富文本（含图片理解结果，供学习笔记生成和前端参考）
+    if note_kind in {"image_text", "mixed"} and source_text_from_download and source_text_from_download != raw_source_text:
         result["source_text_enriched"] = source_text_from_download
     if background_context:
         result["background_for_recognition"] = background_context

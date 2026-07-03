@@ -5,7 +5,7 @@
 import type { ReactNode } from 'react'
 import { Link } from 'lucide-react'
 
-export type PlatformType = 'bilibili' | 'youtube' | 'douyin' | 'kuaishou' | 'unknown'
+export type PlatformType = 'bilibili' | 'youtube' | 'douyin' | 'kuaishou' | 'twitter' | 'unknown'
 
 export interface PlatformInfo {
   type: PlatformType
@@ -52,6 +52,16 @@ const PLATFORM_CONFIG: Record<PlatformType, PlatformInfo> = {
     badge: (className = '') => (
       <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded bg-orange-500 text-[9px] font-bold text-white ${className}`}>
         快
+      </span>
+    ),
+  },
+  twitter: {
+    type: 'twitter',
+    label: 'X (Twitter)',
+    domains: ['x.com', 'twitter.com'],
+    badge: (className = '') => (
+      <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded bg-gray-900 text-[9px] font-bold text-white ${className}`}>
+        𝕏
       </span>
     ),
   },
@@ -112,6 +122,7 @@ export function getAllPlatforms(): Array<Omit<PlatformInfo, 'badge'> & { badgeLa
     { type: 'youtube', label: 'YouTube', domains: PLATFORM_CONFIG.youtube.domains },
     { type: 'douyin', label: 'Douyin', domains: PLATFORM_CONFIG.douyin.domains },
     { type: 'kuaishou', label: 'Kuaishou', domains: PLATFORM_CONFIG.kuaishou.domains },
+    { type: 'twitter', label: 'X (Twitter)', domains: PLATFORM_CONFIG.twitter.domains },
   ]
 }
 

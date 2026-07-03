@@ -384,6 +384,7 @@ def build_prompt(
         return _build_image_text_standard_prompt(item, background)
 
     tpl = get_template(template_id)
+    system_prompt = tpl.system_prompt
     raw_transcript = (item.results or {}).get("transcript", "")
     seg_list = raw_transcript if isinstance(raw_transcript, list) else None
     # 纯文本版本：用于字数统计、非 standard 模板，以及无分段时的兜底
@@ -488,7 +489,7 @@ def build_prompt(
     # Stage 4: 带图模式 → 9 种模板全部注入配图规则（*FRAME-[mm:ss] 占位符）
     if embed_frames and not _is_image_text_item(item) and template_id in _ALL_TEMPLATE_IDS:
         from backend.app.services.summary_templates import FRAME_PLACEHOLDER_RULE
-        system_prompt = tpl.system_prompt + FRAME_PLACEHOLDER_RULE
+        system_prompt = system_prompt + FRAME_PLACEHOLDER_RULE
 
     return system_prompt, user_prompt
 

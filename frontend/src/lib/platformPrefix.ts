@@ -14,6 +14,7 @@ export function platformPrefixFromUrl(url: string): string {
     [/\b(douyin\.com|iesdouyin\.com)$/, 'douyin'],
     [/\bkuaishou\.com$/, 'kuaishou'],
     [/\bweixin\.qq\.com$/, 'weixin'],
+    [/\b(x\.com|twitter\.com)$/, 'twitter'],
   ]
   for (const [re, name] of map) {
     if (re.test(hostname)) return name

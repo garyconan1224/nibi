@@ -32,6 +32,8 @@ _PLATFORM_DOMAIN_MAP: dict[str, tuple[str, str, list[str]]] = {
     "xiaohongshu.com": ("xiaohongshu", "text", ["text"]),
     "xhslink.com": ("xiaohongshu", "text", ["text"]),
     "weixin.qq.com": ("weixin", "text", ["text"]),
+    "x.com": ("twitter", "video", ["video", "image_text"]),
+    "twitter.com": ("twitter", "video", ["video", "image_text"]),
 }
 
 # ── 已知平台的 URL 路径模式（比域名默认值更精细） ──
@@ -292,6 +294,17 @@ def sniff_url(url: str) -> SniffResult:
             return SniffResult(primary_type=_xhs_pt, possible_types=[_xhs_pt], platform="xiaohongshu")
         except Exception:
             return SniffResult(primary_type="text", possible_types=["text"], platform="xiaohongshu")
+
+    # X (Twitter)：调 syndication API 区分视频帖 vs 图文帖
+    if platform == "twitter":
+        try:
+            from shared.twitter_share import fetch_twitter_meta
+            _tw_meta = fetch_twitter_meta(raw)
+            if _tw_meta.get("ok") and _tw_meta.get("has_video"):
+                return SniffResult(primary_type="video", possible_types=["video", "image_text"], platform="twitter")
+            return SniffResult(primary_type="text", possible_types=["text"], platform="twitter")
+        except Exception:
+            return SniffResult(primary_type="video", possible_types=["video", "image_text"], platform="twitter")
 
     if platform:
         path_result = _sniff_by_url_path(url_path, platform)
