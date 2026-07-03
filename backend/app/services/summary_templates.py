@@ -4,6 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+FRAME_PLACEHOLDER_RULE = (
+    "\n\n"
+    "【配图规则（带图模式）】\n"
+    "- 每个 ## 小节，若视频在该处有值得看的画面（图表/代码/UI/演示/关键对比），\n"
+    "  在该节正文末尾单独一行输出：![配图](*FRAME-[mm:ss])\n"
+    "- mm:ss 取自转写分段真实时间戳，指向最能代表本节内容的那一帧。\n"
+    "- 一节最多一图；纯口播、无画面价值的小节不配图（宁缺毋滥）。\n"
+    "- 只放占位符，不要描述图片内容，系统会替换成真实截图。"
+)
+
 STYLE_TEMPLATE_PREFIX = "style"
 
 

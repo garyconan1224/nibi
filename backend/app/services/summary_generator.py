@@ -13,9 +13,12 @@ from typing import Dict, List, Tuple
 logger = logging.getLogger(__name__)
 
 from backend.app.models.workspace import ItemSummary, WorkspaceItem
-from backend.app.services.summary_templates import get_template
+from backend.app.services.summary_templates import get_template, TEMPLATES
 from shared.config import DATA_DIR
 from shared.settings_store import load_settings
+
+# 所有 9 种模板 ID（配图规则注入目标）
+_ALL_TEMPLATE_IDS = frozenset(TEMPLATES.keys())
 
 
 def _is_image_text_item(item: WorkspaceItem) -> bool:
@@ -482,7 +485,12 @@ def build_prompt(
     if background.strip():
         user_prompt = f"【背景信息】\n{background.strip()}\n\n{user_prompt}"
 
-    return tpl.system_prompt, user_prompt
+    # Stage 4: 带图模式 → 9 种模板全部注入配图规则（*FRAME-[mm:ss] 占位符）
+    if embed_frames and not _is_image_text_item(item) and template_id in _ALL_TEMPLATE_IDS:
+        from backend.app.services.summary_templates import FRAME_PLACEHOLDER_RULE
+        system_prompt = tpl.system_prompt + FRAME_PLACEHOLDER_RULE
+
+    return system_prompt, user_prompt
 
 
 # ── 智能配图：价值闸门 + 去重 + 自适应限量（治「图太多 / 不够智能」）──────
@@ -941,6 +949,13 @@ def generate_summary(
     if template_id in {"standard", "detailed", "lecture", "steps"}:
         frames = _collect_frames(item)
         content_md = _postprocess_frames(content_md, frames)
+
+    # Stage 4: 通用占位符后处理 — *FRAME-[mm:ss] → 真图 URL
+    # video 类素材且有 frames 时才替换；无 frames 时占位符直接清除
+    if not _is_image_text_item(item) and embed_frames:
+        from backend.app.services.frame_placeholder import resolve_frame_placeholders
+        frames_raw = _collect_frames(item)
+        content_md = resolve_frame_placeholders(content_md, frames_raw)
 
     return ItemSummary(
         summary_id=str(uuid.uuid4()),
