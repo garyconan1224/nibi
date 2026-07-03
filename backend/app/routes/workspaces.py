@@ -1190,6 +1190,7 @@ _PLATFORM_HOST_MAP: list[tuple[tuple[str, ...], str]] = [
     (("douyin.com", "iesdouyin.com"), "douyin"),
     (("kuaishou.com",), "kuaishou"),
     (("mp.weixin.qq.com",), "weixin"),
+    (("x.com", "twitter.com"), "twitter"),
 ]
 
 
@@ -2890,7 +2891,7 @@ _SNIFF_TO_ITEM_TYPE: Dict[str, str] = {
 }
 
 # 图文平台：sniff_url 报 "text" 但实际含图，应落为 image 类型
-_IMAGE_TEXT_PLATFORMS: frozenset = frozenset({"xiaohongshu"})
+_IMAGE_TEXT_PLATFORMS: frozenset = frozenset({"xiaohongshu", "twitter"})
 
 
 @router.post("/{workspace_id}/items/generate-note")
@@ -4165,6 +4166,125 @@ class NoteUpdateRequest(BaseModel):
     """R1.1: note.md 正文写入请求体。"""
 
     body: str = Field(..., description="正文 markdown（不含 frontmatter）")
+
+
+class TranslateRequest(BaseModel):
+    """字幕翻译请求体。"""
+
+    target_lang: str = Field(..., description="目标语言代码，如 zh/en/ja")
+
+
+@router.post("/{workspace_id}/items/{item_id}/translate")
+async def translate_transcript(
+    workspace_id: str, item_id: str, req: TranslateRequest
+) -> Dict[str, Any]:
+    """逐段翻译字幕并落盘缓存。
+
+    已在 results.translations[target_lang] 有缓存时直接返回，不重复调 LLM。
+    """
+    from fastapi.concurrency import run_in_threadpool
+
+    target_lang = req.target_lang.strip().lower()
+    if not target_lang:
+        raise HTTPException(status_code=400, detail="target_lang 不能为空")
+
+    rec = _store.get(workspace_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail=f"workspace not found: {workspace_id}")
+    item = _find_item(rec, item_id)
+
+    nd = note_dir(workspace_id, item_id)
+    lines = _note_transcript(item.results or {}, nd)
+    if not lines:
+        raise HTTPException(status_code=400, detail="该素材没有字幕可翻译")
+
+    # 检查缓存
+    results = dict(item.results or {})
+    translations = dict(results.get("translations") or {})
+    if target_lang in translations:
+        return {"target_lang": target_lang, "segments": translations[target_lang], "cached": True}
+
+    # 拼待翻译文本
+    texts_to_translate = [str(ln.get("text", "")).strip() for ln in lines]
+    non_empty = [t for t in texts_to_translate if t]
+    if not non_empty:
+        raise HTTPException(status_code=400, detail="字幕内容为空，无法翻译")
+
+    def _do_translate() -> List[Dict[str, Any]]:
+        return _translate_segments_batch(texts_to_translate, target_lang)
+
+    try:
+        translated = await run_in_threadpool(_do_translate)
+    except RuntimeError as err:
+        raise HTTPException(status_code=500, detail=str(err)) from err
+    except Exception as err:
+        raise HTTPException(status_code=502, detail=f"翻译 LLM 调用失败: {err}") from err
+
+    # 落盘缓存
+    translations[target_lang] = translated
+    results["translations"] = translations
+    _store.update_item(workspace_id, item_id, results=results)
+
+    return {"target_lang": target_lang, "segments": translated, "cached": False}
+
+
+def _translate_segments_batch(
+    texts: List[str], target_lang: str
+) -> List[Dict[str, Any]]:
+    """批量翻译字幕段，调用 LLM 并解析编号输出。
+
+    返回与输入 texts 对齐的 [{idx: int, text: str}, ...] 列表。
+    """
+    from src.vidmirror.core.providers import ChatRequest
+    from src.vidmirror.core.providers.registry import create_default_registry
+    from shared.settings_store import load_settings as _load_settings
+
+    lang_names = {"zh": "简体中文", "en": "English", "ja": "日本語"}
+    lang_display = lang_names.get(target_lang, target_lang)
+
+    # 构造输入：编号文本
+    numbered = "\n".join(f"[{i}] {t}" for i, t in enumerate(texts) if t.strip())
+
+    system_prompt = (
+        f"你是一个专业的字幕翻译器。请将以下编号的字幕行逐行翻译成{lang_display}。\n"
+        f"严格要求：\n"
+        f"1. 保持编号格式 [N] 译文，一行一段\n"
+        f"2. 不要合并或拆分行\n"
+        f"3. 只输出译文，不要加任何解释或说明"
+    )
+
+    settings = _load_settings()
+    registry = create_default_registry()
+    profile = registry.resolve_default_profile(settings, "chat")
+    provider = registry.build(profile)
+    chat_model = str(profile.default_models.get("chat") or "").strip()
+    if not chat_model:
+        raise RuntimeError("未配置 chat model")
+
+    raw = provider.chat(ChatRequest(
+        model=chat_model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": numbered},
+        ],
+        temperature=0.3,
+        max_tokens=4000,
+    ))
+
+    # 解析译文
+    result: List[Dict[str, Any]] = []
+    # 初始化全空译文
+    for idx in range(len(texts)):
+        result.append({"idx": idx, "text": ""})
+
+    import re
+    for m in re.finditer(r"\[(\d+)\]\s*(.+)", raw):
+        idx = int(m.group(1))
+        translated_text = m.group(2).strip()
+        if 0 <= idx < len(texts):
+            result[idx]["text"] = translated_text
+
+    return result
 
 
 @router.patch("/{workspace_id}/items/{item_id}/transcript/segments/{segment_idx}")

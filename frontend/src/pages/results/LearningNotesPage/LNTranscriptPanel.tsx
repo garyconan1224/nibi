@@ -1,11 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { FileCode, Quote } from 'lucide-react'
+import { FileCode, Globe, Loader2, Quote } from 'lucide-react'
 import { toast } from 'sonner'
 import type { VideoResultTranscriptLine } from '@/services/workspaces'
-import { updateTranscriptSegment } from '@/services/workspaces'
+import { updateTranscriptSegment, translateTranscriptSegments } from '@/services/workspaces'
 import { useLnEditorStore } from '@/store/lnEditorStore'
 
 type TranscriptMode = 'original' | 'speaker' | 'translated'
+
+const TRANSLATE_LANGS: { value: string; label: string }[] = [
+  { value: 'zh', label: '中文' },
+  { value: 'en', label: 'English' },
+  { value: 'ja', label: '日本語' },
+]
 
 interface LNTranscriptPanelProps {
   transcript: VideoResultTranscriptLine[]
@@ -17,6 +23,8 @@ interface LNTranscriptPanelProps {
   onSaved?: () => void
   /** 原始素材 Markdown（有值时显示「字幕/原始素材」切换 tab） */
   sourceMd?: string
+  /** 已有的译文缓存（key=目标语言，value={idx→text}） */
+  translations?: Record<string, Record<number, string>> | null
 }
 
 function activeTranscriptIdx(
@@ -38,10 +46,17 @@ export default function LNTranscriptPanel({
   itemId,
   onSaved,
   sourceMd,
+  translations,
 }: LNTranscriptPanelProps) {
   const hasSpeaker = useMemo(() => transcript.some((l) => l.speaker), [transcript])
   const [mode, setMode] = useState<TranscriptMode>('original')
   const [showSourceMd, setShowSourceMd] = useState(false)
+  const [translateLang, setTranslateLang] = useState('zh')
+  const [translating, setTranslating] = useState(false)
+  // 本地缓存译文（key=idx），来源：后端 translations 缓存 或 本次翻译结果
+  const [localTranslations, setLocalTranslations] = useState<Record<number, string> | null>(
+    () => (translations?.['zh'] as Record<number, string>) ?? null,
+  )
   const activeIdx = useMemo(
     () => activeTranscriptIdx(transcript, currentTime),
     [transcript, currentTime],
@@ -93,6 +108,33 @@ export default function LNTranscriptPanel({
     setEditText('')
   }, [])
 
+  const handleTranslate = useCallback(async () => {
+    setTranslating(true)
+    try {
+      const res = await translateTranscriptSegments(workspaceId, itemId, translateLang)
+      const idxMap: Record<number, string> = {}
+      for (const s of res.segments) {
+        if (s.text) idxMap[s.idx] = s.text
+      }
+      setLocalTranslations(idxMap)
+      setMode('translated')
+      toast.success(res.cached ? '已加载缓存译文' : '翻译完成')
+    } catch {
+      toast.error('翻译失败，请重试')
+    }
+    setTranslating(false)
+  }, [workspaceId, itemId, translateLang])
+
+  // 切换翻译语言时，如果已有该语言缓存则直接启用
+  useEffect(() => {
+    if (translations?.[translateLang]) {
+      setLocalTranslations(translations[translateLang] as Record<number, string>)
+    } else {
+      setLocalTranslations(null)
+      if (mode === 'translated') setMode('original')
+    }
+  }, [translateLang, translations, mode])
+
   function handleQuote(line: VideoResultTranscriptLine, text: string, e: React.MouseEvent) {
     e.stopPropagation()
     const md = `> [${line.t_str}] ${text}\n`
@@ -139,30 +181,67 @@ export default function LNTranscriptPanel({
         </div>
       ) : (
         <>
-          {/* 模式 tab 栏 */}
-          {hasSpeaker && (
+          {/* 字幕工具栏：模式 tab + 翻译按钮 */}
+          <div className="ln-tr-toolbar">
             <div className="ln-tr-mode-tabs">
-              {([
-                { key: 'original' as const, label: '原文' },
-                { key: 'speaker' as const, label: '说话人' },
-                { key: 'translated' as const, label: '译文' },
-              ]).map((t) => (
+              {/* 原文总是可见 */}
+              <button
+                className="ln-tr-tab"
+                data-active={mode === 'original' ? 'true' : undefined}
+                onClick={() => setMode('original')}
+              >
+                原文
+              </button>
+              {hasSpeaker && (
                 <button
-                  key={t.key}
                   className="ln-tr-tab"
-                  data-active={mode === t.key ? 'true' : undefined}
-                  disabled={t.key === 'translated'}
-                  onClick={() => setMode(t.key)}
+                  data-active={mode === 'speaker' ? 'true' : undefined}
+                  onClick={() => setMode('speaker')}
                 >
-                  {t.label}
+                  说话人
                 </button>
-              ))}
+              )}
+              <button
+                className="ln-tr-tab"
+                data-active={mode === 'translated' ? 'true' : undefined}
+                disabled={!localTranslations}
+                onClick={() => setMode('translated')}
+              >
+                译文
+              </button>
             </div>
-          )}
+            <div className="ln-tr-translate-actions">
+              <select
+                className="ln-tr-lang-select"
+                value={translateLang}
+                onChange={(e) => setTranslateLang(e.target.value)}
+              >
+                {TRANSLATE_LANGS.map((l) => (
+                  <option key={l.value} value={l.value}>{l.label}</option>
+                ))}
+              </select>
+              <button
+                className="ln-tr-translate-btn"
+                disabled={translating}
+                onClick={handleTranslate}
+              >
+                {translating ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : (
+                  <Globe size={13} />
+                )}
+                <span>{translating ? '翻译中…' : '翻译'}</span>
+              </button>
+            </div>
+          </div>
           {transcript.map((line, i) => {
             const isEditing = editingIdx === i
             const displayText = localEdits[i] ?? line.text
             const speakerPrefix = mode === 'speaker' && line.speaker ? `[${line.speaker}] ` : ''
+            const translatedText = localTranslations?.[i]
+            const shownText = mode === 'translated' && translatedText
+              ? translatedText
+              : displayText
             return (
               <div
                 key={`${line.t_sec}-${i}`}
@@ -191,7 +270,14 @@ export default function LNTranscriptPanel({
                     onClick={(e) => e.stopPropagation()}
                   />
                 ) : (
-                  <span className="ln-tr-text">{speakerPrefix}{displayText}</span>
+                  <span className="ln-tr-text">
+                    {speakerPrefix}
+                    {mode === 'translated' && translatedText ? (
+                      <span className="ln-tr-translated">{shownText}</span>
+                    ) : (
+                      shownText
+                    )}
+                  </span>
                 )}
                 <button
                   className="ln-tr-quote"

@@ -612,6 +612,27 @@ export async function updateTranscriptSegment(
   return res.data
 }
 
+// ── Stage 3: 字幕翻译 ──────────────────────────────────────
+
+export interface TranslateSegmentsResponse {
+  target_lang: string
+  segments: { idx: number; text: string }[]
+  cached: boolean
+}
+
+/** POST /workspaces/{id}/items/{item_id}/translate — 逐段翻译字幕 */
+export async function translateTranscriptSegments(
+  workspaceId: string,
+  itemId: string,
+  targetLang: string,
+): Promise<TranslateSegmentsResponse> {
+  const res = await http.post<TranslateSegmentsResponse>(
+    `${BASE}/${workspaceId}/items/${itemId}/translate`,
+    { target_lang: targetLang },
+  )
+  return res.data
+}
+
 // ── Phase 2C.2: 文本结果页 + 提示词版本栈 ──────────────────
 
 export interface PromptVersion {
