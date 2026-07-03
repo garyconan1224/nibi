@@ -125,3 +125,52 @@ class TestRunLocalAsrWithFallback:
         """文件不存在 → FileNotFoundError"""
         with pytest.raises(FileNotFoundError, match="ASR 文件不存在"):
             run_local_asr_with_fallback("/nonexistent/file.mp3")
+
+
+# ── _to_simplified 繁→简 ─────────────────────────────────────
+
+
+class TestToSimplified:
+    def test_converts_traditional_to_simplified(self):
+        """繁体中文 segments → 出口为简体"""
+        from backend.app.services.asr_router import _to_simplified
+        trad = "為什麼語音辨識會輸出繁體中文？"
+        result = _to_simplified(trad)
+        # 繁体 "為什麼" → 简体 "为什么"
+        assert "為" not in result
+        assert "为什么" in result or "爲" not in result
+
+    def test_simplified_unchanged(self):
+        """简体输入不变（t2s 幂等）"""
+        from backend.app.services.asr_router import _to_simplified
+        simp = "语音识别输出简体中文"
+        result = _to_simplified(simp)
+        assert result == simp
+
+    def test_router_outlet_converts_traditional(self, monkeypatch, tmp_path):
+        """通过 router 的繁体 segments 在出口被转成简体"""
+        audio = tmp_path / "test.mp3"
+        audio.write_bytes(b"fake-audio")
+
+        trad_text = "為什麼繁體會出現？"
+        trad_segs = [
+            {"start": 0.0, "end": 1.0, "text": "為什麼繁體會出現？"},
+            {"start": 1.0, "end": 2.0, "text": "這是第二段"},
+        ]
+
+        monkeypatch.setattr(
+            "backend.app.services.asr_mlx_whisper.is_mlx_whisper_available",
+            lambda: True,
+        )
+        monkeypatch.setattr(
+            "backend.app.services.asr_mlx_whisper.transcribe_file_with_mlx_whisper",
+            lambda *a, **kw: (trad_text, [dict(s) for s in trad_segs], 2.0),
+        )
+
+        text, segs, dur, engine = run_local_asr_with_fallback(str(audio))
+        assert engine == "mlx-whisper"
+        # 出口文本应已转简体
+        assert "為什麼" not in text
+        # 各 segment 也应已转简体
+        for seg in segs:
+            assert "為什麼" not in seg["text"]

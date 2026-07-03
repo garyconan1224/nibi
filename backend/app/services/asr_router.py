@@ -21,6 +21,29 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
+_OPENCC_T2S = None
+
+
+def _to_simplified(text: str) -> str:
+    """繁体→简体转换，OpenCC t2s 惰性单例。
+
+    opencc 不可用时静默返回原文（与 asr_fast_whisper 行为一致）。
+    """
+    global _OPENCC_T2S
+    if _OPENCC_T2S is None:
+        try:
+            from opencc import OpenCC
+            _OPENCC_T2S = OpenCC("t2s")
+        except Exception:
+            _OPENCC_T2S = False  # type: ignore[assignment]
+            return text
+    if _OPENCC_T2S is False:
+        return text
+    try:
+        return _OPENCC_T2S.convert(text)  # type: ignore[union-attr]
+    except Exception:
+        return text
+
 
 def select_asr_engine(api_key: str = "") -> str:
     """选择 ASR 引擎，返回引擎名。
@@ -100,6 +123,9 @@ def run_local_asr_with_fallback(
             )
             text, segs, dur = result
             if text.strip():
+                text = _to_simplified(text)
+                for seg in segs:
+                    seg["text"] = _to_simplified(seg.get("text", ""))
                 return text, segs, dur, "mlx-whisper"
             errors.append("mlx-whisper: 转写结果为空")
     except Exception as err:
@@ -126,6 +152,9 @@ def run_local_asr_with_fallback(
             )
             text, segs, dur = result
             if text.strip():
+                text = _to_simplified(text)
+                for seg in segs:
+                    seg["text"] = _to_simplified(seg.get("text", ""))
                 return text, segs, dur, "fast-whisper"
             errors.append("fast-whisper: 转写结果为空")
     except Exception as err:
@@ -147,6 +176,9 @@ def run_local_asr_with_fallback(
                 progress_callback=progress_callback,
             )
             if text.strip():
+                text = _to_simplified(text)
+                for seg in segs:
+                    seg["text"] = _to_simplified(seg.get("text", ""))
                 return text, segs, dur, "remote"
             errors.append("remote: 转写结果为空")
         except Exception as err:
