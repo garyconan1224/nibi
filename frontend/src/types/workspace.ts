@@ -2,6 +2,9 @@
 
 export type ItemType = 'video' | 'audio' | 'image' | 'text'
 
+/** 笔记媒体类型（添加素材时的手动选择） */
+export type NoteMediaKind = 'auto' | 'video' | 'image_text' | 'audio' | 'mixed'
+
 /** 分析范围：仅对 sniff 同时返回 video+audio 时生效 */
 export type AnalysisScope = 'audio_only' | 'visual_only'
 export type ItemSource = 'url' | 'local'

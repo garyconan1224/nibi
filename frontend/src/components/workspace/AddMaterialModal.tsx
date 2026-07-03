@@ -87,7 +87,7 @@ interface AddMaterialModalProps {
   workspaceKind?: 'note' | 'replica'
 }
 
-type NoteMediaKind = 'auto' | 'video' | 'image_text' | 'audio'
+type NoteMediaKind = 'auto' | 'video' | 'image_text' | 'audio' | 'mixed'
 type ActionType = 'note' | 'replica' | 'ai_video' | 'storyboard' | 'rewrite'
 type SourceMode = 'auto' | 'single' | 'batch'
 
@@ -96,6 +96,7 @@ const NOTE_TYPE_CARDS: { value: NoteMediaKind; label: string; desc: string }[] =
   { value: 'video', label: '视频笔记', desc: '视频转写 + 时间戳 + 截帧' },
   { value: 'image_text', label: '图文笔记', desc: '逐图视觉理解 + 文字提取 + 按类型总结' },
   { value: 'audio', label: '音频笔记', desc: '音频转写 + 章节整理' },
+  { value: 'mixed', label: '混合笔记', desc: '视频截帧 + 图文提取 + 说话人（用于既有视频又有图文的素材）' },
 ]
 
 /** 7 个常用风格（主显） */
@@ -492,13 +493,16 @@ export function AddMaterialModal({
             ? 'image_text'
             : 'auto'
   const showVideoNoteSettings =
-    selectedAction === 'note' && (selectedNoteType === 'video' || (selectedNoteType === 'auto' && autoResolvedNoteType === 'video'))
+    selectedAction === 'note' && (selectedNoteType === 'video' || selectedNoteType === 'mixed' || (selectedNoteType === 'auto' && autoResolvedNoteType === 'video'))
   const showAudioNoteSettings =
     selectedAction === 'note' && (selectedNoteType === 'audio' || (selectedNoteType === 'auto' && autoResolvedNoteType === 'audio'))
+  const showImageTextNoteSettings =
+    selectedAction === 'note' && (selectedNoteType === 'image_text' || selectedNoteType === 'mixed' || (selectedNoteType === 'auto' && autoResolvedNoteType === 'image_text'))
   const showFrameAnalysisSettings = selectedAction === 'replica' || showVideoNoteSettings
   const showSpeakerSettings = selectedAction === 'note' && (showVideoNoteSettings || showAudioNoteSettings)
   const advancedSummaryParts = [
     ...(showSpeakerSettings ? ['发言人'] : []),
+    ...(showImageTextNoteSettings ? ['图文理解'] : []),
     '补充说明',
   ]
   const advancedSummary = advancedSummaryParts.join(' · ')
@@ -818,7 +822,7 @@ export function AddMaterialModal({
     setBatchImporting(true)
     setError(null)
     try {
-      const resolvedNoteKind = selectedNoteType === 'auto' ? 'video' : selectedNoteType
+      const resolvedNoteKind = selectedNoteType === 'auto' ? 'video' : selectedNoteType === 'mixed' ? 'mixed' : selectedNoteType
       const effInterval = captureMode === 'auto' ? computeAutoInterval(videoDuration) : frameInterval
       const effVisionModel = selectedVisionModel === '__default__' ? '' : selectedVisionModel
       const result = await importBatchSource({
@@ -868,7 +872,7 @@ export function AddMaterialModal({
         const wsId = localWsId || workspaceIds[0]
         if (!wsId) { setError('未找到合集'); return }
         const resolvedNoteType = selectedNoteType === 'auto' ? autoResolvedNoteType : selectedNoteType
-        const videoTask = resolvedNoteType === 'video'
+        const videoTask = resolvedNoteType === 'video' || resolvedNoteType === 'mixed'
         const effInterval = videoTask
           ? (captureMode === 'auto' ? computeAutoInterval(videoDuration) : frameInterval)
           : undefined
@@ -887,8 +891,10 @@ export function AddMaterialModal({
             summary: {
               embed_frames: videoTask ? embedFrames : false,
               summary_template: noteStyle,
-              diarize: diarizeOn,
+              diarize: resolvedNoteType === 'mixed' ? true : diarizeOn,
             },
+            // 混合笔记：标记 note_media_kind
+            ...(resolvedNoteType === 'mixed' ? { note_media_kind: 'mixed' } : {}),
             // 复刻二级类型（后端 /start 透传到 payload）
             ...(selectedAction === 'replica' ? { replica_kind: replicaKind } : {}),
           },
@@ -943,7 +949,7 @@ export function AddMaterialModal({
         wsId, effectiveUrl, effectiveSniff?.title ?? undefined,
         embedFrames, selectedAction === 'replica' ? 'replica_prompt' : 'vision', effInterval, effVisionModel,
         selectedAction === 'replica' ? 'replica' : 'note', selectedNoteType,
-        { diarize: diarizeOn, summary_template: noteStyle, user_notes: userNotes, ...(selectedAction === 'replica' ? { replica_kind: replicaKind } : {}) },
+        { diarize: selectedNoteType === 'mixed' ? true : diarizeOn, summary_template: noteStyle, user_notes: userNotes, ...(selectedAction === 'replica' ? { replica_kind: replicaKind } : {}), ...(selectedNoteType === 'mixed' ? { note_media_kind: 'mixed' } : {}) },
       )
       toast.success(selectedAction === 'replica' ? '复刻任务已创建' : '笔记生成中', { description: `${result.item_type} · ${effectiveUrl}` })
 
